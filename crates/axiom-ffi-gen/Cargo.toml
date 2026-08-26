@@ -1,0 +1,8 @@
+[package]
+name = "axiom-ffi-gen"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axiom-ast = { path = "../axiom-ast" }
+axiom-parser = { path = "../axiom-parser" }
