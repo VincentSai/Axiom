@@ -8,6 +8,7 @@ members = [
     "crates/axiom-cli",
     "crates/axiom-smt",
     "crates/axiom-diagnostics",
+    "crates/axiom-db",
 ]
 resolver = "2"
 
