@@ -1,0 +1,65 @@
+﻿// ==========================================
+// 示例 2: 跨平台无锁游戏主循环 (game_loop.ax)
+// 展示状态不可变性与图形/输入/音频 Effect 隔离
+// ==========================================
+
+type Vector2 = {
+    x: Float,
+    y: Float,
+}
+
+type Entity = {
+    id: Int,
+    pos: Vector2,
+    velocity: Vector2,
+    hp: Int,
+}
+
+type WorldState = {
+    frame: Int,
+    player: Entity,
+    enemies: List<Entity>,
+}
+
+// 跨端渲染与输入副作用
+effect Render {
+    fn draw_sprite(id: Int, pos: Vector2): ()
+    fn clear_screen(): ()
+}
+
+effect Input {
+    fn get_movement_axis(): Vector2
+}
+
+// 纯计算物理更新函数 (无副作用，AI 秒级生成与单测)
+fn update_physics(entity: Entity, dt: Float) -> Entity {
+    let new_pos = Vector2 {
+        x: entity.pos.x + entity.velocity.x * dt,
+        y: entity.pos.y + entity.velocity.y * dt,
+    };
+    { ...entity, pos: new_pos }
+}
+
+// 游戏单帧步进 (自包含状态机)
+fn tick_frame(world: WorldState, dt: Float) -> WorldState 
+    with [Render, Input]
+{
+    let move_dir = Input.get_movement_axis();
+    
+    // 更新玩家速度与位置
+    let updated_player = update_physics(
+        { ...world.player, velocity: move_dir }, 
+        dt
+    );
+
+    // 渲染
+    Render.clear_screen();
+    Render.draw_sprite(updated_player.id, updated_player.pos);
+
+    // 产出下一帧全新不可变状态
+    WorldState {
+        frame: world.frame + 1,
+        player: updated_player,
+        enemies: world.enemies,
+    }
+}

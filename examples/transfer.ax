@@ -1,0 +1,94 @@
+﻿// ==========================================
+// 示例 1: 银行账户转账服务 (transfer.ax)
+// 展示纯函数、ADT、代数效应、契约与打洞协作
+// ==========================================
+
+// 1. 不可变领域模型
+type Account = {
+    id: Int,
+    owner: String,
+    balance: Decimal,
+}
+
+type TransferReceipt = {
+    tx_id: String,
+    from_id: Int,
+    to_id: Int,
+    amount: Decimal,
+    timestamp: Int,
+}
+
+type TransferError =
+    | AccountNotFound(id: Int)
+    | InsufficientBalance(required: Decimal, available: Decimal)
+    | SameAccountTransfer
+
+// 2. 外部副作用声明 (代数效应)
+effect Database {
+    fn find_account(id: Int): Option<Account>
+    fn update_account(account: Account): Result<(), String>
+}
+
+effect Clock {
+    fn now_timestamp(): Int
+}
+
+effect Log {
+    fn info(msg: String): ()
+}
+
+// 3. 业务转账逻辑 (架构师定义带契约骨架)
+fn execute_transfer(
+    from_id: Int, 
+    to_id: Int, 
+    amount: Decimal
+) -> Result<TransferReceipt, TransferError>
+    with [Database, Clock, Log]
+    requires {
+        amount > 0.0,
+        from_id != to_id,
+    }
+    ensures {
+        // 确保转账成功后返回值有效
+        result is Ok => true
+    }
+{
+    // 读取转出账户
+    let from_acc = match Database.find_account(from_id) {
+        Some(acc) => acc,
+        None => return Err(TransferError.AccountNotFound(from_id)),
+    };
+
+    // 读取转入账户
+    let to_acc = match Database.find_account(to_id) {
+        Some(acc) => acc,
+        None => return Err(TransferError.AccountNotFound(to_id)),
+    };
+
+    // 余额检查
+    if from_acc.balance < amount {
+        return Err(TransferError.InsufficientBalance(
+            required: amount, 
+            available: from_acc.balance
+        ));
+    }
+
+    // 不可变更新 (纯数据变换)
+    let new_from = { ...from_acc, balance: from_acc.balance - amount };
+    let new_to = { ...to_acc, balance: to_acc.balance + amount };
+
+    // 提交副作用
+    Database.update_account(new_from);
+    Database.update_account(new_to);
+
+    let ts = Clock.now_timestamp();
+    Log.info("Transfer completed successfully");
+
+    Ok(TransferReceipt {
+        tx_id: "TX_" + ts.to_string(),
+        from_id: from_id,
+        to_id: to_id,
+        amount: amount,
+        timestamp: ts,
+    })
+}
