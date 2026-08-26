@@ -8,6 +8,7 @@ name = "axiom"
 path = "src/main.rs"
 
 [dependencies]
+axiom-diagnostics = { path = "../axiom-diagnostics" }
 axiom-hole-extractor = { path = "../axiom-hole-extractor" }
 axiom-parser = { path = "../axiom-parser" }
 axiom-transpiler = { path = "../axiom-transpiler" }

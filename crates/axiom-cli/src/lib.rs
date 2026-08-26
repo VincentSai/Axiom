@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use axiom_diagnostics::{diagnose_source, DiagnosticStatus};
 use axiom_hole_extractor::{extract_holes, HoleTask};
 use axiom_parser::{parse_module, ParseError};
 use axiom_transpiler::{transpile_source_to_rust, TranspileError};
@@ -24,6 +25,15 @@ pub struct Cli {
 pub enum Commands {
     /// Parse an Axiom source file and report its unresolved holes.
     Check { file: PathBuf },
+
+    /// Verify contracts and effects with SMT solver and counter-example generator.
+    Verify {
+        file: PathBuf,
+
+        /// Output results as JSON for machine consumption / multi-agent self-healing.
+        #[arg(long)]
+        json: bool,
+    },
 
     /// Extract implementation-hole tasks as JSON.
     ExtractHoles {
@@ -77,6 +87,7 @@ pub enum CliError {
         source: io::Error,
     },
     ProgramFailed(Option<i32>),
+    VerificationFailed,
 }
 
 impl fmt::Display for CliError {
@@ -89,7 +100,7 @@ impl fmt::Display for CliError {
                 write!(formatter, "could not parse `{}`: {source}", path.display())
             }
             Self::Serialize(source) => {
-                write!(formatter, "could not serialize hole tasks: {source}")
+                write!(formatter, "could not serialize: {source}")
             }
             Self::CreateDirectory { path, source } => write!(
                 formatter,
@@ -120,6 +131,7 @@ impl fmt::Display for CliError {
             Self::ProgramFailed(code) => {
                 write!(formatter, "program failed with {}", format_exit_code(*code))
             }
+            Self::VerificationFailed => write!(formatter, "verification failed with diagnostics"),
         }
     }
 }
@@ -135,7 +147,9 @@ impl Error for CliError {
             Self::Parse { source, .. } => Some(source),
             Self::Serialize(source) => Some(source),
             Self::Transpile { source, .. } => Some(source),
-            Self::RustCompilationFailed(_) | Self::ProgramFailed(_) => None,
+            Self::RustCompilationFailed(_) | Self::ProgramFailed(_) | Self::VerificationFailed => {
+                None
+            }
         }
     }
 }
@@ -143,6 +157,7 @@ impl Error for CliError {
 pub fn run(cli: Cli) -> Result<(), CliError> {
     match cli.command {
         Commands::Check { file } => check(&file),
+        Commands::Verify { file, json } => verify(&file, json),
         Commands::ExtractHoles { file, out_dir } => extract(&file, out_dir.as_deref()),
         Commands::EmitRust { file, output } => emit_rust(&file, output.as_deref()),
         Commands::Run { file } => compile_and_run(&file),
@@ -166,6 +181,41 @@ fn check(file: &Path) -> Result<(), CliError> {
         hole_count
     );
     Ok(())
+}
+
+fn verify(file: &Path, json: bool) -> Result<(), CliError> {
+    let source = read_source(file)?;
+    let reports = diagnose_source(&source);
+    let all_verified = reports.iter().all(|r| r.status == DiagnosticStatus::Verified);
+
+    if json {
+        let json_text = serde_json::to_string_pretty(&reports).map_err(CliError::Serialize)?;
+        println!("{json_text}");
+    } else {
+        println!("Verifying `{}`...", file.display());
+        for r in &reports {
+            match r.status {
+                DiagnosticStatus::Verified => {
+                    println!("  [VERIFIED] {}", r.function_name.as_deref().unwrap_or("module"));
+                }
+                _ => {
+                    println!("  [{:?}] {}", r.status, r.diagnosis);
+                    if let Some(ce) = &r.counter_example {
+                        println!("    Counter-Example: {ce:?}");
+                    }
+                    if !r.suggested_action.is_empty() {
+                        println!("    Suggested Action: {}", r.suggested_action);
+                    }
+                }
+            }
+        }
+    }
+
+    if all_verified {
+        Ok(())
+    } else {
+        Err(CliError::VerificationFailed)
+    }
 }
 
 fn extract(file: &Path, out_dir: Option<&Path>) -> Result<(), CliError> {

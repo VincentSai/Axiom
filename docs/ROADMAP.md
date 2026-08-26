@@ -10,9 +10,10 @@
 - [x] 构建 CLI 工具链并完成端到端全流程验证 (`axiom-cli`, 35 个全量测试 100% 通过)
 
 ## 阶段二：Effect 系统与契约验证 (Q2)
-- [ ] 实现代数效应 (Algebraic Effects) 的编译期隔离与分发
-- [ ] 集成轻量 SMT 求解器（如 Z3 绑定），实现 `requires` / `ensures` 静态反例生成
-- [ ] 实现结构化机器报错诊断协议 (JSON-based Diagnostics)
+- [x] 实现代数效应 (Algebraic Effects) 的编译期隔离与分发 (`axiom-effects`)
+- [x] 轻量纯 Rust SMT / 符号求解器，实现 `requires` / `ensures` 静态反例生成 (`axiom-smt`)
+- [x] 实现结构化机器报错诊断协议 (JSON-based Diagnostics) (`axiom-diagnostics`)
+- [x] CLI `axiom verify` 静态形式化验证与 Agent 自愈闭环 (`axiom-cli`, 52 个全量测试 100% 通过)
 
 ## 阶段三：内容寻址 AST 代码库与多 Agent 协同 (Q3)
 - [ ] 实现基于 SQLite / LMDB 的 AST 节点哈希持久化存储引擎
