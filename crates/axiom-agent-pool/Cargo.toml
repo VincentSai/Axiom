@@ -1,0 +1,13 @@
+[package]
+name = "axiom-agent-pool"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axiom-ast = { path = "../axiom-ast" }
+axiom-hole-extractor = { path = "../axiom-hole-extractor" }
+axiom-parser = { path = "../axiom-parser" }
+axiom-smt = { path = "../axiom-smt" }
+
+[dev-dependencies]
+axiom-transpiler = { path = "../axiom-transpiler" }
