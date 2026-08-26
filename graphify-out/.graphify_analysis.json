@@ -1,0 +1,343 @@
+{
+  "communities": {
+    "0": [
+      "crates_axiom_parser_src_lib_parseerror",
+      "crates_axiom_parser_src_lib_parseerror_fmt",
+      "crates_axiom_parser_src_lib_parser_a",
+      "crates_axiom_parser_src_lib_parser_a_bump_char",
+      "crates_axiom_parser_src_lib_parser_a_capture_block_contents",
+      "crates_axiom_parser_src_lib_parser_a_consume_char",
+      "crates_axiom_parser_src_lib_parser_a_consume_text",
+      "crates_axiom_parser_src_lib_parser_a_error",
+      "crates_axiom_parser_src_lib_parser_a_expect_char",
+      "crates_axiom_parser_src_lib_parser_a_expect_text",
+      "crates_axiom_parser_src_lib_parser_a_expect_word",
+      "crates_axiom_parser_src_lib_parser_a_format_type",
+      "crates_axiom_parser_src_lib_parser_a_is_at_end",
+      "crates_axiom_parser_src_lib_parser_a_new",
+      "crates_axiom_parser_src_lib_parser_a_parse_additive",
+      "crates_axiom_parser_src_lib_parser_a_parse_block_contents",
+      "crates_axiom_parser_src_lib_parser_a_parse_call",
+      "crates_axiom_parser_src_lib_parser_a_parse_comparison",
+      "crates_axiom_parser_src_lib_parser_a_parse_contract_block",
+      "crates_axiom_parser_src_lib_parser_a_parse_effect",
+      "crates_axiom_parser_src_lib_parser_a_parse_enum_type_definition",
+      "crates_axiom_parser_src_lib_parser_a_parse_expression",
+      "crates_axiom_parser_src_lib_parser_a_parse_function",
+      "crates_axiom_parser_src_lib_parser_a_parse_ident",
+      "crates_axiom_parser_src_lib_parser_a_parse_implication",
+      "crates_axiom_parser_src_lib_parser_a_parse_literal_pattern_from_expr",
+      "crates_axiom_parser_src_lib_parser_a_parse_logical_and",
+      "crates_axiom_parser_src_lib_parser_a_parse_match",
+      "crates_axiom_parser_src_lib_parser_a_parse_multiplicative",
+      "crates_axiom_parser_src_lib_parser_a_parse_number",
+      "crates_axiom_parser_src_lib_parser_a_parse_params",
+      "crates_axiom_parser_src_lib_parser_a_parse_pattern",
+      "crates_axiom_parser_src_lib_parser_a_parse_primary",
+      "crates_axiom_parser_src_lib_parser_a_parse_record_fields",
+      "crates_axiom_parser_src_lib_parser_a_parse_string",
+      "crates_axiom_parser_src_lib_parser_a_parse_type",
+      "crates_axiom_parser_src_lib_parser_a_parse_type_definition",
+      "crates_axiom_parser_src_lib_parser_a_parse_unary",
+      "crates_axiom_parser_src_lib_parser_a_peek_char",
+      "crates_axiom_parser_src_lib_parser_a_skip_whitespace",
+      "crates_axiom_parser_src_lib_parser_a_starts_word",
+      "crates_axiom_parser_src_lib_rs_display",
+      "crates_axiom_parser_src_lib_rs_error",
+      "crates_axiom_parser_src_lib_rs_formatter",
+      "crates_axiom_parser_src_lib_rs_option",
+      "crates_axiom_parser_src_lib_rs_result",
+      "crates_axiom_parser_src_lib_rs_self",
+      "crates_axiom_parser_src_lib_rs_string",
+      "crates_axiom_parser_src_lib_rs_vec",
+      "into"
+    ],
+    "1": [
+      "crates_axiom_parser_src_lib",
+      "crates_axiom_parser_src_lib_parse_expr",
+      "crates_axiom_parser_src_lib_parse_module",
+      "crates_axiom_parser_src_lib_parser",
+      "crates_axiom_parser_tests_adt_and_match_test",
+      "crates_axiom_parser_tests_adt_and_match_test_parses_chained_field_access",
+      "crates_axiom_parser_tests_adt_and_match_test_parses_enum_type_with_payload_and_unit_variants",
+      "crates_axiom_parser_tests_adt_and_match_test_parses_exhaustive_match_with_destructuring",
+      "crates_axiom_parser_tests_adt_and_match_test_parses_generic_type_annotations",
+      "crates_axiom_parser_tests_adt_and_match_test_parses_immutable_record_update",
+      "crates_axiom_parser_tests_adt_and_match_test_parses_literal_patterns",
+      "crates_axiom_parser_tests_adt_and_match_test_parses_named_record_construction",
+      "crates_axiom_parser_tests_adt_and_match_test_parses_record_type_definition",
+      "crates_axiom_parser_tests_effects_and_contracts_test",
+      "crates_axiom_parser_tests_effects_and_contracts_test_parses_effect_operations_with_both_return_syntaxes_and_separators",
+      "crates_axiom_parser_tests_effects_and_contracts_test_parses_effects_and_contracts_from_transfer_example",
+      "crates_axiom_parser_tests_effects_and_contracts_test_parses_function_effect_dependencies_and_contracts",
+      "crates_axiom_parser_tests_effects_and_contracts_test_parses_top_level_effects_and_functions_in_any_order",
+      "crates_axiom_parser_tests_hole_syntax_test",
+      "crates_axiom_parser_tests_hole_syntax_test_parses_hole_as_function_body",
+      "crates_axiom_parser_tests_hole_syntax_test_parses_named_hole_expression",
+      "crates_axiom_parser_tests_pure_func_test",
+      "crates_axiom_parser_tests_pure_func_test_ignores_comments_and_parses_multiple_functions",
+      "crates_axiom_parser_tests_pure_func_test_parses_boolean_comparison_function",
+      "crates_axiom_parser_tests_pure_func_test_parses_calls_unary_operators_and_core_literals",
+      "crates_axiom_parser_tests_pure_func_test_parses_decimal_string_unit_and_custom_types",
+      "crates_axiom_parser_tests_pure_func_test_parses_let_bindings_and_block_result",
+      "crates_axiom_parser_tests_pure_func_test_parses_nested_arithmetic_with_precedence",
+      "crates_axiom_parser_tests_pure_func_test_parses_simple_arithmetic_function",
+      "crates_axiom_parser_tests_pure_func_test_reports_illegal_token_location",
+      "crates_axiom_parser_tests_pure_func_test_reports_missing_closing_parenthesis",
+      "crates_axiom_parser_tests_pure_func_test_separates_block_statements_and_preserves_tail_expression",
+      "crates_axiom_parser_tests_pure_func_test_treats_explicit_return_as_block_result"
+    ],
+    "2": [
+      "crates_axiom_cli_src_lib",
+      "crates_axiom_cli_src_lib_check",
+      "crates_axiom_cli_src_lib_cli",
+      "crates_axiom_cli_src_lib_clierror",
+      "crates_axiom_cli_src_lib_clierror_fmt",
+      "crates_axiom_cli_src_lib_clierror_source",
+      "crates_axiom_cli_src_lib_commands",
+      "crates_axiom_cli_src_lib_compile_and_run",
+      "crates_axiom_cli_src_lib_emit_rust",
+      "crates_axiom_cli_src_lib_extract",
+      "crates_axiom_cli_src_lib_format_exit_code",
+      "crates_axiom_cli_src_lib_read_source",
+      "crates_axiom_cli_src_lib_rs_display",
+      "crates_axiom_cli_src_lib_rs_drop",
+      "crates_axiom_cli_src_lib_rs_error",
+      "crates_axiom_cli_src_lib_rs_formatter",
+      "crates_axiom_cli_src_lib_rs_option",
+      "crates_axiom_cli_src_lib_rs_path",
+      "crates_axiom_cli_src_lib_rs_pathbuf",
+      "crates_axiom_cli_src_lib_rs_result",
+      "crates_axiom_cli_src_lib_rs_self",
+      "crates_axiom_cli_src_lib_rs_string",
+      "crates_axiom_cli_src_lib_run",
+      "crates_axiom_cli_src_lib_temporarybuilddirectory",
+      "crates_axiom_cli_src_lib_temporarybuilddirectory_create",
+      "crates_axiom_cli_src_lib_temporarybuilddirectory_drop",
+      "crates_axiom_cli_src_lib_write_hole_tasks"
+    ],
+    "3": [
+      "crates_axiom_transpiler_src_lib",
+      "crates_axiom_transpiler_src_lib_binary_operator",
+      "crates_axiom_transpiler_src_lib_find_record_type_for_expr",
+      "crates_axiom_transpiler_src_lib_rs_display",
+      "crates_axiom_transpiler_src_lib_rs_error",
+      "crates_axiom_transpiler_src_lib_rs_formatter",
+      "crates_axiom_transpiler_src_lib_rs_option",
+      "crates_axiom_transpiler_src_lib_rs_result",
+      "crates_axiom_transpiler_src_lib_rs_self",
+      "crates_axiom_transpiler_src_lib_rs_string",
+      "crates_axiom_transpiler_src_lib_rust_type",
+      "crates_axiom_transpiler_src_lib_transpile_expr",
+      "crates_axiom_transpiler_src_lib_transpile_function",
+      "crates_axiom_transpiler_src_lib_transpile_literal",
+      "crates_axiom_transpiler_src_lib_transpile_pattern",
+      "crates_axiom_transpiler_src_lib_transpile_source_to_rust",
+      "crates_axiom_transpiler_src_lib_transpile_to_rust",
+      "crates_axiom_transpiler_src_lib_transpile_type_definition",
+      "crates_axiom_transpiler_src_lib_transpileerror",
+      "crates_axiom_transpiler_src_lib_transpileerror_fmt",
+      "crates_axiom_transpiler_src_lib_transpileerror_from",
+      "crates_axiom_transpiler_src_lib_transpileerror_source",
+      "crates_axiom_transpiler_tests_transpiler_test",
+      "crates_axiom_transpiler_tests_transpiler_test_transpiles_primitive_function_signatures_and_expressions",
+      "crates_axiom_transpiler_tests_transpiler_test_transpiles_record_and_enum_definitions",
+      "crates_axiom_transpiler_tests_transpiler_test_transpiles_record_construction_update_and_match",
+      "from"
+    ],
+    "4": [
+      "crates_axiom_hole_extractor_src_lib",
+      "crates_axiom_hole_extractor_src_lib_build_task",
+      "crates_axiom_hole_extractor_src_lib_collect_hole_ids",
+      "crates_axiom_hole_extractor_src_lib_contracts",
+      "crates_axiom_hole_extractor_src_lib_extract_holes",
+      "crates_axiom_hole_extractor_src_lib_extract_holes_from_source",
+      "crates_axiom_hole_extractor_src_lib_format_expr",
+      "crates_axiom_hole_extractor_src_lib_format_expr_at_precedence",
+      "crates_axiom_hole_extractor_src_lib_format_literal",
+      "crates_axiom_hole_extractor_src_lib_format_pattern",
+      "crates_axiom_hole_extractor_src_lib_format_type",
+      "crates_axiom_hole_extractor_src_lib_holeparameter",
+      "crates_axiom_hole_extractor_src_lib_holetask",
+      "crates_axiom_hole_extractor_src_lib_holetask_to_json",
+      "crates_axiom_hole_extractor_src_lib_holetask_to_json_pretty",
+      "crates_axiom_hole_extractor_src_lib_rs_result",
+      "crates_axiom_hole_extractor_src_lib_rs_string",
+      "crates_axiom_hole_extractor_src_lib_rs_vec",
+      "crates_axiom_hole_extractor_tests_hole_extraction_test",
+      "crates_axiom_hole_extractor_tests_hole_extraction_test_extracts_multiple_holes_nested_in_a_function_body",
+      "crates_axiom_hole_extractor_tests_hole_extraction_test_extracts_parameters_contracts_and_allowed_effects",
+      "crates_axiom_hole_extractor_tests_hole_extraction_test_extracts_single_hole_as_structured_task_and_json"
+    ],
+    "5": [
+      "box",
+      "crates_axiom_ast_src_lib",
+      "crates_axiom_ast_src_lib_binaryoperator",
+      "crates_axiom_ast_src_lib_effectdecl",
+      "crates_axiom_ast_src_lib_effectop",
+      "crates_axiom_ast_src_lib_expr",
+      "crates_axiom_ast_src_lib_fielddef",
+      "crates_axiom_ast_src_lib_functiondecl",
+      "crates_axiom_ast_src_lib_functionparam",
+      "crates_axiom_ast_src_lib_literal",
+      "crates_axiom_ast_src_lib_matcharm",
+      "crates_axiom_ast_src_lib_module",
+      "crates_axiom_ast_src_lib_pattern",
+      "crates_axiom_ast_src_lib_rs_option",
+      "crates_axiom_ast_src_lib_rs_string",
+      "crates_axiom_ast_src_lib_rs_vec",
+      "crates_axiom_ast_src_lib_type",
+      "crates_axiom_ast_src_lib_typedef",
+      "crates_axiom_ast_src_lib_unaryoperator",
+      "crates_axiom_ast_src_lib_variantdef"
+    ],
+    "6": [
+      "crates_axiom_cli_tests_e2e_pipeline_test",
+      "crates_axiom_cli_tests_e2e_pipeline_test_assert_success",
+      "crates_axiom_cli_tests_e2e_pipeline_test_axiom",
+      "crates_axiom_cli_tests_e2e_pipeline_test_check_extract_holes_and_emit_rust_report_invalid_inputs",
+      "crates_axiom_cli_tests_e2e_pipeline_test_cli_happy_paths_cover_check_stdout_json_emit_and_run",
+      "crates_axiom_cli_tests_e2e_pipeline_test_extracts_transfer_implementation_as_schema_compliant_json",
+      "crates_axiom_cli_tests_e2e_pipeline_test_filled_axiom_source_emits_rust_that_compiles_and_runs",
+      "crates_axiom_cli_tests_e2e_pipeline_test_path_text",
+      "crates_axiom_cli_tests_e2e_pipeline_test_rs_drop",
+      "crates_axiom_cli_tests_e2e_pipeline_test_rs_path",
+      "crates_axiom_cli_tests_e2e_pipeline_test_rs_pathbuf",
+      "crates_axiom_cli_tests_e2e_pipeline_test_rs_self",
+      "crates_axiom_cli_tests_e2e_pipeline_test_testdirectory",
+      "crates_axiom_cli_tests_e2e_pipeline_test_testdirectory_drop",
+      "crates_axiom_cli_tests_e2e_pipeline_test_testdirectory_new",
+      "crates_axiom_cli_tests_e2e_pipeline_test_testdirectory_path",
+      "crates_axiom_cli_tests_e2e_pipeline_test_testdirectory_write",
+      "output"
+    ],
+    "7": [
+      "crates_axiom_cli_src_main",
+      "crates_axiom_cli_src_main_main",
+      "exitcode"
+    ]
+  },
+  "cohesion": {
+    "0": 0.21959183673469387,
+    "1": 0.10037878787878787,
+    "2": 0.19943019943019943,
+    "3": 0.1623931623931624,
+    "4": 0.2077922077922078,
+    "5": 0.3,
+    "6": 0.28104575163398693,
+    "7": 1.0
+  },
+  "gods": [
+    {
+      "id": "crates_axiom_parser_src_lib_parseerror",
+      "label": "ParseError",
+      "degree": 40
+    },
+    {
+      "id": "crates_axiom_parser_src_lib_parser_a",
+      "label": "Parser<'a>",
+      "degree": 38
+    },
+    {
+      "id": "crates_axiom_parser_src_lib_parse_module",
+      "label": "parse_module()",
+      "degree": 33
+    },
+    {
+      "id": "crates_axiom_ast_src_lib_expr",
+      "label": "Expr",
+      "degree": 32
+    },
+    {
+      "id": "crates_axiom_cli_src_lib_clierror",
+      "label": "CliError",
+      "degree": 17
+    },
+    {
+      "id": "crates_axiom_parser_src_lib_parse_expr",
+      "label": "parse_expr()",
+      "degree": 17
+    },
+    {
+      "id": "crates_axiom_transpiler_src_lib_transpileerror",
+      "label": "TranspileError",
+      "degree": 14
+    },
+    {
+      "id": "crates_axiom_ast_src_lib_module",
+      "label": "Module",
+      "degree": 11
+    },
+    {
+      "id": "crates_axiom_hole_extractor_src_lib_holetask",
+      "label": "HoleTask",
+      "degree": 11
+    },
+    {
+      "id": "crates_axiom_transpiler_src_lib_transpile_source_to_rust",
+      "label": "transpile_source_to_rust()",
+      "degree": 11
+    }
+  ],
+  "surprises": [
+    {
+      "source": "check()",
+      "target": "extract_holes()",
+      "source_files": [
+        "crates/axiom-cli/src/lib.rs",
+        "crates/axiom-hole-extractor/src/lib.rs"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "check()",
+      "target": "parse_module()",
+      "source_files": [
+        "crates/axiom-cli/src/lib.rs",
+        "crates/axiom-parser/src/lib.rs"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "extract()",
+      "target": "extract_holes()",
+      "source_files": [
+        "crates/axiom-cli/src/lib.rs",
+        "crates/axiom-hole-extractor/src/lib.rs"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "extract()",
+      "target": "parse_module()",
+      "source_files": [
+        "crates/axiom-cli/src/lib.rs",
+        "crates/axiom-parser/src/lib.rs"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    },
+    {
+      "source": "emit_rust()",
+      "target": "transpile_source_to_rust()",
+      "source_files": [
+        "crates/axiom-cli/src/lib.rs",
+        "crates/axiom-transpiler/src/lib.rs"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; bridges separate communities"
+    }
+  ],
+  "tokens": {
+    "input": 0,
+    "output": 0
+  }
+}

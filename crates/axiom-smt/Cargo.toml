@@ -1,0 +1,10 @@
+[package]
+name = "axiom-smt"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axiom-ast = { path = "../axiom-ast" }
+
+[dev-dependencies]
+axiom-parser = { path = "../axiom-parser" }
