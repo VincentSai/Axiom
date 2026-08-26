@@ -1,0 +1,9 @@
+[package]
+name = "axiom-vfs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axiom-ast = { path = "../axiom-ast" }
+axiom-db = { path = "../axiom-db" }
+axiom-parser = { path = "../axiom-parser" }

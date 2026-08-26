@@ -388,7 +388,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_implication(&mut self) -> Result<Expr, ParseError> {
-        let left = self.parse_logical_and()?;
+        let left = self.parse_logical_or()?;
         if self.consume_text("=>") {
             return Ok(Expr::BinaryOp {
                 left: Box::new(left),
@@ -397,6 +397,18 @@ impl<'a> Parser<'a> {
             });
         }
         Ok(left)
+    }
+
+    fn parse_logical_or(&mut self) -> Result<Expr, ParseError> {
+        let mut expression = self.parse_logical_and()?;
+        while self.consume_text("||") {
+            expression = Expr::BinaryOp {
+                left: Box::new(expression),
+                op: BinaryOperator::Or,
+                right: Box::new(self.parse_logical_and()?),
+            };
+        }
+        Ok(expression)
     }
 
     fn parse_logical_and(&mut self) -> Result<Expr, ParseError> {
