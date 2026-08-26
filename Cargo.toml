@@ -3,6 +3,7 @@ members = [
     "crates/axiom-ast",
     "crates/axiom-parser",
     "crates/axiom-hole-extractor",
+    "crates/axiom-transpiler",
 ]
 resolver = "2"
 
