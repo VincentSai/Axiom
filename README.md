@@ -77,3 +77,26 @@ fn level_up(player: Player, bonus: Int) -> Player
     ?level_up_implementation
 }
 ```
+
+## CLI 快速上手
+
+从 workspace 根目录运行：
+
+```powershell
+# 检查语法并报告未填 hole 数量
+cargo run -p axiom-cli -- check examples/transfer.ax
+
+# 将 hole 任务作为 JSON 输出到终端，或分别写入指定目录
+cargo run -p axiom-cli -- extract-holes examples/transfer.ax
+cargo run -p axiom-cli -- extract-holes examples/transfer.ax --out-dir .scratch/hole-tasks
+
+# 将无 hole 的 Axiom 源码转译为 Rust
+cargo run -p axiom-cli -- emit-rust path/to/program.ax -o program.rs
+
+# 转译、使用 rustc 编译并运行包含 `fn main()` 的 Axiom 程序
+cargo run -p axiom-cli -- run path/to/program.ax
+```
+
+`check` 接受仍包含 hole 的合法源码，并在摘要中报告 hole 数量；`emit-rust` 和
+`run` 会拒绝未填 hole。所有失败都会向 stderr 输出带源码路径和解析位置的诊断，
+并返回非零退出码。
