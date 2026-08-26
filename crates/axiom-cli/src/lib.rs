@@ -1,4 +1,4 @@
-//! Command-line entry points for the Axiom toolchain.
+﻿//! Command-line entry points for the Axiom toolchain.
 
 use std::error::Error;
 use std::fmt;
@@ -10,10 +10,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use axiom_db::{AstDatabase, DbError, NodeHash};
 use axiom_diagnostics::{diagnose_source, DiagnosticStatus};
+use axiom_ffi_gen::{
+    generate_c_abi_rust_glue, generate_c_header_from_source, generate_typescript_from_source,
+    FfiError,
+};
 use axiom_hole_extractor::{extract_holes, HoleTask};
 use axiom_parser::{parse_module, ParseError};
 use axiom_transpiler::{transpile_source_to_rust, TranspileError};
 use axiom_vfs::{export_database_module, sync_source_to_database, VfsError};
+use axiom_wit::{generate_wit_from_source, WitError};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -57,6 +62,50 @@ pub enum Commands {
 
     /// Transpile, compile, and execute a hole-free Axiom program.
     Run { file: PathBuf },
+
+    /// Generate a WebAssembly Component Model interface.
+    ExportWit {
+        file: PathBuf,
+
+        /// Write generated WIT to a file instead of stdout.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// WIT package ID. Defaults to the source file name in the `axiom` namespace.
+        #[arg(long)]
+        package: Option<String>,
+    },
+
+    /// Generate TypeScript declarations, C header files, or Rust C-ABI glue.
+    ExportFfi {
+        file: PathBuf,
+
+        /// Target language: `ts`, `c`, or `rust`.
+        #[arg(long)]
+        lang: String,
+
+        /// Write generated bindings to a file instead of stdout.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Custom header guard name (for C headers).
+        #[arg(long)]
+        guard: Option<String>,
+    },
+
+    /// Scaffold a new Axiom project structure.
+    Scaffold {
+        /// Name of the new Axiom project.
+        name: String,
+
+        /// Project target template: `web`, `native`, or `ffi`.
+        #[arg(long, default_value = "web")]
+        target: String,
+
+        /// Output directory where project files will be generated.
+        #[arg(long)]
+        out_dir: Option<PathBuf>,
+    },
 
     /// Store and retrieve content-addressed modules in the AST database.
     Db {
@@ -126,6 +175,9 @@ pub enum CliError {
         source: DbError,
     },
     DatabaseProjection(VfsError),
+    Wit(WitError),
+    Ffi(FfiError),
+    InvalidFfiLanguage(String),
 }
 
 impl fmt::Display for CliError {
@@ -178,6 +230,11 @@ impl fmt::Display for CliError {
                 )
             }
             Self::DatabaseProjection(source) => write!(formatter, "{source}"),
+            Self::Wit(source) => write!(formatter, "could not generate WIT: {source}"),
+            Self::Ffi(source) => write!(formatter, "could not generate FFI bindings: {source}"),
+            Self::InvalidFfiLanguage(lang) => {
+                write!(formatter, "unsupported FFI target language `{lang}` (supported: ts, c, rust)")
+            }
         }
     }
 }
@@ -195,9 +252,12 @@ impl Error for CliError {
             Self::Transpile { source, .. } => Some(source),
             Self::OpenDatabase { source, .. } => Some(source),
             Self::DatabaseProjection(source) => Some(source),
-            Self::RustCompilationFailed(_) | Self::ProgramFailed(_) | Self::VerificationFailed => {
-                None
-            }
+            Self::Wit(source) => Some(source),
+            Self::Ffi(source) => Some(source),
+            Self::InvalidFfiLanguage(_)
+            | Self::RustCompilationFailed(_)
+            | Self::ProgramFailed(_)
+            | Self::VerificationFailed => None,
         }
     }
 }
@@ -209,6 +269,22 @@ pub fn run(cli: Cli) -> Result<(), CliError> {
         Commands::ExtractHoles { file, out_dir } => extract(&file, out_dir.as_deref()),
         Commands::EmitRust { file, output } => emit_rust(&file, output.as_deref()),
         Commands::Run { file } => compile_and_run(&file),
+        Commands::ExportWit {
+            file,
+            output,
+            package,
+        } => export_wit(&file, output.as_deref(), package.as_deref()),
+        Commands::ExportFfi {
+            file,
+            lang,
+            output,
+            guard,
+        } => export_ffi(&file, &lang, output.as_deref(), guard.as_deref()),
+        Commands::Scaffold {
+            name,
+            target,
+            out_dir,
+        } => scaffold(&name, &target, out_dir.as_deref()),
         Commands::Db { command } => match command {
             DatabaseCommands::Put { file, db } => database_put(&file, &db),
             DatabaseCommands::Export { hash, db, out } => {
@@ -216,6 +292,135 @@ pub fn run(cli: Cli) -> Result<(), CliError> {
             }
         },
     }
+}
+
+fn export_wit(
+    file: &Path,
+    output: Option<&Path>,
+    package: Option<&str>,
+) -> Result<(), CliError> {
+    let source = read_source(file)?;
+    let default_package = file
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .unwrap_or("component");
+    let wit = generate_wit_from_source(&source, package.unwrap_or(default_package))
+        .map_err(CliError::Wit)?;
+
+    if let Some(output) = output {
+        fs::write(output, wit).map_err(|source| CliError::WriteFile {
+            path: output.to_owned(),
+            source,
+        })?;
+    } else {
+        io::stdout()
+            .write_all(wit.as_bytes())
+            .map_err(|source| CliError::WriteFile {
+                path: PathBuf::from("<stdout>"),
+                source,
+            })?;
+    }
+    Ok(())
+}
+
+fn export_ffi(
+    file: &Path,
+    lang: &str,
+    output: Option<&Path>,
+    guard: Option<&str>,
+) -> Result<(), CliError> {
+    let source = read_source(file)?;
+    let code = match lang.to_ascii_lowercase().as_str() {
+        "ts" | "typescript" => {
+            generate_typescript_from_source(&source).map_err(CliError::Ffi)?
+        }
+        "c" | "header" => {
+            let default_guard = file
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("AXIOM_BINDINGS")
+                .to_ascii_uppercase()
+                + "_H";
+            generate_c_header_from_source(&source, guard.unwrap_or(&default_guard))
+                .map_err(CliError::Ffi)?
+        }
+        "rust" | "c-abi" => {
+            let module = parse_module(&source).map_err(|source| CliError::Parse {
+                path: file.to_owned(),
+                source,
+            })?;
+            generate_c_abi_rust_glue(&module).map_err(CliError::Ffi)?
+        }
+        other => return Err(CliError::InvalidFfiLanguage(other.to_string())),
+    };
+
+    if let Some(output) = output {
+        fs::write(output, code).map_err(|source| CliError::WriteFile {
+            path: output.to_owned(),
+            source,
+        })?;
+    } else {
+        io::stdout()
+            .write_all(code.as_bytes())
+            .map_err(|source| CliError::WriteFile {
+                path: PathBuf::from("<stdout>"),
+                source,
+            })?;
+    }
+    Ok(())
+}
+
+fn scaffold(name: &str, target: &str, out_dir: Option<&Path>) -> Result<(), CliError> {
+    let project_dir = match out_dir {
+        Some(dir) => dir.join(name),
+        None => PathBuf::from(name),
+    };
+    let src_dir = project_dir.join("src");
+
+    fs::create_dir_all(&src_dir).map_err(|source| CliError::CreateDirectory {
+        path: src_dir.clone(),
+        source,
+    })?;
+
+    let main_ax = format!(
+        r#"// {name} - Axiom Core Logic
+type State = {{ count: Int }}
+
+fn init() -> State {{
+    State {{ count: 0 }}
+}}
+
+fn increment(s: State) -> State
+    requires {{ s.count >= 0 }}
+    ensures {{ result.count > s.count }}
+{{
+    State {{ count: s.count + 1 }}
+}}
+"#
+    );
+
+    let config = format!(
+        r#"{{
+  "name": "{name}",
+  "version": "0.1.0",
+  "target": "{target}",
+  "main": "src/main.ax"
+}}
+"#
+    );
+
+    fs::write(src_dir.join("main.ax"), main_ax).map_err(|source| CliError::WriteFile {
+        path: src_dir.join("main.ax"),
+        source,
+    })?;
+
+    fs::write(project_dir.join("axiom.json"), config).map_err(|source| CliError::WriteFile {
+        path: project_dir.join("axiom.json"),
+        source,
+    })?;
+
+    println!("Scaffolded new Axiom project `{name}` ({target}) in {}", project_dir.display());
+    Ok(())
 }
 
 fn database_put(file: &Path, database_path: &Path) -> Result<(), CliError> {
