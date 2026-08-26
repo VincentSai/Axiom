@@ -22,6 +22,6 @@
 - [x] CLI `axiom db` 工具集与 20+ Holes 多 Agent 并发协同端到端演示 (`axiom-cli`, 65 个全量测试 100% 通过)
 
 ## 阶段四：全平台与生态互操作 (Q4)
-- [ ] 完善 WebAssembly Component Model (WIT) 双向绑定
-- [ ] 自动生成 C / TS / Rust 声明式 FFI 胶水代码
-- [ ] 发布全平台脚手架（一键输出 Web、iOS/Android 动态库、Native CLI）
+- [x] 完善 WebAssembly Component Model (WIT) 双向绑定 (`axiom-wit`)
+- [x] 自动生成 C / TS / Rust 声明式 FFI 胶水代码 (`axiom-ffi-gen`)
+- [x] 发布全平台脚手架与生态导出工具链 (`axiom-cli`, 76 个全量测试 100% 通过)

@@ -1,4 +1,4 @@
-﻿# Axiom: AI-Native 全平台并发编程语言
+# Axiom: AI-Native 全平台并发编程语言
 
 > **Axiom** 是一门专门为 **AI Agent 协作** 与 **全平台跨端发布** 量身设计的现代编程语言。  
 > 核心理念：消除代码冲突、杜绝隐式副作用、内置形式化契约与类型打洞、实现数十个 Agent 无锁并行编写。
@@ -78,25 +78,40 @@ fn level_up(player: Player, bonus: Int) -> Player
 }
 ```
 
-## CLI 快速上手
+## CLI 工具链完整指南
 
-从 workspace 根目录运行：
+从 workspace 根目录运行（或安装 `axiom` 二进制）：
 
 ```powershell
-# 检查语法并报告未填 hole 数量
+# 1. 语法检查与打洞统计
 cargo run -p axiom-cli -- check examples/transfer.ax
 
-# 将 hole 任务作为 JSON 输出到终端，或分别写入指定目录
+# 2. 静态 SMT 契约形式化验证（支持人类终端模式与 Agent 机器 JSON 自愈模式）
+cargo run -p axiom-cli -- verify examples/transfer.ax
+cargo run -p axiom-cli -- verify examples/transfer.ax --json
+
+# 3. 提取打洞任务派发 JSON
 cargo run -p axiom-cli -- extract-holes examples/transfer.ax
 cargo run -p axiom-cli -- extract-holes examples/transfer.ax --out-dir .scratch/hole-tasks
 
-# 将无 hole 的 Axiom 源码转译为 Rust
-cargo run -p axiom-cli -- emit-rust path/to/program.ax -o program.rs
+# 4. 内容寻址 AST 代码库 (ASTDB) 管理与虚拟源码投影
+cargo run -p axiom-cli -- db put examples/transfer.ax
+cargo run -p axiom-cli -- db export #mod_589e44855c2b4e0223acf6867cdd3c6f0947fb3a23d7afafbb62e7fbc044559a
 
-# 转译、使用 rustc 编译并运行包含 `fn main()` 的 Axiom 程序
-cargo run -p axiom-cli -- run path/to/program.ax
+# 5. WebAssembly Component Model (WIT) 契约导出
+cargo run -p axiom-cli -- export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
+
+# 6. 多语言 FFI 胶水代码与类型声明导出 (TypeScript .d.ts / C 头文件 .h / Rust C-ABI)
+cargo run -p axiom-cli -- export-ffi examples/game_loop.ax --lang ts -o game_loop.d.ts
+cargo run -p axiom-cli -- export-ffi examples/game_loop.ax --lang c -o game_loop.h
+cargo run -p axiom-cli -- export-ffi examples/game_loop.ax --lang rust -o game_loop_c_abi.rs
+
+# 7. 全平台工程脚手架一键生成
+cargo run -p axiom-cli -- scaffold my_game --target web --out-dir ./projects
+
+# 8. 转译至 Rust 并编译执行
+cargo run -p axiom-cli -- emit-rust examples/game_loop.ax -o game_loop.rs
+cargo run -p axiom-cli -- run path/to/program_with_main.ax
 ```
 
-`check` 接受仍包含 hole 的合法源码，并在摘要中报告 hole 数量；`emit-rust` 和
-`run` 会拒绝未填 hole。所有失败都会向 stderr 输出带源码路径和解析位置的诊断，
-并返回非零退出码。
+Axiom 工具链完整覆盖了从语法解析、代数效应隔离、SMT 反例自愈、内容寻址存储、多 Agent 无冲突并发组装到 Web/Native/FFI 全平台发布的全链路。
