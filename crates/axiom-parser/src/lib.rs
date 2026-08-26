@@ -3,7 +3,8 @@
 use std::fmt;
 
 use axiom_ast::{
-    BinaryOperator, Expr, FunctionDecl, FunctionParam, Literal, Module, Type, UnaryOperator,
+    BinaryOperator, Expr, FieldDef, FunctionDecl, FunctionParam, Literal, MatchArm, Module, Pattern,
+    Type, TypeDef, UnaryOperator, VariantDef,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,12 +29,17 @@ impl std::error::Error for ParseError {}
 pub fn parse_module(source: &str) -> Result<Module, ParseError> {
     let mut parser = Parser::new(source);
     parser.skip_whitespace();
+    let mut types = Vec::new();
     let mut functions = Vec::new();
     while !parser.is_at_end() {
-        functions.push(parser.parse_function()?);
+        if parser.starts_word("type") {
+            types.push(parser.parse_type_definition()?);
+        } else {
+            functions.push(parser.parse_function()?);
+        }
         parser.skip_whitespace();
     }
-    Ok(Module { functions })
+    Ok(Module { types, functions })
 }
 
 pub fn parse_expr(source: &str) -> Result<Expr, ParseError> {
@@ -49,11 +55,76 @@ pub fn parse_expr(source: &str) -> Result<Expr, ParseError> {
 struct Parser<'a> {
     source: &'a str,
     offset: usize,
+    allow_record_init: bool,
 }
 
 impl<'a> Parser<'a> {
+    fn parse_type_definition(&mut self) -> Result<TypeDef, ParseError> {
+        self.expect_word("type")?;
+        let name = self.parse_ident()?;
+        self.expect_char('=')?;
+        if !self.consume_char('{') {
+            return self.parse_enum_type_definition(name);
+        }
+        let mut fields = Vec::new();
+        if !self.consume_char('}') {
+            loop {
+                let field_name = self.parse_ident()?;
+                self.expect_char(':')?;
+                let ty = self.parse_type()?;
+                fields.push(FieldDef {
+                    name: field_name,
+                    ty,
+                });
+                if self.consume_char('}') {
+                    break;
+                }
+                self.expect_char(',')?;
+                if self.consume_char('}') {
+                    break;
+                }
+            }
+        }
+        Ok(TypeDef::Record { name, fields })
+    }
+
+    fn parse_enum_type_definition(&mut self, name: String) -> Result<TypeDef, ParseError> {
+        self.consume_char('|');
+        let mut variants = Vec::new();
+        loop {
+            let variant_name = self.parse_ident()?;
+            let mut fields = Vec::new();
+            if self.consume_char('(') && !self.consume_char(')') {
+                loop {
+                    let field_name = self.parse_ident()?;
+                    self.expect_char(':')?;
+                    fields.push(FieldDef {
+                        name: field_name,
+                        ty: self.parse_type()?,
+                    });
+                    if !self.consume_char(',') {
+                        break;
+                    }
+                }
+                self.expect_char(')')?;
+            }
+            variants.push(VariantDef {
+                name: variant_name,
+                fields,
+            });
+            if !self.consume_char('|') {
+                break;
+            }
+        }
+        Ok(TypeDef::Enum { name, variants })
+    }
+
     fn new(source: &'a str) -> Self {
-        Self { source, offset: 0 }
+        Self {
+            source,
+            offset: 0,
+            allow_record_init: true,
+        }
     }
 
     fn parse_function(&mut self) -> Result<FunctionDecl, ParseError> {
@@ -213,27 +284,39 @@ impl<'a> Parser<'a> {
 
     fn parse_call(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.parse_primary()?;
-        while self.consume_char('(') {
-            let mut args = Vec::new();
-            if !self.consume_char(')') {
-                loop {
-                    args.push(self.parse_expression()?);
-                    if !self.consume_char(',') {
-                        break;
+        loop {
+            if self.consume_char('(') {
+                let mut args = Vec::new();
+                if !self.consume_char(')') {
+                    loop {
+                        args.push(self.parse_expression()?);
+                        if !self.consume_char(',') {
+                            break;
+                        }
                     }
+                    self.expect_char(')')?;
                 }
-                self.expect_char(')')?;
+                expr = Expr::Call {
+                    callee: Box::new(expr),
+                    args,
+                };
+            } else if self.consume_char('.') {
+                expr = Expr::FieldAccess {
+                    target: Box::new(expr),
+                    field: self.parse_ident()?,
+                };
+            } else {
+                break;
             }
-            expr = Expr::Call {
-                callee: Box::new(expr),
-                args,
-            };
         }
         Ok(expr)
     }
 
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
         self.skip_whitespace();
+        if self.starts_word("match") {
+            return self.parse_match();
+        }
         if self.consume_char('(') {
             if self.consume_char(')') {
                 return Ok(Expr::Literal(Literal::Unit));
@@ -241,6 +324,20 @@ impl<'a> Parser<'a> {
             let expr = self.parse_expression()?;
             self.expect_char(')')?;
             return Ok(expr);
+        }
+        if self.consume_char('{') {
+            self.expect_text("...")?;
+            let base = self.parse_expression()?;
+            let updates = if self.consume_char('}') {
+                Vec::new()
+            } else {
+                self.expect_char(',')?;
+                self.parse_record_fields()?
+            };
+            return Ok(Expr::RecordUpdate {
+                base: Box::new(base),
+                updates,
+            });
         }
         if self.peek_char() == Some('"') {
             return self.parse_string();
@@ -250,16 +347,128 @@ impl<'a> Parser<'a> {
         }
         if matches!(self.peek_char(), Some(ch) if ch == '_' || ch.is_ascii_alphabetic()) {
             let ident = self.parse_ident()?;
-            return Ok(match ident.as_str() {
-                "true" => Expr::Literal(Literal::Bool(true)),
-                "false" => Expr::Literal(Literal::Bool(false)),
-                _ => Expr::Ident(ident),
-            });
+            return match ident.as_str() {
+                "true" => Ok(Expr::Literal(Literal::Bool(true))),
+                "false" => Ok(Expr::Literal(Literal::Bool(false))),
+                _ if self.allow_record_init && self.consume_char('{') => Ok(Expr::RecordInit {
+                    ty_name: Some(ident),
+                    fields: self.parse_record_fields()?,
+                }),
+                _ => Ok(Expr::Ident(ident)),
+            };
         }
         match self.peek_char() {
             Some(ch) => Err(self.error(format!("unexpected token `{ch}`"))),
             None => Err(self.error("unexpected end of input")),
         }
+    }
+
+    fn parse_match(&mut self) -> Result<Expr, ParseError> {
+        self.expect_word("match")?;
+        let previous_allow_record_init = self.allow_record_init;
+        self.allow_record_init = false;
+        let target = self.parse_expression();
+        self.allow_record_init = previous_allow_record_init;
+        let target = target?;
+        self.expect_char('{')?;
+
+        let mut arms = Vec::new();
+        if !self.consume_char('}') {
+            loop {
+                let pattern = self.parse_pattern()?;
+                self.expect_text("=>")?;
+                let body = self.parse_expression()?;
+                arms.push(MatchArm { pattern, body });
+                if self.consume_char('}') {
+                    break;
+                }
+                self.expect_char(',')?;
+                if self.consume_char('}') {
+                    break;
+                }
+            }
+        }
+        Ok(Expr::Match {
+            target: Box::new(target),
+            arms,
+        })
+    }
+
+    fn parse_pattern(&mut self) -> Result<Pattern, ParseError> {
+        self.skip_whitespace();
+        if self.consume_char('(') {
+            self.expect_char(')')?;
+            return Ok(Pattern::Literal(Literal::Unit));
+        }
+        if self.peek_char() == Some('"') {
+            let expr = self.parse_string()?;
+            return self.parse_literal_pattern_from_expr(expr);
+        }
+        if matches!(self.peek_char(), Some(ch) if ch.is_ascii_digit()) {
+            let expr = self.parse_number()?;
+            return self.parse_literal_pattern_from_expr(expr);
+        }
+        let first = self.parse_ident()?;
+        if first == "_" {
+            return Ok(Pattern::Wildcard);
+        }
+        if first == "true" {
+            return Ok(Pattern::Literal(Literal::Bool(true)));
+        }
+        if first == "false" {
+            return Ok(Pattern::Literal(Literal::Bool(false)));
+        }
+
+        let (enum_name, variant_name) = if self.consume_char('.') {
+            (Some(first), self.parse_ident()?)
+        } else if first.starts_with(|ch: char| ch.is_ascii_uppercase()) {
+            (None, first)
+        } else {
+            return Ok(Pattern::Ident(first));
+        };
+
+        let mut fields = Vec::new();
+        if self.consume_char('(') && !self.consume_char(')') {
+            loop {
+                fields.push(self.parse_pattern()?);
+                if !self.consume_char(',') {
+                    break;
+                }
+            }
+            self.expect_char(')')?;
+        }
+        Ok(Pattern::Variant {
+            enum_name,
+            variant_name,
+            fields,
+        })
+    }
+
+    fn parse_literal_pattern_from_expr(&self, expr: Expr) -> Result<Pattern, ParseError> {
+        match expr {
+            Expr::Literal(literal) => Ok(Pattern::Literal(literal)),
+            _ => Err(self.error("expected literal pattern")),
+        }
+    }
+
+    fn parse_record_fields(&mut self) -> Result<Vec<(String, Expr)>, ParseError> {
+        let mut fields = Vec::new();
+        if self.consume_char('}') {
+            return Ok(fields);
+        }
+        loop {
+            let name = self.parse_ident()?;
+            self.expect_char(':')?;
+            fields.push((name, self.parse_expression()?));
+            if self.consume_char('}') {
+                break;
+            }
+            self.expect_char(',')?;
+            if self.consume_char('}') {
+                break;
+            }
+        }
+        Ok(fields)
     }
 
     fn parse_string(&mut self) -> Result<Expr, ParseError> {
@@ -316,14 +525,29 @@ impl<'a> Parser<'a> {
             return Ok(Type::Unit);
         }
         let name = self.parse_ident()?;
-        match name.as_str() {
+        let simple_type = match name.as_str() {
             "Int" => Ok(Type::Int),
             "Float" => Ok(Type::Float),
             "Decimal" => Ok(Type::Decimal),
             "Bool" => Ok(Type::Bool),
             "String" => Ok(Type::String),
             _ => Ok(Type::Custom(name)),
+        }?;
+        if !self.consume_char('<') {
+            return Ok(simple_type);
         }
+
+        let mut arguments = Vec::new();
+        loop {
+            arguments.push(self.parse_type()?);
+            if !self.consume_char(',') {
+                break;
+            }
+        }
+        self.expect_char('>')?;
+        let base = type_name(&simple_type);
+        let arguments = arguments.iter().map(type_name).collect::<Vec<_>>().join(", ");
+        Ok(Type::Custom(format!("{base}<{arguments}>")))
     }
 
     fn parse_ident(&mut self) -> Result<String, ParseError> {
@@ -436,5 +660,17 @@ impl<'a> Parser<'a> {
             column,
             message: message.into(),
         }
+    }
+}
+
+fn type_name(ty: &Type) -> String {
+    match ty {
+        Type::Int => "Int".into(),
+        Type::Float => "Float".into(),
+        Type::Decimal => "Decimal".into(),
+        Type::Bool => "Bool".into(),
+        Type::String => "String".into(),
+        Type::Unit => "()".into(),
+        Type::Custom(name) => name.clone(),
     }
 }
