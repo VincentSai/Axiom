@@ -102,12 +102,12 @@ fn parses_effects_and_contracts_from_transfer_example() {
             .iter()
             .map(|effect| effect.name.as_str())
             .collect::<Vec<_>>(),
-        vec!["Database", "Clock", "Log"]
+        vec!["Database", "Clock", "AuditLog"]
     );
     assert_eq!(module.functions.len(), 1);
     let transfer = &module.functions[0];
     assert_eq!(transfer.name, "execute_transfer");
-    assert_eq!(transfer.effects, vec!["Database", "Clock", "Log"]);
+    assert_eq!(transfer.effects, vec!["Database", "Clock", "AuditLog"]);
     assert_eq!(transfer.requires.len(), 2);
     assert_eq!(transfer.ensures.len(), 1);
 }

@@ -33,7 +33,7 @@ effect Clock {
     fn now_timestamp(): Int
 }
 
-effect Log {
+effect AuditLog {
     fn info(msg: String): ()
 }
 
@@ -43,7 +43,7 @@ fn execute_transfer(
     to_id: Int, 
     amount: Decimal
 ) -> Result<TransferReceipt, TransferError>
-    with [Database, Clock, Log]
+    with [Database, Clock, AuditLog]
     requires {
         amount > 0.0,
         from_id != to_id,
@@ -82,7 +82,7 @@ fn execute_transfer(
     Database.update_account(new_to);
 
     let ts = Clock.now_timestamp();
-    Log.info("Transfer completed successfully");
+    AuditLog.info("Transfer completed successfully");
 
     Ok(TransferReceipt {
         tx_id: "TX_" + ts.to_string(),
