@@ -6,6 +6,7 @@ members = [
     "crates/axiom-hole-extractor",
     "crates/axiom-transpiler",
     "crates/axiom-cli",
+    "crates/axiom-smt",
 ]
 resolver = "2"
 

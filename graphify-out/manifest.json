@@ -1,0 +1,67 @@
+{
+  "crates/axiom-ast/src/lib.rs": {
+    "mtime": 1787741129.671969,
+    "ast_hash": "39049ef0df28208094f07607745cb275",
+    "semantic_hash": "39049ef0df28208094f07607745cb275"
+  },
+  "crates/axiom-cli/src/lib.rs": {
+    "mtime": 1787741129.6730685,
+    "ast_hash": "c776d1483ae6189d482bbea51268dd04",
+    "semantic_hash": "c776d1483ae6189d482bbea51268dd04"
+  },
+  "crates/axiom-cli/src/main.rs": {
+    "mtime": 1787741129.6730685,
+    "ast_hash": "6164272691792aa8f35be828215aa287",
+    "semantic_hash": "6164272691792aa8f35be828215aa287"
+  },
+  "crates/axiom-cli/tests/e2e_pipeline_test.rs": {
+    "mtime": 1787741129.673579,
+    "ast_hash": "c6cc2b3ab93d8a6bedba0847481379f1",
+    "semantic_hash": "c6cc2b3ab93d8a6bedba0847481379f1"
+  },
+  "crates/axiom-hole-extractor/src/lib.rs": {
+    "mtime": 1787741129.6745715,
+    "ast_hash": "d698a6368520f3b0142f068d3b75d608",
+    "semantic_hash": "d698a6368520f3b0142f068d3b75d608"
+  },
+  "crates/axiom-hole-extractor/tests/hole_extraction_test.rs": {
+    "mtime": 1787741129.6745715,
+    "ast_hash": "21c6ae6c1b4d764f1f4abaa74d9ec2a7",
+    "semantic_hash": "21c6ae6c1b4d764f1f4abaa74d9ec2a7"
+  },
+  "crates/axiom-parser/src/lib.rs": {
+    "mtime": 1787741129.6755683,
+    "ast_hash": "efaa3a68e7b20e36d241dc419712934e",
+    "semantic_hash": "efaa3a68e7b20e36d241dc419712934e"
+  },
+  "crates/axiom-parser/tests/adt_and_match_test.rs": {
+    "mtime": 1787741129.6755683,
+    "ast_hash": "4c263c55d786c24371460ee607623309",
+    "semantic_hash": "4c263c55d786c24371460ee607623309"
+  },
+  "crates/axiom-parser/tests/effects_and_contracts_test.rs": {
+    "mtime": 1787741129.6775627,
+    "ast_hash": "2cb6ffef04d4d6462255b71d2e2bf66b",
+    "semantic_hash": "2cb6ffef04d4d6462255b71d2e2bf66b"
+  },
+  "crates/axiom-parser/tests/hole_syntax_test.rs": {
+    "mtime": 1787741129.6775627,
+    "ast_hash": "6473f2170662845c37fdb623a292770e",
+    "semantic_hash": "6473f2170662845c37fdb623a292770e"
+  },
+  "crates/axiom-parser/tests/pure_func_test.rs": {
+    "mtime": 1787741129.6805553,
+    "ast_hash": "47080b760b89ca907959f9e661bbcbbd",
+    "semantic_hash": "47080b760b89ca907959f9e661bbcbbd"
+  },
+  "crates/axiom-transpiler/src/lib.rs": {
+    "mtime": 1787741129.6820974,
+    "ast_hash": "4184cd2bfef7dfd3f9b79ee48da74c34",
+    "semantic_hash": "4184cd2bfef7dfd3f9b79ee48da74c34"
+  },
+  "crates/axiom-transpiler/tests/transpiler_test.rs": {
+    "mtime": 1787741129.6830828,
+    "ast_hash": "459fe02f0c1260f498ae03e5965cd07b",
+    "semantic_hash": "459fe02f0c1260f498ae03e5965cd07b"
+  }
+}
