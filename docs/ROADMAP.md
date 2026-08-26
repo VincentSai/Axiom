@@ -1,13 +1,13 @@
-﻿# Axiom 项目发展路线图 (Roadmap)
+# Axiom 项目发展路线图 (Roadmap)
 
 ---
 
 ## 阶段一：原型与验证编译器 (MVP Prototype - Q1)
 - [x] 完成语言架构设计与 /grill-me 压力验证
-- [ ] 编写基于 Rust 的语法解析器 (Parser) 与 AST 定义
-- [ ] 实现基础打洞机制 (`?hole`) 与 JSON 任务分发器
-- [ ] 实现 Axiom 到 Rust 的基础转译器 (Transpiler)
-- [ ] 验证端到端单函数编译并在 WASI 环境运行
+- [x] 编写基于 Rust 的语法解析器 (Parser) 与 AST 定义 (`axiom-ast`, `axiom-parser`)
+- [x] 实现基础打洞机制 (`?hole`) 与 JSON 任务分发器 (`axiom-hole-extractor`)
+- [x] 实现 Axiom 到 Rust 的基础转译器 (Transpiler) (`axiom-transpiler`)
+- [x] 构建 CLI 工具链并完成端到端全流程验证 (`axiom-cli`, 35 个全量测试 100% 通过)
 
 ## 阶段二：Effect 系统与契约验证 (Q2)
 - [ ] 实现代数效应 (Algebraic Effects) 的编译期隔离与分发
