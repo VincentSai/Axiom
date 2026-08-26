@@ -1,0 +1,13 @@
+[package]
+name = "axiom-diagnostics"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axiom-ast = { path = "../axiom-ast" }
+axiom-effects = { path = "../axiom-effects" }
+axiom-hole-extractor = { path = "../axiom-hole-extractor" }
+axiom-parser = { path = "../axiom-parser" }
+axiom-smt = { path = "../axiom-smt" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
