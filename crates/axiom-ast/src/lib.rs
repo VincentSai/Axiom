@@ -1,4 +1,4 @@
-//! Core abstract syntax tree definitions for Axiom.
+﻿//! Core abstract syntax tree definitions for Axiom.
 
 use serde::{Deserialize, Serialize};
 
@@ -72,9 +72,13 @@ pub enum BinaryOperator {
     Divide,
     GreaterThan,
     GreaterThanOrEqual,
+    LessThan,
+    LessThanOrEqual,
     Equal,
     NotEqual,
     Is,
+    And,
+    Or,
     Implies,
 }
 
@@ -88,6 +92,7 @@ pub enum UnaryOperator {
 pub enum Expr {
     Literal(Literal),
     Ident(String),
+    Hole(String),
     BinaryOp {
         left: Box<Expr>,
         op: BinaryOperator,

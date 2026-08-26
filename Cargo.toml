@@ -1,4 +1,4 @@
 [workspace]
-members = ["crates/axiom-ast", "crates/axiom-parser"]
+members = ["crates/axiom-ast", "crates/axiom-parser", "crates/axiom-transpiler"]
 resolver = "2"
 
