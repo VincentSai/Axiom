@@ -4,6 +4,7 @@ members = [
     "crates/axiom-parser",
     "crates/axiom-effects",
     "crates/axiom-hole-extractor",
+    "crates/axiom-ffi-gen",
     "crates/axiom-transpiler",
     "crates/axiom-cli",
     "crates/axiom-smt",
