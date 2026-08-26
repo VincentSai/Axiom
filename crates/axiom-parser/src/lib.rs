@@ -214,7 +214,6 @@ impl<'a> Parser<'a> {
         })
     }
 
-
     fn capture_block_contents(&mut self) -> Result<String, ParseError> {
         let start = self.offset;
         let mut depth = 1usize;
@@ -389,7 +388,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_implication(&mut self) -> Result<Expr, ParseError> {
-        let left = self.parse_comparison()?;
+        let left = self.parse_logical_and()?;
         if self.consume_text("=>") {
             return Ok(Expr::BinaryOp {
                 left: Box::new(left),
@@ -400,16 +399,32 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
+    fn parse_logical_and(&mut self) -> Result<Expr, ParseError> {
+        let mut expression = self.parse_comparison()?;
+        while self.consume_text("&&") {
+            expression = Expr::BinaryOp {
+                left: Box::new(expression),
+                op: BinaryOperator::And,
+                right: Box::new(self.parse_comparison()?),
+            };
+        }
+        Ok(expression)
+    }
+
     fn parse_comparison(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.parse_additive()?;
         let op = if self.consume_text(">=") {
             Some(BinaryOperator::GreaterThanOrEqual)
+        } else if self.consume_text("<=") {
+            Some(BinaryOperator::LessThanOrEqual)
         } else if self.consume_text("==") {
             Some(BinaryOperator::Equal)
         } else if self.consume_text("!=") {
             Some(BinaryOperator::NotEqual)
         } else if self.consume_char('>') {
             Some(BinaryOperator::GreaterThan)
+        } else if self.consume_char('<') {
+            Some(BinaryOperator::LessThan)
         } else if self.starts_word("is") {
             self.expect_word("is")?;
             Some(BinaryOperator::Is)
@@ -515,6 +530,9 @@ impl<'a> Parser<'a> {
 
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
         self.skip_whitespace();
+        if self.consume_char('?') {
+            return self.parse_ident().map(Expr::Hole);
+        }
         if self.starts_word("match") {
             return self.parse_match();
         }
@@ -892,4 +910,3 @@ impl<'a> Parser<'a> {
         }
     }
 }
-
