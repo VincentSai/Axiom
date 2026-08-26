@@ -16,9 +16,10 @@
 - [x] CLI `axiom verify` 静态形式化验证与 Agent 自愈闭环 (`axiom-cli`, 52 个全量测试 100% 通过)
 
 ## 阶段三：内容寻址 AST 代码库与多 Agent 协同 (Q3)
-- [ ] 实现基于 SQLite / LMDB 的 AST 节点哈希持久化存储引擎
-- [ ] 开发虚拟文件系统视图 (Virtual FS)，支持人类在 VS Code 中像普通文件一样查看 AST
-- [ ] 构建 Multi-Agent 调度演示：架构师 Agent 派发 20 个 Holes，多 Worker Agent 无锁并发实现
+- [x] 实现 AST 节点规范化哈希与内容寻址存储引擎 (`axiom-db`)
+- [x] 开发虚拟代码投影视图与双向源码同步 (`axiom-vfs`)
+- [x] 实现多 Agent 无锁并发打洞派发与协作池 (`axiom-agent-pool`)
+- [x] CLI `axiom db` 工具集与 20+ Holes 多 Agent 并发协同端到端演示 (`axiom-cli`, 65 个全量测试 100% 通过)
 
 ## 阶段四：全平台与生态互操作 (Q4)
 - [ ] 完善 WebAssembly Component Model (WIT) 双向绑定

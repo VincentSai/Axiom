@@ -1,0 +1,1278 @@
+{
+  "types": {
+    "#type_2fa99a373d6aeed9694ebc40c8f318d59718756fabbe6ef5131589309cd0b493": {
+      "Record": {
+        "name": "Vector2",
+        "fields": [
+          {
+            "name": "x",
+            "ty": "Float"
+          },
+          {
+            "name": "y",
+            "ty": "Float"
+          }
+        ]
+      }
+    },
+    "#type_7df2d29a6fafb3fe42c8e34a2be679aa3ab49da781935d6664cc6bba94e6cf09": {
+      "Record": {
+        "name": "Account",
+        "fields": [
+          {
+            "name": "id",
+            "ty": "Int"
+          },
+          {
+            "name": "owner",
+            "ty": "String"
+          },
+          {
+            "name": "balance",
+            "ty": "Decimal"
+          }
+        ]
+      }
+    },
+    "#type_8540fc545f9e4a4651fb103bb6e824e467604c6d1b7c6fd4303106e17b36bb71": {
+      "Record": {
+        "name": "TransferReceipt",
+        "fields": [
+          {
+            "name": "tx_id",
+            "ty": "String"
+          },
+          {
+            "name": "from_id",
+            "ty": "Int"
+          },
+          {
+            "name": "to_id",
+            "ty": "Int"
+          },
+          {
+            "name": "amount",
+            "ty": "Decimal"
+          },
+          {
+            "name": "timestamp",
+            "ty": "Int"
+          }
+        ]
+      }
+    },
+    "#type_a49967cec59f9740939d94b8df737ec8b3464d78eee81bd4e50eddee770f1149": {
+      "Record": {
+        "name": "Entity",
+        "fields": [
+          {
+            "name": "id",
+            "ty": "Int"
+          },
+          {
+            "name": "pos",
+            "ty": {
+              "Custom": "Vector2"
+            }
+          },
+          {
+            "name": "velocity",
+            "ty": {
+              "Custom": "Vector2"
+            }
+          },
+          {
+            "name": "hp",
+            "ty": "Int"
+          }
+        ]
+      }
+    },
+    "#type_b1351e24dcc4f38cd5d1b96cfbea64c6f8acbe7d7e7eb89ad7d2c539a9714e5a": {
+      "Record": {
+        "name": "WorldState",
+        "fields": [
+          {
+            "name": "frame",
+            "ty": "Int"
+          },
+          {
+            "name": "player",
+            "ty": {
+              "Custom": "Entity"
+            }
+          },
+          {
+            "name": "enemies",
+            "ty": {
+              "Custom": "List<Entity>"
+            }
+          }
+        ]
+      }
+    },
+    "#type_c2683e0631cf5447a569b6308131f024b1dd05a77eefe7a3995f1a77776f462a": {
+      "Enum": {
+        "name": "TransferError",
+        "variants": [
+          {
+            "name": "AccountNotFound",
+            "fields": [
+              {
+                "name": "id",
+                "ty": "Int"
+              }
+            ]
+          },
+          {
+            "name": "InsufficientBalance",
+            "fields": [
+              {
+                "name": "required",
+                "ty": "Decimal"
+              },
+              {
+                "name": "available",
+                "ty": "Decimal"
+              }
+            ]
+          },
+          {
+            "name": "SameAccountTransfer",
+            "fields": []
+          }
+        ]
+      }
+    }
+  },
+  "functions": {
+    "#fn_3895ff40ebfa57f213944da35846617a974e43db868109b1a05c3ff358974559": {
+      "name": "tick_frame",
+      "params": [
+        {
+          "name": "world",
+          "ty": {
+            "Custom": "WorldState"
+          }
+        },
+        {
+          "name": "dt",
+          "ty": "Float"
+        }
+      ],
+      "return_type": {
+        "Custom": "WorldState"
+      },
+      "effects": [
+        "Render",
+        "Input"
+      ],
+      "requires": [],
+      "ensures": [],
+      "body": {
+        "Block": {
+          "statements": [
+            {
+              "Let": {
+                "name": "move_dir",
+                "value": {
+                  "Call": {
+                    "callee": {
+                      "FieldAccess": {
+                        "target": {
+                          "Ident": "Input"
+                        },
+                        "field": "get_movement_axis"
+                      }
+                    },
+                    "args": []
+                  }
+                }
+              }
+            },
+            {
+              "Let": {
+                "name": "updated_player",
+                "value": {
+                  "Call": {
+                    "callee": {
+                      "Ident": "update_physics"
+                    },
+                    "args": [
+                      {
+                        "RecordUpdate": {
+                          "base": {
+                            "FieldAccess": {
+                              "target": {
+                                "Ident": "world"
+                              },
+                              "field": "player"
+                            }
+                          },
+                          "updates": [
+                            [
+                              "velocity",
+                              {
+                                "Ident": "move_dir"
+                              }
+                            ]
+                          ]
+                        }
+                      },
+                      {
+                        "Ident": "dt"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "Call": {
+                "callee": {
+                  "FieldAccess": {
+                    "target": {
+                      "Ident": "Render"
+                    },
+                    "field": "clear_screen"
+                  }
+                },
+                "args": []
+              }
+            },
+            {
+              "Call": {
+                "callee": {
+                  "FieldAccess": {
+                    "target": {
+                      "Ident": "Render"
+                    },
+                    "field": "draw_sprite"
+                  }
+                },
+                "args": [
+                  {
+                    "FieldAccess": {
+                      "target": {
+                        "Ident": "updated_player"
+                      },
+                      "field": "id"
+                    }
+                  },
+                  {
+                    "FieldAccess": {
+                      "target": {
+                        "Ident": "updated_player"
+                      },
+                      "field": "pos"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "tail": {
+            "RecordInit": {
+              "ty_name": "WorldState",
+              "fields": [
+                [
+                  "frame",
+                  {
+                    "BinaryOp": {
+                      "left": {
+                        "FieldAccess": {
+                          "target": {
+                            "Ident": "world"
+                          },
+                          "field": "frame"
+                        }
+                      },
+                      "op": "Add",
+                      "right": {
+                        "Literal": {
+                          "Int": 1
+                        }
+                      }
+                    }
+                  }
+                ],
+                [
+                  "player",
+                  {
+                    "Ident": "updated_player"
+                  }
+                ],
+                [
+                  "enemies",
+                  {
+                    "FieldAccess": {
+                      "target": {
+                        "Ident": "world"
+                      },
+                      "field": "enemies"
+                    }
+                  }
+                ]
+              ]
+            }
+          }
+        }
+      }
+    },
+    "#fn_86b2caa2c2ff4cc1d3ffb3801cd8106f37c2e5f6142e770322cca3780c3d13a8": {
+      "name": "execute_transfer",
+      "params": [
+        {
+          "name": "from_id",
+          "ty": "Int"
+        },
+        {
+          "name": "to_id",
+          "ty": "Int"
+        },
+        {
+          "name": "amount",
+          "ty": "Decimal"
+        }
+      ],
+      "return_type": {
+        "Custom": "Result<TransferReceipt, TransferError>"
+      },
+      "effects": [
+        "Database",
+        "Clock",
+        "AuditLog"
+      ],
+      "requires": [
+        {
+          "BinaryOp": {
+            "left": {
+              "Ident": "amount"
+            },
+            "op": "GreaterThan",
+            "right": {
+              "Literal": {
+                "Float": 0.0
+              }
+            }
+          }
+        },
+        {
+          "BinaryOp": {
+            "left": {
+              "Ident": "from_id"
+            },
+            "op": "NotEqual",
+            "right": {
+              "Ident": "to_id"
+            }
+          }
+        }
+      ],
+      "ensures": [
+        {
+          "BinaryOp": {
+            "left": {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "result"
+                },
+                "op": "Is",
+                "right": {
+                  "Ident": "Ok"
+                }
+              }
+            },
+            "op": "Implies",
+            "right": {
+              "Literal": {
+                "Bool": true
+              }
+            }
+          }
+        }
+      ],
+      "body": {
+        "Raw": "// 读取转出账户\r\n    let from_acc = match Database.find_account(from_id) {\r\n        Some(acc) => acc,\r\n        None => return Err(TransferError.AccountNotFound(from_id)),\r\n    };\r\n\r\n    // 读取转入账户\r\n    let to_acc = match Database.find_account(to_id) {\r\n        Some(acc) => acc,\r\n        None => return Err(TransferError.AccountNotFound(to_id)),\r\n    };\r\n\r\n    // 余额检查\r\n    if from_acc.balance < amount {\r\n        return Err(TransferError.InsufficientBalance(\r\n            required: amount, \r\n            available: from_acc.balance\r\n        ));\r\n    }\r\n\r\n    // 不可变更新 (纯数据变换)\r\n    let new_from = { ...from_acc, balance: from_acc.balance - amount };\r\n    let new_to = { ...to_acc, balance: to_acc.balance + amount };\r\n\r\n    // 提交副作用\r\n    Database.update_account(new_from);\r\n    Database.update_account(new_to);\r\n\r\n    let ts = Clock.now_timestamp();\r\n    AuditLog.info(\"Transfer completed successfully\");\r\n\r\n    Ok(TransferReceipt {\r\n        tx_id: \"TX_\" + ts.to_string(),\r\n        from_id: from_id,\r\n        to_id: to_id,\r\n        amount: amount,\r\n        timestamp: ts,\r\n    })"
+      }
+    },
+    "#fn_c0a37e12011159aa26f76f1746a9c8e4f53f2a003462120ab0d2969a9a293d5e": {
+      "name": "update_physics",
+      "params": [
+        {
+          "name": "entity",
+          "ty": {
+            "Custom": "Entity"
+          }
+        },
+        {
+          "name": "dt",
+          "ty": "Float"
+        }
+      ],
+      "return_type": {
+        "Custom": "Entity"
+      },
+      "effects": [],
+      "requires": [],
+      "ensures": [],
+      "body": {
+        "Block": {
+          "statements": [
+            {
+              "Let": {
+                "name": "new_pos",
+                "value": {
+                  "RecordInit": {
+                    "ty_name": "Vector2",
+                    "fields": [
+                      [
+                        "x",
+                        {
+                          "BinaryOp": {
+                            "left": {
+                              "FieldAccess": {
+                                "target": {
+                                  "FieldAccess": {
+                                    "target": {
+                                      "Ident": "entity"
+                                    },
+                                    "field": "pos"
+                                  }
+                                },
+                                "field": "x"
+                              }
+                            },
+                            "op": "Add",
+                            "right": {
+                              "BinaryOp": {
+                                "left": {
+                                  "FieldAccess": {
+                                    "target": {
+                                      "FieldAccess": {
+                                        "target": {
+                                          "Ident": "entity"
+                                        },
+                                        "field": "velocity"
+                                      }
+                                    },
+                                    "field": "x"
+                                  }
+                                },
+                                "op": "Multiply",
+                                "right": {
+                                  "Ident": "dt"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ],
+                      [
+                        "y",
+                        {
+                          "BinaryOp": {
+                            "left": {
+                              "FieldAccess": {
+                                "target": {
+                                  "FieldAccess": {
+                                    "target": {
+                                      "Ident": "entity"
+                                    },
+                                    "field": "pos"
+                                  }
+                                },
+                                "field": "y"
+                              }
+                            },
+                            "op": "Add",
+                            "right": {
+                              "BinaryOp": {
+                                "left": {
+                                  "FieldAccess": {
+                                    "target": {
+                                      "FieldAccess": {
+                                        "target": {
+                                          "Ident": "entity"
+                                        },
+                                        "field": "velocity"
+                                      }
+                                    },
+                                    "field": "y"
+                                  }
+                                },
+                                "op": "Multiply",
+                                "right": {
+                                  "Ident": "dt"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                }
+              }
+            }
+          ],
+          "tail": {
+            "RecordUpdate": {
+              "base": {
+                "Ident": "entity"
+              },
+              "updates": [
+                [
+                  "pos",
+                  {
+                    "Ident": "new_pos"
+                  }
+                ]
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "effects": {
+    "#effect_0ff0b0f308dd8402b0007d99a399d51e65f6cbddc90aabd5f033c8fe4c6582f0": {
+      "name": "Input",
+      "operations": [
+        {
+          "name": "get_movement_axis",
+          "params": [],
+          "return_type": {
+            "Custom": "Vector2"
+          }
+        }
+      ]
+    },
+    "#effect_194eef91d14d48376f1a7db98da073397bad977f08385ff9b6769d5a2588d2e6": {
+      "name": "Database",
+      "operations": [
+        {
+          "name": "find_account",
+          "params": [
+            {
+              "name": "id",
+              "ty": "Int"
+            }
+          ],
+          "return_type": {
+            "Custom": "Option<Account>"
+          }
+        },
+        {
+          "name": "update_account",
+          "params": [
+            {
+              "name": "account",
+              "ty": {
+                "Custom": "Account"
+              }
+            }
+          ],
+          "return_type": {
+            "Custom": "Result<(), String>"
+          }
+        }
+      ]
+    },
+    "#effect_233f339d39e690741bcc9020ca849b71176d2571838215a2975f94a5d39eb6eb": {
+      "name": "Clock",
+      "operations": [
+        {
+          "name": "now_timestamp",
+          "params": [],
+          "return_type": "Int"
+        }
+      ]
+    },
+    "#effect_514aaeb40207d2de295ecd1c6a7b65962d9d053316368b7d68dd5166278f29ab": {
+      "name": "AuditLog",
+      "operations": [
+        {
+          "name": "info",
+          "params": [
+            {
+              "name": "msg",
+              "ty": "String"
+            }
+          ],
+          "return_type": "Unit"
+        }
+      ]
+    },
+    "#effect_df4dd02c836a1a48ef13f6c9c87c55a2ceab97fe015d7a8c487a59ebd3e4966e": {
+      "name": "Render",
+      "operations": [
+        {
+          "name": "draw_sprite",
+          "params": [
+            {
+              "name": "id",
+              "ty": "Int"
+            },
+            {
+              "name": "pos",
+              "ty": {
+                "Custom": "Vector2"
+              }
+            }
+          ],
+          "return_type": "Unit"
+        },
+        {
+          "name": "clear_screen",
+          "params": [],
+          "return_type": "Unit"
+        }
+      ]
+    }
+  },
+  "modules": {
+    "#mod_2d8ef55f355fc54453d30a2ed3d5bc7277bd3221c8eaf4e494b21de4cda94877": {
+      "types": [
+        {
+          "Record": {
+            "name": "Vector2",
+            "fields": [
+              {
+                "name": "x",
+                "ty": "Float"
+              },
+              {
+                "name": "y",
+                "ty": "Float"
+              }
+            ]
+          }
+        },
+        {
+          "Record": {
+            "name": "Entity",
+            "fields": [
+              {
+                "name": "id",
+                "ty": "Int"
+              },
+              {
+                "name": "pos",
+                "ty": {
+                  "Custom": "Vector2"
+                }
+              },
+              {
+                "name": "velocity",
+                "ty": {
+                  "Custom": "Vector2"
+                }
+              },
+              {
+                "name": "hp",
+                "ty": "Int"
+              }
+            ]
+          }
+        },
+        {
+          "Record": {
+            "name": "WorldState",
+            "fields": [
+              {
+                "name": "frame",
+                "ty": "Int"
+              },
+              {
+                "name": "player",
+                "ty": {
+                  "Custom": "Entity"
+                }
+              },
+              {
+                "name": "enemies",
+                "ty": {
+                  "Custom": "List<Entity>"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "functions": [
+        {
+          "name": "update_physics",
+          "params": [
+            {
+              "name": "entity",
+              "ty": {
+                "Custom": "Entity"
+              }
+            },
+            {
+              "name": "dt",
+              "ty": "Float"
+            }
+          ],
+          "return_type": {
+            "Custom": "Entity"
+          },
+          "effects": [],
+          "requires": [],
+          "ensures": [],
+          "body": {
+            "Block": {
+              "statements": [
+                {
+                  "Let": {
+                    "name": "new_pos",
+                    "value": {
+                      "RecordInit": {
+                        "ty_name": "Vector2",
+                        "fields": [
+                          [
+                            "x",
+                            {
+                              "BinaryOp": {
+                                "left": {
+                                  "FieldAccess": {
+                                    "target": {
+                                      "FieldAccess": {
+                                        "target": {
+                                          "Ident": "entity"
+                                        },
+                                        "field": "pos"
+                                      }
+                                    },
+                                    "field": "x"
+                                  }
+                                },
+                                "op": "Add",
+                                "right": {
+                                  "BinaryOp": {
+                                    "left": {
+                                      "FieldAccess": {
+                                        "target": {
+                                          "FieldAccess": {
+                                            "target": {
+                                              "Ident": "entity"
+                                            },
+                                            "field": "velocity"
+                                          }
+                                        },
+                                        "field": "x"
+                                      }
+                                    },
+                                    "op": "Multiply",
+                                    "right": {
+                                      "Ident": "dt"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          ],
+                          [
+                            "y",
+                            {
+                              "BinaryOp": {
+                                "left": {
+                                  "FieldAccess": {
+                                    "target": {
+                                      "FieldAccess": {
+                                        "target": {
+                                          "Ident": "entity"
+                                        },
+                                        "field": "pos"
+                                      }
+                                    },
+                                    "field": "y"
+                                  }
+                                },
+                                "op": "Add",
+                                "right": {
+                                  "BinaryOp": {
+                                    "left": {
+                                      "FieldAccess": {
+                                        "target": {
+                                          "FieldAccess": {
+                                            "target": {
+                                              "Ident": "entity"
+                                            },
+                                            "field": "velocity"
+                                          }
+                                        },
+                                        "field": "y"
+                                      }
+                                    },
+                                    "op": "Multiply",
+                                    "right": {
+                                      "Ident": "dt"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        ]
+                      }
+                    }
+                  }
+                }
+              ],
+              "tail": {
+                "RecordUpdate": {
+                  "base": {
+                    "Ident": "entity"
+                  },
+                  "updates": [
+                    [
+                      "pos",
+                      {
+                        "Ident": "new_pos"
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "tick_frame",
+          "params": [
+            {
+              "name": "world",
+              "ty": {
+                "Custom": "WorldState"
+              }
+            },
+            {
+              "name": "dt",
+              "ty": "Float"
+            }
+          ],
+          "return_type": {
+            "Custom": "WorldState"
+          },
+          "effects": [
+            "Render",
+            "Input"
+          ],
+          "requires": [],
+          "ensures": [],
+          "body": {
+            "Block": {
+              "statements": [
+                {
+                  "Let": {
+                    "name": "move_dir",
+                    "value": {
+                      "Call": {
+                        "callee": {
+                          "FieldAccess": {
+                            "target": {
+                              "Ident": "Input"
+                            },
+                            "field": "get_movement_axis"
+                          }
+                        },
+                        "args": []
+                      }
+                    }
+                  }
+                },
+                {
+                  "Let": {
+                    "name": "updated_player",
+                    "value": {
+                      "Call": {
+                        "callee": {
+                          "Ident": "update_physics"
+                        },
+                        "args": [
+                          {
+                            "RecordUpdate": {
+                              "base": {
+                                "FieldAccess": {
+                                  "target": {
+                                    "Ident": "world"
+                                  },
+                                  "field": "player"
+                                }
+                              },
+                              "updates": [
+                                [
+                                  "velocity",
+                                  {
+                                    "Ident": "move_dir"
+                                  }
+                                ]
+                              ]
+                            }
+                          },
+                          {
+                            "Ident": "dt"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                {
+                  "Call": {
+                    "callee": {
+                      "FieldAccess": {
+                        "target": {
+                          "Ident": "Render"
+                        },
+                        "field": "clear_screen"
+                      }
+                    },
+                    "args": []
+                  }
+                },
+                {
+                  "Call": {
+                    "callee": {
+                      "FieldAccess": {
+                        "target": {
+                          "Ident": "Render"
+                        },
+                        "field": "draw_sprite"
+                      }
+                    },
+                    "args": [
+                      {
+                        "FieldAccess": {
+                          "target": {
+                            "Ident": "updated_player"
+                          },
+                          "field": "id"
+                        }
+                      },
+                      {
+                        "FieldAccess": {
+                          "target": {
+                            "Ident": "updated_player"
+                          },
+                          "field": "pos"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ],
+              "tail": {
+                "RecordInit": {
+                  "ty_name": "WorldState",
+                  "fields": [
+                    [
+                      "frame",
+                      {
+                        "BinaryOp": {
+                          "left": {
+                            "FieldAccess": {
+                              "target": {
+                                "Ident": "world"
+                              },
+                              "field": "frame"
+                            }
+                          },
+                          "op": "Add",
+                          "right": {
+                            "Literal": {
+                              "Int": 1
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    [
+                      "player",
+                      {
+                        "Ident": "updated_player"
+                      }
+                    ],
+                    [
+                      "enemies",
+                      {
+                        "FieldAccess": {
+                          "target": {
+                            "Ident": "world"
+                          },
+                          "field": "enemies"
+                        }
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ],
+      "effects": [
+        {
+          "name": "Render",
+          "operations": [
+            {
+              "name": "draw_sprite",
+              "params": [
+                {
+                  "name": "id",
+                  "ty": "Int"
+                },
+                {
+                  "name": "pos",
+                  "ty": {
+                    "Custom": "Vector2"
+                  }
+                }
+              ],
+              "return_type": "Unit"
+            },
+            {
+              "name": "clear_screen",
+              "params": [],
+              "return_type": "Unit"
+            }
+          ]
+        },
+        {
+          "name": "Input",
+          "operations": [
+            {
+              "name": "get_movement_axis",
+              "params": [],
+              "return_type": {
+                "Custom": "Vector2"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "#mod_589e44855c2b4e0223acf6867cdd3c6f0947fb3a23d7afafbb62e7fbc044559a": {
+      "types": [
+        {
+          "Record": {
+            "name": "Account",
+            "fields": [
+              {
+                "name": "id",
+                "ty": "Int"
+              },
+              {
+                "name": "owner",
+                "ty": "String"
+              },
+              {
+                "name": "balance",
+                "ty": "Decimal"
+              }
+            ]
+          }
+        },
+        {
+          "Record": {
+            "name": "TransferReceipt",
+            "fields": [
+              {
+                "name": "tx_id",
+                "ty": "String"
+              },
+              {
+                "name": "from_id",
+                "ty": "Int"
+              },
+              {
+                "name": "to_id",
+                "ty": "Int"
+              },
+              {
+                "name": "amount",
+                "ty": "Decimal"
+              },
+              {
+                "name": "timestamp",
+                "ty": "Int"
+              }
+            ]
+          }
+        },
+        {
+          "Enum": {
+            "name": "TransferError",
+            "variants": [
+              {
+                "name": "AccountNotFound",
+                "fields": [
+                  {
+                    "name": "id",
+                    "ty": "Int"
+                  }
+                ]
+              },
+              {
+                "name": "InsufficientBalance",
+                "fields": [
+                  {
+                    "name": "required",
+                    "ty": "Decimal"
+                  },
+                  {
+                    "name": "available",
+                    "ty": "Decimal"
+                  }
+                ]
+              },
+              {
+                "name": "SameAccountTransfer",
+                "fields": []
+              }
+            ]
+          }
+        }
+      ],
+      "functions": [
+        {
+          "name": "execute_transfer",
+          "params": [
+            {
+              "name": "from_id",
+              "ty": "Int"
+            },
+            {
+              "name": "to_id",
+              "ty": "Int"
+            },
+            {
+              "name": "amount",
+              "ty": "Decimal"
+            }
+          ],
+          "return_type": {
+            "Custom": "Result<TransferReceipt, TransferError>"
+          },
+          "effects": [
+            "Database",
+            "Clock",
+            "AuditLog"
+          ],
+          "requires": [
+            {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "amount"
+                },
+                "op": "GreaterThan",
+                "right": {
+                  "Literal": {
+                    "Float": 0.0
+                  }
+                }
+              }
+            },
+            {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "from_id"
+                },
+                "op": "NotEqual",
+                "right": {
+                  "Ident": "to_id"
+                }
+              }
+            }
+          ],
+          "ensures": [
+            {
+              "BinaryOp": {
+                "left": {
+                  "BinaryOp": {
+                    "left": {
+                      "Ident": "result"
+                    },
+                    "op": "Is",
+                    "right": {
+                      "Ident": "Ok"
+                    }
+                  }
+                },
+                "op": "Implies",
+                "right": {
+                  "Literal": {
+                    "Bool": true
+                  }
+                }
+              }
+            }
+          ],
+          "body": {
+            "Raw": "// 读取转出账户\r\n    let from_acc = match Database.find_account(from_id) {\r\n        Some(acc) => acc,\r\n        None => return Err(TransferError.AccountNotFound(from_id)),\r\n    };\r\n\r\n    // 读取转入账户\r\n    let to_acc = match Database.find_account(to_id) {\r\n        Some(acc) => acc,\r\n        None => return Err(TransferError.AccountNotFound(to_id)),\r\n    };\r\n\r\n    // 余额检查\r\n    if from_acc.balance < amount {\r\n        return Err(TransferError.InsufficientBalance(\r\n            required: amount, \r\n            available: from_acc.balance\r\n        ));\r\n    }\r\n\r\n    // 不可变更新 (纯数据变换)\r\n    let new_from = { ...from_acc, balance: from_acc.balance - amount };\r\n    let new_to = { ...to_acc, balance: to_acc.balance + amount };\r\n\r\n    // 提交副作用\r\n    Database.update_account(new_from);\r\n    Database.update_account(new_to);\r\n\r\n    let ts = Clock.now_timestamp();\r\n    AuditLog.info(\"Transfer completed successfully\");\r\n\r\n    Ok(TransferReceipt {\r\n        tx_id: \"TX_\" + ts.to_string(),\r\n        from_id: from_id,\r\n        to_id: to_id,\r\n        amount: amount,\r\n        timestamp: ts,\r\n    })"
+          }
+        }
+      ],
+      "effects": [
+        {
+          "name": "Database",
+          "operations": [
+            {
+              "name": "find_account",
+              "params": [
+                {
+                  "name": "id",
+                  "ty": "Int"
+                }
+              ],
+              "return_type": {
+                "Custom": "Option<Account>"
+              }
+            },
+            {
+              "name": "update_account",
+              "params": [
+                {
+                  "name": "account",
+                  "ty": {
+                    "Custom": "Account"
+                  }
+                }
+              ],
+              "return_type": {
+                "Custom": "Result<(), String>"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Clock",
+          "operations": [
+            {
+              "name": "now_timestamp",
+              "params": [],
+              "return_type": "Int"
+            }
+          ]
+        },
+        {
+          "name": "AuditLog",
+          "operations": [
+            {
+              "name": "info",
+              "params": [
+                {
+                  "name": "msg",
+                  "ty": "String"
+                }
+              ],
+              "return_type": "Unit"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
