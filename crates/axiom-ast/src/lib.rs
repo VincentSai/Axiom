@@ -14,12 +14,54 @@ pub enum Type {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FieldDef {
+    pub name: String,
+    pub ty: Type,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VariantDef {
+    pub name: String,
+    pub fields: Vec<FieldDef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum TypeDef {
+    Record {
+        name: String,
+        fields: Vec<FieldDef>,
+    },
+    Enum {
+        name: String,
+        variants: Vec<VariantDef>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Literal {
     Int(i64),
     Float(f64),
     Bool(bool),
     String(String),
     Unit,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum Pattern {
+    Wildcard,
+    Literal(Literal),
+    Ident(String),
+    Variant {
+        enum_name: Option<String>,
+        variant_name: String,
+        fields: Vec<Pattern>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MatchArm {
+    pub pattern: Pattern,
+    pub body: Expr,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -62,6 +104,22 @@ pub enum Expr {
         callee: Box<Expr>,
         args: Vec<Expr>,
     },
+    FieldAccess {
+        target: Box<Expr>,
+        field: String,
+    },
+    RecordInit {
+        ty_name: Option<String>,
+        fields: Vec<(String, Expr)>,
+    },
+    RecordUpdate {
+        base: Box<Expr>,
+        updates: Vec<(String, Expr)>,
+    },
+    Match {
+        target: Box<Expr>,
+        arms: Vec<MatchArm>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -80,5 +138,6 @@ pub struct FunctionDecl {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Module {
+    pub types: Vec<TypeDef>,
     pub functions: Vec<FunctionDecl>,
 }
