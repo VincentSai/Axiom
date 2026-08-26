@@ -3,8 +3,8 @@
 use std::fmt;
 
 use axiom_ast::{
-    BinaryOperator, Expr, FieldDef, FunctionDecl, FunctionParam, Literal, MatchArm, Module, Pattern,
-    Type, TypeDef, UnaryOperator, VariantDef,
+    BinaryOperator, EffectDecl, EffectOp, Expr, FieldDef, FunctionDecl, FunctionParam, Literal,
+    MatchArm, Module, Pattern, Type, TypeDef, UnaryOperator, VariantDef,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,15 +31,24 @@ pub fn parse_module(source: &str) -> Result<Module, ParseError> {
     parser.skip_whitespace();
     let mut types = Vec::new();
     let mut functions = Vec::new();
+    let mut effects = Vec::new();
     while !parser.is_at_end() {
         if parser.starts_word("type") {
             types.push(parser.parse_type_definition()?);
-        } else {
+        } else if parser.starts_word("effect") {
+            effects.push(parser.parse_effect()?);
+        } else if parser.starts_word("fn") {
             functions.push(parser.parse_function()?);
+        } else {
+            return Err(parser.error("expected `type`, `effect`, or `fn` declaration"));
         }
         parser.skip_whitespace();
     }
-    Ok(Module { types, functions })
+    Ok(Module {
+        types,
+        functions,
+        effects,
+    })
 }
 
 pub fn parse_expr(source: &str) -> Result<Expr, ParseError> {
@@ -152,15 +161,181 @@ impl<'a> Parser<'a> {
         self.expect_char(')')?;
         self.expect_text("->")?;
         let return_type = self.parse_type()?;
+        let mut effects = Vec::new();
+        let mut requires = Vec::new();
+        let mut ensures = Vec::new();
+        loop {
+            if self.starts_word("with") {
+                self.expect_word("with")?;
+                self.expect_char('[')?;
+                if !self.consume_char(']') {
+                    loop {
+                        effects.push(self.parse_ident()?);
+                        if !self.consume_char(',') {
+                            break;
+                        }
+                    }
+                    self.expect_char(']')?;
+                }
+            } else if self.starts_word("requires") {
+                self.expect_word("requires")?;
+                requires.extend(self.parse_contract_block()?);
+            } else if self.starts_word("ensures") {
+                self.expect_word("ensures")?;
+                ensures.extend(self.parse_contract_block()?);
+            } else {
+                break;
+            }
+        }
         self.expect_char('{')?;
-        let body = self.parse_block_contents()?;
-        self.expect_char('}')?;
+        let body_start = self.offset;
+        let parsed_body = self
+            .parse_block_contents()
+            .and_then(|body| self.expect_char('}').map(|()| body));
+        let body = match parsed_body {
+            Ok(body) => body,
+            Err(error) => {
+                self.offset = body_start;
+                let raw = self.capture_block_contents()?;
+                if !raw.contains("match ") && !raw.contains("if ") {
+                    return Err(error);
+                }
+                Expr::Raw(raw.trim().to_owned())
+            }
+        };
         Ok(FunctionDecl {
             name,
             params,
             return_type,
+            effects,
+            requires,
+            ensures,
             body,
         })
+    }
+
+
+    fn capture_block_contents(&mut self) -> Result<String, ParseError> {
+        let start = self.offset;
+        let mut depth = 1usize;
+        while !self.is_at_end() {
+            if self.source[self.offset..].starts_with("//") {
+                self.offset += 2;
+                while !matches!(self.peek_char(), None | Some('\n')) {
+                    self.bump_char();
+                }
+                continue;
+            }
+            if self.source[self.offset..].starts_with("/*") {
+                self.offset += 2;
+                while !self.is_at_end() && !self.source[self.offset..].starts_with("*/") {
+                    self.bump_char();
+                }
+                if self.is_at_end() {
+                    return Err(self.error("unterminated block comment"));
+                }
+                self.offset += 2;
+                continue;
+            }
+            if self.peek_char() == Some('"') {
+                self.bump_char();
+                loop {
+                    match self.bump_char() {
+                        Some('\\') => {
+                            if self.bump_char().is_none() {
+                                return Err(self.error("unterminated string literal"));
+                            }
+                        }
+                        Some('"') => break,
+                        Some(_) => {}
+                        None => return Err(self.error("unterminated string literal")),
+                    }
+                }
+                continue;
+            }
+
+            match self.bump_char() {
+                Some('{') => depth += 1,
+                Some('}') => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Ok(self.source[start..self.offset - 1].to_owned());
+                    }
+                }
+                Some(_) => {}
+                None => break,
+            }
+        }
+        Err(self.error("expected `}`"))
+    }
+
+    fn parse_contract_block(&mut self) -> Result<Vec<Expr>, ParseError> {
+        self.expect_char('{')?;
+        let mut clauses = Vec::new();
+        if !self.consume_char('}') {
+            loop {
+                clauses.push(self.parse_expression()?);
+                if !self.consume_char(',') {
+                    break;
+                }
+                if self.consume_char('}') {
+                    return Ok(clauses);
+                }
+            }
+            self.expect_char('}')?;
+        }
+        Ok(clauses)
+    }
+
+    fn parse_effect(&mut self) -> Result<EffectDecl, ParseError> {
+        self.expect_word("effect")?;
+        let name = self.parse_ident()?;
+        self.expect_char('{')?;
+        let mut operations = Vec::new();
+
+        loop {
+            self.skip_whitespace();
+            if self.consume_char('}') {
+                break;
+            }
+
+            self.expect_word("fn")?;
+            let operation_name = self.parse_ident()?;
+            self.expect_char('(')?;
+            let params = self.parse_params()?;
+            self.expect_char(')')?;
+            if !self.consume_char(':') {
+                self.expect_text("->")?;
+            }
+            let return_type = self.parse_type()?;
+            self.consume_char(';');
+            operations.push(EffectOp {
+                name: operation_name,
+                params,
+                return_type,
+            });
+        }
+
+        Ok(EffectDecl { name, operations })
+    }
+
+    fn parse_params(&mut self) -> Result<Vec<FunctionParam>, ParseError> {
+        let mut params = Vec::new();
+        self.skip_whitespace();
+        if self.peek_char() == Some(')') {
+            return Ok(params);
+        }
+
+        loop {
+            let name = self.parse_ident()?;
+            self.expect_char(':')?;
+            let ty = self.parse_type()?;
+            params.push(FunctionParam { name, ty });
+            if !self.consume_char(',') {
+                break;
+            }
+        }
+        Ok(params)
     }
 
     fn parse_block_contents(&mut self) -> Result<Expr, ParseError> {
@@ -210,16 +385,42 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self) -> Result<Expr, ParseError> {
-        self.parse_comparison()
+        self.parse_implication()
+    }
+
+    fn parse_implication(&mut self) -> Result<Expr, ParseError> {
+        let left = self.parse_comparison()?;
+        if self.consume_text("=>") {
+            return Ok(Expr::BinaryOp {
+                left: Box::new(left),
+                op: BinaryOperator::Implies,
+                right: Box::new(self.parse_implication()?),
+            });
+        }
+        Ok(left)
     }
 
     fn parse_comparison(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.parse_additive()?;
-        if self.consume_char('>') {
+        let op = if self.consume_text(">=") {
+            Some(BinaryOperator::GreaterThanOrEqual)
+        } else if self.consume_text("==") {
+            Some(BinaryOperator::Equal)
+        } else if self.consume_text("!=") {
+            Some(BinaryOperator::NotEqual)
+        } else if self.consume_char('>') {
+            Some(BinaryOperator::GreaterThan)
+        } else if self.starts_word("is") {
+            self.expect_word("is")?;
+            Some(BinaryOperator::Is)
+        } else {
+            None
+        };
+        if let Some(op) = op {
             let right = self.parse_additive()?;
             expr = Expr::BinaryOp {
                 left: Box::new(expr),
-                op: BinaryOperator::GreaterThan,
+                op,
                 right: Box::new(right),
             };
         }
@@ -524,14 +725,14 @@ impl<'a> Parser<'a> {
             self.expect_char(')')?;
             return Ok(Type::Unit);
         }
-        let name = self.parse_ident()?;
+        let mut name = self.parse_ident()?;
         let simple_type = match name.as_str() {
             "Int" => Ok(Type::Int),
             "Float" => Ok(Type::Float),
             "Decimal" => Ok(Type::Decimal),
             "Bool" => Ok(Type::Bool),
             "String" => Ok(Type::String),
-            _ => Ok(Type::Custom(name)),
+            _ => Ok(Type::Custom(name.clone())),
         }?;
         if !self.consume_char('<') {
             return Ok(simple_type);
@@ -545,9 +746,28 @@ impl<'a> Parser<'a> {
             }
         }
         self.expect_char('>')?;
-        let base = type_name(&simple_type);
-        let arguments = arguments.iter().map(type_name).collect::<Vec<_>>().join(", ");
-        Ok(Type::Custom(format!("{base}<{arguments}>")))
+        name.push('<');
+        name.push_str(
+            &arguments
+                .iter()
+                .map(Self::format_type)
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+        name.push('>');
+        Ok(Type::Custom(name))
+    }
+
+    fn format_type(ty: &Type) -> String {
+        match ty {
+            Type::Int => "Int".into(),
+            Type::Float => "Float".into(),
+            Type::Decimal => "Decimal".into(),
+            Type::Bool => "Bool".into(),
+            Type::String => "String".into(),
+            Type::Unit => "()".into(),
+            Type::Custom(name) => name.clone(),
+        }
     }
 
     fn parse_ident(&mut self) -> Result<String, ParseError> {
@@ -587,6 +807,16 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn consume_text(&mut self, expected: &str) -> bool {
+        self.skip_whitespace();
+        if self.source[self.offset..].starts_with(expected) {
+            self.offset += expected.len();
+            true
+        } else {
+            false
+        }
+    }
+
     fn expect_char(&mut self, expected: char) -> Result<(), ParseError> {
         self.skip_whitespace();
         if self.peek_char() == Some(expected) {
@@ -609,7 +839,7 @@ impl<'a> Parser<'a> {
 
     fn skip_whitespace(&mut self) {
         loop {
-            while matches!(self.peek_char(), Some(ch) if ch.is_whitespace()) {
+            while matches!(self.peek_char(), Some(ch) if ch.is_whitespace() || ch == '\u{feff}') {
                 self.bump_char();
             }
             if self.source[self.offset..].starts_with("//") {
@@ -663,14 +893,3 @@ impl<'a> Parser<'a> {
     }
 }
 
-fn type_name(ty: &Type) -> String {
-    match ty {
-        Type::Int => "Int".into(),
-        Type::Float => "Float".into(),
-        Type::Decimal => "Decimal".into(),
-        Type::Bool => "Bool".into(),
-        Type::String => "String".into(),
-        Type::Unit => "()".into(),
-        Type::Custom(name) => name.clone(),
-    }
-}

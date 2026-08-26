@@ -71,6 +71,11 @@ pub enum BinaryOperator {
     Multiply,
     Divide,
     GreaterThan,
+    GreaterThanOrEqual,
+    Equal,
+    NotEqual,
+    Is,
+    Implies,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -120,6 +125,7 @@ pub enum Expr {
         target: Box<Expr>,
         arms: Vec<MatchArm>,
     },
+    Raw(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -129,10 +135,26 @@ pub struct FunctionParam {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EffectOp {
+    pub name: String,
+    pub params: Vec<FunctionParam>,
+    pub return_type: Type,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EffectDecl {
+    pub name: String,
+    pub operations: Vec<EffectOp>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FunctionDecl {
     pub name: String,
     pub params: Vec<FunctionParam>,
     pub return_type: Type,
+    pub effects: Vec<String>,
+    pub requires: Vec<Expr>,
+    pub ensures: Vec<Expr>,
     pub body: Expr,
 }
 
@@ -140,4 +162,5 @@ pub struct FunctionDecl {
 pub struct Module {
     pub types: Vec<TypeDef>,
     pub functions: Vec<FunctionDecl>,
+    pub effects: Vec<EffectDecl>,
 }
