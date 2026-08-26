@@ -11,6 +11,7 @@ members = [
     "crates/axiom-db",
     "crates/axiom-vfs",
     "crates/axiom-agent-pool",
+    "crates/axiom-wit",
 ]
 resolver = "2"
 
