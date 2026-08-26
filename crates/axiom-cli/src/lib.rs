@@ -8,10 +8,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use axiom_db::{AstDatabase, DbError, NodeHash};
 use axiom_diagnostics::{diagnose_source, DiagnosticStatus};
 use axiom_hole_extractor::{extract_holes, HoleTask};
 use axiom_parser::{parse_module, ParseError};
 use axiom_transpiler::{transpile_source_to_rust, TranspileError};
+use axiom_vfs::{export_database_module, sync_source_to_database, VfsError};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -55,6 +57,37 @@ pub enum Commands {
 
     /// Transpile, compile, and execute a hole-free Axiom program.
     Run { file: PathBuf },
+
+    /// Store and retrieve content-addressed modules in the AST database.
+    Db {
+        #[command(subcommand)]
+        command: DatabaseCommands,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DatabaseCommands {
+    /// Parse an Axiom file and store its AST by content hash.
+    Put {
+        file: PathBuf,
+
+        /// Path to the persistent AST database.
+        #[arg(long, default_value = ".axiom/astdb.json")]
+        db: PathBuf,
+    },
+
+    /// Export a stored module as deterministic Axiom source.
+    Export {
+        hash: NodeHash,
+
+        /// Path to the persistent AST database.
+        #[arg(long, default_value = ".axiom/astdb.json")]
+        db: PathBuf,
+
+        /// Write source to a file instead of stdout.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug)]
@@ -88,6 +121,11 @@ pub enum CliError {
     },
     ProgramFailed(Option<i32>),
     VerificationFailed,
+    OpenDatabase {
+        path: PathBuf,
+        source: DbError,
+    },
+    DatabaseProjection(VfsError),
 }
 
 impl fmt::Display for CliError {
@@ -132,6 +170,14 @@ impl fmt::Display for CliError {
                 write!(formatter, "program failed with {}", format_exit_code(*code))
             }
             Self::VerificationFailed => write!(formatter, "verification failed with diagnostics"),
+            Self::OpenDatabase { path, source } => {
+                write!(
+                    formatter,
+                    "could not open AST database `{}`: {source}",
+                    path.display()
+                )
+            }
+            Self::DatabaseProjection(source) => write!(formatter, "{source}"),
         }
     }
 }
@@ -147,6 +193,8 @@ impl Error for CliError {
             Self::Parse { source, .. } => Some(source),
             Self::Serialize(source) => Some(source),
             Self::Transpile { source, .. } => Some(source),
+            Self::OpenDatabase { source, .. } => Some(source),
+            Self::DatabaseProjection(source) => Some(source),
             Self::RustCompilationFailed(_) | Self::ProgramFailed(_) | Self::VerificationFailed => {
                 None
             }
@@ -161,7 +209,54 @@ pub fn run(cli: Cli) -> Result<(), CliError> {
         Commands::ExtractHoles { file, out_dir } => extract(&file, out_dir.as_deref()),
         Commands::EmitRust { file, output } => emit_rust(&file, output.as_deref()),
         Commands::Run { file } => compile_and_run(&file),
+        Commands::Db { command } => match command {
+            DatabaseCommands::Put { file, db } => database_put(&file, &db),
+            DatabaseCommands::Export { hash, db, out } => {
+                database_export(&hash, &db, out.as_deref())
+            }
+        },
     }
+}
+
+fn database_put(file: &Path, database_path: &Path) -> Result<(), CliError> {
+    let source = read_source(file)?;
+    let mut database = open_database(database_path)?;
+    let summary =
+        sync_source_to_database(&mut database, &source).map_err(CliError::DatabaseProjection)?;
+    println!("{}", summary.module_hash);
+    Ok(())
+}
+
+fn database_export(
+    module_hash: &NodeHash,
+    database_path: &Path,
+    output: Option<&Path>,
+) -> Result<(), CliError> {
+    let database = open_database(database_path)?;
+    let source =
+        export_database_module(&database, module_hash).map_err(CliError::DatabaseProjection)?;
+
+    if let Some(output) = output {
+        fs::write(output, source).map_err(|source| CliError::WriteFile {
+            path: output.to_owned(),
+            source,
+        })?;
+    } else {
+        io::stdout()
+            .write_all(source.as_bytes())
+            .map_err(|source| CliError::WriteFile {
+                path: PathBuf::from("<stdout>"),
+                source,
+            })?;
+    }
+    Ok(())
+}
+
+fn open_database(path: &Path) -> Result<AstDatabase, CliError> {
+    AstDatabase::open(path).map_err(|source| CliError::OpenDatabase {
+        path: path.to_owned(),
+        source,
+    })
 }
 
 fn check(file: &Path) -> Result<(), CliError> {

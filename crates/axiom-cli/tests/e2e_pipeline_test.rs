@@ -133,6 +133,76 @@ fn cli_happy_paths_cover_check_stdout_json_emit_and_run() {
     assert_success(&run);
 }
 
+#[test]
+fn db_put_and_export_round_trip_a_content_addressed_module() {
+    let temp = TestDirectory::new();
+    let source = temp.write(
+        "stored.ax",
+        r#"
+        type Answer = { value: Int }
+
+        fn answer() -> Answer {
+            Answer { value: 40 + 2 }
+        }
+        "#,
+    );
+    let database = temp.path().join("nested").join("astdb.json");
+
+    let put = axiom(&[
+        "db",
+        "put",
+        path_text(&source),
+        "--db",
+        path_text(&database),
+    ]);
+    assert_success(&put);
+    let module_hash = String::from_utf8(put.stdout)
+        .expect("module hash should be UTF-8")
+        .trim()
+        .to_owned();
+    assert!(module_hash.starts_with("#mod_"));
+    assert_eq!(module_hash.len(), "#mod_".len() + 64);
+
+    let export_stdout = axiom(&["db", "export", &module_hash, "--db", path_text(&database)]);
+    assert_success(&export_stdout);
+    let projected = temp.write(
+        "projected.ax",
+        std::str::from_utf8(&export_stdout.stdout).expect("projected source should be UTF-8"),
+    );
+
+    let put_again = axiom(&[
+        "db",
+        "put",
+        path_text(&projected),
+        "--db",
+        path_text(&database),
+    ]);
+    assert_success(&put_again);
+    assert_eq!(
+        String::from_utf8(put_again.stdout)
+            .expect("module hash should be UTF-8")
+            .trim(),
+        module_hash
+    );
+
+    let output_path = temp.path().join("exported.ax");
+    let export_file = axiom(&[
+        "db",
+        "export",
+        &module_hash,
+        "--db",
+        path_text(&database),
+        "--out",
+        path_text(&output_path),
+    ]);
+    assert_success(&export_file);
+    assert!(export_file.stdout.is_empty());
+    assert_eq!(
+        fs::read(&output_path).expect("exported source should be readable"),
+        export_stdout.stdout
+    );
+}
+
 fn axiom(arguments: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_axiom"))
         .args(arguments)

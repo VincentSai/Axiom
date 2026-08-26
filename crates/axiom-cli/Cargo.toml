@@ -8,9 +8,12 @@ name = "axiom"
 path = "src/main.rs"
 
 [dependencies]
+axiom-agent-pool = { path = "../axiom-agent-pool" }
+axiom-db = { path = "../axiom-db" }
 axiom-diagnostics = { path = "../axiom-diagnostics" }
 axiom-hole-extractor = { path = "../axiom-hole-extractor" }
 axiom-parser = { path = "../axiom-parser" }
 axiom-transpiler = { path = "../axiom-transpiler" }
+axiom-vfs = { path = "../axiom-vfs" }
 clap = { version = "4", features = ["derive"] }
 serde_json = "1"

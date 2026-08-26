@@ -112,6 +112,21 @@ fn hashes_are_stable_and_change_when_content_changes() {
 }
 
 #[test]
+fn textual_hashes_round_trip_and_reject_malformed_values() {
+    let hash = compute_module_hash(&sample_module());
+    assert_eq!(hash.as_str().parse::<axiom_db::NodeHash>().unwrap(), hash);
+
+    for malformed in [
+        "mod_deadbeef",
+        "#unknown_deadbeef",
+        "#mod_deadbeef",
+        "#mod_ABCDEF0000000000000000000000000000000000000000000000000000",
+    ] {
+        assert!(malformed.parse::<axiom_db::NodeHash>().is_err());
+    }
+}
+
+#[test]
 fn persisted_database_can_reconstruct_the_original_module() {
     let path = temporary_database_path("persistence");
     let module = sample_module();

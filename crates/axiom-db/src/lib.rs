@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 /// A stable, typed SHA-256 content identifier for an AST node.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -17,6 +18,47 @@ impl NodeHash {
     /// Returns the textual content identifier.
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+}
+
+/// A malformed textual AST node hash.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseNodeHashError {
+    value: String,
+}
+
+impl fmt::Display for ParseNodeHashError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "invalid AST node hash `{}`; expected `#<kind>_<64 lowercase hex digits>`",
+            self.value
+        )
+    }
+}
+
+impl std::error::Error for ParseNodeHashError {}
+
+impl FromStr for NodeHash {
+    type Err = ParseNodeHashError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let valid_prefix = ["#type_", "#fn_", "#effect_", "#mod_"]
+            .iter()
+            .find(|prefix| value.starts_with(**prefix));
+        let digest = valid_prefix.and_then(|prefix| value.strip_prefix(prefix));
+        if digest.is_some_and(|digest| {
+            digest.len() == 64
+                && digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        }) {
+            Ok(Self(value.to_owned()))
+        } else {
+            Err(ParseNodeHashError {
+                value: value.to_owned(),
+            })
+        }
     }
 }
 
