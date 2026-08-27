@@ -1,4 +1,4 @@
-﻿// Shared benchmark domain model from SPEC_200.md.
+// Shared benchmark domain model from SPEC_200.md.
 
 type Point = {
     x: Int,
@@ -256,42 +256,46 @@ fn calc_line_of_sight_cost(dist: Int, terrain_density: Int) -> Int
 
 // 017 - Cartesian quadrant code: NE=0, NW=1, SW=2, SE=3.
 fn spatial_subsys_017(a: Int, b: Int) -> Int
-    requires { a >= 0, b >= 0 }
-    ensures { result >= 0 }
+    requires { true }
+    ensures { result >= 0, result <= 3 }
 {
-    a + b
+    let quadrant = match a >= 0 {
+        true => match b >= 0 { true => 0, false => 3 },
+        false => match b >= 0 { true => 1, false => 2 },
+    };
+    calc_grid_index(quadrant, 0, 1)
 }
 
 // 018 - Diamond-field mask distance from the origin.
 fn spatial_subsys_018(a: Int, b: Int) -> Int
-    requires { a >= 0, b >= 0 }
+    requires { true }
     ensures { result >= 0 }
 {
-    a + b
+    calc_manhattan_dist(0, 0, a, b)
 }
 
 // 019 - Farthest nonnegative ray-intersection depth.
 fn spatial_subsys_019(a: Int, b: Int) -> Int
     requires { a >= 0, b >= 0 }
-    ensures { result >= 0 }
+    ensures { result >= a, result >= b }
 {
-    a + b
+    calc_chebyshev_dist(0, 0, a, b)
 }
 
 // 020 - Quadtree child-cell index.
 fn spatial_subsys_020(a: Int, b: Int) -> Int
-    requires { a >= 0, b >= 0 }
-    ensures { result >= 0 }
+    requires { a >= 0, b >= 0, b < 4 }
+    ensures { result >= a * 4, result < (a + 1) * 4 }
 {
-    a + b
+    a * 4 + b
 }
 
 // 021 - Squared displacement of a grid vector.
 fn spatial_subsys_021(a: Int, b: Int) -> Int
-    requires { a >= 0, b >= 0 }
+    requires { true }
     ensures { result >= 0 }
 {
-    a + b
+    a * a + b * b
 }
 
 // 022 - Nonnegative projection-scale product.
@@ -299,55 +303,63 @@ fn spatial_subsys_022(a: Int, b: Int) -> Int
     requires { a >= 0, b >= 0 }
     ensures { result >= 0 }
 {
-    a + b
+    a * b
 }
 
 // 023 - Smaller nonnegative axis extent.
 fn spatial_subsys_023(a: Int, b: Int) -> Int
     requires { a >= 0, b >= 0 }
-    ensures { result >= 0 }
+    ensures { result >= 0, result <= a, result <= b }
 {
-    a + b
+    let shared_extent = match a <= b { true => a, false => b };
+    calc_grid_index(shared_extent, 0, 1)
 }
 
 // 024 - Sum of normalized axis directions.
 fn spatial_subsys_024(a: Int, b: Int) -> Int
-    requires { a >= 0, b >= 0 }
-    ensures { result >= 0 }
+    requires { true }
+    ensures { result >= -2, result <= 2 }
 {
-    a + b
+    let direction_sum = match a > 0 {
+        true => match b > 0 { true => 2, false => match b < 0 { true => 0, false => 1 } },
+        false => match a < 0 {
+            true => match b > 0 { true => 0, false => match b < 0 { true => -2, false => -1 } },
+            false => match b > 0 { true => 1, false => match b < 0 { true => -1, false => 0 } },
+        },
+    };
+    spatial_subsys_040(direction_sum, direction_sum)
 }
 
 // 025 - Inclusive-axis span delta.
 fn spatial_subsys_025(a: Int, b: Int) -> Int
-    requires { a >= 0, b >= 0 }
+    requires { true }
     ensures { result >= 0 }
 {
-    a + b
+    calc_manhattan_dist(a, 0, b, 0)
 }
 
 // 026 - Midpoint of an ordered nonnegative interval.
 fn spatial_subsys_026(a: Int, b: Int) -> Int
-    requires { a >= 0, b >= 0 }
-    ensures { result >= 0 }
+    requires { a >= 0, a <= b }
+    ensures { result >= a, result <= b }
 {
-    a + b
+    (a + b) / 2
 }
 
 // 027 - Pack a bounded cell-local coordinate.
 fn spatial_subsys_027(a: Int, b: Int) -> Int
-    requires { a >= 0, b >= 0 }
+    requires { a >= 0, b >= 0, b < 65536 }
     ensures { result >= 0 }
 {
-    a + b
+    a * 65536 + b
 }
 
 // 028 - Manhattan ring number for an offset.
 fn spatial_subsys_028(a: Int, b: Int) -> Int
-    requires { a >= 0, b >= 0 }
+    requires { true }
     ensures { result >= 0 }
 {
-    a + b
+    calc_manhattan_dist(0, 0, a, b)
 }
 
 // 029 - Area of a nonnegative grid rectangle.
@@ -355,21 +367,21 @@ fn spatial_subsys_029(a: Int, b: Int) -> Int
     requires { a >= 0, b >= 0 }
     ensures { result >= 0 }
 {
-    a + b
+    a * b
 }
 
 // 030 - Squared diagonal length of a grid cell.
 fn spatial_subsys_030(a: Int, b: Int) -> Int
-    requires { a >= 0, b >= 0 }
+    requires { true }
     ensures { result >= 0 }
 {
-    a + b
+    a * a + b * b
 }
 
 // 031 - Advance a ray by a nonnegative origin and step.
 fn spatial_subsys_031(a: Int, b: Int) -> Int
     requires { a >= 0, b >= 0 }
-    ensures { result >= 0 }
+    ensures { result >= a, result >= b }
 {
     a + b
 }
@@ -377,9 +389,10 @@ fn spatial_subsys_031(a: Int, b: Int) -> Int
 // 032 - Remaining visibility after nonnegative occlusion.
 fn spatial_subsys_032(a: Int, b: Int) -> Int
     requires { a >= 0, b >= 0 }
-    ensures { result >= 0 }
+    ensures { result >= 0, result <= a }
 {
-    a + b
+    let remaining = match a >= b { true => a - b, false => 0 };
+    calc_grid_index(remaining, 0, 1)
 }
 
 // 033 - Shared length of two origin-aligned intervals.
@@ -1969,5 +1982,3 @@ fn world_engine_200(turn_num: Int, cycle_len: Int) -> Int
     let world_score = world_engine_199(turn_num, cycle_len);
     initiative + combat_result + hazard_result + world_score
 }
-
-
