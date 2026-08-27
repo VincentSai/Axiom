@@ -1,4 +1,8 @@
-﻿# 🏆 200-Functions 跨语言多 Agent 协作基准测试权威总结
+﻿> **Languages / 语言 / 語言**: [English](README.en.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md)
+
+---
+
+# 🏆 200-Functions 跨语言多 Agent 协作基准测试权威总结
 
 > **评测目标**：严格依据工业级 RPG 游戏引擎需求规范 [`SPEC_200.md`](./SPEC_200.md)，横向评测在由真实 AI 大模型（OpenAI Codex CLI）多 Agent 并发协作开发 200 个真实业务函数时，**Axiom、Python、Rust 与 TypeScript** 四大语言体系在 **Tokens 消耗、开发耗时、协作冲突率与形式化正确性** 维度的实际表现。
 
@@ -64,3 +68,4 @@ cargo test --manifest-path examples/benchmark_200/rs/Cargo.toml
 # 4. 运行 TypeScript 200 函数完整测试套件
 npx tsx --test examples/benchmark_200/ts/tests/engine_200.test.ts
 ```
+

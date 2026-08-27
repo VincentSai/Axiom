@@ -1,4 +1,8 @@
-﻿# Axiom 语言语法与语义规范草案 (Language Specification v0.1)
+﻿> **Languages / 语言 / 語言**: [English](en/SPECIFICATION.md) | [简体中文](zh-CN/SPECIFICATION.md) | [繁體中文](zh-TW/SPECIFICATION.md)
+
+---
+
+# Axiom 语言语法与语义规范草案 (Language Specification v0.1)
 
 ---
 

@@ -1,4 +1,8 @@
-﻿# Axiom 架构设计白皮书 (Architecture Whitepaper)
+﻿> **Languages / 语言 / 語言**: [English](en/ARCHITECTURE.md) | [简体中文](zh-CN/ARCHITECTURE.md) | [繁體中文](zh-TW/ARCHITECTURE.md)
+
+---
+
+# Axiom 架构设计白皮书 (Architecture Whitepaper)
 
 > 版本: 0.1.0-draft  
 > 状态: 架构共识达成 (Approved by /grill-me session)
