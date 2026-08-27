@@ -1,4 +1,4 @@
-﻿//! Command-line entry points for the Axiom toolchain.
+//! Command-line entry points for the Axiom toolchain.
 
 use std::error::Error;
 use std::fmt;
@@ -547,7 +547,12 @@ fn write_hole_tasks(out_dir: &Path, tasks: &[HoleTask]) -> Result<(), CliError> 
     })?;
 
     for task in tasks {
-        let path = out_dir.join(format!("{}.json", task.hole_id));
+        let filename = if task.hole_id == "hole" || task.hole_id.is_empty() {
+            &task.target_function
+        } else {
+            &task.hole_id
+        };
+        let path = out_dir.join(format!("{filename}.json"));
         let mut json = task.to_json_pretty();
         json.push('\n');
         fs::write(&path, json).map_err(|source| CliError::WriteFile { path, source })?;

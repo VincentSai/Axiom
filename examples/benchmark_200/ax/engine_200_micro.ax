@@ -1,0 +1,1984 @@
+// Shared benchmark domain model from SPEC_200.md.
+
+type Point = {
+    x: Int,
+    y: Int,
+}
+
+type Velocity = {
+    dx: Int,
+    dy: Int,
+}
+
+type Rect = {
+    min_x: Int,
+    min_y: Int,
+    max_x: Int,
+    max_y: Int,
+}
+
+type BaseAttributes = {
+    strength: Int,
+    agility: Int,
+    intelligence: Int,
+    vitality: Int,
+}
+
+type DerivedStats = {
+    max_hp: Int,
+    max_mana: Int,
+    max_stamina: Int,
+    phys_atk: Int,
+    magic_atk: Int,
+    armor: Int,
+    magic_res: Int,
+    crit_rate: Int,
+    crit_dmg_pct: Int,
+    dodge_rate: Int,
+    move_speed: Int,
+}
+
+type StatusEffect = {
+    bleed_stacks: Int,
+    poison_duration: Int,
+    burn_damage: Int,
+    freeze_stacks: Int,
+    shield_hp: Int,
+}
+
+type Entity = {
+    id: Int,
+    pos: Point,
+    base_attr: BaseAttributes,
+    stats: DerivedStats,
+    status: StatusEffect,
+    curr_hp: Int,
+    curr_mana: Int,
+    curr_stamina: Int,
+    gold: Int,
+    level: Int,
+    exp: Int,
+    weight: Int,
+    max_weight: Int,
+    is_alive: Bool,
+}
+
+// Tier 0: spatial geometry and grid math (functions 001-040).
+// All functions are total over their declared preconditions and are pure.
+
+// 001 - Manhattan grid distance.
+fn calc_manhattan_dist(x1: Int, y1: Int, x2: Int, y2: Int) -> Int
+    requires { true }
+    ensures { result >= 0 }
+{
+    let raw_distance = match x1 >= x2 {
+        true => match y1 >= y2 {
+            true => (x1 - x2) + (y1 - y2),
+            false => (x1 - x2) + (y2 - y1),
+        },
+        false => match y1 >= y2 {
+            true => (x2 - x1) + (y1 - y2),
+            false => (x2 - x1) + (y2 - y1),
+        },
+    };
+    calc_line_of_sight_cost(raw_distance, 100)
+}
+
+// 002 - Chebyshev (king-move) distance.
+fn calc_chebyshev_dist(x1: Int, y1: Int, x2: Int, y2: Int) -> Int
+    requires { true }
+    ensures { result >= 0 }
+{
+    let raw_distance = match x1 >= x2 {
+        true => match y1 >= y2 {
+            true => match (x1 - x2) >= (y1 - y2) { true => x1 - x2, false => y1 - y2 },
+            false => match (x1 - x2) >= (y2 - y1) { true => x1 - x2, false => y2 - y1 },
+        },
+        false => match y1 >= y2 {
+            true => match (x2 - x1) >= (y1 - y2) { true => x2 - x1, false => y1 - y2 },
+            false => match (x2 - x1) >= (y2 - y1) { true => x2 - x1, false => y2 - y1 },
+        },
+    };
+    calc_line_of_sight_cost(raw_distance, 100)
+}
+
+// 003 - Squared Euclidean distance.
+fn calc_euclidean_sq(x1: Int, y1: Int, x2: Int, y2: Int) -> Int
+    requires { true }
+    ensures { result >= 0 }
+{
+    (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2)
+}
+
+// 004 - Circular range test using squared values.
+fn check_in_radius_sq(dist_sq: Int, radius: Int) -> Bool
+    requires { dist_sq >= 0, radius >= 0 }
+    ensures { result == (dist_sq <= radius * radius) }
+{
+    dist_sq <= radius * radius
+}
+
+// 005 - Bresenham horizontal sign step.
+fn bresenham_step_x(x1: Int, x2: Int) -> Int
+    requires { true }
+    ensures { result >= -1, result <= 1 }
+{
+    let raw_step = match x2 > x1 {
+        true => 1,
+        false => match x2 < x1 { true => -1, false => 0 },
+    };
+    spatial_subsys_040(raw_step, raw_step)
+}
+
+// 006 - Bresenham vertical sign step.
+fn bresenham_step_y(y1: Int, y2: Int) -> Int
+    requires { true }
+    ensures { result >= -1, result <= 1 }
+{
+    let raw_step = match y2 > y1 {
+        true => 1,
+        false => match y2 < y1 { true => -1, false => 0 },
+    };
+    spatial_subsys_040(raw_step, raw_step)
+}
+
+// 007 - Pack X with the low 16 bits of Y using arithmetic equivalents.
+fn pack_coords_to_hash(x: Int, y: Int) -> Int
+    requires { x >= 0, y >= 0 }
+    ensures { result >= 0 }
+{
+    x * 65536 + (y - (y / 65536) * 65536)
+}
+
+// 008 - Unpack the high-coordinate component.
+fn unpack_hash_x(hash: Int) -> Int
+    requires { hash >= 0 }
+    ensures { result >= 0 }
+{
+    hash / 65536
+}
+
+// 009 - Unpack the low 16-bit coordinate component.
+fn unpack_hash_y(hash: Int) -> Int
+    requires { hash >= 0 }
+    ensures { result >= 0, result < 65536 }
+{
+    hash - (hash / 65536) * 65536
+}
+
+// 010 - Positive modulo for a wrapping X coordinate.
+fn wrap_map_coord_x(x: Int, width: Int) -> Int
+    requires { width > 0 }
+    ensures { result >= 0, result < width }
+{
+    let wrapped = match x >= 0 {
+        true => x - (x / width) * width,
+        false => x - ((x - (width - 1)) / width) * width,
+    };
+    spatial_subsys_035(wrapped, width)
+}
+
+// 011 - Positive modulo for a wrapping Y coordinate.
+fn wrap_map_coord_y(y: Int, height: Int) -> Int
+    requires { height > 0 }
+    ensures { result >= 0, result < height }
+{
+    let wrapped = match y >= 0 {
+        true => y - (y / height) * height,
+        false => y - ((y - (height - 1)) / height) * height,
+    };
+    spatial_subsys_035(wrapped, height)
+}
+
+// 012 - Clamp X into [0, width - 1].
+fn clamp_to_bounds_x(x: Int, width: Int) -> Int
+    requires { width > 0 }
+    ensures { result >= 0, result < width }
+{
+    let clamped = match x < 0 {
+        true => 0,
+        false => match x >= width { true => width - 1, false => x },
+    };
+    calc_grid_index(clamped, 0, 1)
+}
+
+// 013 - Clamp Y into [0, height - 1].
+fn clamp_to_bounds_y(y: Int, height: Int) -> Int
+    requires { height > 0 }
+    ensures { result >= 0, result < height }
+{
+    let clamped = match y < 0 {
+        true => 0,
+        false => match y >= height { true => height - 1, false => y },
+    };
+    calc_grid_index(clamped, 0, 1)
+}
+
+// 014 - Inclusive axis-aligned bounding-box intersection.
+fn check_aabb_overlap(
+    min_x1: Int,
+    min_y1: Int,
+    max_x1: Int,
+    max_y1: Int,
+    min_x2: Int,
+    min_y2: Int,
+    max_x2: Int,
+    max_y2: Int
+) -> Bool
+    requires {
+        min_x1 <= max_x1,
+        min_y1 <= max_y1,
+        min_x2 <= max_x2,
+        min_y2 <= max_y2,
+    }
+    ensures {
+        result == (max_x1 >= min_x2 && min_x1 <= max_x2 && max_y1 >= min_y2 && min_y1 <= max_y2)
+    }
+{
+    max_x1 >= min_x2 && min_x1 <= max_x2 && max_y1 >= min_y2 && min_y1 <= max_y2
+}
+
+// 015 - Flatten a two-dimensional grid coordinate.
+fn calc_grid_index(x: Int, y: Int, map_width: Int) -> Int
+    requires { x >= 0, y >= 0, map_width > 0 }
+    ensures { result >= 0 }
+{
+    y * map_width + x
+}
+
+// 016 - Terrain-weighted line-of-sight energy cost.
+fn calc_line_of_sight_cost(dist: Int, terrain_density: Int) -> Int
+    requires { dist >= 0, terrain_density >= 0 }
+    ensures { result >= 0 }
+{
+    dist * terrain_density / 100
+}
+
+// 017 - Cartesian quadrant code: NE=0, NW=1, SW=2, SE=3.
+fn spatial_subsys_017(a: Int, b: Int) -> Int
+    requires { true }
+    ensures { result >= 0, result <= 3 }
+{
+    let quadrant = match a >= 0 {
+        true => match b >= 0 { true => 0, false => 3 },
+        false => match b >= 0 { true => 1, false => 2 },
+    };
+    calc_grid_index(quadrant, 0, 1)
+}
+
+// 018 - Diamond-field mask distance from the origin.
+fn spatial_subsys_018(a: Int, b: Int) -> Int
+    requires { true }
+    ensures { result >= 0 }
+{
+    calc_manhattan_dist(0, 0, a, b)
+}
+
+// 019 - Farthest nonnegative ray-intersection depth.
+fn spatial_subsys_019(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= a, result >= b }
+{
+    calc_chebyshev_dist(0, 0, a, b)
+}
+
+// 020 - Quadtree child-cell index.
+fn spatial_subsys_020(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0, b < 4 }
+    ensures { result >= a * 4, result < (a + 1) * 4 }
+{
+    a * 4 + b
+}
+
+// 021 - Squared displacement of a grid vector.
+fn spatial_subsys_021(a: Int, b: Int) -> Int
+    requires { true }
+    ensures { result >= 0 }
+{
+    a * a + b * b
+}
+
+// 022 - Nonnegative projection-scale product.
+fn spatial_subsys_022(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a * b
+}
+
+// 023 - Smaller nonnegative axis extent.
+fn spatial_subsys_023(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0, result <= a, result <= b }
+{
+    let shared_extent = match a <= b { true => a, false => b };
+    calc_grid_index(shared_extent, 0, 1)
+}
+
+// 024 - Sum of normalized axis directions.
+fn spatial_subsys_024(a: Int, b: Int) -> Int
+    requires { true }
+    ensures { result >= -2, result <= 2 }
+{
+    let direction_sum = match a > 0 {
+        true => match b > 0 { true => 2, false => match b < 0 { true => 0, false => 1 } },
+        false => match a < 0 {
+            true => match b > 0 { true => 0, false => match b < 0 { true => -2, false => -1 } },
+            false => match b > 0 { true => 1, false => match b < 0 { true => -1, false => 0 } },
+        },
+    };
+    spatial_subsys_040(direction_sum, direction_sum)
+}
+
+// 025 - Inclusive-axis span delta.
+fn spatial_subsys_025(a: Int, b: Int) -> Int
+    requires { true }
+    ensures { result >= 0 }
+{
+    calc_manhattan_dist(a, 0, b, 0)
+}
+
+// 026 - Midpoint of an ordered nonnegative interval.
+fn spatial_subsys_026(a: Int, b: Int) -> Int
+    requires { a >= 0, a <= b }
+    ensures { result >= a, result <= b }
+{
+    (a + b) / 2
+}
+
+// 027 - Pack a bounded cell-local coordinate.
+fn spatial_subsys_027(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0, b < 65536 }
+    ensures { result >= 0 }
+{
+    a * 65536 + b
+}
+
+// 028 - Manhattan ring number for an offset.
+fn spatial_subsys_028(a: Int, b: Int) -> Int
+    requires { true }
+    ensures { result >= 0 }
+{
+    calc_manhattan_dist(0, 0, a, b)
+}
+
+// 029 - Area of a nonnegative grid rectangle.
+fn spatial_subsys_029(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a * b
+}
+
+// 030 - Squared diagonal length of a grid cell.
+fn spatial_subsys_030(a: Int, b: Int) -> Int
+    requires { true }
+    ensures { result >= 0 }
+{
+    a * a + b * b
+}
+
+// 031 - Advance a ray by a nonnegative origin and step.
+fn spatial_subsys_031(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= a, result >= b }
+{
+    a + b
+}
+
+// 032 - Remaining visibility after nonnegative occlusion.
+fn spatial_subsys_032(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0, result <= a }
+{
+    let remaining = match a >= b { true => a - b, false => 0 };
+    calc_grid_index(remaining, 0, 1)
+}
+
+// 033 - Shared length of two origin-aligned intervals.
+fn spatial_subsys_033(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0, result <= a, result <= b }
+{
+    let shared_length = match a <= b { true => a, false => b };
+    calc_grid_index(shared_length, 0, 1)
+}
+
+// 034 - Grid bucket containing coordinate a at resolution b.
+fn spatial_subsys_034(a: Int, b: Int) -> Int
+    requires { a >= 0, b > 0 }
+    ensures { result >= 0 }
+{
+    a / b
+}
+
+// 035 - Nonnegative cell-local coordinate modulo b.
+fn spatial_subsys_035(a: Int, b: Int) -> Int
+    requires { a >= 0, b > 0 }
+    ensures { result >= 0, result < b }
+{
+    let local_coord = a - (a / b) * b;
+    calc_grid_index(local_coord, 0, 1)
+}
+
+// 036 - Binary half-plane/sector selector.
+fn spatial_subsys_036(a: Int, b: Int) -> Int
+    requires { true }
+    ensures { result >= 0, result <= 1 }
+{
+    let sector = match a >= b { true => 0, false => 1 };
+    calc_grid_index(sector, 0, 1)
+}
+
+// 037 - Width of a row in a radius-a diamond at offset b.
+fn spatial_subsys_037(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= -a, b <= a }
+    ensures { result > 0 }
+{
+    let row_width = match b >= 0 {
+        true => 2 * (a - b) + 1,
+        false => 2 * (a + b) + 1,
+    };
+    calc_grid_index(row_width, 0, 1)
+}
+
+// 038 - Start offset for quadtree range a with stride b + 1.
+fn spatial_subsys_038(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a * (b + 1)
+}
+
+// 039 - Collision penetration bounded by both axis depths.
+fn spatial_subsys_039(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0, result <= a, result <= b }
+{
+    let penetration = match a <= b { true => a, false => b };
+    calc_grid_index(penetration, 0, 1)
+}
+
+// 040 - Bresenham-style doubled raster error update.
+fn spatial_subsys_040(a: Int, b: Int) -> Int
+    requires { true }
+    ensures { result == 2 * a - b }
+{
+    2 * a - b
+}
+
+// Tier 1: RPG stat mapping and non-linear resistance calculations.
+// Element ids used by calc_elemental_multiplier:
+//   0 = fire, 1 = wind, 2 = earth, 3 = lightning, 4 = water.
+
+fn calc_max_hp_from_vit(base_hp: Int, vitality: Int, strength: Int) -> Int
+    requires { base_hp >= 0, vitality >= 0, strength >= 0 }
+    ensures { result >= base_hp }
+{
+    base_hp + vitality * 10 + strength * 2
+}
+
+fn calc_max_mana_from_int(base_mana: Int, intelligence: Int) -> Int
+    requires { base_mana >= 0, intelligence >= 0 }
+    ensures { result >= base_mana }
+{
+    base_mana + intelligence * 15
+}
+
+fn calc_phys_atk_from_str(strength: Int, agility: Int) -> Int
+    requires { strength >= 0, agility >= 0 }
+    ensures { result >= 0 }
+{
+    strength * 2 + agility / 2
+}
+
+fn calc_armor_damage_reduction(damage: Int, armor: Int) -> Int
+    requires { damage >= 0, armor >= 0 }
+    ensures { result >= 0, result <= damage }
+{
+    damage - (damage * armor / (100 + armor))
+}
+
+fn calc_magic_res_reduction(magic_dmg: Int, res: Int) -> Int
+    requires { magic_dmg >= 0, res >= 0 }
+    ensures { result >= 0, result <= magic_dmg }
+{
+    magic_dmg - (magic_dmg * res / (100 + res))
+}
+
+fn calc_elemental_multiplier(elem_type: Int, target_type: Int, base_dmg: Int) -> Int
+    requires {
+        elem_type >= 0,
+        elem_type <= 4,
+        target_type >= 0,
+        target_type <= 4,
+        base_dmg >= 0
+    }
+    ensures { result >= 0, result <= base_dmg * 150 / 100 }
+{
+    match elem_type {
+        0 => match target_type {
+            1 => base_dmg * 150 / 100,
+            4 => base_dmg * 75 / 100,
+            _ => base_dmg,
+        },
+        1 => match target_type {
+            2 => base_dmg * 150 / 100,
+            0 => base_dmg * 75 / 100,
+            _ => base_dmg,
+        },
+        2 => match target_type {
+            3 => base_dmg * 150 / 100,
+            1 => base_dmg * 75 / 100,
+            _ => base_dmg,
+        },
+        3 => match target_type {
+            4 => base_dmg * 150 / 100,
+            2 => base_dmg * 75 / 100,
+            _ => base_dmg,
+        },
+        _ => match target_type {
+            0 => base_dmg * 150 / 100,
+            3 => base_dmg * 75 / 100,
+            _ => base_dmg,
+        },
+    }
+}
+
+fn calc_crit_chance_clamped(base_crit: Int, agility: Int) -> Int
+    requires { agility >= 0 }
+    ensures { result >= 0, result <= 10000 }
+{
+    clamp_to_bounds_x(base_crit + agility * 10, 10001)
+}
+
+fn calc_effective_penetration(raw_armor: Int, pct_pen: Int, flat_pen: Int) -> Int
+    requires {
+        raw_armor >= 0,
+        pct_pen >= 0,
+        pct_pen <= 100,
+        flat_pen >= 0
+    }
+    ensures { result >= 0, result <= raw_armor }
+{
+    match raw_armor * (100 - pct_pen) / 100 - flat_pen > 0 {
+        true => raw_armor * (100 - pct_pen) / 100 - flat_pen,
+        false => 0,
+    }
+}
+
+fn calc_overburden_penalty(weight: Int, max_weight: Int, base_speed: Int) -> Int
+    requires { weight >= 0, max_weight > 0, base_speed >= 0 }
+    ensures { result >= 0, result <= base_speed }
+{
+    match weight > max_weight {
+        true => base_speed * 50 / 100,
+        false => base_speed,
+    }
+}
+
+fn calc_lifesteal_conversion(damage_dealt: Int, lifesteal_rate: Int) -> Int
+    requires {
+        damage_dealt >= 0,
+        lifesteal_rate >= 0,
+        lifesteal_rate <= 100
+    }
+    ensures { result >= 0, result <= damage_dealt }
+{
+    damage_dealt * lifesteal_rate / 100
+}
+
+// Functions 051-066 map the first sixteen Tier 0 primitives into stat-space.
+
+fn stat_subsys_051(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    calc_manhattan_dist(0, 0, stat_val, modifier)
+}
+
+fn stat_subsys_052(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    calc_chebyshev_dist(0, 0, stat_val, modifier)
+}
+
+fn stat_subsys_053(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    calc_euclidean_sq(0, 0, stat_val, modifier)
+}
+
+fn stat_subsys_054(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0, result <= 1 }
+{
+    match check_in_radius_sq(stat_val, modifier) {
+        true => 1,
+        false => 0,
+    }
+}
+
+fn stat_subsys_055(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + bresenham_step_x(stat_val, modifier) + 1
+}
+
+fn stat_subsys_056(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + bresenham_step_y(stat_val, modifier) + 1
+}
+
+fn stat_subsys_057(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    pack_coords_to_hash(stat_val, modifier)
+}
+
+fn stat_subsys_058(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    modifier + unpack_hash_x(stat_val)
+}
+
+fn stat_subsys_059(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    modifier + unpack_hash_y(stat_val)
+}
+
+fn stat_subsys_060(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    wrap_map_coord_x(stat_val, modifier + 1)
+}
+
+fn stat_subsys_061(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    wrap_map_coord_y(stat_val, modifier + 1)
+}
+
+fn stat_subsys_062(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    clamp_to_bounds_x(stat_val, modifier + 1)
+}
+
+fn stat_subsys_063(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    clamp_to_bounds_y(stat_val, modifier + 1)
+}
+
+fn stat_subsys_064(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0, result <= 1 }
+{
+    match check_aabb_overlap(0, 0, stat_val, modifier, modifier, stat_val, stat_val + modifier, stat_val + modifier) {
+        true => 1,
+        false => 0,
+    }
+}
+
+fn stat_subsys_065(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    calc_grid_index(stat_val, modifier, stat_val + 1)
+}
+
+fn stat_subsys_066(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    calc_line_of_sight_cost(stat_val, modifier)
+}
+
+// Functions 067-090 cover every extended Tier 0 spatial subsystem exactly once.
+
+fn stat_subsys_067(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_017(stat_val, modifier)
+}
+
+fn stat_subsys_068(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_018(stat_val, modifier)
+}
+
+fn stat_subsys_069(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_019(stat_val, modifier)
+}
+
+fn stat_subsys_070(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_020(stat_val, modifier)
+}
+
+fn stat_subsys_071(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_021(stat_val, modifier)
+}
+
+fn stat_subsys_072(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_022(stat_val, modifier)
+}
+
+fn stat_subsys_073(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_023(stat_val, modifier)
+}
+
+fn stat_subsys_074(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_024(stat_val, modifier)
+}
+
+fn stat_subsys_075(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_025(stat_val, modifier)
+}
+
+fn stat_subsys_076(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_026(stat_val, modifier)
+}
+
+fn stat_subsys_077(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_027(stat_val, modifier)
+}
+
+fn stat_subsys_078(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_028(stat_val, modifier)
+}
+
+fn stat_subsys_079(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_029(stat_val, modifier)
+}
+
+fn stat_subsys_080(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_030(stat_val, modifier)
+}
+
+fn stat_subsys_081(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_031(stat_val, modifier)
+}
+
+fn stat_subsys_082(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_032(stat_val, modifier)
+}
+
+fn stat_subsys_083(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_033(stat_val, modifier)
+}
+
+fn stat_subsys_084(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_034(stat_val, modifier)
+}
+
+fn stat_subsys_085(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_035(stat_val, modifier)
+}
+
+fn stat_subsys_086(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_036(stat_val, modifier)
+}
+
+fn stat_subsys_087(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_037(stat_val, modifier)
+}
+
+fn stat_subsys_088(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_038(stat_val, modifier)
+}
+
+fn stat_subsys_089(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_039(stat_val, modifier)
+}
+
+fn stat_subsys_090(stat_val: Int, modifier: Int) -> Int
+    requires { stat_val >= 0, modifier >= 0 }
+    ensures { result >= 0 }
+{
+    stat_val + spatial_subsys_040(stat_val, modifier)
+}
+
+// =============================================================================
+// Tier 2: Combat Pipeline and Status-Effect State Machine (Functions 091-140)
+// Pure combat transformations layered on the Tier 1 stat/resistance subsystem.
+// =============================================================================
+
+// 091: Apply nonlinear armor mitigation, but preserve the one-damage hit floor.
+fn resolve_physical_hit(atk: Int, def_val: Int) -> Int
+    requires {
+        atk >= 0,
+        def_val >= 0,
+    }
+    ensures {
+        result >= 1
+    }
+{
+    let reduced = calc_armor_damage_reduction(atk, def_val);
+    match reduced >= 1 {
+        true => reduced,
+        false => 1,
+    }
+}
+
+// 092: Expand a critical hit by its percentage multiplier.
+fn resolve_crit_hit(dmg: Int, is_crit: Bool, crit_pct: Int) -> Int
+    requires {
+        dmg >= 0,
+        crit_pct >= 100,
+    }
+    ensures {
+        result >= dmg
+    }
+{
+    let normalized_dmg = calc_armor_damage_reduction(dmg, 0);
+    match is_crit {
+        true => normalized_dmg * crit_pct / 100,
+        false => normalized_dmg,
+    }
+}
+
+// 093: Return only the damage that penetrates the available shield pool.
+fn apply_dual_shield_absorption(incoming_dmg: Int, shield_hp: Int) -> Int
+    requires {
+        incoming_dmg >= 0,
+        shield_hp >= 0,
+    }
+    ensures {
+        result >= 0,
+        result <= incoming_dmg,
+    }
+{
+    calc_effective_penetration(incoming_dmg, 0, shield_hp)
+}
+
+// 094: Each bleed stack deals five damage, doubled while the target is moving.
+fn apply_bleed_stack_tick(stacks: Int, is_moving: Bool) -> Int
+    requires {
+        stacks >= 0
+    }
+    ensures {
+        result >= 0
+    }
+{
+    let base_tick = calc_lifesteal_conversion(stacks * 5, 100);
+    match is_moving {
+        true => base_tick * 2,
+        false => base_tick,
+    }
+}
+
+// 095: Apply the specification's duration-weighted eighty-percent poison decay.
+fn apply_poison_exponential_decay(base_poison: Int, duration: Int) -> Int
+    requires {
+        base_poison >= 0,
+        duration >= 0,
+    }
+    ensures {
+        result >= 0
+    }
+{
+    base_poison * (duration * 80 / 100)
+}
+
+// 096: Burn combines three percent of maximum HP with a flat true-damage term.
+fn apply_burn_max_hp_tick(target_max_hp: Int, flat_burn: Int) -> Int
+    requires {
+        target_max_hp >= 0,
+        flat_burn >= 0,
+    }
+    ensures {
+        result >= flat_burn
+    }
+{
+    target_max_hp * 3 / 100 + flat_burn
+}
+
+// 097: Five accumulated stacks transition the target into the frozen state.
+fn check_freeze_threshold(freeze_stacks: Int) -> Bool
+    requires {
+        freeze_stacks >= 0
+    }
+    ensures {
+        result == (freeze_stacks >= 5)
+    }
+{
+    freeze_stacks >= 5
+}
+
+// 098: Stamina efficiency is a bounded percentage reduction of the base cost.
+fn calc_stamina_skill_cost(base_cost: Int, stamina_eff: Int) -> Int
+    requires {
+        base_cost >= 0,
+        stamina_eff >= 0,
+        stamina_eff <= 100,
+    }
+    ensures {
+        result >= 0,
+        result <= base_cost,
+    }
+{
+    base_cost * (100 - stamina_eff) / 100
+}
+
+// 099: Convert ten percent of missing mana into overload true damage.
+fn calc_mana_overload_burst(missing_mana: Int) -> Int
+    requires {
+        missing_mana >= 0
+    }
+    ensures {
+        result >= 0,
+        result <= missing_mana,
+    }
+{
+    missing_mana * 10 / 100
+}
+
+// 100: An impact equal to or greater than remaining poise causes a stun.
+fn calc_poise_break_stun(poise: Int, impact: Int) -> Bool
+    requires {
+        poise >= 0,
+        impact >= 0,
+    }
+    ensures {
+        result == (impact >= poise)
+    }
+{
+    impact >= poise
+}
+
+// Functions 101-140 form forty distinct Tier 2 pipeline stages. Each stage
+// obtains its effective defense from the corresponding Tier 1 stat subsystem,
+// then resolves penetration while maintaining the combat-wide one-damage floor.
+
+fn combat_subsys_101(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_051(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_102(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_052(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_103(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_053(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_104(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_054(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_105(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_055(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_106(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_056(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_107(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_057(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_108(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_058(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_109(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_059(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_110(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_060(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_111(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_061(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_112(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_062(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_113(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_063(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_114(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_064(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_115(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_065(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_116(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_066(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_117(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_067(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_118(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_068(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_119(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_069(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_120(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_070(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_121(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_071(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_122(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_072(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_123(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_073(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_124(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_074(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_125(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_075(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_126(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_076(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_127(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_077(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_128(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_078(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_129(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_079(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_130(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_080(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_131(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_081(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_132(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_082(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_133(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_083(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_134(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_084(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_135(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_085(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_136(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_086(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_137(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_087(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_138(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_088(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_139(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_089(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+fn combat_subsys_140(raw_dmg: Int, target_def: Int) -> Int
+    requires { raw_dmg >= 0, target_def >= 0 }
+    ensures { result >= 1 }
+{
+    let effective_def = stat_subsys_090(target_def, 0);
+    match raw_dmg > effective_def { true => raw_dmg - effective_def, false => 1 }
+}
+
+// =============================================================================
+// Tier 3: Monster AI Decisions and Loot Economy (Functions 141-180)
+// Pure AI/economy transformations layered on the Tier 2 combat subsystem.
+// =============================================================================
+
+// 141: Decay a precomputed threat value by Manhattan distance.
+fn calc_threat_decay_by_dist(threat: Int, dist: Int) -> Int
+    requires {
+        threat >= 0,
+        dist >= 0,
+    }
+    ensures {
+        result >= 0,
+        result <= threat,
+    }
+{
+    threat * 100 / (100 + dist * 10)
+}
+
+// 142: Low health takes priority over aggro when selecting the AI state.
+// State encoding: 1 = Flee, 2 = Chase, 3 = Patrol.
+fn evaluate_ai_behavior_state(hp_pct: Int, aggro: Int) -> Int
+    requires {
+        hp_pct >= 0,
+        hp_pct <= 100,
+        aggro >= 0,
+    }
+    ensures {
+        result >= 1,
+        result <= 3,
+    }
+{
+    // Integer division turns each threshold into a stable zero-or-one flag.
+    let flee = 1 / (hp_pct / 20 + 1);
+    let chase = 1 - 1 / (aggro / 51 + 1);
+    flee + (1 - flee) * (3 - chase)
+}
+
+// 143: Resolve a 0-9999 roll against cumulative 60/25/10/4/1 weights.
+fn calc_weighted_loot_tier(roll_val: Int) -> Int
+    requires {
+        roll_val >= 0,
+        roll_val < 10000,
+    }
+    ensures {
+        result >= 1,
+        result <= 5,
+    }
+{
+    // Each cumulative threshold contributes one tier once it is crossed.
+    let crossed_tier_2 = 1 - 1 / (roll_val / 6000 + 1);
+    let crossed_tier_3 = 1 - 1 / (roll_val / 8500 + 1);
+    let crossed_tier_4 = 1 - 1 / (roll_val / 9500 + 1);
+    let crossed_tier_5 = 1 - 1 / (roll_val / 9900 + 1);
+    1 + crossed_tier_2 + crossed_tier_3 + crossed_tier_4 + crossed_tier_5
+}
+
+// 144: Add two roll points per luck point and clamp at 10000.
+fn scale_drop_by_luck(roll_val: Int, luck: Int) -> Int
+    requires {
+        roll_val >= 0,
+        roll_val <= 10000,
+        luck >= 0,
+        luck <= 5000,
+    }
+    ensures {
+        result >= 0,
+        result <= 10000,
+    }
+{
+    let boosted_roll = roll_val + luck * 2;
+    let crossed_cap = boosted_roll / 10001;
+    boosted_roll - crossed_cap * (boosted_roll - 10000)
+}
+
+// 145: Penalize experience when the player substantially outlevels the monster.
+fn calc_exp_gain_with_level_diff(base_exp: Int, player_lvl: Int, monster_lvl: Int) -> Int
+    requires {
+        base_exp >= 0,
+        player_lvl >= 1,
+        monster_lvl >= 1,
+    }
+    ensures {
+        result >= 0,
+        result <= base_exp,
+    }
+{
+    let level_diff = player_lvl - monster_lvl;
+    match level_diff > 10 {
+        true => base_exp / 10,
+        false => match level_diff > 5 {
+            true => base_exp / 2,
+            false => base_exp,
+        },
+    }
+}
+
+// 146: Quadratic experience curve from the benchmark specification.
+fn calc_exp_to_next_level(level: Int) -> Int
+    requires {
+        level >= 0,
+        level <= 300000000,
+    }
+    ensures {
+        result >= 0,
+        result == level * level * 100 + level * 500,
+    }
+{
+    level * level * 100 + level * 500
+}
+
+// 147: Increase prices by two percent for every elapsed world day.
+fn calc_shop_inflation_price(base_price: Int, world_day: Int) -> Int
+    requires {
+        base_price >= 0,
+        world_day >= 0,
+    }
+    ensures {
+        result >= base_price
+    }
+{
+    base_price * (100 + world_day * 2) / 100
+}
+
+// Functions 148-180 are Tier 3 aggregation stages. Each stage delegates its
+// delta calculation to a distinct Tier 2 combat stage, then adds the resulting
+// nonnegative threat contribution to the current aggro value.
+
+fn ai_loot_subsys_148(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_101(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_149(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_102(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_150(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_103(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_151(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_104(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_152(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_105(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_153(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_106(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_154(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_107(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_155(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_108(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_156(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_109(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_157(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_110(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_158(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_111(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_159(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_112(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_160(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_113(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_161(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_114(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_162(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_115(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_163(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_116(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_164(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_117(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_165(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_118(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_166(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_119(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_167(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_120(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_168(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_121(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_169(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_122(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_170(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_123(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_171(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_124(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_172(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_125(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_173(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_126(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_174(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_127(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_175(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_128(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_176(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_129(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_177(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_130(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_178(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_131(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_179(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_132(delta, 0);
+    curr_aggro + threat
+}
+
+fn ai_loot_subsys_180(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= curr_aggro }
+{
+    let threat = combat_subsys_133(delta, 0);
+    curr_aggro + threat
+}
+
+// =============================================================================
+// Tier 4: Turn Orchestration and World Simulation (Functions 181-200)
+// Pure world-engine calculations layered across Tiers 0 through 3.
+// =============================================================================
+
+// 181: Initiative is twice agility plus a bounded d20-style roll (0-19).
+fn determine_turn_initiative(agility: Int, roll_val: Int) -> Int
+    requires {
+        agility >= 0,
+        roll_val >= 0,
+        roll_val < 20,
+    }
+    ensures {
+        result >= agility * 2,
+        result <= agility * 2 + 19,
+    }
+{
+    let base_initiative = calc_phys_atk_from_str(agility, 0);
+    base_initiative + roll_val
+}
+
+// 182: Boss phase encoding: 1 above 66%, 2 from 33%-66%, 3 below 33%.
+fn resolve_boss_phase_transition(hp_pct: Int) -> Int
+    requires {
+        hp_pct >= 0,
+        hp_pct <= 100,
+    }
+    ensures {
+        result >= 1,
+        result <= 3,
+    }
+{
+    let phase = match hp_pct > 66 {
+        true => 1,
+        false => match hp_pct >= 33 {
+            true => 2,
+            false => 3,
+        },
+    };
+    calc_grid_index(phase, 0, 1)
+}
+
+// 183: Resolve armor, movement-amplified bleed, and observed AI threat.
+fn simulate_single_turn_exchange(actor_atk: Int, target_def: Int, is_moving: Bool) -> Int
+    requires {
+        actor_atk >= 0,
+        target_def >= 0,
+    }
+    ensures {
+        result >= 1
+    }
+{
+    let direct_damage = resolve_physical_hit(actor_atk, target_def);
+    let movement_distance = match is_moving { true => 1, false => 0 };
+    let grid_distance = calc_manhattan_dist(0, 0, movement_distance, 0);
+    let bleed_damage = apply_bleed_stack_tick(1, is_moving);
+    let observed_threat = calc_threat_decay_by_dist(direct_damage, grid_distance);
+    direct_damage + bleed_damage + observed_threat
+}
+
+// 184: Hazard ids: 0=safe, 1=lava, 2=poison marsh, 3=ice.
+fn resolve_terrain_hazard_tick(hazard_type: Int, max_hp: Int) -> Int
+    requires {
+        hazard_type >= 0,
+        hazard_type <= 3,
+        max_hp >= 0,
+    }
+    ensures {
+        result >= 0
+    }
+{
+    match hazard_type {
+        0 => 0,
+        1 => calc_lifesteal_conversion(max_hp, 5) + 10,
+        2 => apply_poison_exponential_decay(max_hp / 100, 1),
+        _ => 0,
+    }
+}
+
+// 185: Count completed world cycles and map the count into checkpoint space.
+fn world_engine_185(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0 }
+{
+    let completed_cycles = turn_num / cycle_len;
+    calc_grid_index(completed_cycles, 0, cycle_len)
+}
+
+// 186: Produce the monotonically increasing garbage-collection generation.
+fn world_engine_186(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 1 }
+{
+    let completed_cycles = turn_num / cycle_len;
+    ai_loot_subsys_148(completed_cycles, 0)
+}
+
+// 187: Compute the deterministic save-slot hash for this turn/cycle pair.
+fn world_engine_187(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0 }
+{
+    pack_coords_to_hash(turn_num, cycle_len)
+}
+
+// 188: Resolve a four-phase day/night clock from the current cycle position.
+fn world_engine_188(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0, result < 4 }
+{
+    let cycle_position = wrap_map_coord_x(turn_num, cycle_len);
+    cycle_position * 4 / cycle_len
+}
+
+// 189: Return turns remaining until the next cycle boundary (zero on boundary).
+fn world_engine_189(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0, result < cycle_len }
+{
+    let cycle_position = wrap_map_coord_y(turn_num, cycle_len);
+    match cycle_position == 0 {
+        true => 0,
+        false => cycle_len - cycle_position,
+    }
+}
+
+// 190: Apply world-day inflation to a cycle-sized baseline shop price.
+fn world_engine_190(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= cycle_len }
+{
+    let world_day = turn_num / cycle_len;
+    calc_shop_inflation_price(cycle_len, world_day)
+}
+
+// 191: Derive a descending boss-health clock and resolve its active phase.
+fn world_engine_191(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 1, result <= 3 }
+{
+    let cycle_position = wrap_map_coord_x(turn_num, cycle_len);
+    let hp_pct = 100 - cycle_position * 100 / cycle_len;
+    resolve_boss_phase_transition(hp_pct)
+}
+
+// 192: Rotate terrain hazards while scaling maximum HP by elapsed cycles.
+fn world_engine_192(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0 }
+{
+    let hazard_type = wrap_map_coord_x(turn_num, 4);
+    let world_age = turn_num / cycle_len;
+    let scaled_max_hp = calc_max_hp_from_vit(cycle_len, world_age, 0);
+    resolve_terrain_hazard_tick(hazard_type, scaled_max_hp)
+}
+
+// 193: Schedule initiative using elapsed cycles as agility and turn modulo 20.
+fn world_engine_193(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0 }
+{
+    let agility = turn_num / cycle_len;
+    let roll_val = wrap_map_coord_x(turn_num, 20);
+    determine_turn_initiative(agility, roll_val)
+}
+
+// 194: Decay a cycle-scaled encounter threat by distance into the active cycle.
+fn world_engine_194(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0 }
+{
+    let cycle_position = wrap_map_coord_x(turn_num, cycle_len);
+    let distance = calc_manhattan_dist(0, 0, cycle_position, 0);
+    let raw_threat = ai_loot_subsys_149(cycle_len, turn_num / cycle_len);
+    calc_threat_decay_by_dist(raw_threat, distance)
+}
+
+// 195: Resolve a luck-scaled, safely bounded reward tier for the current turn.
+fn world_engine_195(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 1, result <= 5 }
+{
+    let raw_roll = wrap_map_coord_x(turn_num * cycle_len, 10000);
+    let lucky_roll = scale_drop_by_luck(raw_roll, turn_num / cycle_len);
+    let bounded_roll = clamp_to_bounds_x(lucky_roll, 10000);
+    calc_weighted_loot_tier(bounded_roll)
+}
+
+// 196: Calculate the next-level experience target with the supported level cap.
+fn world_engine_196(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0 }
+{
+    let raw_level = turn_num / cycle_len;
+    let capped_level = clamp_to_bounds_x(raw_level, 300000000) + 1;
+    calc_exp_to_next_level(capped_level)
+}
+
+// 197: Preview a complete combat exchange from world-clock-derived combatants.
+fn world_engine_197(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 1 }
+{
+    let cycle_position = wrap_map_coord_x(turn_num, cycle_len);
+    let actor_atk = calc_phys_atk_from_str(turn_num / cycle_len, cycle_position);
+    let target_def = calc_armor_damage_reduction(cycle_len, cycle_position);
+    simulate_single_turn_exchange(actor_atk, target_def, cycle_position > 0)
+}
+
+// 198: Reconstruct both components of a checkpoint hash for integrity checking.
+fn world_engine_198(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0 }
+{
+    let checkpoint_hash = pack_coords_to_hash(turn_num, cycle_len);
+    unpack_hash_x(checkpoint_hash) + unpack_hash_y(checkpoint_hash)
+}
+
+// 199: Aggregate clock phase, reward quality, and encounter threat into a score.
+fn world_engine_199(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 1 }
+{
+    let clock_phase = world_engine_188(turn_num, cycle_len);
+    let reward_tier = world_engine_195(turn_num, cycle_len);
+    let encounter_threat = world_engine_194(turn_num, cycle_len);
+    clock_phase + reward_tier + encounter_threat
+}
+
+// 200: Full world tick orchestration across schedule, combat, hazards, and loot.
+fn world_engine_200(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 2 }
+{
+    let initiative = world_engine_193(turn_num, cycle_len);
+    let combat_result = world_engine_197(turn_num, cycle_len);
+    let hazard_result = world_engine_192(turn_num, cycle_len);
+    let world_score = world_engine_199(turn_num, cycle_len);
+    initiative + combat_result + hazard_result + world_score
+}
