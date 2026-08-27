@@ -53,12 +53,49 @@ pub fn parse_module(source: &str) -> Result<Module, ParseError> {
 
 pub fn parse_expr(source: &str) -> Result<Expr, ParseError> {
     let mut parser = Parser::new(source);
-    let expr = parser.parse_expression()?;
     parser.skip_whitespace();
-    if !parser.is_at_end() {
-        return Err(parser.error("expected end of input"));
+
+    let start_offset = parser.offset;
+    if let Ok(expr) = parser.parse_expression() {
+        parser.skip_whitespace();
+        if parser.is_at_end() {
+            return Ok(expr);
+        }
     }
-    Ok(expr)
+
+    parser.offset = start_offset;
+    if parser.peek_char() == Some('{') {
+        parser.bump_char();
+        if let Ok(body) = parser.parse_block_contents() {
+            if parser.consume_char('}') {
+                parser.skip_whitespace();
+                if parser.is_at_end() {
+                    return Ok(body);
+                }
+            }
+        }
+    }
+
+    parser.offset = start_offset;
+    if let Ok(block) = parser.parse_block_contents() {
+        parser.skip_whitespace();
+        if parser.is_at_end() {
+            return Ok(block);
+        }
+    }
+
+    let trimmed = source.trim();
+    if trimmed.starts_with("if ") || trimmed.starts_with("match ") {
+        Ok(Expr::Raw(trimmed.to_owned()))
+    } else {
+        parser.offset = start_offset;
+        let expr = parser.parse_expression()?;
+        parser.skip_whitespace();
+        if !parser.is_at_end() {
+            return Err(parser.error("expected end of input"));
+        }
+        Ok(expr)
+    }
 }
 
 struct Parser<'a> {

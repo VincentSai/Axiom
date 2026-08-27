@@ -88,16 +88,19 @@ impl AgentTaskPool {
             return Err(PoolError::MissingHole(hole_id.to_owned()));
         }
 
+        let mut final_result = SmtResult::Verified;
         for function_index in affected_functions {
             let result = verify_function(&candidate_module.functions[function_index]);
-            if result != SmtResult::Verified {
-                return Ok(result);
+            match result {
+                SmtResult::CounterExample { .. } => return Ok(result),
+                SmtResult::Skipped(_) => final_result = result,
+                SmtResult::Verified => {}
             }
         }
 
         self.module = candidate_module;
         self.pending_holes.remove(hole_id);
-        Ok(SmtResult::Verified)
+        Ok(final_result)
     }
 
     /// Return whether every dispatched hole has an accepted implementation.

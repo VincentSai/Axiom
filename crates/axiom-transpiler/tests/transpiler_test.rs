@@ -28,10 +28,10 @@ fn transpiles_record_and_enum_definitions() {
     )
     .expect("ADTs should transpile");
 
-    assert!(rust.contains("#[derive(Debug, Clone, PartialEq)]\npub struct Point"));
+    assert!(rust.contains("#[derive(Debug, Clone, Copy, PartialEq)]\npub struct Point"));
     assert!(rust.contains("pub x: f64,"));
     assert!(rust.contains("pub y: f64,"));
-    assert!(rust.contains("#[derive(Debug, Clone, PartialEq)]\npub enum Shape"));
+    assert!(rust.contains("#[derive(Debug, Clone, Copy, PartialEq)]\npub enum Shape"));
     assert!(rust.contains("Circle(f64),"));
     assert!(rust.contains("Rectangle(f64, f64),"));
     assert!(rust.contains("Origin,"));
