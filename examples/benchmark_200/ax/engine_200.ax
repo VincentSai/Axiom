@@ -1,0 +1,2396 @@
+﻿// Axiom Pipeline Stage 1: Architect skeleton for the 200-function RPG benchmark.
+// Reference: examples/benchmark_200/SPEC_200.md
+
+type Point = {
+    x: Int,
+    y: Int,
+}
+
+type Velocity = {
+    dx: Int,
+    dy: Int,
+}
+
+type Rect = {
+    min_x: Int,
+    min_y: Int,
+    max_x: Int,
+    max_y: Int,
+}
+
+type BaseAttributes = {
+    strength: Int,
+    agility: Int,
+    intelligence: Int,
+    vitality: Int,
+}
+
+type DerivedStats = {
+    max_hp: Int,
+    max_mana: Int,
+    max_stamina: Int,
+    phys_atk: Int,
+    magic_atk: Int,
+    armor: Int,
+    magic_res: Int,
+    crit_rate: Int,
+    crit_dmg_pct: Int,
+    dodge_rate: Int,
+    move_speed: Int,
+}
+
+type StatusEffect = {
+    bleed_stacks: Int,
+    poison_duration: Int,
+    burn_damage: Int,
+    freeze_stacks: Int,
+    shield_hp: Int,
+}
+
+type Entity = {
+    id: Int,
+    pos: Point,
+    base_attr: BaseAttributes,
+    stats: DerivedStats,
+    status: StatusEffect,
+    curr_hp: Int,
+    curr_mana: Int,
+    curr_stamina: Int,
+    gold: Int,
+    level: Int,
+    exp: Int,
+    weight: Int,
+    max_weight: Int,
+    is_alive: Bool,
+}
+
+// Tier 0 (001-040): spatial geometry and grid math
+
+fn calc_manhattan_dist(x1: Int, y1: Int, x2: Int, y2: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn calc_chebyshev_dist(x1: Int, y1: Int, x2: Int, y2: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn calc_euclidean_sq(x1: Int, y1: Int, x2: Int, y2: Int) -> Int
+    requires {
+        x1 >= -1000000,
+        x1 <= 1000000,
+        y1 >= -1000000,
+        y1 <= 1000000,
+        x2 >= -1000000,
+        x2 <= 1000000,
+        y2 >= -1000000,
+        y2 <= 1000000,
+    }
+    ensures {
+        result >= 0,
+        result == 0 => x1 == x2 && y1 == y2,
+    }
+{
+    let dx = x1 - x2; let dy = y1 - y2; dx * dx + dy * dy
+}
+
+fn check_in_radius_sq(dist_sq: Int, radius: Int) -> Bool
+    requires {
+        dist_sq >= 0,
+        dist_sq <= 1000000000000,
+        radius >= 0,
+        radius <= 1000000,
+    }
+    ensures {
+        result == (dist_sq <= radius * radius),
+    }
+{
+    dist_sq <= radius * radius
+}
+
+fn bresenham_step_x(x1: Int, x2: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn bresenham_step_y(y1: Int, y2: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn pack_coords_to_hash(x: Int, y: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn unpack_hash_x(hash: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn unpack_hash_y(hash: Int) -> Int
+    requires {
+        hash >= 0,
+        hash <= 4294967295,
+    }
+    ensures {
+        result >= 0,
+        result < 65536,
+    }
+{
+    hash - (hash / 65536) * 65536
+}
+
+fn wrap_map_coord_x(x: Int, width: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn wrap_map_coord_y(y: Int, height: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn clamp_to_bounds_x(x: Int, width: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn clamp_to_bounds_y(y: Int, height: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn check_aabb_overlap(min_x1: Int, min_y1: Int, max_x1: Int, max_y1: Int, min_x2: Int, min_y2: Int, max_x2: Int, max_y2: Int) -> Bool
+    requires {
+        min_x1 <= max_x1,
+        min_y1 <= max_y1,
+        min_x2 <= max_x2,
+        min_y2 <= max_y2,
+        min_x1 >= -1000000,
+        max_x1 <= 1000000,
+        min_y1 >= -1000000,
+        max_y1 <= 1000000,
+        min_x2 >= -1000000,
+        max_x2 <= 1000000,
+        min_y2 >= -1000000,
+        max_y2 <= 1000000,
+    }
+    ensures {
+        result == (max_x1 >= min_x2 && min_x1 <= max_x2 && max_y1 >= min_y2 && min_y1 <= max_y2),
+    }
+{
+    max_x1 >= min_x2 && min_x1 <= max_x2 && max_y1 >= min_y2 && min_y1 <= max_y2
+}
+
+fn calc_grid_index(x: Int, y: Int, map_width: Int) -> Int
+    requires {
+        x >= 0,
+        y >= 0,
+        map_width > 0,
+        x < map_width,
+        y <= 1000000,
+        map_width <= 1000000,
+    }
+    ensures {
+        result == y * map_width + x,
+        result >= 0,
+    }
+{
+    y * map_width + x
+}
+
+fn calc_line_of_sight_cost(dist: Int, terrain_density: Int) -> Int
+    requires {
+        dist >= 0,
+        dist <= 1000000,
+        terrain_density >= 0,
+        terrain_density <= 1000000,
+    }
+    ensures {
+        result == dist * terrain_density / 100,
+        result >= 0,
+    }
+{
+    dist * terrain_density / 100
+}
+
+fn spatial_subsys_017(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_018(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_019(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_020(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_021(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_022(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_023(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_024(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_025(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_026(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_027(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_028(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_029(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_030(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_031(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_032(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_033(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_034(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_035(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_036(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_037(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_038(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_039(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+fn spatial_subsys_040(a: Int, b: Int) -> Int
+    requires { a >= 0, b >= 0 }
+    ensures { result >= 0 }
+{
+    a + b
+}
+
+
+// Tier 1 (041-090): attribute mapping and resistance calculations
+
+fn calc_max_hp_from_vit(base_hp: Int, vitality: Int, strength: Int) -> Int
+    requires {
+        base_hp >= 0,
+        base_hp <= 1000000,
+        vitality >= 0,
+        vitality <= 1000000,
+        strength >= 0,
+        strength <= 1000000,
+    }
+    ensures {
+        result == base_hp + vitality * 10 + strength * 2,
+        result >= base_hp,
+    }
+{
+    base_hp + vitality * 10 + strength * 2
+}
+
+fn calc_max_mana_from_int(base_mana: Int, intelligence: Int) -> Int
+    requires {
+        base_mana >= 0,
+        base_mana <= 1000000,
+        intelligence >= 0,
+        intelligence <= 1000000,
+    }
+    ensures {
+        result == base_mana + intelligence * 15,
+        result >= base_mana,
+    }
+{
+    base_mana + intelligence * 15
+}
+
+fn calc_phys_atk_from_str(strength: Int, agility: Int) -> Int
+    requires {
+        strength >= 0,
+        strength <= 1000000,
+        agility >= 0,
+        agility <= 1000000,
+    }
+    ensures {
+        result == strength * 2 + agility / 2,
+        result >= 0,
+    }
+{
+    strength * 2 + agility / 2
+}
+
+fn calc_armor_damage_reduction(damage: Int, armor: Int) -> Int
+    requires {
+        damage >= 0,
+        damage <= 1000000,
+        armor >= 0,
+        armor <= 1000000,
+    }
+    ensures {
+        result >= 0,
+        result <= damage,
+    }
+{
+    damage - damage * armor / (100 + armor)
+}
+
+fn calc_magic_res_reduction(magic_dmg: Int, res: Int) -> Int
+    requires {
+        magic_dmg >= 0,
+        magic_dmg <= 1000000,
+        res >= 0,
+        res <= 1000000,
+    }
+    ensures {
+        result >= 0,
+        result <= magic_dmg,
+    }
+{
+    magic_dmg - magic_dmg * res / (100 + res)
+}
+
+fn calc_elemental_multiplier(elem_type: Int, target_type: Int, base_dmg: Int) -> Int
+    requires {
+        elem_type >= 0,
+        elem_type <= 4,
+        target_type >= 0,
+        target_type <= 4,
+        base_dmg >= 0,
+        base_dmg <= 1000000,
+    }
+    ensures {
+        result >= base_dmg * 75 / 100,
+        result <= base_dmg * 150 / 100,
+    }
+{
+    match elem_type == target_type { true => base_dmg, false => base_dmg * 120 / 100 }
+}
+
+fn calc_crit_chance_clamped(base_crit: Int, agility: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn calc_effective_penetration(raw_armor: Int, pct_pen: Int, flat_pen: Int) -> Int
+    requires {
+        raw_armor >= 0,
+        raw_armor <= 1000000,
+        pct_pen >= 0,
+        pct_pen <= 100,
+        flat_pen >= 0,
+        flat_pen <= 1000000,
+    }
+    ensures {
+        result >= 0,
+        result <= raw_armor,
+    }
+{
+    match (raw_armor * (100 - pct_pen) / 100 - flat_pen) > 0 { true => raw_armor * (100 - pct_pen) / 100 - flat_pen, false => 0 }
+}
+
+fn calc_overburden_penalty(weight: Int, max_weight: Int, base_speed: Int) -> Int
+    requires {
+        weight >= 0,
+        weight <= 1000000,
+        max_weight > 0,
+        max_weight <= 1000000,
+        base_speed >= 0,
+        base_speed <= 1000000,
+    }
+    ensures {
+        result >= 0,
+        result <= base_speed,
+        weight <= max_weight => result == base_speed,
+    }
+{
+    match weight > max_weight { true => base_speed * 50 / 100, false => base_speed }
+}
+
+fn calc_lifesteal_conversion(damage_dealt: Int, lifesteal_rate: Int) -> Int
+    requires {
+        damage_dealt >= 0,
+        damage_dealt <= 1000000,
+        lifesteal_rate >= 0,
+        lifesteal_rate <= 100,
+    }
+    ensures {
+        result >= 0,
+        result <= damage_dealt,
+    }
+{
+    damage_dealt * lifesteal_rate / 100
+}
+
+fn stat_subsys_051(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_052(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_053(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_054(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_055(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_056(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_057(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_058(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_059(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_060(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_061(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_062(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_063(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_064(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_065(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_066(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_067(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_068(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_069(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_070(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_071(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_072(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_073(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_074(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_075(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_076(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_077(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_078(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_079(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_080(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_081(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_082(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_083(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_084(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_085(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_086(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_087(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+        modifier <= stat_val,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_088(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_089(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+fn stat_subsys_090(stat_val: Int, modifier: Int) -> Int
+    requires {
+        stat_val >= 0,
+        stat_val <= 1000000,
+        modifier >= 0,
+        modifier <= 1000000,
+        modifier <= 3 * stat_val,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    stat_val + modifier
+}
+
+
+// Tier 2 (091-140): combat flow and status state machines
+
+fn resolve_physical_hit(atk: Int, def_val: Int) -> Int
+    requires {
+        atk >= 0,
+        atk <= 1000000,
+        def_val >= 0,
+        def_val <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= atk + 1,
+    }
+{
+    let reduced = calc_armor_damage_reduction(atk, def_val); match reduced > 0 { true => reduced, false => 1 }
+}
+
+fn resolve_crit_hit(dmg: Int, is_crit: Bool, crit_pct: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn apply_dual_shield_absorption(incoming_dmg: Int, shield_hp: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn apply_bleed_stack_tick(stacks: Int, is_moving: Bool) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn apply_poison_exponential_decay(base_poison: Int, duration: Int) -> Int
+    requires { base_poison >= 0, duration >= 0, duration <= 10 }
+    ensures { result >= 0, result <= base_poison }
+{
+    base_poison * (100 - duration * 10) / 100
+}
+
+fn apply_burn_max_hp_tick(target_max_hp: Int, flat_burn: Int) -> Int
+    requires {
+        target_max_hp >= 0,
+        target_max_hp <= 1000000,
+        flat_burn >= 0,
+        flat_burn <= 1000000,
+    }
+    ensures {
+        result >= flat_burn,
+        result == target_max_hp * 3 / 100 + flat_burn,
+    }
+{
+    target_max_hp * 3 / 100 + flat_burn
+}
+
+fn check_freeze_threshold(freeze_stacks: Int) -> Bool
+    requires {
+        freeze_stacks >= 0,
+        freeze_stacks <= 1000000,
+    }
+    ensures {
+        result == (freeze_stacks >= 5),
+    }
+{
+    freeze_stacks >= 5
+}
+
+fn calc_stamina_skill_cost(base_cost: Int, stamina_eff: Int) -> Int
+    requires {
+        base_cost >= 0,
+        base_cost <= 1000000,
+        stamina_eff >= 0,
+        stamina_eff <= 100,
+    }
+    ensures {
+        result >= 0,
+        result <= base_cost,
+    }
+{
+    base_cost * (100 - stamina_eff) / 100
+}
+
+fn calc_mana_overload_burst(missing_mana: Int) -> Int
+    requires {
+        missing_mana >= 0,
+        missing_mana <= 1000000,
+    }
+    ensures {
+        result >= 0,
+        result <= missing_mana,
+    }
+{
+    missing_mana * 10 / 100
+}
+
+fn calc_poise_break_stun(poise: Int, impact: Int) -> Bool
+    requires {
+        poise >= 0,
+        poise <= 1000000,
+        impact >= 0,
+        impact <= 1000000,
+    }
+    ensures {
+        result == (impact >= poise),
+    }
+{
+    impact >= poise
+}
+
+fn combat_subsys_101(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_102(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_103(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_104(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_105(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_106(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_107(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_108(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_109(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_110(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_111(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_112(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_113(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_114(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_115(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_116(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_117(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_118(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_119(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_120(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_121(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_122(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_123(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_124(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_125(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_126(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_127(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_128(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_129(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_130(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_131(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_132(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_133(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_134(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_135(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_136(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_137(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_138(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_139(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+fn combat_subsys_140(raw_dmg: Int, target_def: Int) -> Int
+    requires {
+        raw_dmg >= 0,
+        raw_dmg <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 1,
+        result <= raw_dmg + 1,
+    }
+{
+    let effective_def = calc_armor_damage_reduction(raw_dmg, target_def); match effective_def > 0 { true => effective_def, false => 1 }
+}
+
+
+// Tier 3 (141-180): AI decisions and weighted loot
+
+fn calc_threat_decay_by_dist(threat: Int, dist: Int) -> Int
+    requires {
+        threat >= 0,
+        threat <= 1000000,
+        dist >= 0,
+        dist <= 1000000,
+    }
+    ensures {
+        result >= 0,
+        result <= threat,
+    }
+{
+    threat * 100 / (100 + dist * 10)
+}
+
+fn evaluate_ai_behavior_state(hp_pct: Int, aggro: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn calc_weighted_loot_tier(roll_val: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn scale_drop_by_luck(roll_val: Int, luck: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn calc_exp_gain_with_level_diff(base_exp: Int, player_lvl: Int, monster_lvl: Int) -> Int
+    requires {
+        base_exp >= 0,
+        base_exp <= 1000000,
+        player_lvl >= 1,
+        player_lvl <= 1000000,
+        monster_lvl >= 1,
+        monster_lvl <= 1000000,
+    }
+    ensures {
+        result >= 0,
+        result <= base_exp,
+    }
+{
+    match (player_lvl - monster_lvl) > 5 { true => base_exp * 50 / 100, false => base_exp }
+}
+
+fn calc_exp_to_next_level(level: Int) -> Int
+    requires {
+        level >= 1,
+        level <= 1000000,
+    }
+    ensures {
+        result == level * level * 100 + level * 500,
+        result > level,
+    }
+{
+    level * level * 100 + level * 500
+}
+
+fn calc_shop_inflation_price(base_price: Int, world_day: Int) -> Int
+    requires {
+        base_price >= 0,
+        base_price <= 1000000,
+        world_day >= 0,
+        world_day <= 1000000,
+    }
+    ensures {
+        result >= base_price,
+    }
+{
+    base_price * (100 + world_day * 2) / 100
+}
+
+fn ai_loot_subsys_148(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_149(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_150(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_151(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_152(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_153(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_154(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_155(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_156(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_157(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_158(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_159(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_160(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_161(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_162(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_163(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_164(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_165(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_166(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_167(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_168(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_169(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_170(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_171(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_172(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_173(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_174(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_175(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_176(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_177(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_178(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_179(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+fn ai_loot_subsys_180(curr_aggro: Int, delta: Int) -> Int
+    requires { curr_aggro >= 0, delta >= 0 }
+    ensures { result >= 0 }
+{
+    curr_aggro + delta
+}
+
+
+// Tier 4 (181-200): turn flow and world simulation
+
+fn determine_turn_initiative(agility: Int, roll_val: Int) -> Int
+    requires {
+        agility >= 0,
+        agility <= 1000000,
+        roll_val >= 0,
+        roll_val < 20,
+    }
+    ensures {
+        result >= roll_val,
+        result == agility * 2 + roll_val,
+    }
+{
+    agility * 2 + roll_val
+}
+
+fn resolve_boss_phase_transition(hp_pct: Int) -> Int
+    requires { true }
+    ensures { true }
+{
+    1
+}
+
+fn simulate_single_turn_exchange(actor_atk: Int, target_def: Int, is_moving: Bool) -> Int
+    requires {
+        actor_atk >= 0,
+        actor_atk <= 1000000,
+        target_def >= 0,
+        target_def <= 1000000,
+    }
+    ensures {
+        result >= 6,
+    }
+{
+    let direct_damage = resolve_physical_hit(actor_atk, target_def); let bleed_damage = apply_bleed_stack_tick(1, is_moving); direct_damage + bleed_damage
+}
+
+fn resolve_terrain_hazard_tick(hazard_type: Int, max_hp: Int) -> Int
+    requires {
+        hazard_type >= 0,
+        hazard_type <= 3,
+        max_hp >= 0,
+        max_hp <= 1000000,
+    }
+    ensures {
+        result >= 0,
+        hazard_type == 0 => result == 0,
+        hazard_type == 3 => result == 0,
+    }
+{
+    match hazard_type == 1 { true => calc_lifesteal_conversion(max_hp, 5) + 10, false => 0 }
+}
+
+fn world_engine_185(turn_num: Int, cycle_len: Int) -> Int
+    requires {
+        turn_num >= 0,
+        turn_num <= 1000000,
+        cycle_len > 0,
+        cycle_len <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_186(turn_num: Int, cycle_len: Int) -> Int
+    requires {
+        turn_num >= 0,
+        turn_num <= 1000000,
+        cycle_len > 0,
+        cycle_len <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_187(turn_num: Int, cycle_len: Int) -> Int
+    requires {
+        turn_num >= 0,
+        turn_num <= 1000000,
+        cycle_len > 0,
+        cycle_len <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_188(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0 }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_189(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0 }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_190(turn_num: Int, cycle_len: Int) -> Int
+    requires {
+        turn_num >= 0,
+        turn_num <= 1000000,
+        cycle_len > 0,
+        cycle_len <= 1000000,
+    }
+    ensures {
+        result >= cycle_len,
+    }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_191(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0 }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_192(turn_num: Int, cycle_len: Int) -> Int
+    requires {
+        turn_num >= 0,
+        turn_num <= 1000000,
+        cycle_len > 0,
+        cycle_len <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_193(turn_num: Int, cycle_len: Int) -> Int
+    requires {
+        turn_num >= 0,
+        turn_num <= 1000000,
+        cycle_len > 0,
+        cycle_len <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_194(turn_num: Int, cycle_len: Int) -> Int
+    requires {
+        turn_num >= 0,
+        turn_num <= 1000000,
+        cycle_len > 0,
+        cycle_len <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_195(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0 }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_196(turn_num: Int, cycle_len: Int) -> Int
+    requires {
+        turn_num >= 0,
+        turn_num <= 1000000,
+        cycle_len > 0,
+        cycle_len <= 1000000,
+    }
+    ensures {
+        result > 0,
+    }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_197(turn_num: Int, cycle_len: Int) -> Int
+    requires { turn_num >= 0, cycle_len > 0 }
+    ensures { result >= 0 }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_198(turn_num: Int, cycle_len: Int) -> Int
+    requires {
+        turn_num >= 0,
+        turn_num <= 1000000,
+        cycle_len > 0,
+        cycle_len <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_199(turn_num: Int, cycle_len: Int) -> Int
+    requires {
+        turn_num >= 0,
+        turn_num <= 1000000,
+        cycle_len > 0,
+        cycle_len <= 1000000,
+    }
+    ensures {
+        result >= 1,
+    }
+{
+    turn_num + cycle_len
+}
+
+fn world_engine_200(turn_num: Int, cycle_len: Int) -> Int
+    requires {
+        turn_num >= 0,
+        turn_num <= 1000000,
+        cycle_len > 0,
+        cycle_len <= 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    turn_num + cycle_len
+}
+
+
