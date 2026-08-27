@@ -1,0 +1,526 @@
+{
+  "communities": {
+    "0": [
+      "engine_200_tier0_spatial_calc_grid_index",
+      "engine_200_tier0_spatial_calc_manhattan_dist",
+      "engine_200_tier0_spatial_rationale_114",
+      "engine_200_tier0_spatial_rationale_14",
+      "engine_200_tier0_spatial_rationale_67",
+      "engine_200_tier0_spatial_wrap_map_coord_x",
+      "engine_200_tier1_stats_calc_armor_damage_reduction",
+      "engine_200_tier1_stats_calc_lifesteal_conversion",
+      "engine_200_tier1_stats_calc_max_hp_from_vit",
+      "engine_200_tier1_stats_calc_phys_atk_from_str",
+      "engine_200_tier1_stats_stat_subsys_051",
+      "engine_200_tier2_combat_apply_bleed_stack_tick",
+      "engine_200_tier2_combat_apply_poison_exponential_decay",
+      "engine_200_tier2_combat_combat_subsys_101",
+      "engine_200_tier2_combat_resolve_physical_hit",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_148",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_149",
+      "engine_200_tier3_ai_loot_calc_exp_to_next_level",
+      "engine_200_tier3_ai_loot_calc_shop_inflation_price",
+      "engine_200_tier3_ai_loot_calc_threat_decay_by_dist",
+      "engine_200_tier3_ai_loot_calc_weighted_loot_tier",
+      "engine_200_tier3_ai_loot_scale_drop_by_luck",
+      "engine_200_tier4_world",
+      "engine_200_tier4_world_determine_turn_initiative",
+      "engine_200_tier4_world_rationale_1",
+      "engine_200_tier4_world_rationale_105",
+      "engine_200_tier4_world_rationale_111",
+      "engine_200_tier4_world_rationale_118",
+      "engine_200_tier4_world_rationale_125",
+      "engine_200_tier4_world_rationale_132",
+      "engine_200_tier4_world_rationale_140",
+      "engine_200_tier4_world_rationale_149",
+      "engine_200_tier4_world_rationale_157",
+      "engine_200_tier4_world_rationale_166",
+      "engine_200_tier4_world_rationale_175",
+      "engine_200_tier4_world_rationale_183",
+      "engine_200_tier4_world_rationale_199",
+      "engine_200_tier4_world_rationale_208",
+      "engine_200_tier4_world_rationale_40",
+      "engine_200_tier4_world_rationale_49",
+      "engine_200_tier4_world_rationale_64",
+      "engine_200_tier4_world_rationale_77",
+      "engine_200_tier4_world_rationale_91",
+      "engine_200_tier4_world_rationale_98",
+      "engine_200_tier4_world_resolve_boss_phase_transition",
+      "engine_200_tier4_world_resolve_terrain_hazard_tick",
+      "engine_200_tier4_world_simulate_single_turn_exchange",
+      "engine_200_tier4_world_validate_world_clock",
+      "engine_200_tier4_world_world_engine_185",
+      "engine_200_tier4_world_world_engine_186",
+      "engine_200_tier4_world_world_engine_187",
+      "engine_200_tier4_world_world_engine_188",
+      "engine_200_tier4_world_world_engine_189",
+      "engine_200_tier4_world_world_engine_190",
+      "engine_200_tier4_world_world_engine_191",
+      "engine_200_tier4_world_world_engine_192",
+      "engine_200_tier4_world_world_engine_193",
+      "engine_200_tier4_world_world_engine_194",
+      "engine_200_tier4_world_world_engine_195",
+      "engine_200_tier4_world_world_engine_196",
+      "engine_200_tier4_world_world_engine_197",
+      "engine_200_tier4_world_world_engine_199",
+      "engine_200_tier4_world_world_engine_200"
+    ],
+    "1": [
+      "engine_200_tier0_spatial",
+      "engine_200_tier0_spatial_calc_chebyshev_dist",
+      "engine_200_tier0_spatial_clamp_to_bounds_x",
+      "engine_200_tier0_spatial_rationale_1",
+      "engine_200_tier0_spatial_rationale_141",
+      "engine_200_tier0_spatial_rationale_167",
+      "engine_200_tier0_spatial_rationale_19",
+      "engine_200_tier0_spatial_rationale_217",
+      "engine_200_tier0_spatial_rationale_238",
+      "engine_200_tier0_spatial_rationale_245",
+      "engine_200_tier0_spatial_rationale_252",
+      "engine_200_tier0_spatial_rationale_257",
+      "engine_200_tier0_spatial_rationale_79",
+      "engine_200_tier0_spatial_spatial_subsys_019",
+      "engine_200_tier0_spatial_spatial_subsys_023",
+      "engine_200_tier0_spatial_spatial_subsys_031",
+      "engine_200_tier0_spatial_spatial_subsys_034",
+      "engine_200_tier0_spatial_spatial_subsys_035",
+      "engine_200_tier0_spatial_spatial_subsys_036",
+      "engine_200_tier0_spatial_spatial_subsys_037",
+      "engine_200_tier1_stats",
+      "engine_200_tier1_stats_calc_crit_chance_clamped",
+      "engine_200_tier1_stats_calc_elemental_multiplier",
+      "engine_200_tier1_stats_calc_magic_res_reduction",
+      "engine_200_tier1_stats_calc_max_mana_from_int",
+      "engine_200_tier1_stats_calc_overburden_penalty",
+      "engine_200_tier1_stats_stat_subsys_052",
+      "engine_200_tier1_stats_stat_subsys_062",
+      "engine_200_tier1_stats_stat_subsys_069",
+      "engine_200_tier1_stats_stat_subsys_073",
+      "engine_200_tier1_stats_stat_subsys_081",
+      "engine_200_tier1_stats_stat_subsys_084",
+      "engine_200_tier1_stats_stat_subsys_085",
+      "engine_200_tier1_stats_stat_subsys_086",
+      "engine_200_tier1_stats_stat_subsys_087",
+      "engine_200_tier2_combat_combat_subsys_102",
+      "engine_200_tier2_combat_combat_subsys_112",
+      "engine_200_tier2_combat_combat_subsys_123",
+      "engine_200_tier2_combat_combat_subsys_131",
+      "engine_200_tier2_combat_combat_subsys_134",
+      "engine_200_tier2_combat_combat_subsys_135",
+      "engine_200_tier2_combat_combat_subsys_136",
+      "engine_200_tier2_combat_combat_subsys_137",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_159",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_170",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_178"
+    ],
+    "2": [
+      "engine_200_tier0_spatial_check_in_radius_sq",
+      "engine_200_tier0_spatial_rationale_148",
+      "engine_200_tier0_spatial_rationale_155",
+      "engine_200_tier0_spatial_rationale_31",
+      "engine_200_tier0_spatial_spatial_subsys_020",
+      "engine_200_tier0_spatial_spatial_subsys_021",
+      "engine_200_tier1_stats_stat_subsys_054",
+      "engine_200_tier1_stats_stat_subsys_060",
+      "engine_200_tier1_stats_stat_subsys_065",
+      "engine_200_tier1_stats_stat_subsys_070",
+      "engine_200_tier1_stats_stat_subsys_071",
+      "engine_200_tier2_combat_combat_subsys_104",
+      "engine_200_tier2_combat_combat_subsys_110",
+      "engine_200_tier2_combat_combat_subsys_115",
+      "engine_200_tier2_combat_combat_subsys_119",
+      "engine_200_tier2_combat_combat_subsys_120",
+      "engine_200_tier2_combat_combat_subsys_121",
+      "engine_200_tier3_ai_loot",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_151",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_157",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_162",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_166",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_167",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_168",
+      "engine_200_tier3_ai_loot_calc_exp_gain_with_level_diff",
+      "engine_200_tier3_ai_loot_evaluate_ai_behavior_state"
+    ],
+    "3": [
+      "engine_200_tier0_spatial_rationale_212",
+      "engine_200_tier0_spatial_rationale_264",
+      "engine_200_tier0_spatial_rationale_271",
+      "engine_200_tier0_spatial_rationale_278",
+      "engine_200_tier0_spatial_spatial_subsys_030",
+      "engine_200_tier0_spatial_spatial_subsys_038",
+      "engine_200_tier0_spatial_spatial_subsys_039",
+      "engine_200_tier0_spatial_spatial_subsys_040",
+      "engine_200_tier1_stats_calc_effective_penetration",
+      "engine_200_tier1_stats_stat_subsys_080",
+      "engine_200_tier1_stats_stat_subsys_088",
+      "engine_200_tier1_stats_stat_subsys_089",
+      "engine_200_tier1_stats_stat_subsys_090",
+      "engine_200_tier2_combat",
+      "engine_200_tier2_combat_apply_burn_max_hp_tick",
+      "engine_200_tier2_combat_apply_dual_shield_absorption",
+      "engine_200_tier2_combat_calc_mana_overload_burst",
+      "engine_200_tier2_combat_calc_poise_break_stun",
+      "engine_200_tier2_combat_calc_stamina_skill_cost",
+      "engine_200_tier2_combat_check_freeze_threshold",
+      "engine_200_tier2_combat_combat_subsys_130",
+      "engine_200_tier2_combat_combat_subsys_138",
+      "engine_200_tier2_combat_combat_subsys_139",
+      "engine_200_tier2_combat_combat_subsys_140",
+      "engine_200_tier2_combat_resolve_crit_hit",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_177"
+    ],
+    "4": [
+      "engine_200_init",
+      "engine_200_init_rationale_1",
+      "engine_200_models",
+      "engine_200_models_baseattributes",
+      "engine_200_models_derivedstats",
+      "engine_200_models_entity",
+      "engine_200_models_point",
+      "engine_200_models_rationale_1",
+      "engine_200_models_rationale_16",
+      "engine_200_models_rationale_24",
+      "engine_200_models_rationale_34",
+      "engine_200_models_rationale_44",
+      "engine_200_models_rationale_61",
+      "engine_200_models_rationale_72",
+      "engine_200_models_rationale_8",
+      "engine_200_models_rect",
+      "engine_200_models_statuseffect",
+      "engine_200_models_velocity",
+      "tests_test_engine_200_domainmodeltests",
+      "tests_test_engine_200_domainmodeltests_test_entity_defaults_do_not_share_nested_state",
+      "tests_test_engine_200_domainmodeltests_test_models_are_public_dataclasses"
+    ],
+    "5": [
+      "engine_200_tier0_spatial_pack_coords_to_hash",
+      "engine_200_tier0_spatial_rationale_48",
+      "engine_200_tier0_spatial_rationale_55",
+      "engine_200_tier0_spatial_rationale_61",
+      "engine_200_tier0_spatial_unpack_hash_x",
+      "engine_200_tier0_spatial_unpack_hash_y",
+      "engine_200_tier1_stats_stat_subsys_057",
+      "engine_200_tier1_stats_stat_subsys_058",
+      "engine_200_tier1_stats_stat_subsys_059",
+      "engine_200_tier2_combat_combat_subsys_107",
+      "engine_200_tier2_combat_combat_subsys_108",
+      "engine_200_tier2_combat_combat_subsys_109",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_154",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_155",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_156",
+      "engine_200_tier4_world_rationale_192",
+      "engine_200_tier4_world_world_engine_198"
+    ],
+    "6": [
+      "tests_test_engine_200",
+      "tests_test_engine_200_enginefunctiontests",
+      "tests_test_engine_200_enginefunctiontests_test_tier0_covers_functions_001_through_040",
+      "tests_test_engine_200_enginefunctiontests_test_tier1_covers_functions_041_through_090",
+      "tests_test_engine_200_enginefunctiontests_test_tier2_covers_functions_091_through_140",
+      "tests_test_engine_200_enginefunctiontests_test_tier3_covers_functions_141_through_180",
+      "tests_test_engine_200_enginefunctiontests_test_tier4_contract_boundaries",
+      "tests_test_engine_200_enginefunctiontests_test_tier4_covers_functions_181_through_200",
+      "tests_test_engine_200_publicapitests",
+      "tests_test_engine_200_publicapitests_test_root_exports_exactly_200_functions_and_7_models"
+    ],
+    "7": [
+      "engine_200_tier0_spatial_bresenham_step_x",
+      "engine_200_tier0_spatial_rationale_38",
+      "engine_200_tier1_stats_stat_subsys_055",
+      "engine_200_tier2_combat_combat_subsys_105",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_152"
+    ],
+    "8": [
+      "engine_200_tier0_spatial_bresenham_step_y",
+      "engine_200_tier0_spatial_rationale_43",
+      "engine_200_tier1_stats_stat_subsys_056",
+      "engine_200_tier2_combat_combat_subsys_106",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_153"
+    ],
+    "9": [
+      "engine_200_tier0_spatial_calc_euclidean_sq",
+      "engine_200_tier0_spatial_rationale_24",
+      "engine_200_tier1_stats_stat_subsys_053",
+      "engine_200_tier2_combat_combat_subsys_103",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_150"
+    ],
+    "10": [
+      "engine_200_tier0_spatial_calc_line_of_sight_cost",
+      "engine_200_tier0_spatial_rationale_122",
+      "engine_200_tier1_stats_stat_subsys_066",
+      "engine_200_tier2_combat_combat_subsys_116",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_163"
+    ],
+    "11": [
+      "engine_200_tier0_spatial_check_aabb_overlap",
+      "engine_200_tier0_spatial_rationale_100",
+      "engine_200_tier1_stats_stat_subsys_064",
+      "engine_200_tier2_combat_combat_subsys_114",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_161"
+    ],
+    "12": [
+      "engine_200_tier0_spatial_clamp_to_bounds_y",
+      "engine_200_tier0_spatial_rationale_85",
+      "engine_200_tier1_stats_stat_subsys_063",
+      "engine_200_tier2_combat_combat_subsys_113",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_160"
+    ],
+    "13": [
+      "engine_200_tier0_spatial_rationale_129",
+      "engine_200_tier0_spatial_spatial_subsys_017",
+      "engine_200_tier1_stats_stat_subsys_067",
+      "engine_200_tier2_combat_combat_subsys_117",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_164"
+    ],
+    "14": [
+      "engine_200_tier0_spatial_rationale_136",
+      "engine_200_tier0_spatial_spatial_subsys_018",
+      "engine_200_tier1_stats_stat_subsys_068",
+      "engine_200_tier2_combat_combat_subsys_118",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_165"
+    ],
+    "15": [
+      "engine_200_tier0_spatial_rationale_160",
+      "engine_200_tier0_spatial_spatial_subsys_022",
+      "engine_200_tier1_stats_stat_subsys_072",
+      "engine_200_tier2_combat_combat_subsys_122",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_169"
+    ],
+    "16": [
+      "engine_200_tier0_spatial_rationale_174",
+      "engine_200_tier0_spatial_spatial_subsys_024",
+      "engine_200_tier1_stats_stat_subsys_074",
+      "engine_200_tier2_combat_combat_subsys_124",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_171"
+    ],
+    "17": [
+      "engine_200_tier0_spatial_rationale_181",
+      "engine_200_tier0_spatial_spatial_subsys_025",
+      "engine_200_tier1_stats_stat_subsys_075",
+      "engine_200_tier2_combat_combat_subsys_125",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_172"
+    ],
+    "18": [
+      "engine_200_tier0_spatial_rationale_186",
+      "engine_200_tier0_spatial_spatial_subsys_026",
+      "engine_200_tier1_stats_stat_subsys_076",
+      "engine_200_tier2_combat_combat_subsys_126",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_173"
+    ],
+    "19": [
+      "engine_200_tier0_spatial_rationale_193",
+      "engine_200_tier0_spatial_spatial_subsys_027",
+      "engine_200_tier1_stats_stat_subsys_077",
+      "engine_200_tier2_combat_combat_subsys_127",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_174"
+    ],
+    "20": [
+      "engine_200_tier0_spatial_rationale_200",
+      "engine_200_tier0_spatial_spatial_subsys_028",
+      "engine_200_tier1_stats_stat_subsys_078",
+      "engine_200_tier2_combat_combat_subsys_128",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_175"
+    ],
+    "21": [
+      "engine_200_tier0_spatial_rationale_205",
+      "engine_200_tier0_spatial_spatial_subsys_029",
+      "engine_200_tier1_stats_stat_subsys_079",
+      "engine_200_tier2_combat_combat_subsys_129",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_176"
+    ],
+    "22": [
+      "engine_200_tier0_spatial_rationale_224",
+      "engine_200_tier0_spatial_spatial_subsys_032",
+      "engine_200_tier1_stats_stat_subsys_082",
+      "engine_200_tier2_combat_combat_subsys_132",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_179"
+    ],
+    "23": [
+      "engine_200_tier0_spatial_rationale_231",
+      "engine_200_tier0_spatial_spatial_subsys_033",
+      "engine_200_tier1_stats_stat_subsys_083",
+      "engine_200_tier2_combat_combat_subsys_133",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_180"
+    ],
+    "24": [
+      "engine_200_tier0_spatial_rationale_73",
+      "engine_200_tier0_spatial_wrap_map_coord_y",
+      "engine_200_tier1_stats_stat_subsys_061",
+      "engine_200_tier2_combat_combat_subsys_111",
+      "engine_200_tier3_ai_loot_ai_loot_subsys_158"
+    ]
+  },
+  "cohesion": {
+    "0": 0.06093189964157706,
+    "1": 0.05410628019323672,
+    "2": 0.07692307692307693,
+    "3": 0.07692307692307693,
+    "4": 0.12857142857142856,
+    "5": 0.11764705882352941,
+    "6": 0.2,
+    "7": 0.4,
+    "8": 0.4,
+    "9": 0.4,
+    "10": 0.4,
+    "11": 0.4,
+    "12": 0.4,
+    "13": 0.4,
+    "14": 0.4,
+    "15": 0.4,
+    "16": 0.4,
+    "17": 0.4,
+    "18": 0.4,
+    "19": 0.4,
+    "20": 0.4,
+    "21": 0.4,
+    "22": 0.4,
+    "23": 0.4,
+    "24": 0.4
+  },
+  "gods": [
+    {
+      "id": "engine_200_tier4_world_validate_world_clock",
+      "label": "_validate_world_clock()",
+      "degree": 17
+    },
+    {
+      "id": "engine_200_tier0_spatial_wrap_map_coord_x",
+      "label": "wrap_map_coord_x()",
+      "degree": 11
+    },
+    {
+      "id": "engine_200_tier0_spatial_calc_manhattan_dist",
+      "label": "calc_manhattan_dist()",
+      "degree": 9
+    },
+    {
+      "id": "engine_200_tier4_world_world_engine_194",
+      "label": "world_engine_194()",
+      "degree": 8
+    },
+    {
+      "id": "engine_200_tier4_world_world_engine_195",
+      "label": "world_engine_195()",
+      "degree": 8
+    },
+    {
+      "id": "engine_200_tier4_world_world_engine_197",
+      "label": "world_engine_197()",
+      "degree": 8
+    },
+    {
+      "id": "engine_200_tier0_spatial_clamp_to_bounds_x",
+      "label": "clamp_to_bounds_x()",
+      "degree": 7
+    },
+    {
+      "id": "engine_200_tier4_world_simulate_single_turn_exchange",
+      "label": "simulate_single_turn_exchange()",
+      "degree": 7
+    },
+    {
+      "id": "engine_200_tier4_world_world_engine_192",
+      "label": "world_engine_192()",
+      "degree": 7
+    },
+    {
+      "id": "engine_200_tier4_world_world_engine_199",
+      "label": "world_engine_199()",
+      "degree": 7
+    }
+  ],
+  "surprises": [
+    {
+      "source": "resolve_crit_hit()",
+      "target": "calc_armor_damage_reduction()",
+      "source_files": [
+        "engine_200/tier2_combat.py",
+        "engine_200/tier1_stats.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities; peripheral node `resolve_crit_hit()` unexpectedly reaches hub `calc_armor_damage_reduction()`"
+    },
+    {
+      "source": "world_engine_187()",
+      "target": "pack_coords_to_hash()",
+      "source_files": [
+        "engine_200/tier4_world.py",
+        "engine_200/tier0_spatial.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    },
+    {
+      "source": "stat_subsys_060()",
+      "target": "wrap_map_coord_x()",
+      "source_files": [
+        "engine_200/tier1_stats.py",
+        "engine_200/tier0_spatial.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    },
+    {
+      "source": "world_engine_189()",
+      "target": "wrap_map_coord_y()",
+      "source_files": [
+        "engine_200/tier4_world.py",
+        "engine_200/tier0_spatial.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    },
+    {
+      "source": "world_engine_195()",
+      "target": "clamp_to_bounds_x()",
+      "source_files": [
+        "engine_200/tier4_world.py",
+        "engine_200/tier0_spatial.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "bridges separate communities"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `DomainModelTests` connect `Domain Models` to `Engine Test Suite`?",
+      "why": "High betweenness centrality (0.065) - this node is a cross-community bridge."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `World Simulation` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.06093189964157706 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Spatial Geometry` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.05410628019323672 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `AI and Loot` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.07692307692307693 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Combat and Status` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.07692307692307693 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Domain Models` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.12857142857142856 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Spatial Geometry` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.11764705882352941 - nodes in this community are weakly interconnected."
+    }
+  ]
+}
