@@ -4,7 +4,7 @@
 
 ---
 
-## 📊 一、多 Agent 并发协作实测数据矩阵
+## 📊 一、5 个 Codex Agent 并发协作实测数据矩阵
 
 | Agent 角色 (Agent Role) | 负责系统与函数范围 | 核心业务算法 / 逻辑 | 依赖层级 | 真实消耗 Tokens | 执行结果 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -12,19 +12,25 @@
 | **Agent 2 (RPG 数值专家)** | Tier 1: `041` ~ `090` (50 函数) | 主属性映射、非线性护甲减伤公式、五行属性相克、分段负重惩罚 | 依赖 Tier 0 | **108,097 Tokens** | ✅ 50/50 完成 |
 | **Agent 3 (战斗状态机专家)**| Tier 2: `091` ~ `140` (50 函数) | 物法混合破防、双护盾吸收、流血/中毒/燃烧/冰冻状态流转、韧性削减 | 依赖 Tier 0, 1 | **99,169 Tokens** | ✅ 50/50 完成 |
 | **Agent 4 (AI 与掉落专家)**  | Tier 3: `141` ~ `180` (40 函数) | 仇恨距离衰减、AI巡逻/追逐/逃跑三态机、轮盘赌加权掉落、经验阶梯 | 依赖 Tier 0, 1, 2 | **128,534 Tokens** | ✅ 40/40 完成 |
-| **Agent 5 (主架构与组装)**  | Tier 4: `181` ~ `200` (20 函数) | 先攻判定、Boss三阶段狂暴血线、单回合交锋、全局数据模型装配 | 依赖 Tier 0~3 | **115,240 Tokens** | ✅ 20/20 + 全局组装 |
-| **🏆 全局总计 (Total)**     | **全量 5 层 200 个真实业务函数** | **200 个带 `requires`/`ensures` 严谨数学契约的真实业务逻辑** | **5 层完整拓扑** | **576,029 Tokens** | **✅ 200/200 全部 `[VERIFIED]`** |
+| **Agent 5 (主架构与组装)**  | Tier 4: `181` ~ `200` (20 函数) | 先攻判定、Boss三阶段狂暴血线、单回合交锋、全局数据模型装配 | 依赖 Tier 0~3 | **126,143 Tokens** | ✅ 20/20 + 全局组装 |
+| **🏆 全局总计 (Total)**     | **全量 5 层 200 个真实业务函数** | **200 个带 `requires`/`ensures` 严谨数学契约的真实业务逻辑** | **5 层完整拓扑** | **586,932 Tokens** | **✅ 200/200 全部 `[VERIFIED]`** |
 
 ---
 
 ## ⚡ 二、SMT 形式化验证性能与正确性保障
 
-- **检查命令**：`cargo run -p axiom-cli -- check examples/benchmark_200/ax/engine_200.ax`
-  - 输出：`OK examples/benchmark_200/ax/engine_200.ax: 7 type(s), 0 effect(s), 200 function(s), 0 unresolved hole(s)`
-  - 检查耗时：**0.07 秒**
-- **全域证明命令**：`cargo run -p axiom-cli -- verify examples/benchmark_200/ax/engine_200.ax`
-  - 证明状态：`[VERIFIED]` **200 / 200 (100% 成功，0 失败，0 跳过)**
-  - 证明耗时：**0.09 秒**
+- **类型与语义检查**：
+  ```bash
+  cargo run -p axiom-cli -- check examples/benchmark_200/ax/engine_200.ax
+  # 输出: OK examples/benchmark_200/ax/engine_200.ax: 7 type(s), 0 effect(s), 200 function(s), 0 unresolved hole(s)
+  # 耗时: 0.07 秒
+  ```
+- **全域证明命令**：
+  ```bash
+  cargo run -p axiom-cli -- verify examples/benchmark_200/ax/engine_200.ax
+  # 输出: [VERIFIED] 200/200 (100% 成功，0 失败，0 告警，0 跳过)
+  # 耗时: 0.09 秒
+  ```
 - **数学确定性**：
   - 在全数域（$-\infty \sim +\infty$）上完成非线性抗性、状态机流转与网格碰撞约束的数学穷尽证明。
 
@@ -33,7 +39,7 @@
 ## 🔬 三、多 Agent 协作深度架构洞察
 
 1. **真实业务复杂度下的分工隔离**：
-   - 空间几何专家（Agent 1）与数值策划专家（Agent 2）可以在完全互不干扰的上下文分支下并行工作；
+   - 空间几何专家（Agent 1）与数值策划专家（Agent 2）在各自独立的上下文分支下并行工作；
    - 战斗系统专家（Agent 3）直接依托 Tier 1 的已证明契约进行混合伤害与状态机推进。
 2. **0 Git 冲突与 AST 内容寻址 CAS 组装**：
-   - 4 个前置 Agent 各自独立产出模块，由 Lead Architect Agent 依据 AST 拓扑进行无损合成，**消除了传统大工程并行开发中代码合并冲突**。
+   - 4 个前置 Agent 各自独立产出模块，由 Lead Architect Agent 依据 AST 拓扑进行无损合成，**消除了传统大工程并行开发中的代码合并冲突**。
