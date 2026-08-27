@@ -1,0 +1,268 @@
+﻿// Axiom Large-Scale Roguelike Combat & World Engine (16-Holes Architecture Skeleton)
+
+type Point = {
+    x: Int,
+    y: Int,
+}
+
+type Stats = {
+    hp: Int,
+    max_hp: Int,
+    attack: Int,
+    defense: Int,
+    mana: Int,
+    max_mana: Int,
+    stamina: Int,
+    max_stamina: Int,
+}
+
+type LootItem = {
+    id: Int,
+    name: String,
+    weight: Int,
+    rarity: Int,
+}
+
+type Player = {
+    id: Int,
+    pos: Point,
+    stats: Stats,
+    exp: Int,
+    level: Int,
+    gold: Int,
+}
+
+type Monster = {
+    id: Int,
+    pos: Point,
+    stats: Stats,
+    aggro: Int,
+    is_alive: Bool,
+}
+
+// Side-effect declarations
+effect AudioEffect {
+    fn play_sound(name: String) -> ();
+}
+
+effect RenderEffect {
+    fn draw_tile(x: Int, y: Int, tile_id: Int) -> ();
+}
+
+effect RandomEffect {
+    fn roll_dice(sides: Int) -> Int;
+}
+
+// 1. 暴击伤害计算
+fn calc_crit_damage(base_dmg: Int, is_crit: Bool, crit_multiplier: Int) -> Int
+    requires {
+        base_dmg >= 0,
+        crit_multiplier >= 1,
+    }
+    ensures {
+        result >= base_dmg
+    }
+{
+    if is_crit { base_dmg * crit_multiplier } else { base_dmg }
+}
+
+// 2. 元素抗性削减
+fn calc_elemental_resistance(dmg: Int, res_percent: Int) -> Int
+    requires {
+        dmg >= 0,
+        res_percent >= 0,
+        res_percent <= 100,
+    }
+    ensures {
+        result >= 0 && result <= dmg
+    }
+{
+    dmg - (dmg * res_percent / 100)
+}
+
+// 3. 吸血回复结算
+fn apply_lifesteal(current_hp: Int, max_hp: Int, dmg_dealt: Int, lifesteal_rate: Int) -> Int
+    requires {
+        current_hp >= 0,
+        max_hp > 0,
+        dmg_dealt >= 0,
+        lifesteal_rate >= 0,
+    }
+    ensures {
+        result >= current_hp && result <= max_hp
+    }
+{
+    if current_hp + (dmg_dealt * lifesteal_rate / 100) < max_hp { current_hp + (dmg_dealt * lifesteal_rate / 100) } else { max_hp }
+}
+
+// 4. 闪避判定
+fn calc_dodge_chance(accuracy: Int, evasion: Int) -> Int
+    requires {
+        accuracy >= 0,
+        evasion >= 0,
+    }
+    ensures {
+        result >= 0 && result <= 100
+    }
+{
+    if evasion > accuracy { if evasion - accuracy < 100 { evasion - accuracy } else { 100 } } else { 0 }
+}
+
+// 5. 中毒掉血计算
+fn apply_poison_tick(current_hp: Int, poison_dmg: Int) -> Int
+    requires {
+        current_hp >= 0,
+        poison_dmg >= 0,
+    }
+    ensures {
+        result >= 0 && result <= current_hp
+    }
+{
+    if current_hp > poison_dmg { current_hp - poison_dmg } else { 0 }
+}
+
+// 6. 护盾吸收伤害
+fn apply_shield_absorption(shield_amount: Int, incoming_dmg: Int) -> Int
+    requires {
+        shield_amount >= 0,
+        incoming_dmg >= 0,
+    }
+    ensures {
+        result >= 0 && result <= incoming_dmg
+    }
+{
+    if incoming_dmg > shield_amount { incoming_dmg - shield_amount } else { 0 }
+}
+
+// 7. 法力消耗折算
+fn calc_mana_cost(base_cost: Int, cost_reduction: Int) -> Int
+    requires {
+        base_cost >= 0,
+        cost_reduction >= 0,
+    }
+    ensures {
+        result >= 0 && result <= base_cost
+    }
+{
+    if base_cost > cost_reduction { base_cost - cost_reduction } else { 0 }
+}
+
+// 8. 体力消耗与疲劳判定
+fn calc_stamina_drain(current_stamina: Int, action_cost: Int) -> Int
+    requires {
+        current_stamina >= 0,
+        action_cost >= 0,
+    }
+    ensures {
+        result >= 0 && result <= current_stamina
+    }
+{
+    if current_stamina > action_cost { current_stamina - action_cost } else { 0 }
+}
+
+// 9. 怪物金币掉落
+fn calc_gold_drop(base_gold: Int, luck_bonus: Int) -> Int
+    requires {
+        base_gold >= 0,
+        luck_bonus >= 0,
+    }
+    ensures {
+        result >= base_gold
+    }
+{
+    base_gold + (base_gold * luck_bonus / 100)
+}
+
+// 10. 经验收益与等级差
+fn calc_exp_reward(base_exp: Int, player_lvl: Int, monster_lvl: Int) -> Int
+    requires {
+        base_exp >= 0,
+        player_lvl >= 1,
+        monster_lvl >= 1,
+    }
+    ensures {
+        result >= 0
+    }
+{
+    if monster_lvl >= player_lvl { base_exp + (monster_lvl - player_lvl) * 10 } else { if base_exp > (player_lvl - monster_lvl) * 5 { base_exp - (player_lvl - monster_lvl) * 5 } else { 1 } }
+}
+
+// 11. 怪物 AI 仇恨计算
+fn evaluate_ai_aggro(current_aggro: Int, player_threat: Int) -> Int
+    requires {
+        current_aggro >= 0,
+        player_threat >= 0,
+    }
+    ensures {
+        result >= current_aggro
+    }
+{
+    current_aggro + player_threat
+}
+
+// 12. 网格距离步进
+fn calc_pathfinding_step(cur_x: Int, target_x: Int) -> Int
+    requires {
+        cur_x >= 0,
+        target_x >= 0,
+    }
+    ensures {
+        (target_x > cur_x && result == cur_x + 1) ||
+        (target_x < cur_x && result == cur_x - 1) ||
+        (target_x == cur_x && result == cur_x)
+    }
+{
+    if target_x > cur_x { cur_x + 1 } else { if target_x < cur_x { cur_x - 1 } else { cur_x } }
+}
+
+// 13. 掉落品质判定
+fn roll_loot_rarity(roll_value: Int) -> Int
+    requires {
+        roll_value >= 0,
+        roll_value <= 100,
+    }
+    ensures {
+        result >= 1 && result <= 5
+    }
+{
+    if roll_value > 95 { 5 } else { if roll_value > 80 { 4 } else { if roll_value > 50 { 3 } else { if roll_value > 20 { 2 } else { 1 } } } }
+}
+
+// 14. 负重累计
+fn calc_inventory_weight(current_weight: Int, item_weight: Int) -> Int
+    requires {
+        current_weight >= 0,
+        item_weight >= 0,
+    }
+    ensures {
+        result == current_weight + item_weight
+    }
+{
+    current_weight + item_weight
+}
+
+// 15. 生命药水回复
+fn apply_health_potion(current_hp: Int, max_hp: Int, heal_amount: Int) -> Int
+    requires {
+        current_hp >= 0,
+        max_hp > 0,
+        heal_amount >= 0,
+    }
+    ensures {
+        result >= current_hp && result <= max_hp
+    }
+{
+    if current_hp + heal_amount < max_hp { current_hp + heal_amount } else { max_hp }
+}
+
+// 16. 连击伤害加成
+fn calc_combo_multiplier(combo_count: Int) -> Int
+    requires {
+        combo_count >= 0,
+    }
+    ensures {
+        result >= 100
+    }
+{
+    100 + combo_count * 10
+}
