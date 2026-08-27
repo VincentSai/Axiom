@@ -56,19 +56,35 @@ pub fn transpile_to_rust(module: &Module) -> Result<String, TranspileError> {
     Ok(output)
 }
 
+fn is_scalar_type(ty: &Type) -> bool {
+    matches!(ty, Type::Int | Type::Float | Type::Decimal | Type::Bool | Type::Unit)
+}
+
 fn transpile_type_definition(definition: &TypeDef) -> String {
     match definition {
         TypeDef::Record { name, fields } => {
+            let all_scalar = fields.iter().all(|f| is_scalar_type(&f.ty));
+            let derives = if all_scalar {
+                "#[derive(Debug, Clone, Copy, PartialEq)]"
+            } else {
+                "#[derive(Debug, Clone, PartialEq)]"
+            };
             let fields = fields
                 .iter()
                 .map(|field| format!("    pub {}: {},", field.name, rust_type(&field.ty)))
                 .collect::<Vec<_>>()
                 .join("\n");
             format!(
-                "#[derive(Debug, Clone, PartialEq)]\npub struct {name} {{\n{fields}\n}}\n"
+                "{derives}\npub struct {name} {{\n{fields}\n}}\n"
             )
         }
         TypeDef::Enum { name, variants } => {
+            let all_scalar = variants.iter().all(|v| v.fields.iter().all(|f| is_scalar_type(&f.ty)));
+            let derives = if all_scalar {
+                "#[derive(Debug, Clone, Copy, PartialEq)]"
+            } else {
+                "#[derive(Debug, Clone, PartialEq)]"
+            };
             let variants = variants
                 .iter()
                 .map(|variant| {
@@ -87,7 +103,7 @@ fn transpile_type_definition(definition: &TypeDef) -> String {
                 .collect::<Vec<_>>()
                 .join("\n");
             format!(
-                "#[derive(Debug, Clone, PartialEq)]\npub enum {name} {{\n{variants}\n}}\n"
+                "{derives}\npub enum {name} {{\n{variants}\n}}\n"
             )
         }
     }
@@ -121,10 +137,10 @@ fn transpile_function(function: &FunctionDecl, module: &Module) -> Result<String
         if function.requires.is_empty() {
             body_code.push_str(&format!("    {body_expr}\n"));
         } else {
-            body_code.push_str(&format!("    let result = {body_expr};\n    result\n"));
+            body_code.push_str(&format!("    let result = {{\n        {body_expr}\n    }};\n    result\n"));
         }
     } else {
-        body_code.push_str(&format!("    let result = {body_expr};\n"));
+        body_code.push_str(&format!("    let result = {{\n        {body_expr}\n    }};\n"));
         for ens in &function.ensures {
             let ens_str = transpile_expr(ens, module)?;
             body_code.push_str(&format!(
