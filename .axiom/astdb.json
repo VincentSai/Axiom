@@ -1,5 +1,74 @@
 {
   "types": {
+    "#type_07d79a3257b9dd42dd194e7d6bc5debbab28e3a678deeb698ebbed34202805fb": {
+      "Record": {
+        "name": "Monster",
+        "fields": [
+          {
+            "name": "id",
+            "ty": "Int"
+          },
+          {
+            "name": "pos",
+            "ty": {
+              "Custom": "Point"
+            }
+          },
+          {
+            "name": "stats",
+            "ty": {
+              "Custom": "Stats"
+            }
+          },
+          {
+            "name": "is_alive",
+            "ty": "Bool"
+          }
+        ]
+      }
+    },
+    "#type_104d7d109982203ef5235fd6bf1ae29899614feeade06bca85fd9250840a71a1": {
+      "Record": {
+        "name": "Stats",
+        "fields": [
+          {
+            "name": "hp",
+            "ty": "Int"
+          },
+          {
+            "name": "max_hp",
+            "ty": "Int"
+          },
+          {
+            "name": "attack",
+            "ty": "Int"
+          },
+          {
+            "name": "defense",
+            "ty": "Int"
+          }
+        ]
+      }
+    },
+    "#type_2c49f26dc25b0044a59195d26c59b4f914a57256281256b8710cd027c42c8076": {
+      "Record": {
+        "name": "Item",
+        "fields": [
+          {
+            "name": "id",
+            "ty": "Int"
+          },
+          {
+            "name": "name",
+            "ty": "String"
+          },
+          {
+            "name": "value",
+            "ty": "Int"
+          }
+        ]
+      }
+    },
     "#type_2fa99a373d6aeed9694ebc40c8f318d59718756fabbe6ef5131589309cd0b493": {
       "Record": {
         "name": "Vector2",
@@ -11,6 +80,21 @@
           {
             "name": "y",
             "ty": "Float"
+          }
+        ]
+      }
+    },
+    "#type_39dd382491a0e413712ddf0ba83ca72456f53046495945860bbcbe2526b10eb1": {
+      "Record": {
+        "name": "Point",
+        "fields": [
+          {
+            "name": "x",
+            "ty": "Int"
+          },
+          {
+            "name": "y",
+            "ty": "Int"
           }
         ]
       }
@@ -143,9 +227,315 @@
           }
         ]
       }
+    },
+    "#type_c873ecbcd72b3409786d101932b0cb97c0ac88e0eb513ec30064ec4f076dbaaf": {
+      "Record": {
+        "name": "Player",
+        "fields": [
+          {
+            "name": "id",
+            "ty": "Int"
+          },
+          {
+            "name": "pos",
+            "ty": {
+              "Custom": "Point"
+            }
+          },
+          {
+            "name": "stats",
+            "ty": {
+              "Custom": "Stats"
+            }
+          },
+          {
+            "name": "exp",
+            "ty": "Int"
+          },
+          {
+            "name": "level",
+            "ty": "Int"
+          }
+        ]
+      }
     }
   },
   "functions": {
+    "#fn_10aebde8786613a19987b0974840320a753cc7595adc8d29b98e9f6085714f0f": {
+      "name": "level_up",
+      "params": [
+        {
+          "name": "player",
+          "ty": {
+            "Custom": "Player"
+          }
+        },
+        {
+          "name": "exp_gained",
+          "ty": "Int"
+        }
+      ],
+      "return_type": {
+        "Custom": "Player"
+      },
+      "effects": [],
+      "requires": [
+        {
+          "BinaryOp": {
+            "left": {
+              "Ident": "exp_gained"
+            },
+            "op": "GreaterThanOrEqual",
+            "right": {
+              "Literal": {
+                "Int": 0
+              }
+            }
+          }
+        },
+        {
+          "BinaryOp": {
+            "left": {
+              "FieldAccess": {
+                "target": {
+                  "Ident": "player"
+                },
+                "field": "level"
+              }
+            },
+            "op": "GreaterThanOrEqual",
+            "right": {
+              "Literal": {
+                "Int": 1
+              }
+            }
+          }
+        },
+        {
+          "BinaryOp": {
+            "left": {
+              "FieldAccess": {
+                "target": {
+                  "FieldAccess": {
+                    "target": {
+                      "Ident": "player"
+                    },
+                    "field": "stats"
+                  }
+                },
+                "field": "max_hp"
+              }
+            },
+            "op": "GreaterThan",
+            "right": {
+              "Literal": {
+                "Int": 0
+              }
+            }
+          }
+        }
+      ],
+      "ensures": [
+        {
+          "BinaryOp": {
+            "left": {
+              "BinaryOp": {
+                "left": {
+                  "FieldAccess": {
+                    "target": {
+                      "Ident": "result"
+                    },
+                    "field": "level"
+                  }
+                },
+                "op": "GreaterThanOrEqual",
+                "right": {
+                  "FieldAccess": {
+                    "target": {
+                      "Ident": "player"
+                    },
+                    "field": "level"
+                  }
+                }
+              }
+            },
+            "op": "And",
+            "right": {
+              "BinaryOp": {
+                "left": {
+                  "FieldAccess": {
+                    "target": {
+                      "FieldAccess": {
+                        "target": {
+                          "Ident": "result"
+                        },
+                        "field": "stats"
+                      }
+                    },
+                    "field": "max_hp"
+                  }
+                },
+                "op": "GreaterThanOrEqual",
+                "right": {
+                  "FieldAccess": {
+                    "target": {
+                      "FieldAccess": {
+                        "target": {
+                          "Ident": "player"
+                        },
+                        "field": "stats"
+                      }
+                    },
+                    "field": "max_hp"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "body": {
+        "Raw": "let new_exp = player.exp + exp_gained;\n    let threshold = player.level * 100;\n    if new_exp >= threshold {\n        Player {\n            id: player.id,\n            pos: player.pos,\n            stats: Stats {\n                hp: player.stats.max_hp + 10,\n                max_hp: player.stats.max_hp + 10,\n                attack: player.stats.attack + 2,\n                defense: player.stats.defense + 1,\n            },\n            exp: new_exp - threshold,\n            level: player.level + 1,\n        }\n    } else {\n        Player {\n            id: player.id,\n            pos: player.pos,\n            stats: player.stats,\n            exp: new_exp,\n            level: player.level,\n        }\n    }"
+      }
+    },
+    "#fn_342939f5fe8cb6d0e3702c3d64c2a082a85da086cd75b87345d6928203220850": {
+      "name": "apply_damage",
+      "params": [
+        {
+          "name": "current_hp",
+          "ty": "Int"
+        },
+        {
+          "name": "damage",
+          "ty": "Int"
+        }
+      ],
+      "return_type": "Int",
+      "effects": [],
+      "requires": [
+        {
+          "BinaryOp": {
+            "left": {
+              "Ident": "current_hp"
+            },
+            "op": "GreaterThanOrEqual",
+            "right": {
+              "Literal": {
+                "Int": 0
+              }
+            }
+          }
+        },
+        {
+          "BinaryOp": {
+            "left": {
+              "Ident": "damage"
+            },
+            "op": "GreaterThanOrEqual",
+            "right": {
+              "Literal": {
+                "Int": 0
+              }
+            }
+          }
+        }
+      ],
+      "ensures": [
+        {
+          "BinaryOp": {
+            "left": {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "result"
+                },
+                "op": "GreaterThanOrEqual",
+                "right": {
+                  "Literal": {
+                    "Int": 0
+                  }
+                }
+              }
+            },
+            "op": "And",
+            "right": {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "result"
+                },
+                "op": "LessThanOrEqual",
+                "right": {
+                  "Ident": "current_hp"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "body": {
+        "Raw": "let remaining = current_hp - damage;\n    if remaining > 0 {\n        remaining\n    } else {\n        0\n    }"
+      }
+    },
+    "#fn_3757a024aee50d264f91f939e235964e4bdbc90cc55d4c70cec47d332c54bb00": {
+      "name": "calculate_damage",
+      "params": [
+        {
+          "name": "attacker_atk",
+          "ty": "Int"
+        },
+        {
+          "name": "defender_def",
+          "ty": "Int"
+        }
+      ],
+      "return_type": "Int",
+      "effects": [],
+      "requires": [
+        {
+          "BinaryOp": {
+            "left": {
+              "Ident": "attacker_atk"
+            },
+            "op": "GreaterThanOrEqual",
+            "right": {
+              "Literal": {
+                "Int": 0
+              }
+            }
+          }
+        },
+        {
+          "BinaryOp": {
+            "left": {
+              "Ident": "defender_def"
+            },
+            "op": "GreaterThanOrEqual",
+            "right": {
+              "Literal": {
+                "Int": 0
+              }
+            }
+          }
+        }
+      ],
+      "ensures": [
+        {
+          "BinaryOp": {
+            "left": {
+              "Ident": "result"
+            },
+            "op": "GreaterThanOrEqual",
+            "right": {
+              "Literal": {
+                "Int": 1
+              }
+            }
+          }
+        }
+      ],
+      "body": {
+        "Raw": "let raw = attacker_atk - defender_def;\n    if raw > 1 {\n        raw\n    } else {\n        1\n    }"
+      }
+    },
     "#fn_3895ff40ebfa57f213944da35846617a974e43db868109b1a05c3ff358974559": {
       "name": "tick_frame",
       "params": [
@@ -317,6 +707,153 @@
             }
           }
         }
+      }
+    },
+    "#fn_494ba1c9ca605cc5febf459b8ea732f380be9635b6c781e007991b4846bd5f5c": {
+      "name": "try_move",
+      "params": [
+        {
+          "name": "pos",
+          "ty": {
+            "Custom": "Point"
+          }
+        },
+        {
+          "name": "dx",
+          "ty": "Int"
+        },
+        {
+          "name": "dy",
+          "ty": "Int"
+        },
+        {
+          "name": "map_width",
+          "ty": "Int"
+        },
+        {
+          "name": "map_height",
+          "ty": "Int"
+        }
+      ],
+      "return_type": {
+        "Custom": "Point"
+      },
+      "effects": [],
+      "requires": [
+        {
+          "BinaryOp": {
+            "left": {
+              "Ident": "map_width"
+            },
+            "op": "GreaterThan",
+            "right": {
+              "Literal": {
+                "Int": 0
+              }
+            }
+          }
+        },
+        {
+          "BinaryOp": {
+            "left": {
+              "Ident": "map_height"
+            },
+            "op": "GreaterThan",
+            "right": {
+              "Literal": {
+                "Int": 0
+              }
+            }
+          }
+        }
+      ],
+      "ensures": [
+        {
+          "BinaryOp": {
+            "left": {
+              "BinaryOp": {
+                "left": {
+                  "BinaryOp": {
+                    "left": {
+                      "BinaryOp": {
+                        "left": {
+                          "FieldAccess": {
+                            "target": {
+                              "Ident": "result"
+                            },
+                            "field": "x"
+                          }
+                        },
+                        "op": "GreaterThanOrEqual",
+                        "right": {
+                          "Literal": {
+                            "Int": 0
+                          }
+                        }
+                      }
+                    },
+                    "op": "And",
+                    "right": {
+                      "BinaryOp": {
+                        "left": {
+                          "FieldAccess": {
+                            "target": {
+                              "Ident": "result"
+                            },
+                            "field": "x"
+                          }
+                        },
+                        "op": "LessThan",
+                        "right": {
+                          "Ident": "map_width"
+                        }
+                      }
+                    }
+                  }
+                },
+                "op": "And",
+                "right": {
+                  "BinaryOp": {
+                    "left": {
+                      "FieldAccess": {
+                        "target": {
+                          "Ident": "result"
+                        },
+                        "field": "y"
+                      }
+                    },
+                    "op": "GreaterThanOrEqual",
+                    "right": {
+                      "Literal": {
+                        "Int": 0
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "op": "And",
+            "right": {
+              "BinaryOp": {
+                "left": {
+                  "FieldAccess": {
+                    "target": {
+                      "Ident": "result"
+                    },
+                    "field": "y"
+                  }
+                },
+                "op": "LessThan",
+                "right": {
+                  "Ident": "map_height"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "body": {
+        "Raw": "let new_x = pos.x + dx;\n    let new_y = pos.y + dy;\n    if new_x >= 0 && new_x < map_width && new_y >= 0 && new_y < map_height {\n        Point { x: new_x, y: new_y }\n    } else {\n        Point {\n            x: if pos.x >= 0 && pos.x < map_width { pos.x } else { 0 },\n            y: if pos.y >= 0 && pos.y < map_height { pos.y } else { 0 },\n        }\n    }"
       }
     },
     "#fn_86b2caa2c2ff4cc1d3ffb3801cd8106f37c2e5f6142e770322cca3780c3d13a8": {
@@ -604,6 +1141,59 @@
         }
       ]
     },
+    "#effect_6178021e2d7620eed133d9d14db68f8954669b1e7dd447787e1b8590f0189fb3": {
+      "name": "AudioEffect",
+      "operations": [
+        {
+          "name": "play_sound",
+          "params": [
+            {
+              "name": "name",
+              "ty": "String"
+            }
+          ],
+          "return_type": "Unit"
+        }
+      ]
+    },
+    "#effect_8c754cb88d8ede751cc10b4205f8a5f55918a70e2d305bcc98822635334d2140": {
+      "name": "RandomEffect",
+      "operations": [
+        {
+          "name": "roll_dice",
+          "params": [
+            {
+              "name": "sides",
+              "ty": "Int"
+            }
+          ],
+          "return_type": "Int"
+        }
+      ]
+    },
+    "#effect_cc2111d2dbbfb636e4eafb93264f89eca7633b303208457302e6e9a4e538c9d4": {
+      "name": "RenderEffect",
+      "operations": [
+        {
+          "name": "draw_tile",
+          "params": [
+            {
+              "name": "x",
+              "ty": "Int"
+            },
+            {
+              "name": "y",
+              "ty": "Int"
+            },
+            {
+              "name": "tile_id",
+              "ty": "Int"
+            }
+          ],
+          "return_type": "Unit"
+        }
+      ]
+    },
     "#effect_df4dd02c836a1a48ef13f6c9c87c55a2ceab97fe015d7a8c487a59ebd3e4966e": {
       "name": "Render",
       "operations": [
@@ -632,6 +1222,604 @@
     }
   },
   "modules": {
+    "#mod_068f61740c7cce8539b40073ae03c4ebc71609f8da035808966b21e90090b6dc": {
+      "types": [
+        {
+          "Record": {
+            "name": "Point",
+            "fields": [
+              {
+                "name": "x",
+                "ty": "Int"
+              },
+              {
+                "name": "y",
+                "ty": "Int"
+              }
+            ]
+          }
+        },
+        {
+          "Record": {
+            "name": "Stats",
+            "fields": [
+              {
+                "name": "hp",
+                "ty": "Int"
+              },
+              {
+                "name": "max_hp",
+                "ty": "Int"
+              },
+              {
+                "name": "attack",
+                "ty": "Int"
+              },
+              {
+                "name": "defense",
+                "ty": "Int"
+              }
+            ]
+          }
+        },
+        {
+          "Record": {
+            "name": "Item",
+            "fields": [
+              {
+                "name": "id",
+                "ty": "Int"
+              },
+              {
+                "name": "name",
+                "ty": "String"
+              },
+              {
+                "name": "value",
+                "ty": "Int"
+              }
+            ]
+          }
+        },
+        {
+          "Record": {
+            "name": "Player",
+            "fields": [
+              {
+                "name": "id",
+                "ty": "Int"
+              },
+              {
+                "name": "pos",
+                "ty": {
+                  "Custom": "Point"
+                }
+              },
+              {
+                "name": "stats",
+                "ty": {
+                  "Custom": "Stats"
+                }
+              },
+              {
+                "name": "exp",
+                "ty": "Int"
+              },
+              {
+                "name": "level",
+                "ty": "Int"
+              }
+            ]
+          }
+        },
+        {
+          "Record": {
+            "name": "Monster",
+            "fields": [
+              {
+                "name": "id",
+                "ty": "Int"
+              },
+              {
+                "name": "pos",
+                "ty": {
+                  "Custom": "Point"
+                }
+              },
+              {
+                "name": "stats",
+                "ty": {
+                  "Custom": "Stats"
+                }
+              },
+              {
+                "name": "is_alive",
+                "ty": "Bool"
+              }
+            ]
+          }
+        }
+      ],
+      "functions": [
+        {
+          "name": "try_move",
+          "params": [
+            {
+              "name": "pos",
+              "ty": {
+                "Custom": "Point"
+              }
+            },
+            {
+              "name": "dx",
+              "ty": "Int"
+            },
+            {
+              "name": "dy",
+              "ty": "Int"
+            },
+            {
+              "name": "map_width",
+              "ty": "Int"
+            },
+            {
+              "name": "map_height",
+              "ty": "Int"
+            }
+          ],
+          "return_type": {
+            "Custom": "Point"
+          },
+          "effects": [],
+          "requires": [
+            {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "map_width"
+                },
+                "op": "GreaterThan",
+                "right": {
+                  "Literal": {
+                    "Int": 0
+                  }
+                }
+              }
+            },
+            {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "map_height"
+                },
+                "op": "GreaterThan",
+                "right": {
+                  "Literal": {
+                    "Int": 0
+                  }
+                }
+              }
+            }
+          ],
+          "ensures": [
+            {
+              "BinaryOp": {
+                "left": {
+                  "BinaryOp": {
+                    "left": {
+                      "BinaryOp": {
+                        "left": {
+                          "BinaryOp": {
+                            "left": {
+                              "FieldAccess": {
+                                "target": {
+                                  "Ident": "result"
+                                },
+                                "field": "x"
+                              }
+                            },
+                            "op": "GreaterThanOrEqual",
+                            "right": {
+                              "Literal": {
+                                "Int": 0
+                              }
+                            }
+                          }
+                        },
+                        "op": "And",
+                        "right": {
+                          "BinaryOp": {
+                            "left": {
+                              "FieldAccess": {
+                                "target": {
+                                  "Ident": "result"
+                                },
+                                "field": "x"
+                              }
+                            },
+                            "op": "LessThan",
+                            "right": {
+                              "Ident": "map_width"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "op": "And",
+                    "right": {
+                      "BinaryOp": {
+                        "left": {
+                          "FieldAccess": {
+                            "target": {
+                              "Ident": "result"
+                            },
+                            "field": "y"
+                          }
+                        },
+                        "op": "GreaterThanOrEqual",
+                        "right": {
+                          "Literal": {
+                            "Int": 0
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "op": "And",
+                "right": {
+                  "BinaryOp": {
+                    "left": {
+                      "FieldAccess": {
+                        "target": {
+                          "Ident": "result"
+                        },
+                        "field": "y"
+                      }
+                    },
+                    "op": "LessThan",
+                    "right": {
+                      "Ident": "map_height"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "body": {
+            "Raw": "let new_x = pos.x + dx;\n    let new_y = pos.y + dy;\n    if new_x >= 0 && new_x < map_width && new_y >= 0 && new_y < map_height {\n        Point { x: new_x, y: new_y }\n    } else {\n        Point {\n            x: if pos.x >= 0 && pos.x < map_width { pos.x } else { 0 },\n            y: if pos.y >= 0 && pos.y < map_height { pos.y } else { 0 },\n        }\n    }"
+          }
+        },
+        {
+          "name": "calculate_damage",
+          "params": [
+            {
+              "name": "attacker_atk",
+              "ty": "Int"
+            },
+            {
+              "name": "defender_def",
+              "ty": "Int"
+            }
+          ],
+          "return_type": "Int",
+          "effects": [],
+          "requires": [
+            {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "attacker_atk"
+                },
+                "op": "GreaterThanOrEqual",
+                "right": {
+                  "Literal": {
+                    "Int": 0
+                  }
+                }
+              }
+            },
+            {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "defender_def"
+                },
+                "op": "GreaterThanOrEqual",
+                "right": {
+                  "Literal": {
+                    "Int": 0
+                  }
+                }
+              }
+            }
+          ],
+          "ensures": [
+            {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "result"
+                },
+                "op": "GreaterThanOrEqual",
+                "right": {
+                  "Literal": {
+                    "Int": 1
+                  }
+                }
+              }
+            }
+          ],
+          "body": {
+            "Raw": "let raw = attacker_atk - defender_def;\n    if raw > 1 {\n        raw\n    } else {\n        1\n    }"
+          }
+        },
+        {
+          "name": "apply_damage",
+          "params": [
+            {
+              "name": "current_hp",
+              "ty": "Int"
+            },
+            {
+              "name": "damage",
+              "ty": "Int"
+            }
+          ],
+          "return_type": "Int",
+          "effects": [],
+          "requires": [
+            {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "current_hp"
+                },
+                "op": "GreaterThanOrEqual",
+                "right": {
+                  "Literal": {
+                    "Int": 0
+                  }
+                }
+              }
+            },
+            {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "damage"
+                },
+                "op": "GreaterThanOrEqual",
+                "right": {
+                  "Literal": {
+                    "Int": 0
+                  }
+                }
+              }
+            }
+          ],
+          "ensures": [
+            {
+              "BinaryOp": {
+                "left": {
+                  "BinaryOp": {
+                    "left": {
+                      "Ident": "result"
+                    },
+                    "op": "GreaterThanOrEqual",
+                    "right": {
+                      "Literal": {
+                        "Int": 0
+                      }
+                    }
+                  }
+                },
+                "op": "And",
+                "right": {
+                  "BinaryOp": {
+                    "left": {
+                      "Ident": "result"
+                    },
+                    "op": "LessThanOrEqual",
+                    "right": {
+                      "Ident": "current_hp"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "body": {
+            "Raw": "let remaining = current_hp - damage;\n    if remaining > 0 {\n        remaining\n    } else {\n        0\n    }"
+          }
+        },
+        {
+          "name": "level_up",
+          "params": [
+            {
+              "name": "player",
+              "ty": {
+                "Custom": "Player"
+              }
+            },
+            {
+              "name": "exp_gained",
+              "ty": "Int"
+            }
+          ],
+          "return_type": {
+            "Custom": "Player"
+          },
+          "effects": [],
+          "requires": [
+            {
+              "BinaryOp": {
+                "left": {
+                  "Ident": "exp_gained"
+                },
+                "op": "GreaterThanOrEqual",
+                "right": {
+                  "Literal": {
+                    "Int": 0
+                  }
+                }
+              }
+            },
+            {
+              "BinaryOp": {
+                "left": {
+                  "FieldAccess": {
+                    "target": {
+                      "Ident": "player"
+                    },
+                    "field": "level"
+                  }
+                },
+                "op": "GreaterThanOrEqual",
+                "right": {
+                  "Literal": {
+                    "Int": 1
+                  }
+                }
+              }
+            },
+            {
+              "BinaryOp": {
+                "left": {
+                  "FieldAccess": {
+                    "target": {
+                      "FieldAccess": {
+                        "target": {
+                          "Ident": "player"
+                        },
+                        "field": "stats"
+                      }
+                    },
+                    "field": "max_hp"
+                  }
+                },
+                "op": "GreaterThan",
+                "right": {
+                  "Literal": {
+                    "Int": 0
+                  }
+                }
+              }
+            }
+          ],
+          "ensures": [
+            {
+              "BinaryOp": {
+                "left": {
+                  "BinaryOp": {
+                    "left": {
+                      "FieldAccess": {
+                        "target": {
+                          "Ident": "result"
+                        },
+                        "field": "level"
+                      }
+                    },
+                    "op": "GreaterThanOrEqual",
+                    "right": {
+                      "FieldAccess": {
+                        "target": {
+                          "Ident": "player"
+                        },
+                        "field": "level"
+                      }
+                    }
+                  }
+                },
+                "op": "And",
+                "right": {
+                  "BinaryOp": {
+                    "left": {
+                      "FieldAccess": {
+                        "target": {
+                          "FieldAccess": {
+                            "target": {
+                              "Ident": "result"
+                            },
+                            "field": "stats"
+                          }
+                        },
+                        "field": "max_hp"
+                      }
+                    },
+                    "op": "GreaterThanOrEqual",
+                    "right": {
+                      "FieldAccess": {
+                        "target": {
+                          "FieldAccess": {
+                            "target": {
+                              "Ident": "player"
+                            },
+                            "field": "stats"
+                          }
+                        },
+                        "field": "max_hp"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "body": {
+            "Raw": "let new_exp = player.exp + exp_gained;\n    let threshold = player.level * 100;\n    if new_exp >= threshold {\n        Player {\n            id: player.id,\n            pos: player.pos,\n            stats: Stats {\n                hp: player.stats.max_hp + 10,\n                max_hp: player.stats.max_hp + 10,\n                attack: player.stats.attack + 2,\n                defense: player.stats.defense + 1,\n            },\n            exp: new_exp - threshold,\n            level: player.level + 1,\n        }\n    } else {\n        Player {\n            id: player.id,\n            pos: player.pos,\n            stats: player.stats,\n            exp: new_exp,\n            level: player.level,\n        }\n    }"
+          }
+        }
+      ],
+      "effects": [
+        {
+          "name": "AudioEffect",
+          "operations": [
+            {
+              "name": "play_sound",
+              "params": [
+                {
+                  "name": "name",
+                  "ty": "String"
+                }
+              ],
+              "return_type": "Unit"
+            }
+          ]
+        },
+        {
+          "name": "RenderEffect",
+          "operations": [
+            {
+              "name": "draw_tile",
+              "params": [
+                {
+                  "name": "x",
+                  "ty": "Int"
+                },
+                {
+                  "name": "y",
+                  "ty": "Int"
+                },
+                {
+                  "name": "tile_id",
+                  "ty": "Int"
+                }
+              ],
+              "return_type": "Unit"
+            }
+          ]
+        },
+        {
+          "name": "RandomEffect",
+          "operations": [
+            {
+              "name": "roll_dice",
+              "params": [
+                {
+                  "name": "sides",
+                  "ty": "Int"
+                }
+              ],
+              "return_type": "Int"
+            }
+          ]
+        }
+      ]
+    },
     "#mod_2d8ef55f355fc54453d30a2ed3d5bc7277bd3221c8eaf4e494b21de4cda94877": {
       "types": [
         {
