@@ -1,13 +1,10 @@
-﻿# Rust target
+# Rust target
 target/
 **/*.rs.bk
 Cargo.lock
 
-# Orchestrator & Worktrees
-.scratch/worktrees/
-.scratch/prompts/
-.scratch/outputs/
-.scratch/reviews/
+# Scratch workspace & temporary artifacts
+.scratch/
 
 # IDE & OS
 .vscode/
