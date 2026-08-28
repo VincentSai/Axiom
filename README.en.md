@@ -62,6 +62,7 @@ Under the industrial RPG game engine specification [`examples/benchmark_200/SPEC
 - 📘 [Architecture Whitepaper (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)
 - 📝 [Language Syntax & Semantics Specification (docs/SPECIFICATION.md)](docs/SPECIFICATION.md)
 - 🤖 [Multi-Agent Workflow & Content-Addressed AST Storage (docs/MULTI_AGENT_WORKFLOW.md)](docs/MULTI_AGENT_WORKFLOW.md)
+- 🔬 [In-Depth Language Comparison & Boundary Research (docs/RESEARCH_LANGUAGE_COMPARISON.md)](docs/RESEARCH_LANGUAGE_COMPARISON.md)
 - 🗺️ [Project Development Roadmap (docs/ROADMAP.md)](docs/ROADMAP.md)
 - 💡 [Example 1: Bank Transfer Service (examples/transfer.ax)](examples/transfer.ax)
 - 🎮 [Example 2: Cross-Platform Game Loop (examples/game_loop.ax)](examples/game_loop.ax)
@@ -105,40 +106,63 @@ fn level_up(player: Player, bonus: Int) -> Player
 
 ---
 
-## 💻 CLI Toolchain Guide
+## 🚀 Installation & Download Prebuilt Binaries
 
-Run from workspace root (or install `axiom` binary):
+You do not need to install a Rust compilation toolchain. Precompiled binaries are available directly from GitHub Releases:
+
+### 1. Download Binaries
+Visit the GitHub [**Releases**](../../releases) page and download the archive for your operating system:
+- **Windows (x64)**: `axiom-v*-x86_64-pc-windows-msvc.zip` (contains `axiom.exe`)
+- **Linux (x64)**: `axiom-v*-x86_64-unknown-linux-gnu.tar.gz` (contains `axiom`)
+- **macOS (Apple Silicon M1/M2/M3/M4)**: `axiom-v*-aarch64-apple-darwin.tar.gz`
+- **macOS (Intel)**: `axiom-v*-x86_64-apple-darwin.tar.gz`
+
+### 2. Configure Environment Variables (Windows)
+1. Extract the downloaded zip archive to any permanent directory (e.g. `C:\Program Files\Axiom\` or `D:\Tools\axiom\`);
+2. Add that directory path to your system's **`PATH` environment variable**;
+3. Open a new terminal (PowerShell or CMD) and run `axiom --help` to verify the installation.
+
+> 💡 **Developer Source Build (Optional)**:  
+> If you have a local Rust toolchain, you can install directly from source: `cargo install --path crates/axiom-cli`
+
+---
+
+## 💻 CLI Toolchain & `axiom.exe` Usage Guide
+
+Once added to `PATH`, run `axiom` (or `axiom.exe` on Windows) directly from your terminal:
 
 ```powershell
 # 1. Syntax check and hole audit
-cargo run -p axiom-cli -- check examples/transfer.ax
+axiom check examples/transfer.ax
 
-# 2. Static SMT formal contract verification (human console & agent machine JSON modes)
-cargo run -p axiom-cli -- verify examples/transfer.ax
-cargo run -p axiom-cli -- verify examples/transfer.ax --json
+# 2. Static SMT formal contract verification (human console output)
+axiom verify examples/transfer.ax
 
-# 3. Extract structured hole tasks for agent dispatch
-cargo run -p axiom-cli -- extract-holes examples/transfer.ax
-cargo run -p axiom-cli -- extract-holes examples/transfer.ax --out-dir .scratch/hole-tasks
+# 3. Static SMT formal verification (machine-readable JSON output for agent self-healing)
+axiom verify examples/transfer.ax --json
 
-# 4. Content-addressed AST codebase (ASTDB) & virtual source projection
-cargo run -p axiom-cli -- db put examples/transfer.ax
-cargo run -p axiom-cli -- db export #mod_589e44855c2b4e0223acf6867cdd3c6f0947fb3a23d7afafbb62e7fbc044559a
+# 4. Extract structured hole tasks for agent dispatch
+axiom extract-holes examples/transfer.ax
+axiom extract-holes examples/transfer.ax --out-dir .scratch/hole-tasks
 
-# 5. WebAssembly Component Model (WIT) export
-cargo run -p axiom-cli -- export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
+# 5. Content-addressed AST codebase (ASTDB) & virtual source projection
+axiom db put examples/transfer.ax
+axiom db export #mod_589e44855c2b4e0223acf6867cdd3c6f0947fb3a23d7afafbb62e7fbc044559a
 
-# 6. Multi-language FFI glue and type declarations (TypeScript .d.ts / C header .h / Rust C-ABI)
-cargo run -p axiom-cli -- export-ffi examples/game_loop.ax --lang ts -o game_loop.d.ts
-cargo run -p axiom-cli -- export-ffi examples/game_loop.ax --lang c -o game_loop.h
-cargo run -p axiom-cli -- export-ffi examples/game_loop.ax --lang rust -o game_loop_c_abi.rs
+# 6. WebAssembly Component Model (WIT) export
+axiom export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
 
-# 7. Cross-platform project scaffolding
-cargo run -p axiom-cli -- scaffold my_game --target web --out-dir ./projects
+# 7. Multi-language FFI glue and type declarations (TypeScript .d.ts / C header .h / Rust C-ABI)
+axiom export-ffi examples/game_loop.ax --lang ts -o game_loop.d.ts
+axiom export-ffi examples/game_loop.ax --lang c -o game_loop.h
+axiom export-ffi examples/game_loop.ax --lang rust -o game_loop_c_abi.rs
 
-# 8. Transpile to Rust and run
-cargo run -p axiom-cli -- emit-rust examples/game_loop.ax -o game_loop.rs
-cargo run -p axiom-cli -- run path/to/program_with_main.ax
+# 8. Cross-platform project scaffolding (supports web / native / node)
+axiom scaffold my_game --target web --out-dir ./projects
+
+# 9. Transpile to Rust and run
+axiom emit-rust examples/game_loop.ax -o game_loop.rs
+axiom run path/to/program_with_main.ax
 ```
 
-Axiom's toolchain comprehensively spans parsing, algebraic effect isolation, SMT counterexample self-healing, content-addressed storage, lock-free multi-agent concurrency, and multi-platform compilation.
+> ⚙️ **Source Debugging Mode**: If you haven't installed the global binary, you can replace `axiom <subcommand>` with `cargo run -p axiom-cli -- <subcommand>` from the workspace root.

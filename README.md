@@ -62,6 +62,7 @@
 - 📘 [架构设计白皮书 (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)
 - 📝 [语言语法与语义规范草案 (docs/SPECIFICATION.md)](docs/SPECIFICATION.md)
 - 🤖 [多 Agent 协作工作流与 AST 存储 (docs/MULTI_AGENT_WORKFLOW.md)](docs/MULTI_AGENT_WORKFLOW.md)
+- 🔬 [主流语言深度对比与能力边界分析 (docs/RESEARCH_LANGUAGE_COMPARISON.md)](docs/RESEARCH_LANGUAGE_COMPARISON.md)
 - 🗺️ [项目发展路线图 (docs/ROADMAP.md)](docs/ROADMAP.md)
 - 💡 [示例 1：银行转账服务 (examples/transfer.ax)](examples/transfer.ax)
 - 🎮 [示例 2：跨平台游戏循环 (examples/game_loop.ax)](examples/game_loop.ax)
@@ -105,40 +106,63 @@ fn level_up(player: Player, bonus: Int) -> Player
 
 ---
 
-## 💻 CLI 工具链完整指南
+## 🚀 快速安装与预编译二进制下载 (Installation & Download)
 
-从 workspace 根目录运行（或安装 `axiom` 二进制）：
+无需安装 Rust 编译环境，你可以直接从 GitHub 下载开箱即用的预编译二进制：
+
+### 1. 下载预编译文件
+前往 GitHub 仓库的 [**Releases**](../../releases) 页面，下载对应操作系统的压缩包：
+- **Windows (x64)**: `axiom-v*-x86_64-pc-windows-msvc.zip`（内含 `axiom.exe`）
+- **Linux (x64)**: `axiom-v*-x86_64-unknown-linux-gnu.tar.gz`（内含 `axiom`）
+- **macOS (Apple Silicon M1/M2/M3/M4)**: `axiom-v*-aarch64-apple-darwin.tar.gz`
+- **macOS (Intel)**: `axiom-v*-x86_64-apple-darwin.tar.gz`
+
+### 2. 配置环境变量 (Windows)
+1. 将下载的压缩包解压到任意固定目录（例如 `C:\Program Files\Axiom\` 或 `D:\Tools\axiom\`）；
+2. 将该目录路径添加到系统的 **环境变量 `PATH`** 中；
+3. 打开新的终端（PowerShell 或 CMD），运行 `axiom --help` 验证安装成功。
+
+> 💡 **开发者源码安装（可选）**：  
+> 若本地拥有 Rust 工具链，可直接在仓库根目录执行：`cargo install --path crates/axiom-cli`
+
+---
+
+## 💻 CLI 工具链与 `axiom.exe` 使用指南
+
+配置好环境变量后，你可以直接使用 `axiom`（或 `axiom.exe`）命令调用完整的工具链功能：
 
 ```powershell
 # 1. 语法检查与打洞统计
-cargo run -p axiom-cli -- check examples/transfer.ax
+axiom check examples/transfer.ax
 
-# 2. 静态 SMT 契约形式化验证（支持人类终端模式与 Agent 机器 JSON 自愈模式）
-cargo run -p axiom-cli -- verify examples/transfer.ax
-cargo run -p axiom-cli -- verify examples/transfer.ax --json
+# 2. 静态 SMT 契约形式化验证（人类可读控制台模式）
+axiom verify examples/transfer.ax
 
-# 3. 提取打洞任务派发 JSON
-cargo run -p axiom-cli -- extract-holes examples/transfer.ax
-cargo run -p axiom-cli -- extract-holes examples/transfer.ax --out-dir .scratch/hole-tasks
+# 3. 静态 SMT 形式化验证（输出机器可读 JSON，供 Agent 闭环自愈）
+axiom verify examples/transfer.ax --json
 
-# 4. 内容寻址 AST 代码库 (ASTDB) 管理与虚拟源码投影
-cargo run -p axiom-cli -- db put examples/transfer.ax
-cargo run -p axiom-cli -- db export #mod_589e44855c2b4e0223acf6867cdd3c6f0947fb3a23d7afafbb62e7fbc044559a
+# 4. 机械化提取打洞任务 JSON（派发给多个 Worker Agent 并发填洞）
+axiom extract-holes examples/transfer.ax
+axiom extract-holes examples/transfer.ax --out-dir .scratch/hole-tasks
 
-# 5. WebAssembly Component Model (WIT) 契约导出
-cargo run -p axiom-cli -- export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
+# 5. 内容寻址 AST 代码库 (ASTDB) 管理与虚拟源码投影
+axiom db put examples/transfer.ax
+axiom db export #mod_589e44855c2b4e0223acf6867cdd3c6f0947fb3a23d7afafbb62e7fbc044559a
 
-# 6. 多语言 FFI 胶水代码与类型声明导出 (TypeScript .d.ts / C 头文件 .h / Rust C-ABI)
-cargo run -p axiom-cli -- export-ffi examples/game_loop.ax --lang ts -o game_loop.d.ts
-cargo run -p axiom-cli -- export-ffi examples/game_loop.ax --lang c -o game_loop.h
-cargo run -p axiom-cli -- export-ffi examples/game_loop.ax --lang rust -o game_loop_c_abi.rs
+# 6. WebAssembly Component Model (WIT) 契约导出
+axiom export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
 
-# 7. 全平台工程脚手架一键生成
-cargo run -p axiom-cli -- scaffold my_game --target web --out-dir ./projects
+# 7. 多语言 FFI 胶水代码与类型声明导出 (TypeScript .d.ts / C 头文件 .h / Rust C-ABI)
+axiom export-ffi examples/game_loop.ax --lang ts -o game_loop.d.ts
+axiom export-ffi examples/game_loop.ax --lang c -o game_loop.h
+axiom export-ffi examples/game_loop.ax --lang rust -o game_loop_c_abi.rs
 
-# 8. 转译至 Rust 并编译执行
-cargo run -p axiom-cli -- emit-rust examples/game_loop.ax -o game_loop.rs
-cargo run -p axiom-cli -- run path/to/program_with_main.ax
+# 8. 全平台工程脚手架一键生成 (支持 web / native / node)
+axiom scaffold my_game --target web --out-dir ./projects
+
+# 9. 转译至 Rust 源码并直接编译运行
+axiom emit-rust examples/game_loop.ax -o game_loop.rs
+axiom run path/to/program_with_main.ax
 ```
 
-Axiom 工具链完整覆盖了从语法解析、代数效应隔离、SMT 反例自愈、内容寻址存储、多 Agent 无冲突并发组装到 Web/Native/FFI 全平台发布的全链路。
+> ⚙️ **源码调试模式**：若未安装全局二进制，在源码根目录下将 `axiom <subcommand>` 替换为 `cargo run -p axiom-cli -- <subcommand>` 即可达到完全相同的运行效果。

@@ -62,6 +62,7 @@
 - 📘 [架構設計白皮書 (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)
 - 📝 [語言語法與語意規範草案 (docs/SPECIFICATION.md)](docs/SPECIFICATION.md)
 - 🤖 [多 Agent 協作工作流程與 AST 儲存 (docs/MULTI_AGENT_WORKFLOW.md)](docs/MULTI_AGENT_WORKFLOW.md)
+- 🔬 [主流語言深度對比與能力邊界分析 (docs/RESEARCH_LANGUAGE_COMPARISON.md)](docs/RESEARCH_LANGUAGE_COMPARISON.md)
 - 🗺️ [專案發展藍圖 (docs/ROADMAP.md)](docs/ROADMAP.md)
 - 💡 [範例 1：銀行轉帳服務 (examples/transfer.ax)](examples/transfer.ax)
 - 🎮 [範例 2：跨平臺遊戲循環 (examples/game_loop.ax)](examples/game_loop.ax)
@@ -105,40 +106,63 @@ fn level_up(player: Player, bonus: Int) -> Player
 
 ---
 
-## 💻 CLI 工具鏈完整指南
+## 🚀 快速安裝與預編譯二進位制下載 (Installation & Download)
 
-從 workspace 根目錄執行（或安裝 `axiom` 二進位制）：
+無需安裝 Rust 編譯環境，您可以直接從 GitHub 下載開箱即用的預編譯二進位制：
+
+### 1. 下載預編譯檔案
+前往 GitHub 倉庫的 [**Releases**](../../releases) 頁面，下載對應作業系統的壓縮包：
+- **Windows (x64)**: `axiom-v*-x86_64-pc-windows-msvc.zip`（內含 `axiom.exe`）
+- **Linux (x64)**: `axiom-v*-x86_64-unknown-linux-gnu.tar.gz`（內含 `axiom`）
+- **macOS (Apple Silicon M1/M2/M3/M4)**: `axiom-v*-aarch64-apple-darwin.tar.gz`
+- **macOS (Intel)**: `axiom-v*-x86_64-apple-darwin.tar.gz`
+
+### 2. 設定環境變數 (Windows)
+1. 將下載的壓縮包解壓縮至任意固定目錄（例如 `C:\Program Files\Axiom\` 或 `D:\Tools\axiom\`）；
+2. 將該目錄路徑添加至系統的 **環境變數 `PATH`** 中；
+3. 開啟新的終端（PowerShell 或 CMD），執行 `axiom --help` 驗證安裝成功。
+
+> 💡 **開發者原始碼安裝（可選）**：  
+> 若本機具備 Rust 工具鏈，可直接在倉庫根目錄執行：`cargo install --path crates/axiom-cli`
+
+---
+
+## 💻 CLI 工具鏈與 `axiom.exe` 使用指南
+
+設定好環境變數後，您可以直接使用 `axiom`（或 `axiom.exe`）指令呼叫完整的工具鏈功能：
 
 ```powershell
 # 1. 語法檢查與打洞統計
-cargo run -p axiom-cli -- check examples/transfer.ax
+axiom check examples/transfer.ax
 
-# 2. 靜態 SMT 契約形式化驗證（支援人類終端模式與 Agent 機器 JSON 自癒模式）
-cargo run -p axiom-cli -- verify examples/transfer.ax
-cargo run -p axiom-cli -- verify examples/transfer.ax --json
+# 2. 靜態 SMT 契約形式化驗證（人類終端可讀模式）
+axiom verify examples/transfer.ax
 
-# 3. 提取打洞任務派發 JSON
-cargo run -p axiom-cli -- extract-holes examples/transfer.ax
-cargo run -p axiom-cli -- extract-holes examples/transfer.ax --out-dir .scratch/hole-tasks
+# 3. 靜態 SMT 形式化驗證（輸出機器可讀 JSON，供 Agent 閉環自癒）
+axiom verify examples/transfer.ax --json
 
-# 4. 內容定址 AST 代碼庫 (ASTDB) 管理與虛擬原始碼投影
-cargo run -p axiom-cli -- db put examples/transfer.ax
-cargo run -p axiom-cli -- db export #mod_589e44855c2b4e0223acf6867cdd3c6f0947fb3a23d7afafbb62e7fbc044559a
+# 4. 機械化提取打洞任務 JSON（派發給多個 Worker Agent 並行填洞）
+axiom extract-holes examples/transfer.ax
+axiom extract-holes examples/transfer.ax --out-dir .scratch/hole-tasks
 
-# 5. WebAssembly Component Model (WIT) 契約匯出
-cargo run -p axiom-cli -- export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
+# 5. 內容定址 AST 代碼庫 (ASTDB) 管理與虛擬原始碼投影
+axiom db put examples/transfer.ax
+axiom db export #mod_589e44855c2b4e0223acf6867cdd3c6f0947fb3a23d7afafbb62e7fbc044559a
 
-# 6. 多語言 FFI 膠水代碼與型別宣告匯出 (TypeScript .d.ts / C 標頭檔 .h / Rust C-ABI)
-cargo run -p axiom-cli -- export-ffi examples/game_loop.ax --lang ts -o game_loop.d.ts
-cargo run -p axiom-cli -- export-ffi examples/game_loop.ax --lang c -o game_loop.h
-cargo run -p axiom-cli -- export-ffi examples/game_loop.ax --lang rust -o game_loop_c_abi.rs
+# 6. WebAssembly Component Model (WIT) 契約匯出
+axiom export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
 
-# 7. 全平臺專案鷹架一鍵生成
-cargo run -p axiom-cli -- scaffold my_game --target web --out-dir ./projects
+# 7. 多語言 FFI 膠水代碼與型別宣告匯出 (TypeScript .d.ts / C 標頭檔 .h / Rust C-ABI)
+axiom export-ffi examples/game_loop.ax --lang ts -o game_loop.d.ts
+axiom export-ffi examples/game_loop.ax --lang c -o game_loop.h
+axiom export-ffi examples/game_loop.ax --lang rust -o game_loop_c_abi.rs
 
-# 8. 轉譯至 Rust 並編譯執行
-cargo run -p axiom-cli -- emit-rust examples/game_loop.ax -o game_loop.rs
-cargo run -p axiom-cli -- run path/to/program_with_main.ax
+# 8. 全平臺專案鷹架一鍵生成 (支援 web / native / node)
+axiom scaffold my_game --target web --out-dir ./projects
+
+# 9. 轉譯至 Rust 原始碼並直接編譯執行
+axiom emit-rust examples/game_loop.ax -o game_loop.rs
+axiom run path/to/program_with_main.ax
 ```
 
-Axiom 工具鏈完整覆蓋了從語法解析、代數效應隔離、SMT 反例自癒、內容定址儲存、多 Agent 無衝突並發組裝到 Web/Native/FFI 全平臺發布的全鏈路。
+> ⚙️ **原始碼除錯模式**：若未安裝全域二進位制，在原始碼根目錄下將 `axiom <subcommand>` 替換為 `cargo run -p axiom-cli -- <subcommand>` 即可達到完全相同的執行效果。
