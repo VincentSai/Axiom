@@ -108,14 +108,15 @@ fn level_up(player: Player, bonus: Int) -> Player
 
 ## 🚀 Installation & Download Prebuilt Binaries
 
-You do not need to install a Rust compilation toolchain. Precompiled binaries are available directly from GitHub Releases:
+You do not need to install a Rust compilation toolchain. Precompiled binaries and skills are available directly from GitHub Releases:
 
-### 1. Download Binaries
-Visit the GitHub [**Releases**](../../releases) page and download the archive for your operating system:
-- **Windows (x64)**: `axiom-v*-x86_64-pc-windows-msvc.zip` (contains `axiom.exe`)
-- **Linux (x64)**: `axiom-v*-x86_64-unknown-linux-gnu.tar.gz` (contains `axiom`)
-- **macOS (Apple Silicon M1/M2/M3/M4)**: `axiom-v*-aarch64-apple-darwin.tar.gz`
+### 1. Download Release Packages
+Visit the GitHub [**Releases**](../../releases) page and download the archive for your operating system (**every archive includes both the compiled binary and the complete `skills/` suite**):
+- **Windows (x64)**: `axiom-v*-x86_64-pc-windows-msvc.zip` (contains `axiom.exe` & `skills/`)
+- **Linux (x64)**: `axiom-v*-x86_64-unknown-linux-gnu.tar.gz` (contains `axiom` & `skills/`)
+- **macOS (Apple Silicon)**: `axiom-v*-aarch64-apple-darwin.tar.gz`
 - **macOS (Intel)**: `axiom-v*-x86_64-apple-darwin.tar.gz`
+- **Standalone Skills**: `axiom-skills-v*.zip` (Pure Agent Skills package)
 
 ### 2. Configure Environment Variables (Windows)
 1. Extract the downloaded zip archive to any permanent directory (e.g. `C:\Program Files\Axiom\` or `D:\Tools\axiom\`);
@@ -124,6 +125,27 @@ Visit the GitHub [**Releases**](../../releases) page and download the archive fo
 
 > 💡 **Developer Source Build (Optional)**:  
 > If you have a local Rust toolchain, you can install directly from source: `cargo install --path crates/axiom-cli`
+
+---
+
+## 🤖 AI Agent Skills Installation & Activation Guide
+
+Axiom provides 5 specialized collaboration skills designed for modern AI coding agents:
+- `/axiom-pipeline`: Fully automated hole-driven pipeline (Architect -> Extract Holes -> Worker Fill -> SMT Verify -> Healer)
+- `/axiom-interactive`: Phased human-in-the-loop pipeline (Contracts generated first for human review, followed by fast filling)
+- `axiom-architect` / `axiom-worker` / `axiom-healer`: Specialized sub-agent operational specifications
+
+### Setup Instructions for Mainstream Agent Clients:
+
+| AI Agent Client | Installation Path / Configuration | Trigger Command |
+| :--- | :--- | :--- |
+| **🌟 Google Antigravity / Gemini CLI** | Copy extracted `skills/*` into `%USERPROFILE%\.gemini\config\skills\` (global) or `.gemini/config/skills/` (project) | Type in chat:<br>`/axiom-pipeline Implement...` |
+| **⚡ Cursor IDE** | Copy `skills/axiom-pipeline/SKILL.md` to `.cursor/rules/axiom-pipeline.mdc` (or append to `.cursorrules`) | Type in Composer / Agent mode:<br>`Follow axiom-pipeline specification to implement...` |
+| **🌊 Windsurf (Codeium)** | Append `skills/axiom-pipeline/SKILL.md` contents to project `.windsurfrules` | Type in Cascade chat:<br>`Follow Axiom hole pipeline to implement...` |
+| **🧠 Claude Code / Claude Desktop** | Append skill contents to project `CLAUDE.md`, or upload markdown files in `skills/` to Claude.ai Project Knowledge | Type in chat:<br>`Activate /axiom-pipeline to implement...` |
+| **🤖 OpenAI Codex CLI / Aider** | Place `skills/` in the workspace or reference `skills/axiom-pipeline/SKILL.md` in system prompts | Specify in prompt:<br>`Develop according to skills/axiom-pipeline spec` |
+
+> 📖 For comprehensive skill documentation, see: [**Axiom Skills Package Guide (skills/README.md)**](skills/README.md).
 
 ---
 

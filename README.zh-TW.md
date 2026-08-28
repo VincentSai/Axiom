@@ -108,14 +108,15 @@ fn level_up(player: Player, bonus: Int) -> Player
 
 ## 🚀 快速安裝與預編譯二進位制下載 (Installation & Download)
 
-無需安裝 Rust 編譯環境，您可以直接從 GitHub 下載開箱即用的預編譯二進位制：
+無需安裝 Rust 編譯環境，您可以直接從 GitHub 下載開箱即用的預編譯二進位制與技能包：
 
-### 1. 下載預編譯檔案
-前往 GitHub 倉庫的 [**Releases**](../../releases) 頁面，下載對應作業系統的壓縮包：
-- **Windows (x64)**: `axiom-v*-x86_64-pc-windows-msvc.zip`（內含 `axiom.exe`）
-- **Linux (x64)**: `axiom-v*-x86_64-unknown-linux-gnu.tar.gz`（內含 `axiom`）
-- **macOS (Apple Silicon M1/M2/M3/M4)**: `axiom-v*-aarch64-apple-darwin.tar.gz`
+### 1. 下載 Release 預編譯包
+前往 GitHub 倉庫的 [**Releases**](../../releases) 頁面，下載對應作業系統的壓縮包（**每個壓縮包內均已內建二進位制與完整的 `skills/` 技能套件**）：
+- **Windows (x64)**: `axiom-v*-x86_64-pc-windows-msvc.zip`（內含 `axiom.exe` 與 `skills/`）
+- **Linux (x64)**: `axiom-v*-x86_64-unknown-linux-gnu.tar.gz`（內含 `axiom` 與 `skills/`）
+- **macOS (Apple Silicon)**: `axiom-v*-aarch64-apple-darwin.tar.gz`
 - **macOS (Intel)**: `axiom-v*-x86_64-apple-darwin.tar.gz`
+- **獨立技能包 (通用)**: `axiom-skills-v*.zip`（純 Agent Skills 規則包）
 
 ### 2. 設定環境變數 (Windows)
 1. 將下載的壓縮包解壓縮至任意固定目錄（例如 `C:\Program Files\Axiom\` 或 `D:\Tools\axiom\`）；
@@ -124,6 +125,27 @@ fn level_up(player: Player, bonus: Int) -> Player
 
 > 💡 **開發者原始碼安裝（可選）**：  
 > 若本機具備 Rust 工具鏈，可直接在倉庫根目錄執行：`cargo install --path crates/axiom-cli`
+
+---
+
+## 🤖 AI Agent 技能包 (Skills) 安裝與啟用指南
+
+Axiom 隨 Release 提供了專為現代 AI 編碼 Agent 設計的 5 大協同技能包：
+- `/axiom-pipeline`：全自動打洞管線（架構師打洞 -> 提取任務 -> Worker 並發填洞 -> SMT 證明 -> 自癒）
+- `/axiom-interactive`：分階段人機協作打洞（先生成契約等待人類審查，確認後再極速填洞）
+- `axiom-architect` / `axiom-worker` / `axiom-healer`：微專業 Agent 規範
+
+### 各主流 Agent 客戶端安裝方法：
+
+| AI Agent 客戶端 | 安裝路徑 / 設定方法 | 啟用與使用指令 |
+| :--- | :--- | :--- |
+| **🌟 Google Antigravity / Gemini CLI** | 將解壓縮後的 `skills/*` 複製至全域 `%USERPROFILE%\.gemini\config\skills\` 或專案目錄 `.gemini/config/skills/` | 在聊天框直接輸入：<br>`/axiom-pipeline 實作...` |
+| **⚡ Cursor IDE** | 將 `skills/axiom-pipeline/SKILL.md` 複製為專案根目錄 `.cursor/rules/axiom-pipeline.mdc`（或追加至 `.cursorrules`） | 在 Composer / Agent 模式輸入：<br>`使用 axiom-pipeline 規範實作...` |
+| **🌊 Windsurf (Codeium)** | 將 `skills/axiom-pipeline/SKILL.md` 的內容追加至專案根目錄的 `.windsurfrules` | 在 Cascade 聊天框中輸入：<br>`遵循 Axiom 打洞管線實作...` |
+| **🧠 Claude Code / Claude Desktop** | 將技能內容追加至專案根目錄 `CLAUDE.md`，或在 Claude.ai Project Knowledge 中上傳 `skills/` 下的 markdown 檔案 | 在對話中輸入：<br>`啟動 /axiom-pipeline 實作...` |
+| **🤖 OpenAI Codex CLI / Aider** | 在當前工作區放入 `skills/` 或在系統提示詞中引用 `skills/axiom-pipeline/SKILL.md` | 在提示詞中指定：<br>`依據 skills/axiom-pipeline 規範開發` |
+
+> 📖 更多詳細技能說明，請參閱：[**Axiom 技能包使用手冊 (skills/README.md)**](skills/README.md)。
 
 ---
 

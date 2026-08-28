@@ -1,4 +1,4 @@
-﻿name: Release Axiom Binaries
+﻿name: Release Axiom Binaries & Agent Skills
 
 on:
   push:
@@ -52,21 +52,41 @@ jobs:
       - name: Build Release Binary
         run: cargo build --release --target ${{ matrix.target }} -p axiom-cli
 
-      - name: Package Binary (Windows)
+      - name: Package Binary & Skills (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          cd target/${{ matrix.target }}/release
-          Compress-Archive -Path ${{ matrix.binary_name }} -DestinationPath ../../../${{ matrix.asset_name }}
+          mkdir staging
+          cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} staging/
+          cp -r skills staging/skills
+          Compress-Archive -Path staging/* -DestinationPath ${{ matrix.asset_name }}
 
-      - name: Package Binary (Unix)
+      - name: Package Binary & Skills (Unix)
         if: matrix.os != 'windows-latest'
         run: |
-          cd target/${{ matrix.target }}/release
-          tar -czvf ../../../${{ matrix.asset_name }} ${{ matrix.binary_name }}
+          mkdir staging
+          cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} staging/
+          cp -r skills staging/skills
+          tar -czvf ${{ matrix.asset_name }} -C staging .
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.asset_name }}
           generate_release_notes: true
+
+  package-skills:
+    name: Package Standalone Agent Skills
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Package Skills Archive
+        run: |
+          zip -r axiom-skills-${{ github.ref_name }}.zip skills/
+
+      - name: Upload Standalone Skills to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: axiom-skills-${{ github.ref_name }}.zip
