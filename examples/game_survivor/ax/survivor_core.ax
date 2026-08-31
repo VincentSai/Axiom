@@ -1,0 +1,271 @@
+// Deterministic, side-effect-free gameplay core for a survivor-style game.
+// All state transitions are explicit: no clock, random source, renderer, or
+// other effect participates in these calculations.
+
+type Vec2 = {
+    x: Float,
+    y: Float,
+}
+
+type Player = {
+    pos: Vec2,
+    hp: Int,
+    max_hp: Int,
+    exp: Int,
+    level: Int,
+    speed: Float,
+}
+
+type Monster = {
+    id: Int,
+    pos: Vec2,
+    hp: Int,
+    speed: Float,
+    kind: Int,
+}
+
+type Projectile = {
+    pos: Vec2,
+    vel: Vec2,
+    damage: Int,
+    pierce: Int,
+    lifetime: Float,
+}
+
+type Gem = {
+    pos: Vec2,
+    exp_val: Int,
+}
+
+type GameState = {
+    player: Player,
+    score: Int,
+    is_game_over: Bool,
+}
+
+type PlayerInput = {
+    move_x: Float,
+    move_y: Float,
+    is_firing: Bool,
+}
+
+// Squared distance avoids a square root and is sufficient for collision tests.
+fn distance_sq(p1: Vec2, p2: Vec2) -> Float
+    requires {
+        p1.x >= -1000000.0,
+        p1.x <= 1000000.0,
+        p1.y >= -1000000.0,
+        p1.y <= 1000000.0,
+        p2.x >= -1000000.0,
+        p2.x <= 1000000.0,
+        p2.y >= -1000000.0,
+        p2.y <= 1000000.0,
+    }
+    ensures {
+        result >= 0.0,
+        result == (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y),
+    }
+{
+    let dx = p1.x - p2.x;
+    let dy = p1.y - p2.y;
+    dx * dx + dy * dy
+}
+
+// Two circles touch or overlap when their squared center distance is no larger
+// than the square of their combined radius.
+fn check_collision(p1: Vec2, r1: Float, p2: Vec2, r2: Float) -> Bool
+    requires {
+        r1 >= 0.0,
+        r1 <= 1000000.0,
+        r2 >= 0.0,
+        r2 <= 1000000.0,
+        p1.x >= -1000000.0,
+        p1.x <= 1000000.0,
+        p1.y >= -1000000.0,
+        p1.y <= 1000000.0,
+        p2.x >= -1000000.0,
+        p2.x <= 1000000.0,
+        p2.y >= -1000000.0,
+        p2.y <= 1000000.0,
+    }
+    ensures {
+        result == (distance_sq(p1, p2) <= (r1 + r2) * (r1 + r2)),
+    }
+{
+    distance_sq(p1, p2) <= (r1 + r2) * (r1 + r2)
+}
+
+// This scalar helper makes the bounded addition contract independently
+// verifiable before clamp_hp performs its piecewise selection.
+fn hp_after_delta_unclamped(current: Int, delta: Int) -> Int
+    requires {
+        current >= -1000000000,
+        current <= 1000000000,
+        delta >= -1000000000,
+        delta <= 1000000000,
+    }
+    ensures {
+        result == current + delta,
+        result >= -2000000000,
+        result <= 2000000000,
+    }
+{
+    current + delta
+}
+
+// Apply a signed HP delta and clamp the result to the closed interval
+// [0, max_hp].
+fn clamp_hp(current: Int, delta: Int, max_hp: Int) -> Int
+    requires {
+        current >= -1000000000,
+        current <= 1000000000,
+        delta >= -1000000000,
+        delta <= 1000000000,
+        max_hp >= 0,
+        max_hp <= 1000000000,
+    }
+    ensures {
+        result >= 0,
+        result <= max_hp,
+        current + delta < 0 || current + delta > max_hp || result == current + delta,
+        current + delta >= 0 || result == 0,
+        current + delta <= max_hp || result == max_hp,
+    }
+{
+    let candidate = hp_after_delta_unclamped(current, delta);
+    match candidate < 0 {
+        true => 0,
+        false => match candidate > max_hp {
+            true => max_hp,
+            false => candidate,
+        },
+    }
+}
+
+// Armor subtracts damage point-for-point. A positive hit always deals at least
+// one point; a zero-damage hit remains zero.
+fn calc_damage_reduction(armor: Int, raw_damage: Int) -> Int
+    requires {
+        armor >= 0,
+        armor <= 1000000000,
+        raw_damage >= 0,
+        raw_damage <= 1000000000,
+    }
+    ensures {
+        result >= 0,
+        result <= raw_damage,
+        raw_damage != 0 || result == 0,
+        raw_damage == 0 || result >= 1,
+        armor != 0 || result == raw_damage,
+    }
+{
+    let reduced = clamp_hp(raw_damage, -armor, raw_damage);
+    match raw_damage == 0 {
+        true => 0,
+        false => match reduced == 0 {
+            true => 1,
+            false => reduced,
+        },
+    }
+}
+
+// Direction is intentionally not normalized here. The caller supplies an axis
+// vector, and this function applies the exact deterministic Euler displacement.
+fn move_position(pos: Vec2, dir_x: Float, dir_y: Float, speed: Float, dt: Float) -> Vec2
+    requires {
+        pos.x >= -1000000.0,
+        pos.x <= 1000000.0,
+        pos.y >= -1000000.0,
+        pos.y <= 1000000.0,
+        dir_x >= -1.0,
+        dir_x <= 1.0,
+        dir_y >= -1.0,
+        dir_y <= 1.0,
+        speed >= 0.0,
+        speed <= 1000000.0,
+        dt >= 0.0,
+        dt <= 1000.0,
+    }
+    ensures {
+        result.x == pos.x + dir_x * speed * dt,
+        result.y == pos.y + dir_y * speed * dt,
+    }
+{
+    Vec2 {
+        x: pos.x + dir_x * speed * dt,
+        y: pos.y + dir_y * speed * dt,
+    }
+}
+
+// Linear progression: reaching level N requires 100 * N experience points.
+fn exp_for_next_level(current_level: Int) -> Int
+    requires {
+        current_level >= 1,
+        current_level <= 10000000,
+    }
+    ensures {
+        result == current_level * 100,
+        result >= 100,
+        result <= 1000000000,
+    }
+{
+    current_level * 100
+}
+
+fn can_level_up(current_exp: Int, level: Int) -> Bool
+    requires {
+        current_exp >= 0,
+        current_exp <= 1000000000,
+        level >= 1,
+        level <= 10000000,
+    }
+    ensures {
+        result == (current_exp >= level * 100),
+    }
+{
+    current_exp >= level * 100
+}
+
+// Advance only the player's position. Combat, experience, and firing systems
+// consume the same input elsewhere; this movement step preserves every other
+// Player field.
+fn step_player(player: Player, input: PlayerInput, dt: Float) -> Player
+    requires {
+        player.pos.x >= -1000000.0,
+        player.pos.x <= 1000000.0,
+        player.pos.y >= -1000000.0,
+        player.pos.y <= 1000000.0,
+        player.hp >= 0,
+        player.hp <= player.max_hp,
+        player.max_hp >= 0,
+        player.exp >= 0,
+        player.level >= 1,
+        player.speed >= 0.0,
+        player.speed <= 1000000.0,
+        input.move_x >= -1.0,
+        input.move_x <= 1.0,
+        input.move_y >= -1.0,
+        input.move_y <= 1.0,
+        dt >= 0.0,
+        dt <= 1000.0,
+    }
+    ensures {
+        result.pos.x == player.pos.x + input.move_x * player.speed * dt,
+        result.pos.y == player.pos.y + input.move_y * player.speed * dt,
+        result.hp == player.hp,
+        result.max_hp == player.max_hp,
+        result.exp == player.exp,
+        result.level == player.level,
+        result.speed == player.speed,
+    }
+{
+    let new_pos = move_position(player.pos, input.move_x, input.move_y, player.speed, dt);
+    Player {
+        pos: new_pos,
+        hp: player.hp,
+        max_hp: player.max_hp,
+        exp: player.exp,
+        level: player.level,
+        speed: player.speed,
+    }
+}
