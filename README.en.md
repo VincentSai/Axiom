@@ -66,6 +66,7 @@ Under the industrial RPG game engine specification [`examples/benchmark_200/SPEC
 - 🗺️ [Project Development Roadmap (docs/ROADMAP.md)](docs/ROADMAP.md)
 - 💡 [Example 1: Bank Transfer Service (examples/transfer.ax)](examples/transfer.ax)
 - 🎮 [Example 2: Cross-Platform Game Loop (examples/game_loop.ax)](examples/game_loop.ax)
+- 👾 [Example 3: Axiom Survivors Complete Unity Game (examples/game_survivor/)](examples/game_survivor/README.md)
 
 ---
 

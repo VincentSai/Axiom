@@ -66,6 +66,7 @@
 - 🗺️ [專案發展藍圖 (docs/ROADMAP.md)](docs/ROADMAP.md)
 - 💡 [範例 1：銀行轉帳服務 (examples/transfer.ax)](examples/transfer.ax)
 - 🎮 [範例 2：跨平臺遊戲循環 (examples/game_loop.ax)](examples/game_loop.ax)
+- 👾 [範例 3：Axiom Survivors 完整版 Unity 遊戲 (examples/game_survivor/)](examples/game_survivor/README.md)
 
 ---
 
