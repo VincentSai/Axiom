@@ -34,6 +34,7 @@ namespace Axiom.Survivor
         [Header("Runtime")]
         [SerializeField] private AxiomRunner runner = null;
         [SerializeField] private Transform entityRoot = null;
+        [SerializeField] private bool autoFollowCamera = true;
 
         [Header("Entity presentation")]
         [SerializeField] private EntityVisualBinding[] entityVisuals = Array.Empty<EntityVisualBinding>();
@@ -46,15 +47,38 @@ namespace Axiom.Survivor
         [SerializeField] private TMP_Text scoreText = null;
 
         private readonly Dictionary<long, GameObject> _entityViews = new Dictionary<long, GameObject>();
+        private static readonly Dictionary<EntityKind, Sprite> _proceduralSprites = new Dictionary<EntityKind, Sprite>();
         private ISurvivorVisualEffects _visualEffects;
+        private EntitySnapshot _lastPlayerSnapshot;
+        private GameObject _playerView;
 
         public int TrackedEntityCount => _entityViews.Count;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void AutoBootstrapScene()
+        {
+            SurvivorGameController existing = UnityEngine.Object.FindObjectOfType<SurvivorGameController>();
+            if (existing == null)
+            {
+                GameObject manager = new GameObject("Axiom_Survivor_GameManager");
+                manager.AddComponent<AxiomRunner>();
+                manager.AddComponent<SurvivorGameController>();
+            }
+        }
+
+        private void Awake()
+        {
+            if (runner == null)
+            {
+                runner = GetComponent<AxiomRunner>() ?? gameObject.AddComponent<AxiomRunner>();
+            }
+        }
 
         private void OnEnable()
         {
             if (runner == null)
             {
-                runner = GetComponent<AxiomRunner>();
+                runner = GetComponent<AxiomRunner>() ?? gameObject.AddComponent<AxiomRunner>();
             }
 
             if (runner != null)
@@ -74,6 +98,37 @@ namespace Axiom.Survivor
             }
 
             ClearEntityViews();
+        }
+
+        private void LateUpdate()
+        {
+            if (autoFollowCamera && _playerView != null && Camera.main != null)
+            {
+                Vector3 playerPos = _playerView.transform.position;
+                Camera.main.transform.position = new Vector3(playerPos.x, playerPos.y, -10.0f);
+            }
+        }
+
+        private void OnGUI()
+        {
+            if (healthBar != null && levelText != null)
+            {
+                return;
+            }
+
+            GUI.color = Color.white;
+            GUI.Box(new Rect(10, 10, 280, 150), "★ Axiom Survivors 战斗状态");
+
+            int hp = _lastPlayerSnapshot.hp > 0 ? (int)_lastPlayerSnapshot.hp : 100;
+            int maxHp = _lastPlayerSnapshot.max_hp > 0 ? (int)_lastPlayerSnapshot.max_hp : 100;
+            int level = _lastPlayerSnapshot.level > 0 ? (int)_lastPlayerSnapshot.level : 1;
+            long score = _lastPlayerSnapshot.score;
+
+            GUI.Label(new Rect(20, 35, 260, 25), $"💚 生命值: {hp} / {maxHp}");
+            GUI.Label(new Rect(20, 60, 260, 25), $"⭐ 角色等级: Lv. {level}");
+            GUI.Label(new Rect(20, 85, 260, 25), $"🏆 生存积分: {score}  |  👾 怪物: {TrackedEntityCount}");
+            GUI.Label(new Rect(20, 110, 260, 25), "🎮 [WASD/方向键] 移动 | [空格/J] 射击");
+            GUI.Label(new Rect(20, 130, 260, 20), "⚡ [Axiom 确定性内核 60Hz 运行中]");
         }
 
         public void SetVisualEffects(ISurvivorVisualEffects visualEffects)
@@ -98,6 +153,8 @@ namespace Axiom.Survivor
             view.transform.position = new Vector3((float)snapshot.x, (float)snapshot.y, 0.0f);
             if (snapshot.kind == EntityKind.Player)
             {
+                _lastPlayerSnapshot = snapshot;
+                _playerView = view;
                 UpdateHud(snapshot);
             }
         }
@@ -160,24 +217,62 @@ namespace Axiom.Survivor
 
             GameObject view = prefab != null
                 ? Instantiate(prefab, Vector3.zero, Quaternion.identity, entityRoot)
-                : new GameObject($"{snapshot.kind} {snapshot.id}");
+                : new GameObject($"{snapshot.kind}_{snapshot.id}");
             if (entityRoot != null && view.transform.parent != entityRoot)
             {
                 view.transform.SetParent(entityRoot, false);
             }
 
             EntityVisualBinding binding = FindEntityVisualBinding(snapshot.kind);
+            SpriteRenderer renderer = view.GetComponent<SpriteRenderer>() ?? view.AddComponent<SpriteRenderer>();
+
             if (binding.Sprite != null)
             {
-                SpriteRenderer renderer = view.GetComponent<SpriteRenderer>() ?? view.AddComponent<SpriteRenderer>();
                 renderer.sprite = binding.Sprite;
             }
+            else
+            {
+                renderer.sprite = GetOrCreateProceduralSprite(snapshot.kind);
+            }
+
             if (binding.AnimatorController != null)
             {
                 Animator animator = view.GetComponent<Animator>() ?? view.AddComponent<Animator>();
                 animator.runtimeAnimatorController = binding.AnimatorController;
             }
             return view;
+        }
+
+        private static Sprite GetOrCreateProceduralSprite(EntityKind kind)
+        {
+            if (_proceduralSprites.TryGetValue(kind, out Sprite existing))
+            {
+                return existing;
+            }
+
+            int size = (kind == EntityKind.Projectile || kind == EntityKind.Gem) ? 16 : 32;
+            Texture2D tex = new Texture2D(size, size);
+            Color color = kind switch
+            {
+                EntityKind.Player => new Color(0.2f, 0.8f, 0.4f, 1.0f),
+                EntityKind.Monster => new Color(0.9f, 0.2f, 0.2f, 1.0f),
+                EntityKind.Projectile => new Color(1.0f, 0.9f, 0.2f, 1.0f),
+                EntityKind.Gem => new Color(0.2f, 0.6f, 1.0f, 1.0f),
+                _ => new Color(0.8f, 0.8f, 0.8f, 1.0f)
+            };
+
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    tex.SetPixel(x, y, color);
+                }
+            }
+            tex.Apply();
+
+            Sprite sprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 32.0f);
+            _proceduralSprites[kind] = sprite;
+            return sprite;
         }
 
         private void UpdateHud(EntitySnapshot player)

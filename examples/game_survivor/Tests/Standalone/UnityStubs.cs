@@ -117,6 +117,7 @@ namespace UnityEngine
 
         public static void Destroy(Object target) { }
         public static void DestroyImmediate(Object target) { }
+        public static T FindObjectOfType<T>() where T : Object => null;
     }
 
     public class Component : Object
@@ -176,20 +177,100 @@ namespace UnityEngine
 
     public readonly struct Quaternion { public static Quaternion identity => new Quaternion(); }
     public static class Time { public static float fixedDeltaTime => 1.0f / 50.0f; }
+    public enum KeyCode
+    {
+        None = 0,
+        W = 119, A = 97, S = 115, D = 100,
+        UpArrow = 273, DownArrow = 274, RightArrow = 275, LeftArrow = 276,
+        Space = 32, J = 106,
+    }
+
+    public enum RuntimeInitializeLoadType
+    {
+        AfterSceneLoad = 0,
+        BeforeSceneLoad = 1,
+    }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class RuntimeInitializeOnLoadMethodAttribute : Attribute
+    {
+        public RuntimeInitializeOnLoadMethodAttribute(RuntimeInitializeLoadType loadType = RuntimeInitializeLoadType.AfterSceneLoad) { }
+    }
+
+    public readonly struct Color
+    {
+        public readonly float r, g, b, a;
+        public Color(float r, float g, float b, float a = 1.0f) { this.r = r; this.g = g; this.b = b; this.a = a; }
+        public static Color white => new Color(1, 1, 1, 1);
+        public static Color black => new Color(0, 0, 0, 1);
+        public static Color red => new Color(1, 0, 0, 1);
+        public static Color green => new Color(0, 1, 0, 1);
+        public static Color yellow => new Color(1, 1, 0, 1);
+        public static Color cyan => new Color(0, 1, 1, 1);
+        public static Color clear => new Color(0, 0, 0, 0);
+    }
+
+    public readonly struct Rect
+    {
+        public readonly float x, y, width, height;
+        public Rect(float x, float y, float width, float height) { this.x = x; this.y = y; this.width = width; this.height = height; }
+    }
+
+    public readonly struct Vector2
+    {
+        public readonly float x, y;
+        public Vector2(float x, float y) { this.x = x; this.y = y; }
+    }
+
+    public sealed class Texture2D : Object
+    {
+        public Texture2D(int width, int height) { }
+        public void SetPixel(int x, int y, Color color) { }
+        public void Apply() { }
+    }
+
+    public sealed class Camera : Component
+    {
+        public static Camera main { get; set; }
+        public float orthographicSize { get; set; } = 5f;
+    }
+
     public static class Input
     {
         public static float GetAxisRaw(string name) => 0.0f;
         public static bool GetButton(string name) => false;
+        public static bool GetKey(KeyCode key) => false;
+        public static bool GetMouseButton(int button) => false;
     }
-    public static class Mathf { public static int RoundToInt(float value) => (int)Math.Round(value); }
+
+    public static class Mathf
+    {
+        public static int RoundToInt(float value) => (int)Math.Round(value);
+        public static float Abs(float value) => Math.Abs(value);
+        public static float Clamp(float value, float min, float max) => Math.Min(Math.Max(value, min), max);
+    }
+
     public static class Debug
     {
+        public static void Log(object message) => Console.WriteLine(message);
         public static void LogError(object message) => Console.Error.WriteLine(message);
         public static void LogWarning(object message) => Console.Error.WriteLine(message);
     }
 
-    public sealed class Sprite : Object { }
-    public sealed class SpriteRenderer : Component { public Sprite sprite { get; set; } }
+    public static class GUI
+    {
+        public static Color color { get; set; } = Color.white;
+        public static Color backgroundColor { get; set; } = Color.white;
+        public static void Box(Rect position, string text) { }
+        public static void Label(Rect position, string text) { }
+        public static void DrawTexture(Rect position, Texture2D image) { }
+    }
+
+    public sealed class Sprite : Object
+    {
+        public static Sprite Create(Texture2D texture, Rect rect, Vector2 pivot, float pixelsPerUnit = 100.0f) => new Sprite();
+    }
+    public sealed class SpriteRenderer : Component { public Sprite sprite { get; set; } public Color color { get; set; } = Color.white; }
     public sealed class RuntimeAnimatorController : Object { }
     public sealed class Animator : Component
     {
