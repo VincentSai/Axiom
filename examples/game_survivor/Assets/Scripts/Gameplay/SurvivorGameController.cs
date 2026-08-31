@@ -70,7 +70,11 @@ namespace Axiom.Survivor
         {
             if (runner == null)
             {
-                runner = GetComponent<AxiomRunner>() ?? gameObject.AddComponent<AxiomRunner>();
+                runner = GetComponent<AxiomRunner>();
+                if (runner == null)
+                {
+                    runner = gameObject.AddComponent<AxiomRunner>();
+                }
             }
         }
 
@@ -78,7 +82,11 @@ namespace Axiom.Survivor
         {
             if (runner == null)
             {
-                runner = GetComponent<AxiomRunner>() ?? gameObject.AddComponent<AxiomRunner>();
+                runner = GetComponent<AxiomRunner>();
+                if (runner == null)
+                {
+                    runner = gameObject.AddComponent<AxiomRunner>();
+                }
             }
 
             if (runner != null)
@@ -191,7 +199,11 @@ namespace Axiom.Survivor
             {
                 if (audioSource == null)
                 {
-                    audioSource = GetComponent<AudioSource>() ?? gameObject.AddComponent<AudioSource>();
+                    audioSource = GetComponent<AudioSource>();
+                    if (audioSource == null)
+                    {
+                        audioSource = gameObject.AddComponent<AudioSource>();
+                    }
                 }
                 audioSource.PlayOneShot(clip);
             }
@@ -224,7 +236,11 @@ namespace Axiom.Survivor
             }
 
             EntityVisualBinding binding = FindEntityVisualBinding(snapshot.kind);
-            SpriteRenderer renderer = view.GetComponent<SpriteRenderer>() ?? view.AddComponent<SpriteRenderer>();
+            SpriteRenderer renderer = view.GetComponent<SpriteRenderer>();
+            if (renderer == null)
+            {
+                renderer = view.AddComponent<SpriteRenderer>();
+            }
 
             if (binding.Sprite != null)
             {
@@ -237,7 +253,11 @@ namespace Axiom.Survivor
 
             if (binding.AnimatorController != null)
             {
-                Animator animator = view.GetComponent<Animator>() ?? view.AddComponent<Animator>();
+                Animator animator = view.GetComponent<Animator>();
+                if (animator == null)
+                {
+                    animator = view.AddComponent<Animator>();
+                }
                 animator.runtimeAnimatorController = binding.AnimatorController;
             }
             return view;
