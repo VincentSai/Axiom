@@ -111,6 +111,7 @@ struct SurvivorRuntime {
     fire_cooldown: f64,
     player_invincible_timer: f64,
     monster_spawn_timer: f64,
+    is_game_over: bool,
 }
 
 impl SurvivorRuntime {
@@ -137,6 +138,7 @@ impl SurvivorRuntime {
             fire_cooldown: 0.0,
             player_invincible_timer: 0.0,
             monster_spawn_timer: 0.0,
+            is_game_over: false,
         };
 
         // Player entity at origin
@@ -171,6 +173,10 @@ impl SurvivorRuntime {
         runtime
     }
 
+    fn reset(&mut self) {
+        *self = Self::new();
+    }
+
     fn tick(&mut self, input: PlayerInput, delta_time: f64) {
         self.event_count = 0;
         let dt = if delta_time.is_finite() {
@@ -178,6 +184,11 @@ impl SurvivorRuntime {
         } else {
             0.0
         };
+
+        // If Game Over, freeze gameplay and only wait for restart
+        if self.is_game_over {
+            return;
+        }
 
         let move_x = input.move_x.clamp(-1.0, 1.0);
         let move_y = input.move_y.clamp(-1.0, 1.0);
@@ -217,7 +228,12 @@ impl SurvivorRuntime {
         self.fire_cooldown -= dt;
         if input.is_firing != 0 && self.fire_cooldown <= 0.0 {
             self.fire_cooldown = 0.22; // ~4.5 shots per second
-            self.spawn_projectile(self.entities[0].x, self.entities[0].y, self.facing_x, self.facing_y);
+            self.spawn_projectile(
+                self.entities[0].x,
+                self.entities[0].y,
+                self.facing_x,
+                self.facing_y,
+            );
         }
 
         // 4. Update Projectiles & Check Collisions with Monsters
@@ -304,7 +320,11 @@ impl SurvivorRuntime {
                     self.push_event(VisualEventKind::Despawn, self.entities[i].id, 0, 0);
 
                     let damage = generated_core::calc_damage_reduction(0, 15);
-                    self.entities[m].hp = generated_core::clamp_hp(self.entities[m].hp, -damage, self.entities[m].max_hp);
+                    self.entities[m].hp = generated_core::clamp_hp(
+                        self.entities[m].hp,
+                        -damage,
+                        self.entities[m].max_hp,
+                    );
                     self.push_event(VisualEventKind::Hit, self.entities[m].id, 0, damage);
 
                     // Check if monster died
@@ -366,11 +386,16 @@ impl SurvivorRuntime {
             if generated_core::check_collision(current_monster_pos, 0.5, player_pos, 0.5) {
                 if self.player_invincible_timer <= 0.0 {
                     let damage = 10;
-                    self.entities[0].hp = generated_core::clamp_hp(self.entities[0].hp, -damage, self.entities[0].max_hp);
+                    self.entities[0].hp = generated_core::clamp_hp(
+                        self.entities[0].hp,
+                        -damage,
+                        self.entities[0].max_hp,
+                    );
                     self.player_invincible_timer = 0.6; // 0.6s i-frame
                     self.push_event(VisualEventKind::Hit, 1, 0, damage);
 
                     if self.entities[0].hp <= 0 {
+                        self.is_game_over = true;
                         self.push_event(VisualEventKind::GameOver, 1, 0, 0);
                     }
                 }
@@ -457,18 +482,18 @@ impl SurvivorRuntime {
     }
 
     fn find_or_allocate_slot(&mut self) -> usize {
-        // 1. First look for inactive slot
-        for i in 1..self.entity_count {
-            if self.entities[i].active == 0 {
-                return i;
-            }
-        }
-
-        // 2. Allocate new slot if under capacity
+        // 1. Allocate new slot first if under capacity (prevents same-frame slot collision)
         if self.entity_count < MAX_ENTITIES {
             let index = self.entity_count;
             self.entity_count += 1;
             return index;
+        }
+
+        // 2. Look for inactive slot
+        for i in 1..self.entity_count {
+            if self.entities[i].active == 0 {
+                return i;
+            }
         }
 
         // 3. Fallback: override oldest projectile or monster
@@ -557,6 +582,13 @@ pub unsafe extern "C" fn axiom_destroy(instance: *mut c_void) {
     }
     drop(Box::from_raw(instance.cast::<SurvivorRuntime>()));
     LIVE_INSTANCES.fetch_sub(1, Ordering::Relaxed);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn axiom_reset(instance: *mut c_void) {
+    if let Some(runtime) = instance.cast::<SurvivorRuntime>().as_mut() {
+        runtime.reset();
+    }
 }
 
 #[no_mangle]

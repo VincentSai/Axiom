@@ -107,6 +107,19 @@ namespace Axiom.Generated
             _instance = IntPtr.Zero;
         }
 
+        public void ResetGame()
+        {
+            if (_instance != IntPtr.Zero)
+            {
+                AxiomNative.axiom_reset(_instance);
+                PublishSnapshot();
+            }
+            else
+            {
+                Initialize();
+            }
+        }
+
         private void PublishSnapshot()
         {
             _snapshots.Publish(AxiomNative.axiom_get_snapshot_ptr(_instance));
@@ -142,26 +155,9 @@ namespace Axiom.Generated
 
         private void CollectLegacyInput()
         {
-            float horizontal = Input.GetAxisRaw("Horizontal");
-            float vertical = Input.GetAxisRaw("Vertical");
-
-            // Fallback for direct keyboard input when axis is neutral
-            if (Mathf.Abs(horizontal) < 0.01f)
-            {
-                if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) horizontal += 1.0f;
-                if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) horizontal -= 1.0f;
-            }
-            if (Mathf.Abs(vertical) < 0.01f)
-            {
-                if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) vertical += 1.0f;
-                if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) vertical -= 1.0f;
-            }
-
-            bool firing = Input.GetButton("Fire1") || Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.J) || Input.GetMouseButton(0);
-
-            _input.move_x = Mathf.Clamp(horizontal, -1.0f, 1.0f);
-            _input.move_y = Mathf.Clamp(vertical, -1.0f, 1.0f);
-            _input.is_firing = firing;
+            _input.move_x = Input.GetAxisRaw("Horizontal");
+            _input.move_y = Input.GetAxisRaw("Vertical");
+            _input.is_firing = Input.GetButton("Fire1");
         }
 
         private void OnDisable()

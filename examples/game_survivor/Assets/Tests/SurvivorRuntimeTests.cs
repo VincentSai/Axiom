@@ -86,6 +86,23 @@ namespace Axiom.Survivor.Tests
         }
 
         [Test]
+        public void Runner_resets_runtime_and_clears_game_state()
+        {
+            Assert.That(_runner.Initialize(), Is.True);
+            PlayerInput input = new PlayerInput { move_x = 1.0, move_y = 0.0, is_firing = true };
+            for (int tick = 0; tick < 30; tick++)
+            {
+                _runner.Tick(input, 1.0 / 60.0);
+            }
+
+            Assert.That(_runner.SnapshotRevision, Is.EqualTo((ulong)30));
+
+            _runner.ResetGame();
+            Assert.That(_runner.SnapshotRevision, Is.EqualTo((ulong)0));
+            Assert.That(_runner.GetSnapshot(0).hp, Is.EqualTo((long)100));
+        }
+
+        [Test]
         public void Controller_creates_updates_and_removes_views_from_entity_snapshots()
         {
             GameObject controllerObject = new GameObject("Survivor controller test");

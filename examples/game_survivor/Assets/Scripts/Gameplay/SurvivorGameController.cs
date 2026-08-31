@@ -52,7 +52,10 @@ namespace Axiom.Survivor
         private EntitySnapshot _lastPlayerSnapshot;
         private GameObject _playerView;
 
+        private bool _isGameOver;
+
         public int TrackedEntityCount => _entityViews.Count;
+        public bool IsGameOver => _isGameOver;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void AutoBootstrapScene()
@@ -108,6 +111,24 @@ namespace Axiom.Survivor
             ClearEntityViews();
         }
 
+        private void Update()
+        {
+            if (_isGameOver && Input.GetKeyDown(KeyCode.R))
+            {
+                RestartGame();
+            }
+        }
+
+        public void RestartGame()
+        {
+            _isGameOver = false;
+            ClearEntityViews();
+            if (runner != null)
+            {
+                runner.ResetGame();
+            }
+        }
+
         private void LateUpdate()
         {
             if (autoFollowCamera && _playerView != null && Camera.main != null)
@@ -127,7 +148,7 @@ namespace Axiom.Survivor
             GUI.color = Color.white;
             GUI.Box(new Rect(10, 10, 280, 150), "★ Axiom Survivors 战斗状态");
 
-            int hp = _lastPlayerSnapshot.hp > 0 ? (int)_lastPlayerSnapshot.hp : 100;
+            int hp = _lastPlayerSnapshot.max_hp > 0 ? (int)_lastPlayerSnapshot.hp : 100;
             int maxHp = _lastPlayerSnapshot.max_hp > 0 ? (int)_lastPlayerSnapshot.max_hp : 100;
             int level = _lastPlayerSnapshot.level > 0 ? (int)_lastPlayerSnapshot.level : 1;
             long score = _lastPlayerSnapshot.score;
@@ -136,7 +157,24 @@ namespace Axiom.Survivor
             GUI.Label(new Rect(20, 60, 260, 25), $"⭐ 角色等级: Lv. {level}");
             GUI.Label(new Rect(20, 85, 260, 25), $"🏆 生存积分: {score}  |  👾 怪物: {TrackedEntityCount}");
             GUI.Label(new Rect(20, 110, 260, 25), "🎮 [WASD/方向键] 移动 | [空格/J] 射击");
-            GUI.Label(new Rect(20, 130, 260, 20), "⚡ [Axiom 确定性内核 60Hz 运行中]");
+            GUI.Label(new Rect(20, 130, 260, 20), _isGameOver ? "💀 [GAME OVER - 按 R 键重开]" : "⚡ [Axiom 确定性内核 60Hz 运行中]");
+
+            // Game Over Popup Modal
+            if (_isGameOver)
+            {
+                int screenW = Screen.width > 0 ? Screen.width : 800;
+                int screenH = Screen.height > 0 ? Screen.height : 600;
+                int boxW = 360;
+                int boxH = 180;
+                Rect modalRect = new Rect((screenW - boxW) / 2f, (screenH - boxH) / 2f, boxW, boxH);
+
+                GUI.color = Color.red;
+                GUI.Box(modalRect, "💀  Y O U   D I E D  💀");
+                GUI.color = Color.white;
+                GUI.Label(new Rect(modalRect.x + 30, modalRect.y + 45, 300, 30), $"最终生存积分: {score} 点");
+                GUI.Label(new Rect(modalRect.x + 30, modalRect.y + 80, 300, 30), $"最终达成等级: Lv. {level}");
+                GUI.Label(new Rect(modalRect.x + 30, modalRect.y + 125, 300, 30), "👉 请按键盘 [ R ] 键重新开始 👈");
+            }
         }
 
         public void SetVisualEffects(ISurvivorVisualEffects visualEffects)
@@ -163,12 +201,25 @@ namespace Axiom.Survivor
             {
                 _lastPlayerSnapshot = snapshot;
                 _playerView = view;
+                if (snapshot.hp <= 0)
+                {
+                    _isGameOver = true;
+                }
                 UpdateHud(snapshot);
             }
         }
 
         public void HandleVisualEvent(VisualEvent visualEvent)
         {
+            if (visualEvent.kind == VisualEventKind.Death || visualEvent.kind == VisualEventKind.Despawn)
+            {
+                RemoveEntityView(visualEvent.entity_id);
+            }
+            else if (visualEvent.kind == VisualEventKind.GameOver)
+            {
+                _isGameOver = true;
+            }
+
             _entityViews.TryGetValue(visualEvent.entity_id, out GameObject target);
             (_visualEffects ?? this).Present(visualEvent, target);
         }

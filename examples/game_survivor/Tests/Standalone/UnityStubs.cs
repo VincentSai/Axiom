@@ -177,12 +177,18 @@ namespace UnityEngine
 
     public readonly struct Quaternion { public static Quaternion identity => new Quaternion(); }
     public static class Time { public static float fixedDeltaTime => 1.0f / 50.0f; }
+    public static class Screen
+    {
+        public static int width => 800;
+        public static int height => 600;
+    }
+
     public enum KeyCode
     {
         None = 0,
         W = 119, A = 97, S = 115, D = 100,
         UpArrow = 273, DownArrow = 274, RightArrow = 275, LeftArrow = 276,
-        Space = 32, J = 106,
+        Space = 32, J = 106, R = 114,
     }
 
     public enum RuntimeInitializeLoadType
@@ -240,6 +246,7 @@ namespace UnityEngine
         public static float GetAxisRaw(string name) => 0.0f;
         public static bool GetButton(string name) => false;
         public static bool GetKey(KeyCode key) => false;
+        public static bool GetKeyDown(KeyCode key) => false;
         public static bool GetMouseButton(int button) => false;
     }
 
