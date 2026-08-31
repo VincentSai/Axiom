@@ -124,7 +124,6 @@ namespace UnityEngine
         public GameObject gameObject { get; internal set; }
         public Transform transform => gameObject.transform;
         public T GetComponent<T>() where T : Component => gameObject.GetComponent<T>();
-        public T AddComponent<T>() where T : Component, new() => gameObject.AddComponent<T>();
     }
 
     public class Behaviour : Component { public bool enabled { get; set; } = true; }

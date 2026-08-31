@@ -134,7 +134,7 @@ namespace Axiom.Survivor
             {
                 if (audioSource == null)
                 {
-                    audioSource = GetComponent<AudioSource>() ?? AddComponent<AudioSource>();
+                    audioSource = GetComponent<AudioSource>() ?? gameObject.AddComponent<AudioSource>();
                 }
                 audioSource.PlayOneShot(clip);
             }
