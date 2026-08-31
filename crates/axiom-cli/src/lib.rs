@@ -1,5 +1,7 @@
 //! Command-line entry points for the Axiom toolchain.
 
+mod bridge;
+
 use std::error::Error;
 use std::fmt;
 use std::fs;
@@ -19,6 +21,7 @@ use axiom_parser::{parse_module, ParseError};
 use axiom_transpiler::{transpile_source_to_rust, TranspileError};
 use axiom_vfs::{export_database_module, sync_source_to_database, VfsError};
 use axiom_wit::{generate_wit_from_source, WitError};
+use bridge::generate_unity_bridge;
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -107,6 +110,19 @@ pub enum Commands {
         out_dir: Option<PathBuf>,
     },
 
+    /// Generate an engine bridge from an Axiom source module.
+    Bridge {
+        source: PathBuf,
+
+        /// Engine target. Currently supported: `unity`.
+        #[arg(long)]
+        target: String,
+
+        /// Directory where generated bridge files will be written.
+        #[arg(long)]
+        out: PathBuf,
+    },
+
     /// Store and retrieve content-addressed modules in the AST database.
     Db {
         #[command(subcommand)]
@@ -178,6 +194,7 @@ pub enum CliError {
     Wit(WitError),
     Ffi(FfiError),
     InvalidFfiLanguage(String),
+    InvalidBridgeTarget(String),
 }
 
 impl fmt::Display for CliError {
@@ -233,7 +250,16 @@ impl fmt::Display for CliError {
             Self::Wit(source) => write!(formatter, "could not generate WIT: {source}"),
             Self::Ffi(source) => write!(formatter, "could not generate FFI bindings: {source}"),
             Self::InvalidFfiLanguage(lang) => {
-                write!(formatter, "unsupported FFI target language `{lang}` (supported: ts, c, rust)")
+                write!(
+                    formatter,
+                    "unsupported FFI target language `{lang}` (supported: ts, c, rust)"
+                )
+            }
+            Self::InvalidBridgeTarget(target) => {
+                write!(
+                    formatter,
+                    "unsupported bridge target `{target}` (supported: unity)"
+                )
             }
         }
     }
@@ -255,6 +281,7 @@ impl Error for CliError {
             Self::Wit(source) => Some(source),
             Self::Ffi(source) => Some(source),
             Self::InvalidFfiLanguage(_)
+            | Self::InvalidBridgeTarget(_)
             | Self::RustCompilationFailed(_)
             | Self::ProgramFailed(_)
             | Self::VerificationFailed => None,
@@ -285,6 +312,11 @@ pub fn run(cli: Cli) -> Result<(), CliError> {
             target,
             out_dir,
         } => scaffold(&name, &target, out_dir.as_deref()),
+        Commands::Bridge {
+            source,
+            target,
+            out,
+        } => generate_bridge(&source, &target, &out),
         Commands::Db { command } => match command {
             DatabaseCommands::Put { file, db } => database_put(&file, &db),
             DatabaseCommands::Export { hash, db, out } => {
@@ -292,6 +324,36 @@ pub fn run(cli: Cli) -> Result<(), CliError> {
             }
         },
     }
+}
+
+fn generate_bridge(source_path: &Path, target: &str, out: &Path) -> Result<(), CliError> {
+    if !target.eq_ignore_ascii_case("unity") {
+        return Err(CliError::InvalidBridgeTarget(target.to_owned()));
+    }
+
+    let source = read_source(source_path)?;
+    let module = parse_module(&source).map_err(|source| CliError::Parse {
+        path: source_path.to_owned(),
+        source,
+    })?;
+    let files = generate_unity_bridge(&module);
+
+    fs::create_dir_all(out).map_err(|source| CliError::CreateDirectory {
+        path: out.to_owned(),
+        source,
+    })?;
+    for (filename, contents) in [
+        ("AxiomNative.cs", files.native),
+        ("AxiomDoubleBuffer.cs", files.double_buffer),
+        ("AxiomAssetRegistry.cs", files.asset_registry),
+        ("AxiomRunner.cs", files.runner),
+    ] {
+        let path = out.join(filename);
+        fs::write(&path, contents).map_err(|source| CliError::WriteFile { path, source })?;
+    }
+
+    println!("generated Unity bridge in {}", out.display());
+    Ok(())
 }
 
 fn export_wit(
