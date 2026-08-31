@@ -1,0 +1,11 @@
+[package]
+name = "axiom-survivor-native"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "axiom_survivor"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]

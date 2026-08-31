@@ -13,6 +13,7 @@ members = [
     "crates/axiom-vfs",
     "crates/axiom-agent-pool",
     "crates/axiom-wit",
+    "examples/game_survivor/native",
 ]
 resolver = "2"
 
