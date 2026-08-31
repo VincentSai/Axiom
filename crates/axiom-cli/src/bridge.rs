@@ -41,6 +41,9 @@ namespace Axiom.Generated
 
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void axiom_destroy(IntPtr instance);
+
+        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void axiom_reset(IntPtr instance);
     }
 }
 "#
@@ -402,6 +405,19 @@ namespace Axiom.Generated
 
             AxiomNative.axiom_destroy(_instance);
             _instance = IntPtr.Zero;
+        }
+
+        public void ResetGame()
+        {
+            if (_instance != IntPtr.Zero)
+            {
+                AxiomNative.axiom_reset(_instance);
+                PublishSnapshot();
+            }
+            else
+            {
+                Initialize();
+            }
         }
 
         private void PublishSnapshot()

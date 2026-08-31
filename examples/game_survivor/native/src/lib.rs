@@ -286,22 +286,33 @@ impl SurvivorRuntime {
                 continue;
             }
 
-            // Move projectile
-            self.entities[i].x += self.proj_meta[i].vel_x * dt;
-            self.entities[i].y += self.proj_meta[i].vel_y * dt;
-            self.proj_meta[i].lifetime -= dt;
-
-            let proj_pos = generated_core::Vec2 {
-                x: self.entities[i].x,
-                y: self.entities[i].y,
+            // Step Projectile using SMT-verified Axiom core function
+            let core_proj = generated_core::Projectile {
+                pos: generated_core::Vec2 {
+                    x: self.entities[i].x,
+                    y: self.entities[i].y,
+                },
+                vel: generated_core::Vec2 {
+                    x: self.proj_meta[i].vel_x,
+                    y: self.proj_meta[i].vel_y,
+                },
+                damage: 15,
+                pierce: 1,
+                lifetime: self.proj_meta[i].lifetime,
             };
+            let stepped_proj = generated_core::step_projectile(core_proj, dt);
+            self.entities[i].x = stepped_proj.pos.x;
+            self.entities[i].y = stepped_proj.pos.y;
+            self.proj_meta[i].lifetime = stepped_proj.lifetime;
 
-            // Check if expired
-            if self.proj_meta[i].lifetime <= 0.0 {
+            // Check if expired using SMT-verified Axiom predicate
+            if !generated_core::is_projectile_alive(stepped_proj.clone()) {
                 self.entities[i].active = 0;
                 self.push_event(VisualEventKind::Despawn, self.entities[i].id, 0, 0);
                 continue;
             }
+
+            let proj_pos = stepped_proj.pos;
 
             // Check collision with all active monsters
             for m in 0..self.entity_count {
@@ -319,13 +330,18 @@ impl SurvivorRuntime {
                     self.entities[i].active = 0;
                     self.push_event(VisualEventKind::Despawn, self.entities[i].id, 0, 0);
 
-                    let damage = generated_core::calc_damage_reduction(0, 15);
-                    self.entities[m].hp = generated_core::clamp_hp(
-                        self.entities[m].hp,
-                        -damage,
-                        self.entities[m].max_hp,
-                    );
-                    self.push_event(VisualEventKind::Hit, self.entities[m].id, 0, damage);
+                    // Apply damage via SMT-verified Axiom function
+                    let core_monster = generated_core::Monster {
+                        id: self.entities[m].id,
+                        pos: monster_pos,
+                        hp: self.entities[m].hp,
+                        speed: 1.8,
+                        kind: 1,
+                    };
+                    let damaged_monster = generated_core::apply_damage_to_monster(core_monster, 15, 0);
+                    let dealt_damage = self.entities[m].hp - damaged_monster.hp;
+                    self.entities[m].hp = damaged_monster.hp;
+                    self.push_event(VisualEventKind::Hit, self.entities[m].id, 0, dealt_damage);
 
                     // Check if monster died
                     if self.entities[m].hp <= 0 {
@@ -377,7 +393,7 @@ impl SurvivorRuntime {
                 self.entities[i].y = next.y;
             }
 
-            // Check collision with player
+            // Check collision with player using SMT-verified function
             let current_monster_pos = generated_core::Vec2 {
                 x: self.entities[i].x,
                 y: self.entities[i].y,
@@ -385,16 +401,21 @@ impl SurvivorRuntime {
 
             if generated_core::check_collision(current_monster_pos, 0.5, player_pos, 0.5) {
                 if self.player_invincible_timer <= 0.0 {
-                    let damage = 10;
-                    self.entities[0].hp = generated_core::clamp_hp(
-                        self.entities[0].hp,
-                        -damage,
-                        self.entities[0].max_hp,
-                    );
+                    let core_player = generated_core::Player {
+                        pos: player_pos,
+                        hp: self.entities[0].hp,
+                        max_hp: self.entities[0].max_hp,
+                        exp: self.entities[0].exp,
+                        level: self.entities[0].level,
+                        speed: 5.5,
+                    };
+                    let damaged_player = generated_core::apply_damage_to_player(core_player, 10);
+                    let dealt = self.entities[0].hp - damaged_player.hp;
+                    self.entities[0].hp = damaged_player.hp;
                     self.player_invincible_timer = 0.6; // 0.6s i-frame
-                    self.push_event(VisualEventKind::Hit, 1, 0, damage);
+                    self.push_event(VisualEventKind::Hit, 1, 0, dealt);
 
-                    if self.entities[0].hp <= 0 {
+                    if generated_core::is_game_over(damaged_player) {
                         self.is_game_over = true;
                         self.push_event(VisualEventKind::GameOver, 1, 0, 0);
                     }
@@ -442,16 +463,25 @@ impl SurvivorRuntime {
                 self.entities[i].active = 0;
                 self.push_event(VisualEventKind::Pickup, self.entities[i].id, 0, 50);
 
-                let exp_gain = 50;
-                self.entities[0].exp += exp_gain;
+                let core_player = generated_core::Player {
+                    pos: player_pos,
+                    hp: self.entities[0].hp,
+                    max_hp: self.entities[0].max_hp,
+                    exp: self.entities[0].exp,
+                    level: self.entities[0].level,
+                    speed: 5.5,
+                };
+                let old_level = core_player.level;
+                let updated_player = generated_core::apply_gem_pickup(core_player, 50);
+                self.entities[0].hp = updated_player.hp;
+                self.entities[0].max_hp = updated_player.max_hp;
+                self.entities[0].exp = updated_player.exp;
+                self.entities[0].level = updated_player.level;
                 self.entities[0].score += 50;
 
-                // Level up check
-                if generated_core::can_level_up(self.entities[0].exp, self.entities[0].level) {
-                    self.entities[0].level += 1;
-                    self.entities[0].max_hp += 20;
-                    self.entities[0].hp = self.entities[0].max_hp; // Heal to full on level up
-                    self.push_event(VisualEventKind::LevelUp, 1, 0, self.entities[0].level);
+                // Level up visual event
+                if updated_player.level > old_level {
+                    self.push_event(VisualEventKind::LevelUp, 1, 0, updated_player.level);
                 }
             }
         }

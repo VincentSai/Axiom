@@ -298,3 +298,203 @@ fn step_player(player: Player, input: PlayerInput, dt: Float) -> Player
         speed: player.speed,
     }
 }
+
+// Step projectile position along its velocity vector and decrement its lifetime.
+fn step_projectile(proj: Projectile, dt: Float) -> Projectile
+    requires {
+        proj.pos.x >= -1000000.0,
+        proj.pos.x <= 1000000.0,
+        proj.pos.y >= -1000000.0,
+        proj.pos.y <= 1000000.0,
+        proj.vel.x >= -1000000.0,
+        proj.vel.x <= 1000000.0,
+        proj.vel.y >= -1000000.0,
+        proj.vel.y <= 1000000.0,
+        proj.damage >= 0,
+        proj.damage <= 1000000000,
+        proj.pierce >= 0,
+        proj.pierce <= 1000000000,
+        proj.lifetime >= -1000.0,
+        proj.lifetime <= 1000.0,
+        dt >= 0.0,
+        dt <= 1000.0,
+    }
+    ensures {
+        result.pos.x == proj.pos.x + proj.vel.x * dt,
+        result.pos.y == proj.pos.y + proj.vel.y * dt,
+        result.damage == proj.damage,
+        result.pierce == proj.pierce,
+        result.lifetime == proj.lifetime - dt,
+    }
+{
+    Projectile {
+        pos: Vec2 {
+            x: proj.pos.x + proj.vel.x * dt,
+            y: proj.pos.y + proj.vel.y * dt,
+        },
+        vel: proj.vel,
+        damage: proj.damage,
+        pierce: proj.pierce,
+        lifetime: proj.lifetime - dt,
+    }
+}
+
+fn is_projectile_alive(proj: Projectile) -> Bool
+    requires {
+        proj.lifetime >= -1000000.0,
+        proj.lifetime <= 1000000.0,
+    }
+    ensures {
+        result == (proj.lifetime > 0.0),
+    }
+{
+    proj.lifetime > 0.0
+}
+
+// Apply damage to a monster with armor reduction, returning the updated monster.
+fn apply_damage_to_monster(monster: Monster, raw_damage: Int, armor: Int) -> Monster
+    requires {
+        monster.hp >= 0,
+        monster.hp <= 1000000000,
+        monster.pos.x >= -1000000.0,
+        monster.pos.x <= 1000000.0,
+        monster.pos.y >= -1000000.0,
+        monster.pos.y <= 1000000.0,
+        monster.speed >= 0.0,
+        monster.speed <= 1000000.0,
+        raw_damage >= 0,
+        raw_damage <= 1000000000,
+        armor >= 0,
+        armor <= 1000000000,
+    }
+    ensures {
+        result.id == monster.id,
+        result.pos.x == monster.pos.x,
+        result.pos.y == monster.pos.y,
+        result.speed == monster.speed,
+        result.kind == monster.kind,
+        result.hp <= monster.hp,
+        result.hp >= 0,
+    }
+{
+    let eff_damage = calc_damage_reduction(armor, raw_damage);
+    let new_hp = clamp_hp(monster.hp, -eff_damage, monster.hp);
+    Monster {
+        id: monster.id,
+        pos: monster.pos,
+        hp: new_hp,
+        speed: monster.speed,
+        kind: monster.kind,
+    }
+}
+
+// Apply damage to the player, respecting HP bounds and level/speed persistence.
+fn apply_damage_to_player(player: Player, raw_damage: Int) -> Player
+    requires {
+        player.pos.x >= -1000000.0,
+        player.pos.x <= 1000000.0,
+        player.pos.y >= -1000000.0,
+        player.pos.y <= 1000000.0,
+        player.hp >= 0,
+        player.hp <= player.max_hp,
+        player.max_hp >= 0,
+        player.max_hp <= 1000000000,
+        player.exp >= 0,
+        player.level >= 1,
+        player.speed >= 0.0,
+        player.speed <= 1000000.0,
+        raw_damage >= 0,
+        raw_damage <= 1000000000,
+    }
+    ensures {
+        result.pos.x == player.pos.x,
+        result.pos.y == player.pos.y,
+        result.max_hp == player.max_hp,
+        result.exp == player.exp,
+        result.level == player.level,
+        result.speed == player.speed,
+        result.hp >= 0,
+        result.hp <= player.max_hp,
+    }
+{
+    let new_hp = clamp_hp(player.hp, -raw_damage, player.max_hp);
+    Player {
+        pos: player.pos,
+        hp: new_hp,
+        max_hp: player.max_hp,
+        exp: player.exp,
+        level: player.level,
+        speed: player.speed,
+    }
+}
+
+// Apply experience from a collected gem. If experience reaches the threshold,
+// level up the player, increase max HP by 20, and fully restore HP.
+fn apply_gem_pickup(player: Player, exp_gain: Int) -> Player
+    requires {
+        player.pos.x >= -1000000.0,
+        player.pos.x <= 1000000.0,
+        player.pos.y >= -1000000.0,
+        player.pos.y <= 1000000.0,
+        player.hp >= 0,
+        player.hp <= player.max_hp,
+        player.max_hp >= 0,
+        player.max_hp <= 1000000000,
+        player.exp >= 0,
+        player.exp <= 1000000000,
+        player.level >= 1,
+        player.level <= 10000000,
+        player.speed >= 0.0,
+        player.speed <= 1000000.0,
+        exp_gain >= 0,
+        exp_gain <= 1000000000,
+    }
+    ensures {
+        result.pos.x == player.pos.x,
+        result.pos.y == player.pos.y,
+        result.speed == player.speed,
+        result.exp == player.exp + exp_gain,
+        result.level >= player.level,
+        result.hp >= 0,
+        result.hp <= result.max_hp,
+    }
+{
+    let total_exp = player.exp + exp_gain;
+    let upgraded = can_level_up(total_exp, player.level);
+    match upgraded {
+        true => {
+            let next_level = player.level + 1;
+            let next_max_hp = player.max_hp + 20;
+            Player {
+                pos: player.pos,
+                hp: next_max_hp,
+                max_hp: next_max_hp,
+                exp: total_exp,
+                level: next_level,
+                speed: player.speed,
+            }
+        },
+        false => {
+            Player {
+                pos: player.pos,
+                hp: player.hp,
+                max_hp: player.max_hp,
+                exp: total_exp,
+                level: player.level,
+                speed: player.speed,
+            }
+        },
+    }
+}
+
+fn is_game_over(player: Player) -> Bool
+    requires {
+        player.hp >= -1000000000,
+        player.hp <= 1000000000,
+    }
+    ensures {
+        result == (player.hp <= 0),
+    }
+{
+    player.hp <= 0
+}
