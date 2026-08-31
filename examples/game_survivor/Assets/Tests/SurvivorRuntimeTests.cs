@@ -59,6 +59,33 @@ namespace Axiom.Survivor.Tests
         }
 
         [Test]
+        public void Runner_firing_spawns_projectiles_and_damages_monsters()
+        {
+            Assert.That(_runner.Initialize(), Is.True);
+
+            // Fire towards initial monster at (5.0, 2.0)
+            PlayerInput input = new PlayerInput { move_x = 1.0, move_y = 0.4, is_firing = true };
+            bool spawnedProjectile = false;
+
+            for (int tick = 0; tick < 60; tick++)
+            {
+                _runner.Tick(input, 1.0 / 60.0);
+                for (int i = 0; i < _runner.SnapshotCount; i++)
+                {
+                    EntitySnapshot entity = _runner.GetSnapshot(i);
+                    if (entity.active && entity.kind == EntityKind.Projectile)
+                    {
+                        spawnedProjectile = true;
+                        break;
+                    }
+                }
+            }
+
+            Assert.That(spawnedProjectile, Is.True);
+            Assert.That(_runner.SnapshotRevision, Is.GreaterThan((ulong)50));
+        }
+
+        [Test]
         public void Controller_creates_updates_and_removes_views_from_entity_snapshots()
         {
             GameObject controllerObject = new GameObject("Survivor controller test");

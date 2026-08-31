@@ -83,14 +83,22 @@ pub struct SnapshotBatch {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct VisualEventBatch {
     pub data: *const VisualEvent,
     pub length: usize,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct ProjectileMeta {
+    vel_x: f64,
+    vel_y: f64,
+    lifetime: f64,
+}
+
 struct SurvivorRuntime {
     entities: [EntitySnapshot; MAX_ENTITIES],
+    proj_meta: [ProjectileMeta; MAX_ENTITIES],
     entity_count: usize,
     events: [VisualEvent; MAX_VISUAL_EVENTS],
     event_count: usize,
@@ -98,12 +106,18 @@ struct SurvivorRuntime {
     next_entity_id: i64,
     snapshot_batch: SnapshotBatch,
     event_batch: VisualEventBatch,
+    facing_x: f64,
+    facing_y: f64,
+    fire_cooldown: f64,
+    player_invincible_timer: f64,
+    monster_spawn_timer: f64,
 }
 
 impl SurvivorRuntime {
     fn new() -> Self {
         let mut runtime = Self {
             entities: [EntitySnapshot::default(); MAX_ENTITIES],
+            proj_meta: [ProjectileMeta::default(); MAX_ENTITIES],
             entity_count: 4,
             events: [VisualEvent::default(); MAX_VISUAL_EVENTS],
             event_count: 0,
@@ -118,42 +132,66 @@ impl SurvivorRuntime {
                 data: ptr::null(),
                 length: 0,
             },
+            facing_x: 1.0,
+            facing_y: 0.0,
+            fire_cooldown: 0.0,
+            player_invincible_timer: 0.0,
+            monster_spawn_timer: 0.0,
         };
+
+        // Player entity at origin
         runtime.entities[0] = EntitySnapshot {
             id: 1,
             kind: EntityKind::Player,
+            x: 0.0,
+            y: 0.0,
             hp: 100,
             max_hp: 100,
             level: 1,
             active: 1,
             ..EntitySnapshot::default()
         };
-        for index in 1..runtime.entity_count {
-            runtime.entities[index] = EntitySnapshot {
-                id: (index + 1) as i64,
+
+        // Initial monsters surrounding the player
+        let initial_positions = [(5.0, 2.0), (-5.0, 3.0), (2.0, -5.0)];
+        for (i, &(mx, my)) in initial_positions.iter().enumerate() {
+            runtime.entities[i + 1] = EntitySnapshot {
+                id: (i + 2) as i64,
                 kind: EntityKind::Monster,
-                x: 4.0 + index as f64 * 2.0,
-                y: -3.0 + index as f64,
-                hp: 20,
-                max_hp: 20,
+                x: mx,
+                y: my,
+                hp: 30,
+                max_hp: 30,
                 sprite_id: 1,
                 active: 1,
                 ..EntitySnapshot::default()
             };
         }
+
         runtime
     }
 
     fn tick(&mut self, input: PlayerInput, delta_time: f64) {
         self.event_count = 0;
-        let delta_time = if delta_time.is_finite() {
-            delta_time.clamp(0.0, 1.0)
+        let dt = if delta_time.is_finite() {
+            delta_time.clamp(0.0, 0.1)
         } else {
             0.0
         };
+
         let move_x = input.move_x.clamp(-1.0, 1.0);
         let move_y = input.move_y.clamp(-1.0, 1.0);
 
+        // 1. Update facing direction based on movement
+        if move_x.abs() > 0.01 || move_y.abs() > 0.01 {
+            let len = (move_x * move_x + move_y * move_y).sqrt();
+            if len > 0.001 {
+                self.facing_x = move_x / len;
+                self.facing_y = move_y / len;
+            }
+        }
+
+        // 2. Step Player Movement using SMT-verified step_player
         let player = self.entities[0];
         let core_player = generated_core::Player {
             pos: generated_core::Vec2 {
@@ -164,72 +202,277 @@ impl SurvivorRuntime {
             max_hp: player.max_hp,
             exp: player.exp,
             level: player.level,
-            speed: 5.0,
+            speed: 5.5,
         };
         let core_input = generated_core::PlayerInput {
             move_x,
             move_y,
             is_firing: input.is_firing != 0,
         };
-        let moved = generated_core::step_player(core_player, core_input, delta_time);
+        let moved = generated_core::step_player(core_player, core_input, dt);
         self.entities[0].x = moved.pos.x;
         self.entities[0].y = moved.pos.y;
-        self.entities[0].score = self.revision as i64 + 1;
 
-        for index in 1..self.entity_count {
-            if self.entities[index].active == 0 || self.entities[index].kind != EntityKind::Monster
-            {
-                continue;
-            }
-            let dx = (self.entities[0].x - self.entities[index].x).signum();
-            let dy = (self.entities[0].y - self.entities[index].y).signum();
-            let next = generated_core::move_position(
-                generated_core::Vec2 {
-                    x: self.entities[index].x,
-                    y: self.entities[index].y,
-                },
-                dx,
-                dy,
-                0.75,
-                delta_time,
-            );
-            self.entities[index].x = next.x;
-            self.entities[index].y = next.y;
+        // 3. Handle Weapon Firing & Spawn Projectiles
+        self.fire_cooldown -= dt;
+        if input.is_firing != 0 && self.fire_cooldown <= 0.0 {
+            self.fire_cooldown = 0.22; // ~4.5 shots per second
+            self.spawn_projectile(self.entities[0].x, self.entities[0].y, self.facing_x, self.facing_y);
+        }
+
+        // 4. Update Projectiles & Check Collisions with Monsters
+        self.update_projectiles(dt);
+
+        // 5. Update Monsters (Move towards player & Attack player)
+        self.update_monsters(dt);
+
+        // 6. Check Gem Pickups & Level Up
+        self.update_gems();
+
+        // 7. Periodic Monster Spawning (Every 2.0s)
+        self.monster_spawn_timer += dt;
+        if self.monster_spawn_timer >= 2.0 {
+            self.monster_spawn_timer = 0.0;
+            self.spawn_wave_monster();
         }
 
         self.revision += 1;
-        if input.is_firing != 0 && self.revision % 15 == 0 {
-            self.push_event(VisualEventKind::Shot, 1, 0, 0);
-        }
-        if self.revision % 30 == 0 {
-            self.spawn_monster();
-        }
-        if self.revision % 50 == 0 {
-            self.entities[0].hp = (self.entities[0].hp - 1).max(0);
-            self.push_event(VisualEventKind::Hit, 1, 2, 1);
+    }
+
+    fn spawn_projectile(&mut self, x: f64, y: f64, dir_x: f64, dir_y: f64) {
+        let slot = self.find_or_allocate_slot();
+        let id = self.next_entity_id;
+        self.next_entity_id += 1;
+
+        self.entities[slot] = EntitySnapshot {
+            id,
+            kind: EntityKind::Projectile,
+            x: x + dir_x * 0.4,
+            y: y + dir_y * 0.4,
+            hp: 1,
+            max_hp: 1,
+            active: 1,
+            ..EntitySnapshot::default()
+        };
+
+        self.proj_meta[slot] = ProjectileMeta {
+            vel_x: dir_x * 14.0,
+            vel_y: dir_y * 14.0,
+            lifetime: 1.2,
+        };
+
+        self.push_event(VisualEventKind::Shot, id, 0, 0);
+    }
+
+    fn update_projectiles(&mut self, dt: f64) {
+        for i in 0..self.entity_count {
+            if self.entities[i].active == 0 || self.entities[i].kind != EntityKind::Projectile {
+                continue;
+            }
+
+            // Move projectile
+            self.entities[i].x += self.proj_meta[i].vel_x * dt;
+            self.entities[i].y += self.proj_meta[i].vel_y * dt;
+            self.proj_meta[i].lifetime -= dt;
+
+            let proj_pos = generated_core::Vec2 {
+                x: self.entities[i].x,
+                y: self.entities[i].y,
+            };
+
+            // Check if expired
+            if self.proj_meta[i].lifetime <= 0.0 {
+                self.entities[i].active = 0;
+                self.push_event(VisualEventKind::Despawn, self.entities[i].id, 0, 0);
+                continue;
+            }
+
+            // Check collision with all active monsters
+            for m in 0..self.entity_count {
+                if self.entities[m].active == 0 || self.entities[m].kind != EntityKind::Monster {
+                    continue;
+                }
+
+                let monster_pos = generated_core::Vec2 {
+                    x: self.entities[m].x,
+                    y: self.entities[m].y,
+                };
+
+                if generated_core::check_collision(proj_pos, 0.4, monster_pos, 0.6) {
+                    // Hit monster!
+                    self.entities[i].active = 0;
+                    self.push_event(VisualEventKind::Despawn, self.entities[i].id, 0, 0);
+
+                    let damage = generated_core::calc_damage_reduction(0, 15);
+                    self.entities[m].hp = generated_core::clamp_hp(self.entities[m].hp, -damage, self.entities[m].max_hp);
+                    self.push_event(VisualEventKind::Hit, self.entities[m].id, 0, damage);
+
+                    // Check if monster died
+                    if self.entities[m].hp <= 0 {
+                        self.entities[m].active = 0;
+                        self.push_event(VisualEventKind::Death, self.entities[m].id, 0, 0);
+                        self.entities[0].score += 100;
+
+                        // Spawn Gem at monster location
+                        let mx = self.entities[m].x;
+                        let my = self.entities[m].y;
+                        self.spawn_gem(mx, my);
+                    }
+
+                    break;
+                }
+            }
         }
     }
 
-    fn spawn_monster(&mut self) {
-        if self.entity_count >= MAX_ENTITIES {
-            return;
+    fn update_monsters(&mut self, dt: f64) {
+        let player_pos = generated_core::Vec2 {
+            x: self.entities[0].x,
+            y: self.entities[0].y,
+        };
+        self.player_invincible_timer -= dt;
+
+        for i in 0..self.entity_count {
+            if self.entities[i].active == 0 || self.entities[i].kind != EntityKind::Monster {
+                continue;
+            }
+
+            let mx = self.entities[i].x;
+            let my = self.entities[i].y;
+            let dx = player_pos.x - mx;
+            let dy = player_pos.y - my;
+            let dist = (dx * dx + dy * dy).sqrt();
+
+            if dist > 0.1 {
+                let dir_x = dx / dist;
+                let dir_y = dy / dist;
+                let next = generated_core::move_position(
+                    generated_core::Vec2 { x: mx, y: my },
+                    dir_x,
+                    dir_y,
+                    1.8,
+                    dt,
+                );
+                self.entities[i].x = next.x;
+                self.entities[i].y = next.y;
+            }
+
+            // Check collision with player
+            let current_monster_pos = generated_core::Vec2 {
+                x: self.entities[i].x,
+                y: self.entities[i].y,
+            };
+
+            if generated_core::check_collision(current_monster_pos, 0.5, player_pos, 0.5) {
+                if self.player_invincible_timer <= 0.0 {
+                    let damage = 10;
+                    self.entities[0].hp = generated_core::clamp_hp(self.entities[0].hp, -damage, self.entities[0].max_hp);
+                    self.player_invincible_timer = 0.6; // 0.6s i-frame
+                    self.push_event(VisualEventKind::Hit, 1, 0, damage);
+
+                    if self.entities[0].hp <= 0 {
+                        self.push_event(VisualEventKind::GameOver, 1, 0, 0);
+                    }
+                }
+            }
         }
+    }
+
+    fn spawn_gem(&mut self, x: f64, y: f64) {
+        let slot = self.find_or_allocate_slot();
         let id = self.next_entity_id;
         self.next_entity_id += 1;
-        let index = self.entity_count;
-        self.entity_count += 1;
-        self.entities[index] = EntitySnapshot {
+
+        self.entities[slot] = EntitySnapshot {
+            id,
+            kind: EntityKind::Gem,
+            x,
+            y,
+            hp: 50, // 50 EXP value
+            max_hp: 50,
+            active: 1,
+            ..EntitySnapshot::default()
+        };
+        self.push_event(VisualEventKind::Spawn, id, 0, 0);
+    }
+
+    fn update_gems(&mut self) {
+        let player_pos = generated_core::Vec2 {
+            x: self.entities[0].x,
+            y: self.entities[0].y,
+        };
+
+        for i in 0..self.entity_count {
+            if self.entities[i].active == 0 || self.entities[i].kind != EntityKind::Gem {
+                continue;
+            }
+
+            let gem_pos = generated_core::Vec2 {
+                x: self.entities[i].x,
+                y: self.entities[i].y,
+            };
+
+            if generated_core::check_collision(gem_pos, 0.4, player_pos, 0.9) {
+                // Collect Gem
+                self.entities[i].active = 0;
+                self.push_event(VisualEventKind::Pickup, self.entities[i].id, 0, 50);
+
+                let exp_gain = 50;
+                self.entities[0].exp += exp_gain;
+                self.entities[0].score += 50;
+
+                // Level up check
+                if generated_core::can_level_up(self.entities[0].exp, self.entities[0].level) {
+                    self.entities[0].level += 1;
+                    self.entities[0].max_hp += 20;
+                    self.entities[0].hp = self.entities[0].max_hp; // Heal to full on level up
+                    self.push_event(VisualEventKind::LevelUp, 1, 0, self.entities[0].level);
+                }
+            }
+        }
+    }
+
+    fn spawn_wave_monster(&mut self) {
+        let slot = self.find_or_allocate_slot();
+        let id = self.next_entity_id;
+        self.next_entity_id += 1;
+
+        let angle = (self.revision as f64 * 0.7) % 6.28;
+        let radius = 8.0 + (self.revision % 4) as f64;
+        let px = self.entities[0].x + angle.cos() * radius;
+        let py = self.entities[0].y + angle.sin() * radius;
+
+        self.entities[slot] = EntitySnapshot {
             id,
             kind: EntityKind::Monster,
-            x: 8.0 + (self.revision % 7) as f64,
-            y: -6.0 + (self.revision % 5) as f64,
-            hp: 20,
-            max_hp: 20,
+            x: px,
+            y: py,
+            hp: 30,
+            max_hp: 30,
             sprite_id: 1,
             active: 1,
             ..EntitySnapshot::default()
         };
         self.push_event(VisualEventKind::Spawn, id, 0, 0);
+    }
+
+    fn find_or_allocate_slot(&mut self) -> usize {
+        // 1. First look for inactive slot
+        for i in 1..self.entity_count {
+            if self.entities[i].active == 0 {
+                return i;
+            }
+        }
+
+        // 2. Allocate new slot if under capacity
+        if self.entity_count < MAX_ENTITIES {
+            let index = self.entity_count;
+            self.entity_count += 1;
+            return index;
+        }
+
+        // 3. Fallback: override oldest projectile or monster
+        1 + (self.revision as usize % (MAX_ENTITIES - 1))
     }
 
     fn push_event(&mut self, kind: VisualEventKind, entity_id: i64, asset_id: i64, value: i64) {

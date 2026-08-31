@@ -17,9 +17,13 @@ try {
     cargo build -p axiom-survivor-native --release
 
     New-Item -ItemType Directory -Force $pluginDirectory | Out-Null
-    Copy-Item -LiteralPath "target/release/axiom_survivor.dll" `
-        -Destination "$pluginDirectory/axiom_survivor.dll" -Force
-    Write-Host "Unity bridge and native plugin are ready in examples/game_survivor/Assets."
+    try {
+        Copy-Item -LiteralPath "target/release/axiom_survivor.dll" `
+            -Destination "$pluginDirectory/axiom_survivor.dll" -Force -ErrorAction Stop
+        Write-Host "Unity bridge and native plugin are ready in examples/game_survivor/Assets."
+    } catch {
+        Write-Warning "axiom_survivor.dll is currently loaded and locked by Unity Editor. Please close Unity Play mode or restart Unity Editor, then re-run build_bridge.ps1."
+    }
 }
 finally {
     Pop-Location

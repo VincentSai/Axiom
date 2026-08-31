@@ -16,9 +16,13 @@
     <Compile Include="../../Assets/Tests/SurvivorRuntimeTests.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="../../../../target/release/axiom_survivor.dll"
+          Link="axiom_survivor.dll"
+          CopyToOutputDirectory="Always"
+          Condition="Exists('../../../../target/release/axiom_survivor.dll')" />
     <None Include="../../Assets/Plugins/x86_64/axiom_survivor.dll"
           Link="axiom_survivor.dll"
           CopyToOutputDirectory="PreserveNewest"
-          Condition="Exists('../../Assets/Plugins/x86_64/axiom_survivor.dll')" />
+          Condition="!Exists('../../../../target/release/axiom_survivor.dll') and Exists('../../Assets/Plugins/x86_64/axiom_survivor.dll')" />
   </ItemGroup>
 </Project>
