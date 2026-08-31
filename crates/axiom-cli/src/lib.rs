@@ -121,6 +121,10 @@ pub enum Commands {
         /// Directory where generated bridge files will be written.
         #[arg(long)]
         out: PathBuf,
+
+        /// Native library name used by generated P/Invoke declarations.
+        #[arg(long, default_value = "axiom")]
+        library_name: String,
     },
 
     /// Store and retrieve content-addressed modules in the AST database.
@@ -316,7 +320,8 @@ pub fn run(cli: Cli) -> Result<(), CliError> {
             source,
             target,
             out,
-        } => generate_bridge(&source, &target, &out),
+            library_name,
+        } => generate_bridge(&source, &target, &out, &library_name),
         Commands::Db { command } => match command {
             DatabaseCommands::Put { file, db } => database_put(&file, &db),
             DatabaseCommands::Export { hash, db, out } => {
@@ -326,7 +331,12 @@ pub fn run(cli: Cli) -> Result<(), CliError> {
     }
 }
 
-fn generate_bridge(source_path: &Path, target: &str, out: &Path) -> Result<(), CliError> {
+fn generate_bridge(
+    source_path: &Path,
+    target: &str,
+    out: &Path,
+    library_name: &str,
+) -> Result<(), CliError> {
     if !target.eq_ignore_ascii_case("unity") {
         return Err(CliError::InvalidBridgeTarget(target.to_owned()));
     }
@@ -336,7 +346,7 @@ fn generate_bridge(source_path: &Path, target: &str, out: &Path) -> Result<(), C
         path: source_path.to_owned(),
         source,
     })?;
-    let files = generate_unity_bridge(&module);
+    let files = generate_unity_bridge(&module, library_name);
 
     fs::create_dir_all(out).map_err(|source| CliError::CreateDirectory {
         path: out.to_owned(),

@@ -22,8 +22,5 @@ namespace Axiom.Generated
 
         [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void axiom_destroy(IntPtr instance);
-
-        [DllImport(LibraryName, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern UIntPtr axiom_live_instances();
     }
 }

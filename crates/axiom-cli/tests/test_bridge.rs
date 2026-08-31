@@ -12,7 +12,7 @@ fn unity_bridge_generates_native_double_buffer_asset_registry_and_runner() {
         "game.ax",
         r#"
         type EntitySnapshot = { id: Int, x: Float, y: Float, health: Float }
-        type PlayerInput = { horizontal: Float, vertical: Float, fire: Bool }
+        type PlayerInput = { move_x: Float, move_y: Float, is_firing: Bool }
         type AssetKind = | Player | Enemy | Projectile
 
         fn update(snapshot: EntitySnapshot, input: PlayerInput) -> EntitySnapshot {
@@ -29,6 +29,8 @@ fn unity_bridge_generates_native_double_buffer_asset_registry_and_runner() {
         "unity",
         "--out",
         path_text(&output_dir),
+        "--library-name",
+        "axiom_survivor",
     ]);
     assert_success(&output);
 
@@ -46,12 +48,18 @@ fn unity_bridge_generates_native_double_buffer_asset_registry_and_runner() {
         );
     }
     assert!(native.contains("DllImport"));
+    assert!(native.contains("LibraryName = \"axiom_survivor\""));
 
     let double_buffer = read_generated(&output_dir, "AxiomDoubleBuffer.cs");
     assert!(double_buffer.contains("[StructLayout(LayoutKind.Sequential)]"));
     assert!(double_buffer.contains("struct EntitySnapshot"));
     assert!(double_buffer.contains("struct PlayerInput"));
+    assert!(double_buffer.contains("struct VisualEvent"));
+    assert!(double_buffer.contains("struct AxiomSnapshotBatch"));
+    assert!(double_buffer.contains("struct AxiomVisualEventBatch"));
     assert!(double_buffer.contains("class AxiomDoubleBuffer"));
+    assert!(double_buffer.contains("public int Count"));
+    assert!(double_buffer.contains("public ulong Revision"));
 
     let registry = read_generated(&output_dir, "AxiomAssetRegistry.cs");
     assert!(registry.contains("ScriptableObject"));
@@ -65,6 +73,14 @@ fn unity_bridge_generates_native_double_buffer_asset_registry_and_runner() {
     assert!(runner.contains("AxiomNative.axiom_tick"));
     assert!(runner.contains("AxiomNative.axiom_get_snapshot_ptr"));
     assert!(runner.contains("AxiomNative.axiom_get_events_ptr"));
+    assert!(runner.contains("public bool Initialize()"));
+    assert!(runner.contains("public void Tick(PlayerInput input, double deltaTime)"));
+    assert!(runner.contains("public void Shutdown()"));
+    assert!(runner.contains("OnEntityUpdated"));
+    assert!(runner.contains("OnVisualEvent"));
+    assert!(runner.contains("Input.GetAxisRaw(\"Horizontal\")"));
+    assert!(runner.contains("Input.GetAxisRaw(\"Vertical\")"));
+    assert!(runner.contains("Input.GetButton(\"Fire1\")"));
 }
 
 fn axiom(arguments: &[&str]) -> Output {

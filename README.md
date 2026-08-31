@@ -66,6 +66,7 @@
 - 🗺️ [项目发展路线图 (docs/ROADMAP.md)](docs/ROADMAP.md)
 - 💡 [示例 1：银行转账服务 (examples/transfer.ax)](examples/transfer.ax)
 - 🎮 [示例 2：跨平台游戏循环 (examples/game_loop.ax)](examples/game_loop.ax)
+- 👾 [示例 3：Axiom Survivors 完整版 Unity 游戏 (examples/game_survivor/)](examples/game_survivor/README.md)
 
 ---
 

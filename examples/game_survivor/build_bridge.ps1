@@ -9,7 +9,8 @@ $pluginDirectory = "examples/game_survivor/Assets/Plugins/x86_64"
 
 Push-Location $repositoryRoot
 try {
-    cargo run -p axiom-cli -- bridge $axiomSource --target unity --out $bridgeOutput
+    cargo run -p axiom-cli -- bridge $axiomSource --target unity --out $bridgeOutput `
+        --library-name axiom_survivor
     cargo run -p axiom-cli -- emit-rust $axiomSource --output $generatedRust
     cargo fmt -p axiom-survivor-native
     cargo test -p axiom-survivor-native
