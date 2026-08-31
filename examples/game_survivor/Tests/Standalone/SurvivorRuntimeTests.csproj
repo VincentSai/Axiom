@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningLevel>9999</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="UnityStubs.cs" />
+    <Compile Include="../../Assets/Scripts/AxiomBridge/*.cs" />
+    <Compile Include="../../Assets/Scripts/Gameplay/*.cs" />
+    <Compile Include="../../Assets/Tests/SurvivorRuntimeTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../Assets/Plugins/x86_64/axiom_survivor.dll"
+          Link="axiom_survivor.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('../../Assets/Plugins/x86_64/axiom_survivor.dll')" />
+  </ItemGroup>
+</Project>

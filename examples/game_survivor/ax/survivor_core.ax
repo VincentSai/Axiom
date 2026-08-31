@@ -49,6 +49,35 @@ type PlayerInput = {
     is_firing: Bool,
 }
 
+// The Unity bridge consumes these wire records directly. Their fields stay
+// scalar so the generated Rust and C# layouts are deterministic across FFI.
+type EntityKind = | Player | Monster | Projectile | Gem
+
+type VisualEventKind = | Spawn | Despawn | Hit | Death | Shot | Pickup | LevelUp | GameOver
+
+type EntitySnapshot = {
+    id: Int,
+    kind: EntityKind,
+    x: Float,
+    y: Float,
+    hp: Int,
+    max_hp: Int,
+    exp: Int,
+    level: Int,
+    score: Int,
+    sprite_id: Int,
+    active: Bool,
+}
+
+type VisualEvent = {
+    kind: VisualEventKind,
+    entity_id: Int,
+    asset_id: Int,
+    x: Float,
+    y: Float,
+    value: Int,
+}
+
 // Squared distance avoids a square root and is sufficient for collision tests.
 fn distance_sq(p1: Vec2, p2: Vec2) -> Float
     requires {

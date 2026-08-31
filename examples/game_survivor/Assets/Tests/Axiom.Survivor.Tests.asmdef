@@ -1,0 +1,17 @@
+{
+  "name": "Axiom.Survivor.Tests",
+  "rootNamespace": "Axiom.Survivor.Tests",
+  "references": [
+    "Axiom.Survivor.Runtime"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "versionDefines": [],
+  "noEngineReferences": false,
+  "optionalUnityReferences": ["TestAssemblies"]
+}
