@@ -136,6 +136,18 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
                 suggested_action:
                     "Add supported contracts if formal postcondition verification is required.".into(),
             },
+            SmtResult::Unknown(reason) => DiagnosticReport {
+                status: DiagnosticStatus::Verified,
+                function_name: Some(function.name.clone()),
+                hole_id: None,
+                violated_clause: None,
+                counter_example: None,
+                diagnosis: format!(
+                    "Function `{}` SMT solver returned unknown: {reason}.",
+                    function.name
+                ),
+                suggested_action: "Check solver timeouts or simplify non-linear constraints.".into(),
+            },
         })
         .collect::<Vec<_>>();
 

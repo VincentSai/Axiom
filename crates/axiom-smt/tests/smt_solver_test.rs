@@ -1,4 +1,4 @@
-﻿use axiom_parser::parse_module;
+use axiom_parser::parse_module;
 use axiom_smt::{verify_function, verify_module, SmtResult};
 
 #[test]
@@ -104,3 +104,32 @@ fn verifies_logical_operators_and_let_bindings() {
 
     assert_eq!(verify_function(&module.functions[0]), SmtResult::Verified);
 }
+
+#[test]
+fn generates_valid_smtlib2_query_script() {
+    let module = parse_module(
+        r#"
+        fn safe_sub(balance: Int, amount: Int) -> Int
+            requires { balance >= 0, amount > 0, balance >= amount }
+            ensures { result >= 0, result == balance - amount }
+        {
+            balance - amount
+        }
+        "#,
+    )
+    .expect("safe_sub should parse");
+
+    let smt2 = axiom_smt::generate_smtlib2(&module.functions[0])
+        .expect("should generate SMT-LIB2 query");
+
+    assert!(smt2.contains("(set-logic ALL)"));
+    assert!(smt2.contains("(declare-const balance Int)"));
+    assert!(smt2.contains("(declare-const amount Int)"));
+    assert!(smt2.contains("(declare-const result Int)"));
+    assert!(smt2.contains("(assert (>= balance 0))"));
+    assert!(smt2.contains("(assert (= result (- balance amount)))"));
+    assert!(smt2.contains("(assert (not (and (>= result 0) (= result (- balance amount)))))"));
+    assert!(smt2.contains("(check-sat)"));
+    assert!(smt2.contains("(get-model)"));
+}
+

@@ -93,7 +93,7 @@ impl AgentTaskPool {
             let result = verify_function(&candidate_module.functions[function_index]);
             match result {
                 SmtResult::CounterExample { .. } => return Ok(result),
-                SmtResult::Skipped(_) => final_result = result,
+                SmtResult::Skipped(_) | SmtResult::Unknown(_) => final_result = result,
                 SmtResult::Verified => {}
             }
         }

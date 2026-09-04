@@ -18,8 +18,7 @@ axiom-transpiler = { path = "../axiom-transpiler" }
 axiom-vfs = { path = "../axiom-vfs" }
 axiom-wit = { path = "../axiom-wit" }
 axiom-ffi-gen = { path = "../axiom-ffi-gen" }
+axiom-smt = { path = "../axiom-smt" }
 clap = { version = "4", features = ["derive"] }
 serde_json = "1"
 
-[dev-dependencies]
-axiom-smt = { path = "../axiom-smt" }
