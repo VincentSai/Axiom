@@ -15,7 +15,7 @@ Axiom is not designed for traditional manual typing and formatting by humans. It
 
 Its core philosophies are:
 1. **Mathematical Determinism**: With the exception of explicit Effects, all code consists of pure functions—deterministic inputs strictly guarantee deterministic outputs.
-2. **Zero Git Conflicts**: Replaces line-based textual collaboration with **Content-Addressed ASTs**, indexing and assembling functions by their cryptographic hashes.
+2. **Content-Addressed AST & Structural Assembly (Prototype)**: Replaces line-based textual collaboration with **Content-Addressed ASTs**, indexing and assembling functions by their cryptographic hashes.
 3. **Closed-Loop Self-Healing**: Features compiler-native hole-driven development (`?hole`) paired with a lightweight SMT counterexample solver to provide AI agents with precise, machine-readable healing feedback.
 4. **Leverage Existing Ecosystems**: Emits standard Rust/C and WASM/WASI, reusing production-hardened optimizers and runtimes without reinventing lower-level compilers or libc.
 

@@ -33,4 +33,4 @@
 | **📘 TypeScript** | 5 个 Agent 模块化并发 (ESM/TS) | **479,872 Tokens** | `tsx --test` (8 suites, 0.48s) | ⚠️ 仅抽样测试 |
 | **🦀 Rust** | 5 个 Agent 跨 crate/mod 并发 | **446,775 Tokens** | `cargo test` (6 suites, 0.46s) | ⚠️ 仅抽样测试 |
 | **🐍 Python** | 5 个 Agent 模块化并发 | **384,089 Tokens** | `unittest` (9 suites, 0.002s) | ⚠️ 仅抽样测试 |
-| **🌟 Axiom** | **`/axiom-pipeline` 全自动打洞流水线** | **183,662 Tokens** | **SMT 全域定理证明 (0.08s)** | **✅ 全数域 $(-\infty \sim +\infty)$ 100% 绝对安全** |
+| **🌟 Axiom** | **`/axiom-pipeline` 全自动打洞流水线** | **183,662 Tokens** | **SMT 形式化证明 + 网格采样** | **契约形式化求解 (Fail-Closed)** |

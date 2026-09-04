@@ -88,7 +88,7 @@ impl AgentTaskPool {
             return Err(PoolError::MissingHole(hole_id.to_owned()));
         }
 
-        let mut final_result = SmtResult::Verified;
+        let mut final_result = SmtResult::Sampled { points_checked: 0 };
         for function_index in affected_functions {
             let func = &candidate_module.functions[function_index];
             let result = verify_function(func);
@@ -105,7 +105,9 @@ impl AgentTaskPool {
                     }
                     final_result = result;
                 }
-                SmtResult::Verified => {}
+                SmtResult::Proved { .. } | SmtResult::Sampled { .. } => {
+                    final_result = result;
+                }
             }
         }
 

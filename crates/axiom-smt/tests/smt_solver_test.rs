@@ -16,7 +16,7 @@ fn verifies_safe_division_with_precondition() {
     .expect("safe_div should parse");
 
     let result = verify_function(&module.functions[0]);
-    assert_eq!(result, SmtResult::Verified);
+    assert!(matches!(result, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
 }
 
 #[test]
@@ -102,7 +102,8 @@ fn verifies_logical_operators_and_let_bindings() {
     )
     .expect("function should parse");
 
-    assert_eq!(verify_function(&module.functions[0]), SmtResult::Verified);
+    let res = verify_function(&module.functions[0]);
+    assert!(matches!(res, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
 }
 
 #[test]

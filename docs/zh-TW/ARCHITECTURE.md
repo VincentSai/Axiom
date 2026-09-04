@@ -15,7 +15,7 @@ Axiom 不是傳統「為人類打字排版」設計的語言，而是第一門�
 
 其核心哲學為：
 1. **數學確定性 (Mathematical Determinism)**：除顯式 Effect 外，所有代碼都是純函數，輸入確定則輸出必確定。
-2. **零 Git 衝突 (Zero Git Conflicts)**：棄用基於行（Line-based）的文字協作，底層採用 **內容定址 AST (Content-Addressed AST)**，函數按 Hash 索引裝配。
+2. **結構化內容定址 AST (Content-Addressed AST 原型)**：探索棄用傳統基於行（Line-based）的文字合併，底層採用不可變 AST 的 SHA-256 雜湊作為索引與投影，為多 Agent 平行開發提供無歧義的局部任務邊界。
 3. **閉環自癒 (Closed-loop Self-Healing)**：編譯器內建打洞（Hole-driven）與輕量 SMT 反例求解器，提供 Agent 機器可讀的精確修復引導。
 4. **站在巨人肩膀上 (Leverage Existing Ecosystem)**：不重複造底層最佳化器和 libc，編譯前端輸出標準 Rust/C 與 WASM/WASI。
 
@@ -48,7 +48,7 @@ graph TD
 - **協作革命**：
   - 函數改名不會破壞引用；
   - 多個 Agent 同時編寫同名函數不會覆蓋，而是產生兩個不同 Hash 的獨立函數節點；
-  - Git 合併衝突徹底歸零，協作變為「AST 圖譜的無鎖合併」。
+  - 減少傳統文字合併衝突，向「基於不可變 AST 雜湊的引用裝配」演進（注：當前原型透過原子任務池進行記憶體裝配，分散式分支合併協議仍在探索設計中）。
 
 ### 決策 4：表層語法設計 —— 【現代極簡運算式】
 - **機制**：採用類似 Rust / TypeScript 的精簡純淨子集。

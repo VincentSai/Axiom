@@ -338,7 +338,8 @@ impl SurvivorRuntime {
                         speed: 1.8,
                         kind: 1,
                     };
-                    let damaged_monster = generated_core::apply_damage_to_monster(core_monster, 15, 0);
+                    let damaged_monster =
+                        generated_core::apply_damage_to_monster(core_monster, 15, 0);
                     let dealt_damage = self.entities[m].hp - damaged_monster.hp;
                     self.entities[m].hp = damaged_monster.hp;
                     self.push_event(VisualEventKind::Hit, self.entities[m].id, 0, dealt_damage);

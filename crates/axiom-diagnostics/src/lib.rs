@@ -13,10 +13,13 @@ use typecheck::check_module_types;
 /// Stable machine-readable outcomes produced by the diagnostics pipeline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DiagnosticStatus {
-    Verified,
+    Proved,
+    Sampled,
     ContractViolation,
-    EffectViolation,
+    Skipped,
+    Unknown,
     TypeError,
+    EffectViolation,
     ParseError,
     UnresolvedHole,
 }
@@ -108,17 +111,29 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
         .functions
         .iter()
         .map(|function| match verify_function(function) {
-            SmtResult::Verified => DiagnosticReport {
-                status: DiagnosticStatus::Verified,
+            SmtResult::Proved { solver } => DiagnosticReport {
+                status: DiagnosticStatus::Proved,
                 function_name: Some(function.name.clone()),
                 hole_id: None,
                 violated_clause: None,
                 counter_example: None,
                 diagnosis: format!(
-                    "Function `{}` satisfies its declared contracts.",
-                    function.name
+                    "Function `{}` formally proved by {}.",
+                    function.name, solver
                 ),
                 suggested_action: "No action required.".into(),
+            },
+            SmtResult::Sampled { points_checked } => DiagnosticReport {
+                status: DiagnosticStatus::Sampled,
+                function_name: Some(function.name.clone()),
+                hole_id: None,
+                violated_clause: None,
+                counter_example: None,
+                diagnosis: format!(
+                    "Function `{}` passed discrete grid test across {} points (heuristic test, not a mathematical proof).",
+                    function.name, points_checked
+                ),
+                suggested_action: "Install Microsoft Z3 for full first-order SMT theorem proving.".into(),
             },
             SmtResult::CounterExample(counter_example) => DiagnosticReport {
                 status: DiagnosticStatus::ContractViolation,
@@ -138,20 +153,20 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
                         .into(),
             },
             SmtResult::Skipped(reason) => DiagnosticReport {
-                status: DiagnosticStatus::Verified,
+                status: DiagnosticStatus::Skipped,
                 function_name: Some(function.name.clone()),
                 hole_id: None,
                 violated_clause: None,
                 counter_example: None,
                 diagnosis: format!(
-                    "Function `{}` passed available checks; SMT verification was skipped: {reason}.",
+                    "Function `{}` SMT verification was skipped: {reason}.",
                     function.name
                 ),
                 suggested_action:
                     "Add supported contracts if formal postcondition verification is required.".into(),
             },
             SmtResult::Unknown(reason) => DiagnosticReport {
-                status: DiagnosticStatus::Verified,
+                status: DiagnosticStatus::Unknown,
                 function_name: Some(function.name.clone()),
                 hole_id: None,
                 violated_clause: None,
@@ -167,12 +182,12 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
 
     if reports.is_empty() {
         vec![DiagnosticReport {
-            status: DiagnosticStatus::Verified,
+            status: DiagnosticStatus::Skipped,
             function_name: None,
             hole_id: None,
             violated_clause: None,
             counter_example: None,
-            diagnosis: "The module passed all available checks.".into(),
+            diagnosis: "The module contains no functions to verify.".into(),
             suggested_action: "No action required.".into(),
         }]
     } else {

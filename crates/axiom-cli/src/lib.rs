@@ -588,7 +588,11 @@ fn check(file: &Path) -> Result<(), CliError> {
 fn verify(file: &Path, json: bool) -> Result<(), CliError> {
     let source = read_source(file)?;
     let reports = diagnose_source(&source);
-    let all_verified = reports.iter().all(|r| r.status == DiagnosticStatus::Verified);
+    let all_ok = reports.iter().all(|r| {
+        r.status == DiagnosticStatus::Proved
+            || r.status == DiagnosticStatus::Sampled
+            || r.status == DiagnosticStatus::Skipped
+    });
 
     if json {
         let json_text = serde_json::to_string_pretty(&reports).map_err(CliError::Serialize)?;
@@ -597,28 +601,47 @@ fn verify(file: &Path, json: bool) -> Result<(), CliError> {
         let solver_name = if find_z3_executable().is_some() {
             "Microsoft Z3 SMT-LIB2 Engine"
         } else {
-            "Axiom Symbolic Interval Engine"
+            "Axiom Symbolic Interval Engine (Discrete Grid Sampling)"
         };
         println!("Verifying `{}` using {}...", file.display(), solver_name);
         for r in &reports {
+            let func_name = r.function_name.as_deref().unwrap_or("module");
             match r.status {
-                DiagnosticStatus::Verified => {
-                    println!("  [VERIFIED] {}", r.function_name.as_deref().unwrap_or("module"));
+                DiagnosticStatus::Proved => {
+                    println!("  [PROVED] {func_name} (formally proved by SMT solver)");
                 }
-                _ => {
-                    println!("  [{:?}] {}", r.status, r.diagnosis);
+                DiagnosticStatus::Sampled => {
+                    println!("  [SAMPLED] {func_name} (passed grid test, install Z3 for formal proof)");
+                }
+                DiagnosticStatus::Skipped => {
+                    println!("  [SKIPPED] {func_name} - {}", r.diagnosis);
+                }
+                DiagnosticStatus::Unknown => {
+                    println!("  [UNKNOWN] {func_name} - {}", r.diagnosis);
+                }
+                DiagnosticStatus::ContractViolation => {
+                    println!("  [VIOLATION] {func_name} - {}", r.diagnosis);
                     if let Some(ce) = &r.counter_example {
                         println!("    Counter-Example: {ce:?}");
                     }
-                    if !r.suggested_action.is_empty() {
-                        println!("    Suggested Action: {}", r.suggested_action);
-                    }
+                }
+                DiagnosticStatus::TypeError => {
+                    println!("  [TYPE_ERROR] {func_name} - {}", r.diagnosis);
+                }
+                DiagnosticStatus::EffectViolation => {
+                    println!("  [EFFECT_ERROR] {func_name} - {}", r.diagnosis);
+                }
+                DiagnosticStatus::ParseError => {
+                    println!("  [PARSE_ERROR] {}", r.diagnosis);
+                }
+                DiagnosticStatus::UnresolvedHole => {
+                    println!("  [UNRESOLVED_HOLE] {func_name} - {}", r.diagnosis);
                 }
             }
         }
     }
 
-    if all_verified {
+    if all_ok {
         Ok(())
     } else {
         Err(CliError::VerificationFailed)

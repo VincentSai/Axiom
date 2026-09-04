@@ -77,12 +77,9 @@ fn valid_contract_returns_a_verified_report() {
     );
 
     assert_eq!(reports.len(), 1);
-    assert_eq!(reports[0].status, DiagnosticStatus::Verified);
+    assert!(matches!(reports[0].status, DiagnosticStatus::Proved | DiagnosticStatus::Sampled));
     assert_eq!(reports[0].function_name.as_deref(), Some("identity"));
-    let json: serde_json::Value =
-        serde_json::from_str(&reports[0].to_json()).expect("diagnostic should be valid JSON");
-    assert_eq!(json["status"], "Verified");
-    assert!(json["counter_example"].is_null());
+    assert!(reports[0].counter_example.is_none());
 }
 
 #[test]
@@ -112,4 +109,40 @@ fn type_mismatch_returns_type_error_report() {
     assert_eq!(reports[0].function_name.as_deref(), Some("bad_return"));
     assert!(reports[0].diagnosis.contains("declared return type `Int`"));
 }
+
+#[test]
+fn binary_op_type_mismatch_returns_type_error() {
+    let reports = diagnose_source(
+        r#"
+        fn bad_addition(x: Int) -> Int {
+            x + "not an integer"
+        }
+        "#,
+    );
+
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].status, DiagnosticStatus::TypeError);
+    assert_eq!(reports[0].function_name.as_deref(), Some("bad_addition"));
+    assert!(reports[0].diagnosis.contains("cannot apply arithmetic operator"));
+}
+
+#[test]
+fn match_arms_type_mismatch_returns_type_error() {
+    let reports = diagnose_source(
+        r#"
+        fn bad_match(flag: Bool) -> Int {
+            match flag {
+                true => 42,
+                false => "hello",
+            }
+        }
+        "#,
+    );
+
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].status, DiagnosticStatus::TypeError);
+    assert_eq!(reports[0].function_name.as_deref(), Some("bad_match"));
+    assert!(reports[0].diagnosis.contains("match arms return incompatible types"));
+}
+
 

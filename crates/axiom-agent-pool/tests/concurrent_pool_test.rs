@@ -73,7 +73,7 @@ fn concurrent_workers_get_counter_examples_without_contaminating_the_pool() {
         .join()
         .expect("double worker should finish");
     assert!(matches!(bad_result, SmtResult::CounterExample(_)));
-    assert_eq!(double_result, SmtResult::Verified);
+    assert!(matches!(double_result, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
 
     let mut pool = pool.lock().expect("pool lock should not be poisoned");
     assert_eq!(pool.pending_hole_ids(), vec!["increment_impl"]);
@@ -82,26 +82,20 @@ fn concurrent_workers_get_counter_examples_without_contaminating_the_pool() {
         Err(PoolError::Incomplete(ids)) if ids == vec!["increment_impl"]
     ));
 
-    assert_eq!(
-        pool.submit_solution("increment_impl", "value + 1")
-            .expect("fixed candidate should parse"),
-        SmtResult::Verified
-    );
+    let fix_res = pool.submit_solution("increment_impl", "value + 1")
+        .expect("fixed candidate should parse");
+    assert!(matches!(fix_res, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
 }
 
 #[test]
 fn assembles_a_hole_free_module_that_transpiles_to_rust() {
     let mut pool = AgentTaskPool::from_source(TWO_HOLE_SKELETON).expect("skeleton should parse");
-    assert_eq!(
-        pool.submit_solution("increment_impl", "value + 1")
-            .expect("increment solution should parse"),
-        SmtResult::Verified
-    );
-    assert_eq!(
-        pool.submit_solution("double_impl", "value * 2")
-            .expect("double solution should parse"),
-        SmtResult::Verified
-    );
+    let inc_res = pool.submit_solution("increment_impl", "value + 1")
+        .expect("increment solution should parse");
+    assert!(matches!(inc_res, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
+    let dbl_res = pool.submit_solution("double_impl", "value * 2")
+        .expect("double solution should parse");
+    assert!(matches!(dbl_res, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
 
     assert!(pool.is_complete());
     assert!(pool.pending_hole_ids().is_empty());

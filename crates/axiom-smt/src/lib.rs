@@ -1,4 +1,4 @@
-﻿//! SMT-LIB2 & Z3 Formal Verification Engine for Axiom.
+//! SMT-LIB2 & Z3 Formal Verification Engine for Axiom.
 //!
 //! Provides two verification pathways:
 //!   1. First-order full domain SMT theorem proving via Microsoft Z3 (or any SMT-LIB2 solver).
@@ -29,8 +29,10 @@ pub enum SolverBackend {
 /// The result of checking one function's contracts.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SmtResult {
-    /// Formula is unsatisfiable: no input satisfying preconditions can violate a postcondition.
-    Verified,
+    /// Formula is proved globally by an external SMT solver (e.g. Microsoft Z3 Unsat).
+    Proved { solver: String },
+    /// Verified only on a bounded discrete grid without counterexamples (heuristic test, NOT a theorem proof).
+    Sampled { points_checked: usize },
     /// A concrete input satisfying preconditions violates a postcondition.
     CounterExample(CounterExample),
     /// Verification could not be performed for the given function.
@@ -50,7 +52,11 @@ pub fn verify_function(func: &FunctionDecl) -> SmtResult {
     if let Some(z3_path) = find_z3_executable() {
         if let Ok(smt2_query) = generate_smtlib2(func) {
             match run_z3_query(&z3_path, &smt2_query) {
-                Ok(Z3Result::Unsat) => return SmtResult::Verified,
+                Ok(Z3Result::Unsat) => {
+                    return SmtResult::Proved {
+                        solver: "Microsoft Z3 (SMT-LIB2)".into(),
+                    }
+                }
                 Ok(Z3Result::Sat(ce)) => return SmtResult::CounterExample(ce),
                 Ok(Z3Result::Unknown(reason)) => return SmtResult::Unknown(reason),
                 Err(_) => {
@@ -60,7 +66,7 @@ pub fn verify_function(func: &FunctionDecl) -> SmtResult {
         }
     }
 
-    // Standalone fallback solver
+    // Standalone fallback solver (discrete grid sampling)
     internal_solver::verify_with_internal_solver(func)
 }
 
@@ -71,7 +77,9 @@ pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String>
     let smt2_query = generate_smtlib2(func)?;
     
     match run_z3_query(&z3_path, &smt2_query)? {
-        Z3Result::Unsat => Ok(SmtResult::Verified),
+        Z3Result::Unsat => Ok(SmtResult::Proved {
+            solver: "Microsoft Z3 (SMT-LIB2)".into(),
+        }),
         Z3Result::Sat(ce) => Ok(SmtResult::CounterExample(ce)),
         Z3Result::Unknown(r) => Ok(SmtResult::Unknown(r)),
     }

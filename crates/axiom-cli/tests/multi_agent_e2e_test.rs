@@ -74,7 +74,10 @@ fn twenty_workers_verify_and_publish_a_hole_free_release() {
         } else {
             assert!(rejected.is_none());
         }
-        assert_eq!(accepted, SmtResult::Verified);
+        assert!(
+            matches!(accepted, SmtResult::Proved { .. } | SmtResult::Sampled { .. }),
+            "accepted result must be Proved or Sampled"
+        );
     }
 
     let release = {

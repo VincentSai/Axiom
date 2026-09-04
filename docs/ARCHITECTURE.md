@@ -15,7 +15,7 @@ Axiom 不是传统“为人类打字排版”设计的语言，而是第一门�
 
 其核心哲学为：
 1. **数学确定性 (Mathematical Determinism)**：除显式 Effect 外，所有代码都是纯函数，输入确定则输出必确定。
-2. **零 Git 冲突 (Zero Git Conflicts)**：弃用基于行（Line-based）的文本协作，底层采用 **内容寻址 AST (Content-Addressed AST)**，函数按 Hash 索引装配。
+2. **结构化内容寻址 AST (Content-Addressed AST 原型)**：探索弃用传统基于行（Line-based）的文本合并，底层采用不可变 AST 的 SHA-256 哈希作为索引与投影，为多 Agent 并行开发提供无歧义的局部任务边界。
 3. **闭环自愈 (Closed-loop Self-Healing)**：编译器内置打洞（Hole-driven）与轻量 SMT 反例求解器，给 Agent 机器可读的精确修复引导。
 4. **站在巨人肩膀上 (Leverage Existing Ecosystem)**：不重复造底层优化器和 libc，编译前端输出标准 Rust/C 与 WASM/WASI。
 
@@ -48,7 +48,7 @@ graph TD
 - **协作革命**：
   - 函数改名不会破坏引用；
   - 多个 Agent 同时编写同名函数不会覆盖，而是产生两个不同 Hash 的独立函数节点；
-  - Git 合并冲突彻底归零，协作变为“AST 图谱的无锁合并”。
+  - 减少传统文本合并冲突，向“基于不可变 AST 哈希的引用装配”演进（注：当前原型通过原子任务池进行内存装配，分布式分支合并协议仍在探索设计中）。
 
 ### 决策 4：表层语法设计 —— 【现代极简表达式】
 - **机制**：采用类似 Rust / TypeScript 的精简纯净子集。

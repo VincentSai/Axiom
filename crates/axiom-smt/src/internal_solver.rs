@@ -100,9 +100,9 @@ pub fn verify_with_internal_solver(func: &FunctionDecl) -> SmtResult {
 
     let grid = generate_grid(&param_names, &candidates);
 
-    for point in grid {
+    for point in &grid {
         let mut env = HashMap::new();
-        for (name, val) in &point {
+        for (name, val) in point {
             env.insert(name.clone(), Value::Num(*val));
         }
 
@@ -126,7 +126,7 @@ pub fn verify_with_internal_solver(func: &FunctionDecl) -> SmtResult {
         let body_val = match eval_expr(&func.body, &mut env.clone()) {
             Ok(v) => v,
             Err(_) => {
-                return SmtResult::CounterExample(point);
+                return SmtResult::CounterExample(point.clone());
             }
         };
 
@@ -145,11 +145,13 @@ pub fn verify_with_internal_solver(func: &FunctionDecl) -> SmtResult {
         }
 
         if !ens_met {
-            return SmtResult::CounterExample(point);
+            return SmtResult::CounterExample(point.clone());
         }
     }
 
-    SmtResult::Verified
+    SmtResult::Sampled {
+        points_checked: grid.len(),
+    }
 }
 
 fn contains_hole_or_unsupported(expr: &Expr) -> bool {
