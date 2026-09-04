@@ -96,3 +96,20 @@ fn unresolved_implementation_returns_a_hole_report_before_smt_verification() {
     assert_eq!(reports[0].function_name.as_deref(), Some("pending"));
     assert_eq!(reports[0].hole_id.as_deref(), Some("implementation"));
 }
+
+#[test]
+fn type_mismatch_returns_type_error_report() {
+    let reports = diagnose_source(
+        r#"
+        fn bad_return(x: Int) -> Int {
+            "this is a string, not an int"
+        }
+        "#,
+    );
+
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].status, DiagnosticStatus::TypeError);
+    assert_eq!(reports[0].function_name.as_deref(), Some("bad_return"));
+    assert!(reports[0].diagnosis.contains("declared return type `Int`"));
+}
+

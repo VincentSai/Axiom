@@ -1,4 +1,4 @@
-//! Structured, JSON-serializable diagnostics for the Axiom verification pipeline.
+pub mod typecheck;
 
 use std::collections::HashMap;
 
@@ -8,6 +8,7 @@ use axiom_hole_extractor::extract_holes;
 use axiom_parser::parse_module;
 use axiom_smt::{verify_function, SmtResult};
 use serde::{Deserialize, Serialize};
+use typecheck::check_module_types;
 
 /// Stable machine-readable outcomes produced by the diagnostics pipeline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -15,6 +16,7 @@ pub enum DiagnosticStatus {
     Verified,
     ContractViolation,
     EffectViolation,
+    TypeError,
     ParseError,
     UnresolvedHole,
 }
@@ -62,10 +64,10 @@ pub fn diagnose_source(source: &str) -> Vec<DiagnosticReport> {
     }
 }
 
-/// Run effect, hole, and contract diagnostics over an already parsed module.
+/// Run effect, hole, type, and contract diagnostics over an already parsed module.
 ///
 /// The checks follow the compiler pipeline: an effect error prevents contract
-/// verification, and unresolved holes must be filled before SMT verification.
+/// verification, holes must be filled, and types must match before SMT verification.
 pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
     if let Err(error) = check_module_effects(module) {
         return vec![effect_report(error)];
@@ -88,6 +90,18 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
                 ),
             })
             .collect();
+    }
+
+    if let Err(type_err) = check_module_types(module) {
+        return vec![DiagnosticReport {
+            status: DiagnosticStatus::TypeError,
+            function_name: Some(type_err.function_name),
+            hole_id: None,
+            violated_clause: None,
+            counter_example: None,
+            diagnosis: type_err.message,
+            suggested_action: "Ensure the function return expression matches its declared type signature.".into(),
+        }];
     }
 
     let reports = module

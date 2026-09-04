@@ -90,10 +90,21 @@ impl AgentTaskPool {
 
         let mut final_result = SmtResult::Verified;
         for function_index in affected_functions {
-            let result = verify_function(&candidate_module.functions[function_index]);
-            match result {
+            let func = &candidate_module.functions[function_index];
+            let result = verify_function(func);
+            match &result {
                 SmtResult::CounterExample { .. } => return Ok(result),
-                SmtResult::Skipped(_) | SmtResult::Unknown(_) => final_result = result,
+                SmtResult::Unknown(_) => {
+                    // Contracted function failed to verify with SMT -> reject solution
+                    return Ok(result);
+                }
+                SmtResult::Skipped(_) => {
+                    if !func.ensures.is_empty() {
+                        // Declared formal contracts but verification was skipped -> reject solution
+                        return Ok(result);
+                    }
+                    final_result = result;
+                }
                 SmtResult::Verified => {}
             }
         }

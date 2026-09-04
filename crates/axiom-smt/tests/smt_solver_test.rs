@@ -133,3 +133,51 @@ fn generates_valid_smtlib2_query_script() {
     assert!(smt2.contains("(get-model)"));
 }
 
+#[test]
+fn generates_nonlinear_real_query_for_sqrt2_counterexample() {
+    let module = parse_module(
+        r#"
+        fn sqrt2_contract(x: Float) -> Bool
+            requires { x >= 0.0, x <= 2.0 }
+            ensures { result == true }
+        {
+            x * x != 2.0
+        }
+        "#,
+    )
+    .expect("sqrt2_contract should parse");
+
+    let smt2 = axiom_smt::generate_smtlib2(&module.functions[0])
+        .expect("should generate SMT-LIB2 for non-linear real query");
+
+    assert!(smt2.contains("(declare-const x Real)"));
+    assert!(smt2.contains("(declare-const result Bool)"));
+    assert!(smt2.contains("(assert (>= x 0.0))"));
+    assert!(smt2.contains("(assert (<= x 2.0))"));
+    assert!(smt2.contains("(assert (= result (distinct (* x x) 2.0)))"));
+    assert!(smt2.contains("(assert (not (= result true)))"));
+    assert!(smt2.contains("(check-sat)"));
+    assert!(smt2.contains("(get-model)"));
+}
+
+#[test]
+fn parses_z3_sat_model_with_real_numbers() {
+    let z3_output = r#"sat
+(model
+  (define-fun x () Real
+    1.4142135623)
+  (define-fun result () Bool
+    false)
+)
+"#;
+    let res = axiom_smt::z3_solver::parse_z3_output(z3_output).expect("should parse sat output");
+    match res {
+        axiom_smt::Z3Result::Sat(model) => {
+            let x = model.get("x").expect("x should be present in model");
+            assert!((*x - 1.4142135623).abs() < 1e-6);
+        }
+        other => panic!("expected Sat, got {:?}", other),
+    }
+}
+
+

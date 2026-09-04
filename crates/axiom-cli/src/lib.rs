@@ -11,7 +11,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use axiom_db::{AstDatabase, DbError, NodeHash};
-use axiom_diagnostics::{diagnose_source, DiagnosticStatus};
+use axiom_diagnostics::{diagnose_module, diagnose_source, DiagnosticStatus};
 use axiom_ffi_gen::{
     generate_c_abi_rust_glue, generate_c_header_from_source, generate_typescript_from_source,
     FfiError,
@@ -553,6 +553,25 @@ fn check(file: &Path) -> Result<(), CliError> {
         path: file.to_owned(),
         source,
     })?;
+
+    let reports = diagnose_module(&module);
+    let mut has_semantic_error = false;
+
+    for r in &reports {
+        match r.status {
+            DiagnosticStatus::EffectViolation | DiagnosticStatus::TypeError => {
+                eprintln!("error in `{}`: {}", file.display(), r.diagnosis);
+                eprintln!("  hint: {}", r.suggested_action);
+                has_semantic_error = true;
+            }
+            _ => {}
+        }
+    }
+
+    if has_semantic_error {
+        return Err(CliError::VerificationFailed);
+    }
+
     let hole_count = extract_holes(&module).len();
 
     println!(

@@ -1,191 +1,108 @@
-﻿# Axiom: AI-Native 全平臺並發程式語言
+﻿# Axiom: 面向 AI 协作的确定性游戏逻辑 DSL 与形式化验证原型
 
 > **Languages / 语言 / 語言**: [English](README.en.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md)
 
 ---
 
-> **Axiom** 是一門專門為 **AI Agent 協作** 與 **全平臺跨端發布** 量身設計的現代程式語言。  
-> 核心理念：消除代碼衝突、杜絕隱式副作用、內建形式化契約與型別打洞、實現數十個 Agent 無鎖並行編寫。
+> **Axiom** 是一门专门为 **AI Agent 协作** 与 **跨引擎确定性逻辑** 探索的现代领域特定语言 (DSL) 原型系统。  
+> 核心探索方向：通过纯函数消除隐式副作用、通过类型打洞（Hole-Driven）实现 Agent 局部上下文隔离、通过 SMT-LIB2 / Z3 进行数学契约定理证明，以及通过零拷贝双缓冲直通游戏引擎（如 Unity）。
 
 ---
 
-## 🌟 核心願景與問題背景
+## 🌟 核心设计理念
 
-在 AI 編碼大模型時代，傳統的文字檔案儲存、隱式全域狀態、複雜生命週期以及基於行差異的 Git 協作方式成為了阻礙 AI 高效、無衝突並行開發的最大瓶頸：
-- **狀態失控**：隱式可變狀態使得 Agent 難以追蹤全域變化，導致生成代碼頻繁產生隱藏 Bug。
-- **合併衝突**：多 Agent 並行編寫傳統原始碼檔案時，極易產生 Git Merge 衝突與符號重名。
-- **跨平臺沉重**：現有跨端方案要麼依賴龐大的直譯器（Python/JS），要麼心智負擔極高（Rust 借用檢查器）。
+在 AI 辅助游戏逻辑开发的场景中，传统的通用编程语言存在若干痛点：
+- **状态失控与难以追踪**：隐式全局状态和随机副作用导致 AI 生成的代码容易产生隐藏边界 Bug 和联机不同步。
+- **上下文膨胀与幻觉**：让 Agent 在庞大工程代码中反复通读和修改，极易导致 Token 浪费与上下文污染。
+- **跨引擎胶水繁琐**：不同游戏引擎和平台间传递状态时，缺乏零 GC、零拷贝的确定性内存同步机制。
 
-**Axiom** 從底層重新思考了語言與工具鏈的設計：
-1. **純函數 + 顯式代數效應 (Algebraic Effects)**：杜絕全域狀態污染，單函數 100% 自閉環。
-2. **內容定址 AST (Content-Addressed Codebase)**：代碼以 AST Hash 儲存，徹底消滅命名衝突與 Git Merge 衝突。
-3. **型別打洞協同 (Hole-Driven Development)**：架構師 Agent 宣告骨架與 `?hole`，Worker Agents 精準填空，編譯器提供結構化反例閉環。
-4. **全平臺轉譯與 WASM 基底**：轉譯至 Rust/C 與 WebAssembly (WASM/WASI)，一鍵發布至 Web、iOS、Android、Windows、Linux、macOS 及嵌入式裝置。
-5. **雙軌生態互操作**：支援 W3C WIT (WebAssembly Component Model) 與宣告式 FFI 包裝，零成本復用全球已有開源生態。
-
----
-
-## 📊 對比熱門程式語言
-
-| 語言 | 優勢 | 劣勢 (在 AI / 跨平臺 / 並發生成 視角下) | Axiom 的解法 |
-| :--- | :--- | :--- | :--- |
-| **Python** | LLM 訓練語料最豐富，生成流暢 | 動態型別易產生隱式 Bug，跨平臺打包極重，全域狀態易被多 Agent 污染 | 保留極簡運算式與模式匹配，引入純函數、強型別與全平臺 WASM 轉譯 |
-| **Rust** | 記憶體安全、效能極致、跨平臺好 | 借用檢查器與複雜生命週期導致 AI 試錯成本極高（易陷入編譯器報錯死循環） | 保留 Rust 級別的記憶體安全與效能底座，對上層屏蔽生命週期心智負擔 |
-| **Go** | 編譯快速、跨平臺友好、並發簡單 | 缺乏代數資料型別 (ADT) 與形式化契約，多 Agent 仍有命名與介面破壞風險 | 引入 ADT、顯式 Effect、內建 Pre/Post 契約與內容定址 AST |
-| **TypeScript** | Web/全端生態豐富 | 執行期無法保證絕對型別安全，跨 Native 端依賴重型執行期，非同步傳染 | 強型別自描述 + 轉譯為 Rust/WASM，零執行期開銷，統一跨端 |
+**Axiom** 围绕这些问题构建了一套自闭环的探索型工具链：
+1. **纯函数 + 显式代数效应 (Algebraic Effects)**：游戏逻辑表达为无副作用的纯状态转移，副作用显式隔离。
+2. **SMT-LIB2 / Microsoft Z3 定理证明**：内置 `requires` / `ensures` 契约，可一键编译为标准 SMT-LIB2 脚本并通过 Z3 求解器证明或提取反例，内置轻量符号区间引擎。
+3. **微型打洞协作 (Hole-Driven Development)**：通过 `?hole` 声明待实现点，编译器可机械化拆解出独立的 `hole-task.json`，让 Agent 在 $O(1)$ 极简局部上下文中精准填空。
+4. **Unity 零拷贝双缓冲桥接 (`axiom bridge`)**：转译至 Rust 编译为 C-ABI 原生库，自动生成 Unity C# P/Invoke 与连续内存双缓冲快照。
+5. **多语言绑定与内容寻址 AST 原型**：提供 TypeScript `.d.ts`、C `.h` 与 WebAssembly WIT 接口生成，探索基于 SHA-256 的 AST 模块存储。
 
 ---
 
-## 🏆 權威基準評測：200-Function 真實業務多 Agent 協作大比拼
+## 🎮 实战演示：Axiom Survivors 割草游戏
 
-在工業級遊戲引擎規範 [`examples/benchmark_200/SPEC_200.md`](examples/benchmark_200/SPEC_200.md) 下（涵蓋空間幾何、非線性護甲減傷、五行相剋、戰鬥狀態機、AI 衰減、加權掉落與世界排程等 200 個真實業務函數），由真實 AI 大模型（OpenAI Codex CLI）多 Agent 並發協作開發，**Axiom、Python、Rust 與 TypeScript** 四大語言體系的實測數據矩陣如下：
-
-| 語言體系 | 多 Agent 協作模式與架構 | 任務粒度與上下文邊界 | 真實消耗 Tokens | 正確性驗證手段與耗時 | 形式化數學保證 | 相對基準對比 |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **🌟 Axiom** | **`/axiom-pipeline` 全自動打洞管線**<br>(Architect + 編譯器拆解 + 200 Workers) | **單函數 `hole-task.json` 隔離<br>($O(1)$ 超輕量局部上下文)** | **183,662 Tokens** | **SMT 全域定理證明<br>(0.08 秒 200/200)** | **✅ 全數域 $(-\infty \sim +\infty)$<br>100% 絕對零漏洞** | **🔥 節省 58.9% ~ 61.7%<br>(2.4x 提速)** |
-| **🐍 Python** | 5 個 Agent 模組化並發 (Tier 0~4) | 40~50 函數/大模組 ($O(N)$ 大檔案) | **384,089 Tokens** | Unittest (0.002s, 9/9 Passed) | ⚠️ 僅依賴抽樣單元測試 | 0.86x 消耗 |
-| **🦀 Rust** | 5 個 Agent 跨 crate/mod 並發 | 40~50 函數/大模組 ($O(N)$ 大檔案) | **446,775 Tokens** | Cargo test (0.46s, 6/6 Passed) | ⚠️ 僅依賴抽樣單元測試 | 1.00x 基準參照 |
-| **📘 TypeScript** | 5 個 Agent 模組化並發 (ESM/TS) | 40~50 函數/大模組 ($O(N)$ 大檔案) | **479,872 Tokens** | TSX / Node test (0.48s, 8/8 Passed) | ⚠️ 僅依賴抽樣單元測試 | 1.07x 消耗 |
-
-### 🔬 為什麼 Axiom 打洞管線具備顛覆性優勢？
-1. **$O(1)$ 微型上下文隔離，消滅幻覺與 Token 浪費**：
-   傳統語言由於 Agent 必須在 40~50 函數的大檔案中反覆閱讀與重寫，上下文持續膨脹。Axiom 編譯器原生工具 `axiom extract-holes` 機械化拆解出 200 個獨立的 `hole-task.json`（每個僅 ~160 Tokens），Worker 僅需輸出單個純運算式（~18 Tokens），**200 個函數的實作階段僅消耗 35,627 Tokens**！
-2. **0.08 秒 SMT 全數域形式化定理證明**：
-   傳統語言面對邊界溢位只能依賴有限用例抽樣，而 Axiom 內建 Z3 定理證明器在 0.08 秒內對 200 個函數的契約完成了 $(-\infty \sim +\infty)$ 全數域數學證明，**從根本上杜絕了隱式 Bug 與數值溢位**。
-
-> 📖 詳細跨語言測試報告、各模組消耗明細與完整原始碼，請參閱：[**200-Functions 基準測試專題 (examples/benchmark_200/README.md)**](examples/benchmark_200/README.md)。
+在 [`examples/game_survivor/`](examples/game_survivor/) 中提供了一个完整的 2D 肉鸽割草游戏落地示范：
+- **形式化逻辑内核 ([`survivor_core.ax`](examples/game_survivor/ax/survivor_core.ax))**：涵盖角色移动、弹道欧拉物理推进、欧几里得圆形碰撞、伤害减伤与经验升级突破等 15 个纯函数与数学契约；
+- **Unity 表现层 ([`SurvivorGameController.cs`](examples/game_survivor/Assets/Scripts/Gameplay/SurvivorGameController.cs))**：零配置自举（打开 SampleScene 即可试玩）、过程化像素精灵生成、平滑相机跟随与死亡一键满血重开；
+- **零 GC 双缓冲同步**：Rust Native 库与 Unity 之间通过定长连续内存进行 60FPS+ 双缓冲传递。
 
 ---
 
-## 📂 專案文件導覽
+## 🔬 实验性评测：200-Function 微型任务拆解探索
 
-- 📘 [架構設計白皮書 (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)
-- 📝 [語言語法與語意規範草案 (docs/SPECIFICATION.md)](docs/SPECIFICATION.md)
-- 🤖 [多 Agent 協作工作流程與 AST 儲存 (docs/MULTI_AGENT_WORKFLOW.md)](docs/MULTI_AGENT_WORKFLOW.md)
-- 🔬 [主流語言深度對比與能力邊界分析 (docs/RESEARCH_LANGUAGE_COMPARISON.md)](docs/RESEARCH_LANGUAGE_COMPARISON.md)
-- 🗺️ [專案發展藍圖 (docs/ROADMAP.md)](docs/ROADMAP.md)
-- 💡 [範例 1：銀行轉帳服務 (examples/transfer.ax)](examples/transfer.ax)
-- 🎮 [範例 2：跨平臺遊戲循環 (examples/game_loop.ax)](examples/game_loop.ax)
-- 👾 [範例 3：Axiom Survivors 完整版 Unity 遊戲 (examples/game_survivor/)](examples/game_survivor/README.md)
+在 [`examples/benchmark_200/SPEC_200.md`](examples/benchmark_200/SPEC_200.md) 领域规范下（涵盖空间几何、非线性减伤、状态机与数值曲线等 200 个函数），我们进行了微型打洞任务与传统大文件生成模式的对比实验：
+
+- **微型打洞流水线 (`/axiom-pipeline`)**：利用 `axiom extract-holes` 将 200 个函数拆解为隔离的 `hole-task.json` 单任务，使 Worker Agent 仅需在局部上下文中输出单个表达式，大幅减少了单任务的 Prompt 上下文冗余；
+- **SMT 契约约束**：通过 SMT-LIB2 与求解器在提交阶段快速过滤出包含边界缺陷的反例实现；
+- **说明与局限性**：该实验主要验证局部上下文打洞模式在 Token 消耗与形式化验证上的可行性；具体性能与耗时受本地硬件、求解器算力与测试用例复杂度影响。
 
 ---
 
-## 🛠️ 語法速覽 (Syntax Glance)
+## 🚀 一键极速安装 (One-Liner Install)
 
-```rust
-// 1. 不可變代數資料型別 (ADT)
-type Player = {
-    id: Int,
-    name: String,
-    score: Int,
-}
+无需手动克隆编译，可直接安装预构建的 `axiom` CLI 工具链：
 
-// 2. 宣告顯式副作用 (Algebraic Effect)
-effect Audio {
-    fn play_sound(sound_id: String): ()
-}
-
-effect Network {
-    fn send_packet(packet: String): ()
-}
-
-// 3. 架構師 Agent 定義的帶契約函數骨架 (含 ?hole 打洞)
-fn level_up(player: Player, bonus: Int) -> Player 
-    with [Audio, Network]
-    requires {
-        bonus > 0,
-        player.score >= 0,
-    }
-    ensures {
-        result.score == player.score + bonus
-    }
-{
-    // 交由 Worker Agent 並發填洞實作
-    ?level_up_implementation
-}
-```
+- **Windows (PowerShell)**:
+  ```powershell
+  irm https://raw.githubusercontent.com/axiom-lang/axiom/main/scripts/install.ps1 | iex
+  ```
+- **Linux & macOS (Bash)**:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/axiom-lang/axiom/main/scripts/install.sh | bash
+  ```
 
 ---
 
-## 🚀 快速安裝與預編譯二進位制下載 (Installation & Download)
+## 🎨 VS Code 官方插件 (IDE Support)
 
-無需安裝 Rust 編譯環境，您可以直接從 GitHub 下載開箱即用的預編譯二進位制與技能包：
-
-### 1. 下載 Release 預編譯包
-前往 GitHub 倉庫的 [**Releases**](../../releases) 頁面，下載對應作業系統的壓縮包（**每個壓縮包內均已內建二進位制與完整的 `skills/` 技能套件**）：
-- **Windows (x64)**: `axiom-v*-x86_64-pc-windows-msvc.zip`（內含 `axiom.exe` 與 `skills/`）
-- **Linux (x64)**: `axiom-v*-x86_64-unknown-linux-gnu.tar.gz`（內含 `axiom` 與 `skills/`）
-- **macOS (Apple Silicon)**: `axiom-v*-aarch64-apple-darwin.tar.gz`
-- **macOS (Intel)**: `axiom-v*-x86_64-apple-darwin.tar.gz`
-- **獨立技能包 (通用)**: `axiom-skills-v*.zip`（純 Agent Skills 規則包）
-
-### 2. 設定環境變數 (Windows)
-1. 將下載的壓縮包解壓縮至任意固定目錄（例如 `C:\Program Files\Axiom\` 或 `D:\Tools\axiom\`）；
-2. 將該目錄路徑添加至系統的 **環境變數 `PATH`** 中；
-3. 開啟新的終端（PowerShell 或 CMD），執行 `axiom --help` 驗證安裝成功。
-
-> 💡 **開發者原始碼安裝（可選）**：  
-> 若本機具備 Rust 工具鏈，可直接在倉庫根目錄執行：`cargo install --path crates/axiom-cli`
+位于 [`editors/vscode-axiom`](editors/vscode-axiom) 的 VS Code 插件提供基础开发者体验：
+- **语法高亮**：对 `.ax` 的关键字、类型、Effect 与模式匹配提供 TextMate 着色；
+- **保存即检查 (Verify on Save)**：保存文件时调用 `axiom check` / `verify`，在问题面板提示语法错误、类型不匹配或 SMT 反例；
+- **智能代码片段 (Snippets)**：内置 `fn-contract`、`type-record`、`type-enum` 等脚手架模板。
 
 ---
 
-## 🤖 AI Agent 技能包 (Skills) 安裝與啟用指南
-
-Axiom 隨 Release 提供了專為現代 AI 編碼 Agent 設計的 5 大協同技能包：
-- `/axiom-pipeline`：全自動打洞管線（架構師打洞 -> 提取任務 -> Worker 並發填洞 -> SMT 證明 -> 自癒）
-- `/axiom-interactive`：分階段人機協作打洞（先生成契約等待人類審查，確認後再極速填洞）
-- `axiom-architect` / `axiom-worker` / `axiom-healer`：微專業 Agent 規範
-
-### 各主流 Agent 客戶端安裝方法：
-
-| AI Agent 客戶端 | 安裝路徑 / 設定方法 | 啟用與使用指令 |
-| :--- | :--- | :--- |
-| **🌟 Google Antigravity / Gemini CLI** | 將解壓縮後的 `skills/*` 複製至全域 `%USERPROFILE%\.gemini\config\skills\` 或專案目錄 `.gemini/config/skills/` | 在聊天框直接輸入：<br>`/axiom-pipeline 實作...` |
-| **⚡ Cursor IDE** | 將 `skills/axiom-pipeline/SKILL.md` 複製為專案根目錄 `.cursor/rules/axiom-pipeline.mdc`（或追加至 `.cursorrules`） | 在 Composer / Agent 模式輸入：<br>`使用 axiom-pipeline 規範實作...` |
-| **🌊 Windsurf (Codeium)** | 將 `skills/axiom-pipeline/SKILL.md` 的內容追加至專案根目錄的 `.windsurfrules` | 在 Cascade 聊天框中輸入：<br>`遵循 Axiom 打洞管線實作...` |
-| **🧠 Claude Code / Claude Desktop** | 將技能內容追加至專案根目錄 `CLAUDE.md`，或在 Claude.ai Project Knowledge 中上傳 `skills/` 下的 markdown 檔案 | 在對話中輸入：<br>`啟動 /axiom-pipeline 實作...` |
-| **🤖 OpenAI Codex CLI / Aider** | 在當前工作區放入 `skills/` 或在系統提示詞中引用 `skills/axiom-pipeline/SKILL.md` | 在提示詞中指定：<br>`依據 skills/axiom-pipeline 規範開發` |
-
-> 📖 更多詳細技能說明，請參閱：[**Axiom 技能包使用手冊 (skills/README.md)**](skills/README.md)。
-
----
-
-## 💻 CLI 工具鏈與 `axiom.exe` 使用指南
-
-設定好環境變數後，您可以直接使用 `axiom`（或 `axiom.exe`）指令呼叫完整的工具鏈功能：
+## 💻 CLI 工具链指南
 
 ```powershell
-# 1. 語法檢查與打洞統計
+# 1. 语法与静态类型检查、打洞统计
 axiom check examples/transfer.ax
 
-# 2. 靜態 SMT 契約形式化驗證（人類終端可讀模式）
-axiom verify examples/transfer.ax
+# 2. 形式化契约验证 (自动探测 Z3 求解器，回退至内置符号引擎)
+axiom verify examples/game_survivor/ax/survivor_core.ax
 
-# 3. 靜態 SMT 形式化驗證（輸出機器可讀 JSON，供 Agent 閉環自癒）
-axiom verify examples/transfer.ax --json
+# 3. 导出标准 SMT-LIB2 (.smt2) 文件供第三方求解器 (Z3/CVC5) 独立验证
+axiom export-smt2 examples/transfer.ax -o transfer.smt2
 
-# 4. 機械化提取打洞任務 JSON（派發給多個 Worker Agent 並行填洞）
-axiom extract-holes examples/transfer.ax
+# 4. 机械化提取打洞任务 JSON (派发给 Worker Agents 并发填洞)
 axiom extract-holes examples/transfer.ax --out-dir .scratch/hole-tasks
 
-# 5. 內容定址 AST 代碼庫 (ASTDB) 管理與虛擬原始碼投影
-axiom db put examples/transfer.ax
-axiom db export #mod_589e44855c2b4e0223acf6867cdd3c6f0947fb3a23d7afafbb62e7fbc044559a
+# 5. Unity 跨端代码生成与零拷贝双缓冲桥接
+axiom bridge examples/game_survivor/ax/survivor_core.ax --target unity --out examples/game_survivor/Assets/Scripts/AxiomBridge --library-name axiom_survivor
 
-# 6. WebAssembly Component Model (WIT) 契約匯出
-axiom export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
-
-# 7. 多語言 FFI 膠水代碼與型別宣告匯出 (TypeScript .d.ts / C 標頭檔 .h / Rust C-ABI)
-axiom export-ffi examples/game_loop.ax --lang ts -o game_loop.d.ts
-axiom export-ffi examples/game_loop.ax --lang c -o game_loop.h
-axiom export-ffi examples/game_loop.ax --lang rust -o game_loop_c_abi.rs
-
-# 8. 全平臺專案鷹架一鍵生成 (支援 web / native / node)
-axiom scaffold my_game --target web --out-dir ./projects
-
-# 9. 轉譯至 Rust 原始碼並直接編譯執行
+# 6. 转译至 Rust 源码并由 rustc 编译运行
 axiom emit-rust examples/game_loop.ax -o game_loop.rs
 axiom run path/to/program_with_main.ax
+
+# 7. 多语言接口绑定导出 (TypeScript / C / WIT)
+axiom export-ffi examples/game_loop.ax --lang ts -o game_loop.d.ts
+axiom export-ffi examples/game_loop.ax --lang c -o game_loop.h
+axiom export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
 ```
 
-> ⚙️ **原始碼除錯模式**：若未安裝全域二進位制，在原始碼根目錄下將 `axiom <subcommand>` 替換為 `cargo run -p axiom-cli -- <subcommand>` 即可達到完全相同的執行效果。
+---
+
+## 📂 项目文档导航
+
+- 📘 [架构设计白皮书 (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)
+- 📝 [语言语法与语义规范草案 (docs/SPECIFICATION.md)](docs/SPECIFICATION.md)
+- 🤖 [多 Agent 协作工作流与 AST 存储 (docs/MULTI_AGENT_WORKFLOW.md)](docs/MULTI_AGENT_WORKFLOW.md)
+- 🔬 [主流语言能力边界探索 (docs/RESEARCH_LANGUAGE_COMPARISON.md)](docs/RESEARCH_LANGUAGE_COMPARISON.md)
+- 🗺️ [项目发展路线图 (docs/ROADMAP.md)](docs/ROADMAP.md)
+- 👾 [Axiom Survivors Unity 示例工程 (examples/game_survivor/)](examples/game_survivor/README.md)
