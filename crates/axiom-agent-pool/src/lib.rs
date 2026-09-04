@@ -10,12 +10,23 @@ use axiom_parser::{parse_expr, parse_module, ParseError};
 use axiom_smt::verify_function;
 pub use axiom_smt::SmtResult;
 
+/// Verification policy for accepting hole candidate solutions into the pool.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PoolVerificationPolicy {
+    /// Strict formal mode: contracted functions MUST be formally Proved by SMT solver.
+    StrictProved,
+    /// Permissive mode: allows discrete grid sampling (Sampled) when solver is unavailable.
+    #[default]
+    Permissive,
+}
+
 /// A pool of hole tasks backed by a module whose accepted solutions are SMT-verified.
 #[derive(Debug, Clone)]
 pub struct AgentTaskPool {
     module: Module,
     tasks: Vec<HoleTask>,
     pending_holes: HashSet<String>,
+    policy: PoolVerificationPolicy,
 }
 
 impl AgentTaskPool {
@@ -32,7 +43,19 @@ impl AgentTaskPool {
             module: skeleton_module,
             tasks,
             pending_holes,
+            policy: PoolVerificationPolicy::Permissive,
         }
+    }
+
+    /// Set verification policy for this pool.
+    pub fn with_policy(mut self, policy: PoolVerificationPolicy) -> Self {
+        self.policy = policy;
+        self
+    }
+
+    /// Set verification policy mutably.
+    pub fn set_policy(&mut self, policy: PoolVerificationPolicy) {
+        self.policy = policy;
     }
 
     /// Parse an Axiom skeleton module and create its task pool.
@@ -105,7 +128,14 @@ impl AgentTaskPool {
                     }
                     final_result = result;
                 }
-                SmtResult::Proved { .. } | SmtResult::Sampled { .. } => {
+                SmtResult::Sampled { .. } => {
+                    if self.policy == PoolVerificationPolicy::StrictProved && !func.ensures.is_empty() {
+                        // Strict mode rejects Sampled for contracted functions
+                        return Ok(result);
+                    }
+                    final_result = result;
+                }
+                SmtResult::Proved { .. } => {
                     final_result = result;
                 }
             }

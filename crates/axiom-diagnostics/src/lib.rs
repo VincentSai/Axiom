@@ -34,6 +34,8 @@ pub struct DiagnosticReport {
     pub counter_example: Option<HashMap<String, f64>>,
     pub diagnosis: String,
     pub suggested_action: String,
+    #[serde(default)]
+    pub has_contracts: bool,
 }
 
 impl DiagnosticReport {
@@ -63,6 +65,7 @@ pub fn diagnose_source(source: &str) -> Vec<DiagnosticReport> {
                 "Correct the Axiom syntax near line {}, column {} and run diagnostics again.",
                 error.line, error.column
             ),
+            has_contracts: false,
         }],
     }
 }
@@ -91,6 +94,7 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
                     "Fill `?{}` with an implementation satisfying the function contracts.",
                     hole.hole_id
                 ),
+                has_contracts: false,
             })
             .collect();
     }
@@ -104,79 +108,88 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
             counter_example: None,
             diagnosis: type_err.message,
             suggested_action: "Ensure the function return expression matches its declared type signature.".into(),
+            has_contracts: false,
         }];
     }
 
     let reports = module
         .functions
         .iter()
-        .map(|function| match verify_function(function) {
-            SmtResult::Proved { solver } => DiagnosticReport {
-                status: DiagnosticStatus::Proved,
-                function_name: Some(function.name.clone()),
-                hole_id: None,
-                violated_clause: None,
-                counter_example: None,
-                diagnosis: format!(
-                    "Function `{}` formally proved by {}.",
-                    function.name, solver
-                ),
-                suggested_action: "No action required.".into(),
-            },
-            SmtResult::Sampled { points_checked } => DiagnosticReport {
-                status: DiagnosticStatus::Sampled,
-                function_name: Some(function.name.clone()),
-                hole_id: None,
-                violated_clause: None,
-                counter_example: None,
-                diagnosis: format!(
-                    "Function `{}` passed discrete grid test across {} points (heuristic test, not a mathematical proof).",
-                    function.name, points_checked
-                ),
-                suggested_action: "Install Microsoft Z3 for full first-order SMT theorem proving.".into(),
-            },
-            SmtResult::CounterExample(counter_example) => DiagnosticReport {
-                status: DiagnosticStatus::ContractViolation,
-                function_name: Some(function.name.clone()),
-                hole_id: None,
-                violated_clause: function
-                    .ensures
-                    .first()
-                    .map(|clause| format!("ensures: {}", format_expr(clause))),
-                counter_example: Some(counter_example),
-                diagnosis: format!(
-                    "Function `{}` violates a postcondition for the reported input.",
-                    function.name
-                ),
-                suggested_action:
-                    "Adjust the implementation or strengthen its preconditions, then verify again."
-                        .into(),
-            },
-            SmtResult::Skipped(reason) => DiagnosticReport {
-                status: DiagnosticStatus::Skipped,
-                function_name: Some(function.name.clone()),
-                hole_id: None,
-                violated_clause: None,
-                counter_example: None,
-                diagnosis: format!(
-                    "Function `{}` SMT verification was skipped: {reason}.",
-                    function.name
-                ),
-                suggested_action:
-                    "Add supported contracts if formal postcondition verification is required.".into(),
-            },
-            SmtResult::Unknown(reason) => DiagnosticReport {
-                status: DiagnosticStatus::Unknown,
-                function_name: Some(function.name.clone()),
-                hole_id: None,
-                violated_clause: None,
-                counter_example: None,
-                diagnosis: format!(
-                    "Function `{}` SMT solver returned unknown: {reason}.",
-                    function.name
-                ),
-                suggested_action: "Check solver timeouts or simplify non-linear constraints.".into(),
-            },
+        .map(|function| {
+            let has_contracts = !function.requires.is_empty() || !function.ensures.is_empty();
+            match verify_function(function) {
+                SmtResult::Proved { solver } => DiagnosticReport {
+                    status: DiagnosticStatus::Proved,
+                    function_name: Some(function.name.clone()),
+                    hole_id: None,
+                    violated_clause: None,
+                    counter_example: None,
+                    diagnosis: format!(
+                        "Function `{}` formally proved by {}.",
+                        function.name, solver
+                    ),
+                    suggested_action: "No action required.".into(),
+                    has_contracts,
+                },
+                SmtResult::Sampled { points_checked } => DiagnosticReport {
+                    status: DiagnosticStatus::Sampled,
+                    function_name: Some(function.name.clone()),
+                    hole_id: None,
+                    violated_clause: None,
+                    counter_example: None,
+                    diagnosis: format!(
+                        "Function `{}` passed discrete grid test across {} points (heuristic test, not a mathematical proof).",
+                        function.name, points_checked
+                    ),
+                    suggested_action: "Install Microsoft Z3 for full first-order SMT theorem proving.".into(),
+                    has_contracts,
+                },
+                SmtResult::CounterExample(counter_example) => DiagnosticReport {
+                    status: DiagnosticStatus::ContractViolation,
+                    function_name: Some(function.name.clone()),
+                    hole_id: None,
+                    violated_clause: function
+                        .ensures
+                        .first()
+                        .map(|clause| format!("ensures: {}", format_expr(clause))),
+                    counter_example: Some(counter_example),
+                    diagnosis: format!(
+                        "Function `{}` violates a postcondition for the reported input.",
+                        function.name
+                    ),
+                    suggested_action:
+                        "Adjust the implementation or strengthen its preconditions, then verify again."
+                            .into(),
+                    has_contracts,
+                },
+                SmtResult::Skipped(reason) => DiagnosticReport {
+                    status: DiagnosticStatus::Skipped,
+                    function_name: Some(function.name.clone()),
+                    hole_id: None,
+                    violated_clause: None,
+                    counter_example: None,
+                    diagnosis: format!(
+                        "Function `{}` SMT verification was skipped: {reason}.",
+                        function.name
+                    ),
+                    suggested_action:
+                        "Add supported contracts if formal postcondition verification is required.".into(),
+                    has_contracts,
+                },
+                SmtResult::Unknown(reason) => DiagnosticReport {
+                    status: DiagnosticStatus::Unknown,
+                    function_name: Some(function.name.clone()),
+                    hole_id: None,
+                    violated_clause: None,
+                    counter_example: None,
+                    diagnosis: format!(
+                        "Function `{}` SMT solver returned unknown: {reason}.",
+                        function.name
+                    ),
+                    suggested_action: "Check solver timeouts or simplify non-linear constraints.".into(),
+                    has_contracts,
+                },
+            }
         })
         .collect::<Vec<_>>();
 
@@ -189,6 +202,7 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
             counter_example: None,
             diagnosis: "The module contains no functions to verify.".into(),
             suggested_action: "No action required.".into(),
+            has_contracts: false,
         }]
     } else {
         reports
@@ -219,6 +233,7 @@ fn effect_report(error: EffectError) -> DiagnosticReport {
         counter_example: None,
         diagnosis: error.to_string(),
         suggested_action,
+        has_contracts: false,
     }
 }
 

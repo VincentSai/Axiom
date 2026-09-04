@@ -44,6 +44,10 @@ pub enum Commands {
         /// Output results as JSON for machine consumption / multi-agent self-healing.
         #[arg(long)]
         json: bool,
+
+        /// Strict mode: require formal theorem proof (Proved) for all contracted functions (reject Sampled/Skipped).
+        #[arg(long)]
+        strict: bool,
     },
 
     /// Export Axiom functions and mathematical contracts to standard SMT-LIB2 (.smt2) format.
@@ -306,7 +310,7 @@ impl Error for CliError {
 pub fn run(cli: Cli) -> Result<(), CliError> {
     match cli.command {
         Commands::Check { file } => check(&file),
-        Commands::Verify { file, json } => verify(&file, json),
+        Commands::Verify { file, json, strict } => verify(&file, json, strict),
         Commands::ExportSmt2 { file, output } => export_smt2(&file, output.as_deref()),
         Commands::ExtractHoles { file, out_dir } => extract(&file, out_dir.as_deref()),
         Commands::EmitRust { file, output } => emit_rust(&file, output.as_deref()),
@@ -473,11 +477,15 @@ fn init() -> State {{
     State {{ count: 0 }}
 }}
 
-fn increment(s: State) -> State
-    requires {{ s.count >= 0 }}
-    ensures {{ result.count > s.count }}
+fn calculate_next_count(current: Int) -> Int
+    requires {{ current >= 0 }}
+    ensures {{ result > current }}
 {{
-    State {{ count: s.count + 1 }}
+    current + 1
+}}
+
+fn increment(s: State) -> State {{
+    State {{ count: calculate_next_count(s.count) }}
 }}
 "#
     );
@@ -585,13 +593,34 @@ fn check(file: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn verify(file: &Path, json: bool) -> Result<(), CliError> {
+fn verify(file: &Path, json: bool, strict: bool) -> Result<(), CliError> {
     let source = read_source(file)?;
     let reports = diagnose_source(&source);
-    let all_ok = reports.iter().all(|r| {
-        r.status == DiagnosticStatus::Proved
-            || r.status == DiagnosticStatus::Sampled
-            || r.status == DiagnosticStatus::Skipped
+
+    // Fail-Closed verification evaluation:
+    // 1. Any ParseError, TypeError, EffectViolation, UnresolvedHole, ContractViolation, Unknown -> HARD FAIL.
+    // 2. If function has contracts:
+    //    - Proved -> PASS
+    //    - Sampled -> PASS in default mode (with notice), FAIL in --strict mode
+    //    - Skipped -> HARD FAIL (contract declared but skipped = unverified false positive risk!)
+    // 3. If function has NO contracts:
+    //    - Skipped -> PASS (no contracts to prove)
+    let all_ok = reports.iter().all(|r| match r.status {
+        DiagnosticStatus::Proved => true,
+        DiagnosticStatus::Sampled => !strict,
+        DiagnosticStatus::Skipped => {
+            if strict && r.has_contracts {
+                false
+            } else {
+                true
+            }
+        }
+        DiagnosticStatus::ContractViolation
+        | DiagnosticStatus::Unknown
+        | DiagnosticStatus::TypeError
+        | DiagnosticStatus::EffectViolation
+        | DiagnosticStatus::ParseError
+        | DiagnosticStatus::UnresolvedHole => false,
     });
 
     if json {
@@ -611,10 +640,18 @@ fn verify(file: &Path, json: bool) -> Result<(), CliError> {
                     println!("  [PROVED] {func_name} (formally proved by SMT solver)");
                 }
                 DiagnosticStatus::Sampled => {
-                    println!("  [SAMPLED] {func_name} (passed grid test, install Z3 for formal proof)");
+                    if strict {
+                        println!("  [SAMPLED_FAIL] {func_name} (only sampled; --strict requires formal Z3 proof)");
+                    } else {
+                        println!("  [SAMPLED] {func_name} (passed grid test, install Z3 for formal proof)");
+                    }
                 }
                 DiagnosticStatus::Skipped => {
-                    println!("  [SKIPPED] {func_name} - {}", r.diagnosis);
+                    if strict && r.has_contracts {
+                        println!("  [SKIPPED_FAIL] {func_name} - Has formal contracts but was skipped; --strict requires formal proof");
+                    } else {
+                        println!("  [SKIPPED] {func_name} - {}", r.diagnosis);
+                    }
                 }
                 DiagnosticStatus::Unknown => {
                     println!("  [UNKNOWN] {func_name} - {}", r.diagnosis);

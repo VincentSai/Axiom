@@ -594,18 +594,23 @@ impl<'a> Parser<'a> {
             return Ok(expr);
         }
         if self.consume_char('{') {
-            self.expect_text("...")?;
-            let base = self.parse_expression()?;
-            let updates = if self.consume_char('}') {
-                Vec::new()
+            if self.consume_text("...") {
+                let base = self.parse_expression()?;
+                let updates = if self.consume_char('}') {
+                    Vec::new()
+                } else {
+                    self.expect_char(',')?;
+                    self.parse_record_fields()?
+                };
+                return Ok(Expr::RecordUpdate {
+                    base: Box::new(base),
+                    updates,
+                });
             } else {
-                self.expect_char(',')?;
-                self.parse_record_fields()?
-            };
-            return Ok(Expr::RecordUpdate {
-                base: Box::new(base),
-                updates,
-            });
+                let block = self.parse_block_contents()?;
+                self.expect_char('}')?;
+                return Ok(block);
+            }
         }
         if self.peek_char() == Some('"') {
             return self.parse_string();

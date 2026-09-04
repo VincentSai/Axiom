@@ -26,7 +26,7 @@ pub fn generate_smtlib2(func: &FunctionDecl) -> Result<String, String> {
     let mut smt = String::new();
     smt.push_str("; Axiom Formal Verification Query for: ");
     smt.push_str(&func.name);
-    smt.push_str("\n(set-logic ALL)\n(set-option :produce-models true)\n\n");
+    smt.push_str("\n(reset)\n(set-logic ALL)\n(set-option :produce-models true)\n\n");
 
     // 1. Declare parameters
     for p in &func.params {

@@ -145,4 +145,25 @@ fn match_arms_type_mismatch_returns_type_error() {
     assert!(reports[0].diagnosis.contains("match arms return incompatible types"));
 }
 
+#[test]
+fn non_boolean_contract_expression_rejected() {
+    let source = r#"
+fn invalid_contract(x: Int) -> Int
+    requires {
+        1
+    }
+{
+    x + 1
+}
+"#;
+
+    let reports = diagnose_source(source);
+
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].status, DiagnosticStatus::TypeError);
+    assert_eq!(reports[0].function_name.as_deref(), Some("invalid_contract"));
+    assert!(reports[0].diagnosis.contains("must evaluate to Bool"));
+}
+
+
 

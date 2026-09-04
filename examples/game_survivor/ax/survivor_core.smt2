@@ -2,6 +2,7 @@
 
 ; === Function: hp_after_delta_unclamped ===
 ; Axiom Formal Verification Query for: hp_after_delta_unclamped
+(reset)
 (set-logic ALL)
 (set-option :produce-models true)
 
@@ -25,8 +26,64 @@
 (get-model)
 
 
+; === Function: clamp_hp ===
+; Axiom Formal Verification Query for: clamp_hp
+(reset)
+(set-logic ALL)
+(set-option :produce-models true)
+
+(declare-const current Int)
+(declare-const delta Int)
+(declare-const max_hp Int)
+(declare-const result Int)
+
+; Preconditions (Requires)
+(assert (>= current (- 1000000000)))
+(assert (<= current 1000000000))
+(assert (>= delta (- 1000000000)))
+(assert (<= delta 1000000000))
+(assert (>= max_hp 0))
+(assert (<= max_hp 1000000000))
+
+; Function Body Definition
+(assert (= result (let ((candidate (hp_after_delta_unclamped current delta))) (ite (< candidate 0) 0 (ite (> candidate max_hp) max_hp candidate)))))
+
+; Goal: Find any counterexample violating Ensures clauses
+(assert (not (and (>= result 0) (<= result max_hp) (or (or (< (+ current delta) 0) (> (+ current delta) max_hp)) (= result (+ current delta))) (or (>= (+ current delta) 0) (= result 0)) (or (<= (+ current delta) max_hp) (= result max_hp)))))
+
+(check-sat)
+(get-model)
+
+
+; === Function: calc_damage_reduction ===
+; Axiom Formal Verification Query for: calc_damage_reduction
+(reset)
+(set-logic ALL)
+(set-option :produce-models true)
+
+(declare-const armor Int)
+(declare-const raw_damage Int)
+(declare-const result Int)
+
+; Preconditions (Requires)
+(assert (>= armor 0))
+(assert (<= armor 1000000000))
+(assert (>= raw_damage 0))
+(assert (<= raw_damage 1000000000))
+
+; Function Body Definition
+(assert (= result (let ((reduced (clamp_hp raw_damage (- armor) raw_damage))) (ite (= raw_damage 0) 0 (ite (= reduced 0) 1 reduced)))))
+
+; Goal: Find any counterexample violating Ensures clauses
+(assert (not (and (>= result 0) (<= result raw_damage) (or (distinct raw_damage 0) (= result 0)) (or (= raw_damage 0) (>= result 1)) (or (distinct armor 0) (= result raw_damage)))))
+
+(check-sat)
+(get-model)
+
+
 ; === Function: exp_for_next_level ===
 ; Axiom Formal Verification Query for: exp_for_next_level
+(reset)
 (set-logic ALL)
 (set-option :produce-models true)
 
@@ -49,6 +106,7 @@
 
 ; === Function: can_level_up ===
 ; Axiom Formal Verification Query for: can_level_up
+(reset)
 (set-logic ALL)
 (set-option :produce-models true)
 
