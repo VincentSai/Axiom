@@ -85,3 +85,42 @@ fn contracted_add(x: Int) -> Int
 
     let _ = std::fs::remove_dir_all(temp_dir);
 }
+
+#[test]
+fn test_default_mode_rejects_skipped_contracted_function_fail_closed() {
+    let bin = env!("CARGO_BIN_EXE_axiom");
+    let temp_dir =
+        std::env::temp_dir().join(format!("axiom_fail_closed_test_{}", std::process::id()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let ax_file = temp_dir.join("test_skipped.ax");
+    // String parameter is not supported by numeric SMT, so it will be Skipped
+    std::fs::write(
+        &ax_file,
+        r#"
+fn contracted_string_fn(s: String) -> Int
+    requires { s == "hello" }
+    ensures { result >= 0 }
+{
+    0
+}
+"#,
+    )
+    .unwrap();
+
+    let output = Command::new(bin)
+        .arg("verify")
+        .arg(&ax_file)
+        .output()
+        .expect("run verify in default mode");
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !output.status.success(),
+        "Default mode MUST fail-closed when a contracted function is skipped! stdout:\n{}",
+        stdout
+    );
+    assert!(stdout.contains("[SKIPPED_FAIL]"));
+
+    let _ = std::fs::remove_dir_all(temp_dir);
+}
+

@@ -1,5 +1,217 @@
 {
-  "generated_at": "2026-08-26T10:46:52.714530+00:00",
-  "nodes": {},
+  "generated_at": "2026-09-04T09:21:31.523753+00:00",
+  "nodes": {
+    "crates_axiom_agent_pool_src_lib_agenttaskpool": {
+      "code_fingerprint": "5ba0a03148f8bbb34de938d76464e4b711a62623f506d0121007b65d0dee6415",
+      "label": "AgentTaskPool",
+      "last": "2026-09-04T07:57:44.983485+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-04T07:57:44.983485+00:00",
+          "outcome": "useful",
+          "q": "Axiom有更新了，重新分析评价"
+        },
+        {
+          "date": "2026-09-04T06:20:47.082005+00:00",
+          "outcome": "useful",
+          "q": "Axiom有更新了，重新分析评价"
+        },
+        {
+          "date": "2026-09-04T02:56:44.630102+00:00",
+          "outcome": "useful",
+          "q": "分析代码，评估Axiom是不是像他描述的一样"
+        }
+      ],
+      "score": 2.98960609,
+      "source_file": "crates/axiom-agent-pool/src/lib.rs",
+      "status": "preferred",
+      "uses": 3
+    },
+    "crates_axiom_cli_src_lib_check": {
+      "code_fingerprint": "fbec1f3ebb8c62597ec5e3854155ddf67f12668f99edcbc4644aed41d70a52f3",
+      "label": "check()",
+      "last": "2026-08-26T14:21:06.783313+00:00",
+      "provenance": [
+        {
+          "date": "2026-08-26T14:21:06.783313+00:00",
+          "outcome": "useful",
+          "q": "Implement Ticket 17 CLI integration for export-wit, export-ffi, and scaffold, with ecosystem end-to-end tests."
+        }
+      ],
+      "score": 0.816166216,
+      "source_file": "crates/axiom-cli/src/lib.rs",
+      "status": "tentative",
+      "uses": 1
+    },
+    "crates_axiom_cli_src_lib_cli": {
+      "code_fingerprint": "fbec1f3ebb8c62597ec5e3854155ddf67f12668f99edcbc4644aed41d70a52f3",
+      "label": "Cli",
+      "last": "2026-08-26T14:21:06.783313+00:00",
+      "provenance": [
+        {
+          "date": "2026-08-26T14:21:06.783313+00:00",
+          "outcome": "useful",
+          "q": "Implement Ticket 17 CLI integration for export-wit, export-ffi, and scaffold, with ecosystem end-to-end tests."
+        }
+      ],
+      "score": 0.816166216,
+      "source_file": "crates/axiom-cli/src/lib.rs",
+      "status": "tentative",
+      "uses": 1
+    },
+    "crates_axiom_cli_src_lib_commands": {
+      "code_fingerprint": "fbec1f3ebb8c62597ec5e3854155ddf67f12668f99edcbc4644aed41d70a52f3",
+      "label": "Commands",
+      "last": "2026-08-26T14:21:06.783313+00:00",
+      "provenance": [
+        {
+          "date": "2026-08-26T14:21:06.783313+00:00",
+          "outcome": "useful",
+          "q": "Implement Ticket 17 CLI integration for export-wit, export-ffi, and scaffold, with ecosystem end-to-end tests."
+        }
+      ],
+      "score": 0.816166216,
+      "source_file": "crates/axiom-cli/src/lib.rs",
+      "status": "tentative",
+      "uses": 1
+    },
+    "crates_axiom_cli_src_lib_run": {
+      "code_fingerprint": "fbec1f3ebb8c62597ec5e3854155ddf67f12668f99edcbc4644aed41d70a52f3",
+      "label": "run()",
+      "last": "2026-08-26T14:21:06.783313+00:00",
+      "provenance": [
+        {
+          "date": "2026-08-26T14:21:06.783313+00:00",
+          "outcome": "useful",
+          "q": "Implement Ticket 17 CLI integration for export-wit, export-ffi, and scaffold, with ecosystem end-to-end tests."
+        }
+      ],
+      "score": 0.816166216,
+      "source_file": "crates/axiom-cli/src/lib.rs",
+      "status": "tentative",
+      "uses": 1
+    },
+    "crates_axiom_cli_src_lib_verify": {
+      "code_fingerprint": "fbec1f3ebb8c62597ec5e3854155ddf67f12668f99edcbc4644aed41d70a52f3",
+      "label": "verify()",
+      "last": "2026-09-04T02:56:44.630102+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-04T02:56:44.630102+00:00",
+          "outcome": "useful",
+          "q": "分析代码，评估Axiom是不是像他描述的一样"
+        }
+      ],
+      "score": 0.993845171,
+      "source_file": "crates/axiom-cli/src/lib.rs",
+      "status": "tentative",
+      "uses": 1
+    },
+    "crates_axiom_cli_tests_e2e_pipeline_test": {
+      "code_fingerprint": "dc56b81a2da947ba8765dfddf29fef83635898a0c0fce8f84d0b6bdcf93204f1",
+      "label": "e2e_pipeline_test.rs",
+      "last": "2026-09-04T07:57:44.983485+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-04T07:57:44.983485+00:00",
+          "outcome": "useful",
+          "q": "Axiom有更新了，重新分析评价"
+        },
+        {
+          "date": "2026-09-04T02:56:44.630102+00:00",
+          "outcome": "useful",
+          "q": "分析代码，评估Axiom是不是像他描述的一样"
+        },
+        {
+          "date": "2026-08-26T14:21:06.783313+00:00",
+          "outcome": "useful",
+          "q": "Implement Ticket 17 CLI integration for export-wit, export-ffi, and scaffold, with ecosystem end-to-end tests."
+        }
+      ],
+      "score": 2.808668103,
+      "source_file": "crates/axiom-cli/tests/e2e_pipeline_test.rs",
+      "status": "preferred",
+      "uses": 3
+    },
+    "crates_axiom_db_src_lib_astdatabase": {
+      "code_fingerprint": "f0415b16fe23e8f957be05e142af829e7bf7073d439e91a1407ed7b7a474f16b",
+      "label": "AstDatabase",
+      "last": "2026-09-04T07:57:44.983485+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-04T07:57:44.983485+00:00",
+          "outcome": "useful",
+          "q": "Axiom有更新了，重新分析评价"
+        },
+        {
+          "date": "2026-09-04T06:20:47.082005+00:00",
+          "outcome": "useful",
+          "q": "Axiom有更新了，重新分析评价"
+        },
+        {
+          "date": "2026-09-04T02:56:44.630102+00:00",
+          "outcome": "useful",
+          "q": "分析代码，评估Axiom是不是像他描述的一样"
+        }
+      ],
+      "score": 2.98960609,
+      "source_file": "crates/axiom-db/src/lib.rs",
+      "status": "preferred",
+      "uses": 3
+    },
+    "crates_axiom_smt_src_lib_smtresult": {
+      "code_fingerprint": "219c0a90fd26dace6cbcf5899c9ebff42c617f97fd1dff8f3454dcff79555afd",
+      "label": "SmtResult",
+      "last": "2026-09-04T07:57:44.983485+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-04T07:57:44.983485+00:00",
+          "outcome": "useful",
+          "q": "Axiom有更新了，重新分析评价"
+        },
+        {
+          "date": "2026-09-04T06:20:47.082005+00:00",
+          "outcome": "useful",
+          "q": "Axiom有更新了，重新分析评价"
+        }
+      ],
+      "score": 1.995760919,
+      "source_file": "crates/axiom-smt/src/lib.rs",
+      "status": "preferred",
+      "uses": 2
+    },
+    "crates_axiom_transpiler_src_lib_transpile_to_rust": {
+      "code_fingerprint": "27e36132563781b2102f89e954214cfbf28676ba679a7288af8e1b34d3514c87",
+      "label": "transpile_to_rust()",
+      "last": "2026-09-04T02:56:44.630102+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-04T02:56:44.630102+00:00",
+          "outcome": "useful",
+          "q": "分析代码，评估Axiom是不是像他描述的一样"
+        }
+      ],
+      "score": 0.993845171,
+      "source_file": "crates/axiom-transpiler/src/lib.rs",
+      "status": "tentative",
+      "uses": 1
+    },
+    "examples_benchmark_200_readme": {
+      "code_fingerprint": "6db78cf82f2853fef5ce6a265313332fa1e6021b1afc851087744114c3bf5667",
+      "label": "benchmark_200/README.md",
+      "last": "2026-09-04T07:57:44.983485+00:00",
+      "provenance": [
+        {
+          "date": "2026-09-04T07:57:44.983485+00:00",
+          "outcome": "useful",
+          "q": "Axiom有更新了，重新分析评价"
+        }
+      ],
+      "score": 0.998656716,
+      "source_file": "examples/benchmark_200/README.md",
+      "status": "tentative",
+      "uses": 1
+    }
+  },
   "version": 1
 }

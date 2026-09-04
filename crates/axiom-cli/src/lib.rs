@@ -18,7 +18,7 @@ use axiom_ffi_gen::{
 };
 use axiom_hole_extractor::{extract_holes, HoleTask};
 use axiom_parser::{parse_module, ParseError};
-use axiom_smt::{find_z3_executable, generate_smtlib2};
+use axiom_smt::{find_z3_executable, generate_smtlib2_with_module};
 use axiom_transpiler::{transpile_source_to_rust, TranspileError};
 use axiom_vfs::{export_database_module, sync_source_to_database, VfsError};
 use axiom_wit::{generate_wit_from_source, WitError};
@@ -608,13 +608,7 @@ fn verify(file: &Path, json: bool, strict: bool) -> Result<(), CliError> {
     let all_ok = reports.iter().all(|r| match r.status {
         DiagnosticStatus::Proved => true,
         DiagnosticStatus::Sampled => !strict,
-        DiagnosticStatus::Skipped => {
-            if strict && r.has_contracts {
-                false
-            } else {
-                true
-            }
-        }
+        DiagnosticStatus::Skipped => !r.has_contracts,
         DiagnosticStatus::ContractViolation
         | DiagnosticStatus::Unknown
         | DiagnosticStatus::TypeError
@@ -647,8 +641,8 @@ fn verify(file: &Path, json: bool, strict: bool) -> Result<(), CliError> {
                     }
                 }
                 DiagnosticStatus::Skipped => {
-                    if strict && r.has_contracts {
-                        println!("  [SKIPPED_FAIL] {func_name} - Has formal contracts but was skipped; --strict requires formal proof");
+                    if r.has_contracts {
+                        println!("  [SKIPPED_FAIL] {func_name} - Has formal contracts but was skipped (Fail-Closed)");
                     } else {
                         println!("  [SKIPPED] {func_name} - {}", r.diagnosis);
                     }
@@ -699,7 +693,7 @@ fn export_smt2(file: &Path, output: Option<&Path>) -> Result<(), CliError> {
         if func.ensures.is_empty() || !func.effects.is_empty() {
             continue;
         }
-        match generate_smtlib2(func) {
+        match generate_smtlib2_with_module(func, Some(&module)) {
             Ok(query) => {
                 combined_smt.push_str(&format!("; === Function: {} ===\n", func.name));
                 combined_smt.push_str(&query);

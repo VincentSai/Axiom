@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use axiom_agent_pool::{AgentTaskPool, SmtResult};
+use axiom_agent_pool::{AgentTaskPool, PoolVerificationPolicy, SmtResult};
 use axiom_db::AstDatabase;
 use axiom_hole_extractor::extract_holes;
 use axiom_parser::parse_module;
@@ -20,7 +20,9 @@ static NEXT_TEMP_DIR: AtomicUsize = AtomicUsize::new(0);
 fn twenty_workers_verify_and_publish_a_hole_free_release() {
     let skeleton = twenty_hole_skeleton();
     let pool = Arc::new(Mutex::new(
-        AgentTaskPool::from_source(&skeleton).expect("20-hole skeleton should parse"),
+        AgentTaskPool::from_source(&skeleton)
+            .expect("20-hole skeleton should parse")
+            .with_policy(PoolVerificationPolicy::Permissive),
     ));
 
     let tasks = pool

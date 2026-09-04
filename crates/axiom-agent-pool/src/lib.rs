@@ -7,16 +7,16 @@ use axiom_ast::{Expr, Module};
 use axiom_hole_extractor::extract_holes;
 pub use axiom_hole_extractor::HoleTask;
 use axiom_parser::{parse_expr, parse_module, ParseError};
-use axiom_smt::verify_function;
+use axiom_smt::verify_function_in_module;
 pub use axiom_smt::SmtResult;
 
 /// Verification policy for accepting hole candidate solutions into the pool.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PoolVerificationPolicy {
     /// Strict formal mode: contracted functions MUST be formally Proved by SMT solver.
+    #[default]
     StrictProved,
     /// Permissive mode: allows discrete grid sampling (Sampled) when solver is unavailable.
-    #[default]
     Permissive,
 }
 
@@ -43,7 +43,7 @@ impl AgentTaskPool {
             module: skeleton_module,
             tasks,
             pending_holes,
-            policy: PoolVerificationPolicy::Permissive,
+            policy: PoolVerificationPolicy::default(),
         }
     }
 
@@ -56,6 +56,11 @@ impl AgentTaskPool {
     /// Set verification policy mutably.
     pub fn set_policy(&mut self, policy: PoolVerificationPolicy) {
         self.policy = policy;
+    }
+
+    /// Get current verification policy for this pool.
+    pub fn policy(&self) -> PoolVerificationPolicy {
+        self.policy
     }
 
     /// Parse an Axiom skeleton module and create its task pool.
@@ -114,7 +119,7 @@ impl AgentTaskPool {
         let mut final_result = SmtResult::Sampled { points_checked: 0 };
         for function_index in affected_functions {
             let func = &candidate_module.functions[function_index];
-            let result = verify_function(func);
+            let result = verify_function_in_module(func, &candidate_module);
             match &result {
                 SmtResult::CounterExample { .. } => return Ok(result),
                 SmtResult::Unknown(_) => {

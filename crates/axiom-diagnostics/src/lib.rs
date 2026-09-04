@@ -6,7 +6,7 @@ use axiom_ast::{BinaryOperator, Expr, Literal, Module, UnaryOperator};
 use axiom_effects::{check_module_effects, EffectError};
 use axiom_hole_extractor::extract_holes;
 use axiom_parser::parse_module;
-use axiom_smt::{verify_function, SmtResult};
+use axiom_smt::{verify_function_in_module, SmtResult};
 use serde::{Deserialize, Serialize};
 use typecheck::check_module_types;
 
@@ -117,7 +117,7 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
         .iter()
         .map(|function| {
             let has_contracts = !function.requires.is_empty() || !function.ensures.is_empty();
-            match verify_function(function) {
+            match verify_function_in_module(function, module) {
                 SmtResult::Proved { solver } => DiagnosticReport {
                     status: DiagnosticStatus::Proved,
                     function_name: Some(function.name.clone()),

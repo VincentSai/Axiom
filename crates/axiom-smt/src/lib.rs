@@ -11,7 +11,7 @@ pub mod z3_solver;
 use std::collections::HashMap;
 
 use axiom_ast::{FunctionDecl, Module};
-pub use smtlib2::generate_smtlib2;
+pub use smtlib2::{generate_smtlib2, generate_smtlib2_with_module};
 pub use z3_solver::{find_z3_executable, run_z3_query, Z3Result};
 
 /// Concrete numeric parameter assignments that demonstrate a contract violation.
@@ -70,6 +70,29 @@ pub fn verify_function(func: &FunctionDecl) -> SmtResult {
     internal_solver::verify_with_internal_solver(func)
 }
 
+/// Verifies a function using full module context for record flattening and pure function calls.
+pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtResult {
+    if let Some(z3_path) = find_z3_executable() {
+        if let Ok(smt2_query) = generate_smtlib2_with_module(func, Some(module)) {
+            match run_z3_query(&z3_path, &smt2_query) {
+                Ok(Z3Result::Unsat) => {
+                    return SmtResult::Proved {
+                        solver: "Microsoft Z3 (SMT-LIB2)".into(),
+                    }
+                }
+                Ok(Z3Result::Sat(ce)) => return SmtResult::CounterExample(ce),
+                Ok(Z3Result::Unknown(reason)) => return SmtResult::Unknown(reason),
+                Err(_) => {
+                    // Fall through to internal solver on invocation error
+                }
+            }
+        }
+    }
+
+    let ctx = internal_solver::SolverContext::from_module(module);
+    internal_solver::verify_with_internal_solver_context(func, Some(&ctx))
+}
+
 /// Verifies a function explicitly using the Z3 solver via SMT-LIB2 pipe.
 pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String> {
     let z3_path = find_z3_executable()
@@ -85,11 +108,11 @@ pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String>
     }
 }
 
-/// Verify all functions in a module, keyed by function name.
+/// Verify all functions in a module, keyed by function name, with full module context.
 pub fn verify_module(module: &Module) -> HashMap<String, SmtResult> {
     module
         .functions
         .iter()
-        .map(|function| (function.name.clone(), verify_function(function)))
+        .map(|function| (function.name.clone(), verify_function_in_module(function, module)))
         .collect()
 }

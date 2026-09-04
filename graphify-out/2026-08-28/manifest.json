@@ -1,0 +1,467 @@
+{
+  "crates/axiom-ast/src/lib.rs": {
+    "mtime": 1787739589.4246466,
+    "ast_hash": "39049ef0df28208094f07607745cb275",
+    "semantic_hash": "39049ef0df28208094f07607745cb275"
+  },
+  "crates/axiom-cli/src/lib.rs": {
+    "mtime": 1787815046.5738423,
+    "ast_hash": "3fbd6baa7f56e217cffabb8a5b0e692c",
+    "semantic_hash": ""
+  },
+  "crates/axiom-cli/src/main.rs": {
+    "mtime": 1787742659.7971494,
+    "ast_hash": "a5a4f6be944db3563c1f47404a1f7b58",
+    "semantic_hash": ""
+  },
+  "crates/axiom-cli/tests/e2e_pipeline_test.rs": {
+    "mtime": 1787751948.389628,
+    "ast_hash": "a913c114aa64e521d69c6d6a5597efd5",
+    "semantic_hash": ""
+  },
+  "crates/axiom-hole-extractor/src/lib.rs": {
+    "mtime": 1787739589.4256692,
+    "ast_hash": "d698a6368520f3b0142f068d3b75d608",
+    "semantic_hash": "d698a6368520f3b0142f068d3b75d608"
+  },
+  "crates/axiom-hole-extractor/tests/hole_extraction_test.rs": {
+    "mtime": 1787739589.426175,
+    "ast_hash": "21c6ae6c1b4d764f1f4abaa74d9ec2a7",
+    "semantic_hash": "21c6ae6c1b4d764f1f4abaa74d9ec2a7"
+  },
+  "crates/axiom-parser/src/lib.rs": {
+    "mtime": 1787800295.8954363,
+    "ast_hash": "3d08c008d7461a62a4242173581f1cf6",
+    "semantic_hash": ""
+  },
+  "crates/axiom-parser/tests/adt_and_match_test.rs": {
+    "mtime": 1787739006.7138815,
+    "ast_hash": "4c263c55d786c24371460ee607623309",
+    "semantic_hash": "4c263c55d786c24371460ee607623309"
+  },
+  "crates/axiom-parser/tests/effects_and_contracts_test.rs": {
+    "mtime": 1787741515.5603318,
+    "ast_hash": "66f9a64788198195a3999811271b40f3",
+    "semantic_hash": ""
+  },
+  "crates/axiom-parser/tests/hole_syntax_test.rs": {
+    "mtime": 1787739589.4266858,
+    "ast_hash": "6473f2170662845c37fdb623a292770e",
+    "semantic_hash": "6473f2170662845c37fdb623a292770e"
+  },
+  "crates/axiom-parser/tests/pure_func_test.rs": {
+    "mtime": 1787738543.449929,
+    "ast_hash": "47080b760b89ca907959f9e661bbcbbd",
+    "semantic_hash": "47080b760b89ca907959f9e661bbcbbd"
+  },
+  "crates/axiom-transpiler/src/lib.rs": {
+    "mtime": 1787798725.4339025,
+    "ast_hash": "af6b8443fccbb223e211ff75af4d9898",
+    "semantic_hash": ""
+  },
+  "crates/axiom-transpiler/tests/transpiler_test.rs": {
+    "mtime": 1787800319.3643758,
+    "ast_hash": "2dc99891c49b694f3c417bcf6bf8c286",
+    "semantic_hash": ""
+  },
+  ".axiom/astdb.json": {
+    "mtime": 1787796399.9176307,
+    "ast_hash": "843c73a63f2d8290f8e5d34e6805b892",
+    "semantic_hash": ""
+  },
+  "crates/axiom-agent-pool/src/lib.rs": {
+    "mtime": 1787800261.0260382,
+    "ast_hash": "299a1ef5700633d145451176590d6262",
+    "semantic_hash": ""
+  },
+  "crates/axiom-agent-pool/tests/concurrent_pool_test.rs": {
+    "mtime": 1787746555.9198687,
+    "ast_hash": "e97be79b14fcc0e1eb8d5d4c8b1b1f7f",
+    "semantic_hash": ""
+  },
+  "crates/axiom-cli/tests/ecosystem_e2e_test.rs": {
+    "mtime": 1787754222.958957,
+    "ast_hash": "f17832606970f4acbcc5021c18f309f3",
+    "semantic_hash": ""
+  },
+  "crates/axiom-cli/tests/multi_agent_e2e_test.rs": {
+    "mtime": 1787751948.389628,
+    "ast_hash": "2470b6fd85b5bb4a4ef7445cd19aa8b3",
+    "semantic_hash": ""
+  },
+  "crates/axiom-cli/tests/self_healing_e2e_test.rs": {
+    "mtime": 1787742549.9740682,
+    "ast_hash": "a97c436eae60e9f196bf0892c681a58d",
+    "semantic_hash": ""
+  },
+  "crates/axiom-db/src/lib.rs": {
+    "mtime": 1787751948.3906229,
+    "ast_hash": "af9c392af748e443cb7e6e649b1913cb",
+    "semantic_hash": ""
+  },
+  "crates/axiom-db/tests/ast_db_test.rs": {
+    "mtime": 1787751948.3911407,
+    "ast_hash": "29b8194a498e164aca5c92f6dedf79df",
+    "semantic_hash": ""
+  },
+  "crates/axiom-diagnostics/src/lib.rs": {
+    "mtime": 1787742056.5118358,
+    "ast_hash": "a715ce899883e3e899f60860b4f6eba0",
+    "semantic_hash": ""
+  },
+  "crates/axiom-diagnostics/tests/diagnostics_protocol_test.rs": {
+    "mtime": 1787742056.5128329,
+    "ast_hash": "7ba14a07828a23716a181df8f8a4957f",
+    "semantic_hash": ""
+  },
+  "crates/axiom-effects/src/checker.rs": {
+    "mtime": 1787741515.5583375,
+    "ast_hash": "6a95037ed8cbc067337282dd9de9d254",
+    "semantic_hash": ""
+  },
+  "crates/axiom-effects/src/handler.rs": {
+    "mtime": 1787741515.5583375,
+    "ast_hash": "65552aa2aaf97b359e12cecf4ed23962",
+    "semantic_hash": ""
+  },
+  "crates/axiom-effects/src/lib.rs": {
+    "mtime": 1787741515.5593355,
+    "ast_hash": "d600519d09d37126fafec480d1f3e917",
+    "semantic_hash": ""
+  },
+  "crates/axiom-effects/tests/effects_checker_test.rs": {
+    "mtime": 1787741515.5593355,
+    "ast_hash": "d3f174b2b34fe759d5fbc7beaab2b39b",
+    "semantic_hash": ""
+  },
+  "crates/axiom-ffi-gen/src/lib.rs": {
+    "mtime": 1787753641.877021,
+    "ast_hash": "fa9f2ad12585be8f9545cc82470fe03f",
+    "semantic_hash": ""
+  },
+  "crates/axiom-ffi-gen/tests/ffi_gen_test.rs": {
+    "mtime": 1787753641.8780181,
+    "ast_hash": "d16b9f125d52321908a1625c19c95ed2",
+    "semantic_hash": ""
+  },
+  "crates/axiom-smt/src/lib.rs": {
+    "mtime": 1787741519.1343944,
+    "ast_hash": "b35591a2187b20011ea5141489591f30",
+    "semantic_hash": ""
+  },
+  "crates/axiom-smt/tests/smt_solver_test.rs": {
+    "mtime": 1787741519.1343944,
+    "ast_hash": "9cf1dd240ea659b9cd2a5eeb5ed6ed64",
+    "semantic_hash": ""
+  },
+  "crates/axiom-vfs/src/lib.rs": {
+    "mtime": 1787746555.8225298,
+    "ast_hash": "aa60bdd52496a5a976a0aa4f333bb4df",
+    "semantic_hash": ""
+  },
+  "crates/axiom-vfs/tests/projection_roundtrip_test.rs": {
+    "mtime": 1787746555.8230395,
+    "ast_hash": "52d747e30181e4b4abdfde61d8d2bbbd",
+    "semantic_hash": ""
+  },
+  "crates/axiom-wit/src/lib.rs": {
+    "mtime": 1787753641.7774582,
+    "ast_hash": "30d5c57c4c3bd8f057621b9f42cb1294",
+    "semantic_hash": ""
+  },
+  "crates/axiom-wit/tests/wit_generation_test.rs": {
+    "mtime": 1787753641.7779717,
+    "ast_hash": "c396682f56d47c6451fd2156ece2a561",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/py/engine_200/__init__.py": {
+    "mtime": 1787818054.9092002,
+    "ast_hash": "18a76fce2a2ba97ee7185d698d76a39a",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/py/engine_200/models.py": {
+    "mtime": 1787818038.1839972,
+    "ast_hash": "6f04ad75a3f5b9ac81de23b81839d13c",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/py/engine_200/tier0_spatial.py": {
+    "mtime": 1787817786.854765,
+    "ast_hash": "16a567d58d9ffd337fd43148dd06aab4",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/py/engine_200/tier1_stats.py": {
+    "mtime": 1787817789.398799,
+    "ast_hash": "4409ddb33c7066740c5cd87c9a05b068",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/py/engine_200/tier2_combat.py": {
+    "mtime": 1787817806.8362694,
+    "ast_hash": "6f7f99fff5765b7bf3d891f8d236d9ed",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/py/engine_200/tier3_ai_loot.py": {
+    "mtime": 1787817802.1504395,
+    "ast_hash": "1492474c9937284e82a132c26f6680ea",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/py/engine_200/tier4_world.py": {
+    "mtime": 1787818038.1839972,
+    "ast_hash": "63c441409055568654bf90558b210873",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/py/tests/test_engine_200.py": {
+    "mtime": 1787818129.3536465,
+    "ast_hash": "a959c3bfc30bc7b7c21d73c4951ed217",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/rs/src/lib.rs": {
+    "mtime": 1787813494.366502,
+    "ast_hash": "fa3905785a64771960c71596e2db42b4",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/rs/src/tier0_spatial.rs": {
+    "mtime": 1787813629.9642165,
+    "ast_hash": "8489049b8050495cf1bd94d69411cf58",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/rs/src/tier1_stats.rs": {
+    "mtime": 1787813603.012635,
+    "ast_hash": "d24f34e9ec49ea1e7699e5273865ff78",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/rs/src/tier2_combat.rs": {
+    "mtime": 1787813660.4329593,
+    "ast_hash": "b01c370cc8566e6ca5ec0037c1fe4d9e",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/rs/src/tier3_ai_loot.rs": {
+    "mtime": 1787813362.6807635,
+    "ast_hash": "b3f4b12c4c50164dd18e7a251c820ee9",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/rs/src/tier4_world.rs": {
+    "mtime": 1787813494.366502,
+    "ast_hash": "6f2733dbbede970e772c484b13c5f6e4",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/rs/tests/engine_200_test.rs": {
+    "mtime": 1787813629.9715912,
+    "ast_hash": "f4ec20e51e1b08bb88bbfd661a044065",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/ts/package.json": {
+    "mtime": 1787819424.9267943,
+    "ast_hash": "bd24b74939a2dc378c4fdac6c9170d28",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/ts/src/index.ts": {
+    "mtime": 1787819334.7880642,
+    "ast_hash": "78a2c874c4c4b2bd665b8926e6898b2f",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/ts/src/models.ts": {
+    "mtime": 1787819334.7874942,
+    "ast_hash": "615a6ecadafd77f519ca10b587d1f819",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/ts/src/tier0_spatial.ts": {
+    "mtime": 1787819029.5748434,
+    "ast_hash": "4de1a488b0158d2c32c9bbc3c4dc3db7",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/ts/src/tier1_stats.ts": {
+    "mtime": 1787819148.0525622,
+    "ast_hash": "bc0827883a1d7df8cd39dcda5624f124",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/ts/src/tier2_combat.ts": {
+    "mtime": 1787819140.6085653,
+    "ast_hash": "654ab3a9e39fe952588e9fa6621be84c",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/ts/src/tier3_ai_loot.ts": {
+    "mtime": 1787819037.3423262,
+    "ast_hash": "85108486fff7a3747d01d5483aa56ffe",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/ts/src/tier4_world.ts": {
+    "mtime": 1787819334.7880642,
+    "ast_hash": "95649f1d4ef63de7ae26749f975bbaa6",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/ts/tests/engine_200.test.ts": {
+    "mtime": 1787819334.788576,
+    "ast_hash": "46c656ea2bc40bdbc7ed37ccbcb6e396",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/ts/tsconfig.json": {
+    "mtime": 1787818925.32416,
+    "ast_hash": "cdcfcbef4eaf9dd9a8fb2ef642bbe82b",
+    "semantic_hash": ""
+  },
+  "README.en.md": {
+    "mtime": 1787826765.6530392,
+    "ast_hash": "f10c108c8737ad2b1a9066303878c60b",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1787826749.4866,
+    "ast_hash": "9cb2823ccb3907d0f49f02a3fb879fcb",
+    "semantic_hash": ""
+  },
+  "README.zh-CN.md": {
+    "mtime": 1787826749.4866,
+    "ast_hash": "9cb2823ccb3907d0f49f02a3fb879fcb",
+    "semantic_hash": ""
+  },
+  "README.zh-TW.md": {
+    "mtime": 1787826757.181757,
+    "ast_hash": "e67261fdcb91a2464f58ce3365897e94",
+    "semantic_hash": ""
+  },
+  "docs/ARCHITECTURE.md": {
+    "mtime": 1787826740.0001822,
+    "ast_hash": "2b9c04ba5779798558c5fa7ea18b9cff",
+    "semantic_hash": ""
+  },
+  "docs/MULTI_AGENT_WORKFLOW.md": {
+    "mtime": 1787826740.0019703,
+    "ast_hash": "fd74685d28cb71a518a2e2dd77bc9b05",
+    "semantic_hash": ""
+  },
+  "docs/ROADMAP.md": {
+    "mtime": 1787826740.0029674,
+    "ast_hash": "a1daab1a063b1da74d06f67dad9aeae8",
+    "semantic_hash": ""
+  },
+  "docs/SPECIFICATION.md": {
+    "mtime": 1787826740.003965,
+    "ast_hash": "214002c3b3fbdaf461a19e30dec98714",
+    "semantic_hash": ""
+  },
+  "docs/en/ARCHITECTURE.md": {
+    "mtime": 1787826736.563268,
+    "ast_hash": "8a61c91641b66fb79e5337576d3d5d88",
+    "semantic_hash": ""
+  },
+  "docs/en/MULTI_AGENT_WORKFLOW.md": {
+    "mtime": 1787826736.5646088,
+    "ast_hash": "cedbc6f0f99984361a4a0b36cbcc0dae",
+    "semantic_hash": ""
+  },
+  "docs/en/ROADMAP.md": {
+    "mtime": 1787826736.5656,
+    "ast_hash": "4e477c1f5741ff323ab0d882cce85e53",
+    "semantic_hash": ""
+  },
+  "docs/en/SPECIFICATION.md": {
+    "mtime": 1787826736.5675957,
+    "ast_hash": "5b6939440db23f599b6ff8c2522b4b8c",
+    "semantic_hash": ""
+  },
+  "docs/zh-CN/ARCHITECTURE.md": {
+    "mtime": 1787826712.8991823,
+    "ast_hash": "909b47ad672b0e22b829e260628cbae6",
+    "semantic_hash": ""
+  },
+  "docs/zh-CN/MULTI_AGENT_WORKFLOW.md": {
+    "mtime": 1787826712.9017172,
+    "ast_hash": "2ed37163f5d336710f43e1b7c74c7294",
+    "semantic_hash": ""
+  },
+  "docs/zh-CN/ROADMAP.md": {
+    "mtime": 1787826712.9032197,
+    "ast_hash": "e13896781e39fb7719c68d46aef8f97d",
+    "semantic_hash": ""
+  },
+  "docs/zh-CN/SPECIFICATION.md": {
+    "mtime": 1787826712.9042172,
+    "ast_hash": "3ede5f598fe2f2dec4168e7b8b2a8b8d",
+    "semantic_hash": ""
+  },
+  "docs/zh-TW/ARCHITECTURE.md": {
+    "mtime": 1787826724.3186657,
+    "ast_hash": "5932a2a3eae01de97f7797f1f74f7795",
+    "semantic_hash": ""
+  },
+  "docs/zh-TW/MULTI_AGENT_WORKFLOW.md": {
+    "mtime": 1787826724.3206573,
+    "ast_hash": "17a8d61a88f18a67b7c5527a809030a4",
+    "semantic_hash": ""
+  },
+  "docs/zh-TW/ROADMAP.md": {
+    "mtime": 1787826724.3206573,
+    "ast_hash": "9658a6806487db5a0f7b701991d602e6",
+    "semantic_hash": ""
+  },
+  "docs/zh-TW/SPECIFICATION.md": {
+    "mtime": 1787826724.3221426,
+    "ast_hash": "20bbafa6dd5d01af84839073528af954",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/Benchmark_ax.md": {
+    "mtime": 1787817329.3734014,
+    "ast_hash": "17fb1b26078cd9b6b9bb4e4ea483e081",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/Benchmark_py.md": {
+    "mtime": 1787818286.35289,
+    "ast_hash": "a96e98f5c05e4ebe48706170e6e98a09",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/Benchmark_rs.md": {
+    "mtime": 1787813776.582167,
+    "ast_hash": "bd36459b6319e2a347e8ea6ef5b1fc47",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/Benchmark_ts.md": {
+    "mtime": 1787819453.975862,
+    "ast_hash": "0a63979de69aded060b1750a2fe36e7d",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/README.en.md": {
+    "mtime": 1787826777.277563,
+    "ast_hash": "716197041451d47f90dccf0a45ab7688",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/README.md": {
+    "mtime": 1787826769.196273,
+    "ast_hash": "0c7e665f7a6b4a193825cbfec8bf465f",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/README.zh-CN.md": {
+    "mtime": 1787826769.196273,
+    "ast_hash": "0c7e665f7a6b4a193825cbfec8bf465f",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/README.zh-TW.md": {
+    "mtime": 1787826777.2764604,
+    "ast_hash": "bb177b84d3d219faeb1260507a8ac845",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_200/SPEC_200.md": {
+    "mtime": 1787810865.0618465,
+    "ast_hash": "528ca4da923bdb3373d67ce27efc6aec",
+    "semantic_hash": ""
+  },
+  "graphify-out/memory/query_20260826_142106_implement_ticket_17_cli_integration_for_export_wit.md": {
+    "mtime": 1787754222.9594696,
+    "ast_hash": "3039b02096af1bb61c1aea4f6de08e27",
+    "semantic_hash": ""
+  },
+  "skills/axiom-architect/SKILL.md": {
+    "mtime": 1787795304.241404,
+    "ast_hash": "d06fc1c23fbb74fce0aa9a46f8b8222f",
+    "semantic_hash": ""
+  },
+  "skills/axiom-healer/SKILL.md": {
+    "mtime": 1787795315.7527523,
+    "ast_hash": "1064531e21b851d36174f49b991d4147",
+    "semantic_hash": ""
+  },
+  "skills/axiom-worker/SKILL.md": {
+    "mtime": 1787795309.961354,
+    "ast_hash": "b9a3fe91830d4194eddb6f44340f720b",
+    "semantic_hash": ""
+  }
+}
