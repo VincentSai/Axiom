@@ -236,8 +236,12 @@ fn transpile_expr(expr: &Expr, module: &Module) -> Result<String, TranspileError
                 .collect::<Result<Vec<_>, TranspileError>>()?
                 .join(", ");
             
-            // Try to infer record type name from base if it's a known identifier in module
-            let ty_name = find_record_type_for_expr(base, module).unwrap_or_else(|| "Point".to_string());
+            // Try to infer record type name from base if it's a known identifier in module or by fields
+            let ty_name = find_record_type_for_expr(base, updates, module).ok_or_else(|| {
+                TranspileError::UnsupportedExpression(format!(
+                    "cannot infer record type for record update on `{base_str}`"
+                ))
+            })?;
             if updates.is_empty() {
                 Ok(format!("{ty_name} {{ ..{base_str} }}"))
             } else {
@@ -258,7 +262,11 @@ fn transpile_expr(expr: &Expr, module: &Module) -> Result<String, TranspileError
     }
 }
 
-fn find_record_type_for_expr(base: &Expr, module: &Module) -> Option<String> {
+fn find_record_type_for_expr(
+    base: &Expr,
+    updates: &[(String, Expr)],
+    module: &Module,
+) -> Option<String> {
     if let Expr::Ident(name) = base {
         for func in &module.functions {
             for param in &func.params {
@@ -268,9 +276,69 @@ fn find_record_type_for_expr(base: &Expr, module: &Module) -> Option<String> {
                     }
                 }
             }
+            if let Some(ty_name) = find_type_in_block(&func.body, name) {
+                return Some(ty_name);
+            }
         }
     }
+
+    let update_keys: Vec<&str> = updates.iter().map(|(k, _)| k.as_str()).collect();
+    let mut candidate_records = Vec::new();
+    for ty_def in &module.types {
+        if let TypeDef::Record { name, fields } = ty_def {
+            if update_keys.iter().all(|k| fields.iter().any(|f| &f.name == k)) {
+                candidate_records.push(name.clone());
+            }
+        }
+    }
+
+    if candidate_records.len() == 1 {
+        return Some(candidate_records.remove(0));
+    }
+
+    let all_records: Vec<String> = module
+        .types
+        .iter()
+        .filter_map(|t| match t {
+            TypeDef::Record { name, .. } => Some(name.clone()),
+            _ => None,
+        })
+        .collect();
+    if all_records.len() == 1 {
+        return Some(all_records[0].clone());
+    }
+
     None
+}
+
+fn find_type_in_block(expr: &Expr, target_var: &str) -> Option<String> {
+    match expr {
+        Expr::Let { name, value } => {
+            if name == target_var {
+                if let Expr::RecordInit {
+                    ty_name: Some(ref ty),
+                    ..
+                } = **value
+                {
+                    return Some(ty.clone());
+                }
+            }
+            find_type_in_block(value, target_var)
+        }
+        Expr::Block { statements, tail } => {
+            for stmt in statements {
+                if let Some(found) = find_type_in_block(stmt, target_var) {
+                    return Some(found);
+                }
+            }
+            if let Some(tail_expr) = tail {
+                find_type_in_block(tail_expr, target_var)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
 }
 
 fn transpile_pattern(pattern: &Pattern) -> String {

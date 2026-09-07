@@ -11,17 +11,35 @@ use crate::SmtResult;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
-    Num(f64),
+    Num { val: f64, is_int: bool },
     Bool(bool),
     Record(HashMap<String, Value>),
 }
 
 impl Value {
+    pub fn num(val: f64) -> Self {
+        Self::Num { val, is_int: false }
+    }
+
+    pub fn int(val: i64) -> Self {
+        Self::Num {
+            val: val as f64,
+            is_int: true,
+        }
+    }
+
     fn as_f64(&self) -> Option<f64> {
         match self {
-            Self::Num(n) => Some(*n),
+            Self::Num { val, .. } => Some(*val),
             Self::Bool(b) => Some(if *b { 1.0 } else { 0.0 }),
             Self::Record(_) => None,
+        }
+    }
+
+    fn is_int(&self) -> bool {
+        match self {
+            Self::Num { is_int, .. } => *is_int,
+            _ => false,
         }
     }
 
@@ -133,10 +151,11 @@ pub fn verify_with_internal_solver_context(
     candidates.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
 
     let grid = generate_grid(&param_names, &candidates);
+    let param_type_map: HashMap<String, Type> = param_names.into_iter().collect();
 
     for point in &grid {
         let mut env = HashMap::new();
-        populate_env_records(point, &mut env);
+        populate_env_records(point, &param_type_map, &mut env);
 
         // 1. Evaluate requires
         let mut req_met = true;
@@ -221,14 +240,20 @@ fn flatten_param(
     }
 }
 
-fn populate_env_records(point: &HashMap<String, f64>, env: &mut HashMap<String, Value>) {
+fn populate_env_records(
+    point: &HashMap<String, f64>,
+    param_types: &HashMap<String, Type>,
+    env: &mut HashMap<String, Value>,
+) {
     for (key, &val) in point {
-        env.insert(key.clone(), Value::Num(val));
+        let is_int = param_types.get(key).map_or(false, |ty| matches!(ty, Type::Int));
+        env.insert(key.clone(), Value::Num { val, is_int });
     }
     for (key, &val) in point {
+        let is_int = param_types.get(key).map_or(false, |ty| matches!(ty, Type::Int));
         let parts: Vec<&str> = key.split('.').collect();
         if parts.len() > 1 {
-            insert_nested_record(env, &parts, Value::Num(val));
+            insert_nested_record(env, &parts, Value::Num { val, is_int });
         }
     }
 }
@@ -452,10 +477,10 @@ fn eval_expr_internal(
     depth: usize,
 ) -> Result<Value, String> {
     match expr {
-        Expr::Literal(Literal::Int(n)) => Ok(Value::Num(*n as f64)),
-        Expr::Literal(Literal::Float(f)) => Ok(Value::Num(*f)),
+        Expr::Literal(Literal::Int(n)) => Ok(Value::int(*n)),
+        Expr::Literal(Literal::Float(f)) => Ok(Value::num(*f)),
         Expr::Literal(Literal::Bool(b)) => Ok(Value::Bool(*b)),
-        Expr::Literal(Literal::Unit) => Ok(Value::Num(0.0)),
+        Expr::Literal(Literal::Unit) => Ok(Value::num(0.0)),
         Expr::Literal(Literal::String(_)) => Err("strings unsupported in numeric SMT".into()),
         Expr::Ident(name) => env
             .get(name)
@@ -513,14 +538,14 @@ fn eval_expr_internal(
                         }
                     }
                     Pattern::Literal(Literal::Int(pi)) => {
-                        if let Value::Num(vn) = target_val {
+                        if let Value::Num { val: vn, .. } = target_val {
                             if (*pi as f64 - vn).abs() < 1e-9 {
                                 matched = true;
                             }
                         }
                     }
                     Pattern::Literal(Literal::Float(pf)) => {
-                        if let Value::Num(vn) = target_val {
+                        if let Value::Num { val: vn, .. } = target_val {
                             if (*pf - vn).abs() < 1e-9 {
                                 matched = true;
                             }
@@ -593,7 +618,7 @@ fn eval_expr_internal(
             if let Some(t) = tail {
                 eval_expr_internal(t, env, ctx, depth + 1)
             } else {
-                Ok(Value::Num(0.0))
+                Ok(Value::num(0.0))
             }
         }
         Expr::UnaryOp { op, operand } => {
@@ -601,7 +626,10 @@ fn eval_expr_internal(
             match op {
                 UnaryOperator::Negate => {
                     let num = val.as_f64().ok_or_else(|| "cannot negate non-number".to_string())?;
-                    Ok(Value::Num(-num))
+                    Ok(Value::Num {
+                        val: -num,
+                        is_int: val.is_int(),
+                    })
                 }
                 UnaryOperator::Not => {
                     let b = val.as_bool().ok_or_else(|| "cannot invert non-bool".to_string())?;
@@ -617,25 +645,37 @@ fn eval_expr_internal(
                 BinaryOperator::Add => {
                     let l = l_val.as_f64().ok_or("type mismatch in +")?;
                     let r = r_val.as_f64().ok_or("type mismatch in +")?;
-                    Ok(Value::Num(l + r))
+                    let is_int = l_val.is_int() && r_val.is_int();
+                    Ok(Value::Num { val: l + r, is_int })
                 }
                 BinaryOperator::Subtract => {
                     let l = l_val.as_f64().ok_or("type mismatch in -")?;
                     let r = r_val.as_f64().ok_or("type mismatch in -")?;
-                    Ok(Value::Num(l - r))
+                    let is_int = l_val.is_int() && r_val.is_int();
+                    Ok(Value::Num { val: l - r, is_int })
                 }
                 BinaryOperator::Multiply => {
                     let l = l_val.as_f64().ok_or("type mismatch in *")?;
                     let r = r_val.as_f64().ok_or("type mismatch in *")?;
-                    Ok(Value::Num(l * r))
+                    let is_int = l_val.is_int() && r_val.is_int();
+                    Ok(Value::Num { val: l * r, is_int })
                 }
                 BinaryOperator::Divide => {
                     let l = l_val.as_f64().ok_or("type mismatch in /")?;
                     let r = r_val.as_f64().ok_or("type mismatch in /")?;
                     if r == 0.0 {
                         Err("division by zero".into())
+                    } else if l_val.is_int() && r_val.is_int() {
+                        // Integer Truncation: 整数除法采用截断整除，符合语言确定性整数语义
+                        Ok(Value::Num {
+                            val: (l / r).trunc(),
+                            is_int: true,
+                        })
                     } else {
-                        Ok(Value::Num(l / r))
+                        Ok(Value::Num {
+                            val: l / r,
+                            is_int: false,
+                        })
                     }
                 }
                 BinaryOperator::GreaterThan => {
@@ -659,13 +699,17 @@ fn eval_expr_internal(
                     Ok(Value::Bool(l <= r))
                 }
                 BinaryOperator::Equal | BinaryOperator::Is => match (&l_val, &r_val) {
-                    (Value::Num(l), Value::Num(r)) => Ok(Value::Bool((l - r).abs() < 1e-9)),
+                    (Value::Num { val: l, .. }, Value::Num { val: r, .. }) => {
+                        Ok(Value::Bool((l - r).abs() < 1e-9))
+                    }
                     (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l == r)),
                     (Value::Record(l), Value::Record(r)) => Ok(Value::Bool(records_equal(l, r))),
                     _ => Ok(Value::Bool(false)),
                 },
                 BinaryOperator::NotEqual => match (&l_val, &r_val) {
-                    (Value::Num(l), Value::Num(r)) => Ok(Value::Bool((l - r).abs() >= 1e-9)),
+                    (Value::Num { val: l, .. }, Value::Num { val: r, .. }) => {
+                        Ok(Value::Bool((l - r).abs() >= 1e-9))
+                    }
                     (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l != r)),
                     (Value::Record(l), Value::Record(r)) => Ok(Value::Bool(!records_equal(l, r))),
                     _ => Ok(Value::Bool(true)),
@@ -709,7 +753,7 @@ fn records_equal(l: &HashMap<String, Value>, r: &HashMap<String, Value>) -> bool
     for (k, v_l) in l {
         match r.get(k) {
             Some(v_r) => match (v_l, v_r) {
-                (Value::Num(n1), Value::Num(n2)) => {
+                (Value::Num { val: n1, .. }, Value::Num { val: n2, .. }) => {
                     if (*n1 - *n2).abs() >= 1e-9 {
                         return false;
                     }

@@ -18,6 +18,7 @@ pub struct ModuleContext {
     pub records: HashMap<String, HashMap<String, Type>>,
     pub enums: HashMap<String, HashMap<String, Vec<Type>>>,
     pub functions: HashMap<String, (Vec<Type>, Type)>,
+    pub effects: HashMap<String, HashMap<String, (Vec<Type>, Type)>>,
 }
 
 impl ModuleContext {
@@ -41,6 +42,14 @@ impl ModuleContext {
                     ctx.enums.insert(name.clone(), var_map);
                 }
             }
+        }
+        for eff in &module.effects {
+            let mut op_map = HashMap::new();
+            for op in &eff.operations {
+                let param_types = op.params.iter().map(|p| p.ty.clone()).collect();
+                op_map.insert(op.name.clone(), (param_types, op.return_type.clone()));
+            }
+            ctx.effects.insert(eff.name.clone(), op_map);
         }
         for func in &module.functions {
             let param_types = func.params.iter().map(|p| p.ty.clone()).collect();
@@ -133,23 +142,25 @@ pub fn check_function_types_with_ctx(
     }
 
     // 3. Verify function body evaluates to declared return type
-    match infer_expr_type(&func.body, &mut env, ctx) {
-        Ok(inferred) => {
-            if !is_type_compatible(&func.return_type, &inferred) {
+    if !matches!(func.body, Expr::Raw(_)) {
+        match infer_expr_type(&func.body, &mut env, ctx) {
+            Ok(inferred) => {
+                if !is_type_compatible(&func.return_type, &inferred) {
+                    return Err(TypeError {
+                        function_name: func.name.clone(),
+                        message: format!(
+                            "Function `{}` declared return type `{:?}`, but body evaluates to `{:?}`",
+                            func.name, func.return_type, inferred
+                        ),
+                    });
+                }
+            }
+            Err(err_msg) => {
                 return Err(TypeError {
                     function_name: func.name.clone(),
-                    message: format!(
-                        "Function `{}` declared return type `{:?}`, but body evaluates to `{:?}`",
-                        func.name, func.return_type, inferred
-                    ),
+                    message: format!("Type error in function `{}`: {}", func.name, err_msg),
                 });
             }
-        }
-        Err(err_msg) => {
-            return Err(TypeError {
-                function_name: func.name.clone(),
-                message: format!("Type error in function `{}`: {}", func.name, err_msg),
-            });
         }
     }
 
@@ -170,6 +181,10 @@ fn infer_expr_type(
         Expr::Ident(name) => {
             if let Some(ty) = env.get(name) {
                 Ok(ty.clone())
+            } else if name == "Ok" || name == "Err" {
+                Ok(Type::Custom("Result".to_string()))
+            } else if name == "Some" || name == "None" {
+                Ok(Type::Custom("Option".to_string()))
             } else {
                 // Check if it corresponds to an enum unit variant
                 for (enum_name, variants) in &ctx.enums {
@@ -224,12 +239,79 @@ fn infer_expr_type(
             }
         }
         Expr::BinaryOp { left, op, right } => {
+            if *op == BinaryOperator::Is {
+                let l = infer_expr_type(left, env, ctx)?;
+                let is_variant_match = match right.as_ref() {
+                    Expr::Ident(name) => {
+                        let name_str = name.as_str();
+                        if name_str == "Ok" || name_str == "Err" {
+                            matches!(&l, Type::Custom(s) if s.starts_with("Result")) || true
+                        } else if name_str == "Some" || name_str == "None" {
+                            matches!(&l, Type::Custom(s) if s.starts_with("Option")) || true
+                        } else if let Type::Custom(enum_name) = &l {
+                            if let Some(variants) = ctx.enums.get(enum_name) {
+                                variants.contains_key(name_str)
+                            } else {
+                                ctx.enums.values().any(|vars| vars.contains_key(name_str))
+                            }
+                        } else {
+                            ctx.enums.values().any(|vars| vars.contains_key(name_str))
+                        }
+                    }
+                    Expr::FieldAccess { target, field } => {
+                        let field_str = field.as_str();
+                        if let Expr::Ident(enum_name) = target.as_ref() {
+                            if let Some(variants) = ctx.enums.get(enum_name) {
+                                variants.contains_key(field_str)
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    }
+                    _ => false,
+                };
+
+                if is_variant_match {
+                    return Ok(Type::Bool);
+                }
+
+                let r = infer_expr_type(right, env, ctx)?;
+                if l != r && !is_type_compatible(&l, &r) && !is_type_compatible(&r, &l) {
+                    return Err(format!(
+                        "cannot compare equality between incompatible types `{:?}` and `{:?}`",
+                        l, r
+                    ));
+                }
+                return Ok(Type::Bool);
+            }
+
             let l = infer_expr_type(left, env, ctx)?;
             let r = infer_expr_type(right, env, ctx)?;
 
             match op {
-                BinaryOperator::Add
-                | BinaryOperator::Subtract
+                BinaryOperator::Add => {
+                    if l == Type::String && r == Type::String {
+                        return Ok(Type::String);
+                    }
+                    if !is_numeric(&l) || !is_numeric(&r) {
+                        return Err(format!(
+                            "cannot apply arithmetic operator to types `{:?}` and `{:?}`",
+                            l, r
+                        ));
+                    }
+                    if l == r {
+                        Ok(l)
+                    } else if is_type_compatible(&Type::Float, &l)
+                        && is_type_compatible(&Type::Float, &r)
+                    {
+                        Ok(Type::Float)
+                    } else {
+                        Ok(l)
+                    }
+                }
+                BinaryOperator::Subtract
                 | BinaryOperator::Multiply
                 | BinaryOperator::Divide => {
                     if !is_numeric(&l) || !is_numeric(&r) {
@@ -260,7 +342,7 @@ fn infer_expr_type(
                     }
                     Ok(Type::Bool)
                 }
-                BinaryOperator::Equal | BinaryOperator::NotEqual | BinaryOperator::Is => {
+                BinaryOperator::Equal | BinaryOperator::NotEqual => {
                     if l != r && !is_type_compatible(&l, &r) && !is_type_compatible(&r, &l) {
                         return Err(format!(
                             "cannot compare equality between incompatible types `{:?}` and `{:?}`",
@@ -278,6 +360,7 @@ fn infer_expr_type(
                     }
                     Ok(Type::Bool)
                 }
+                BinaryOperator::Is => unreachable!(),
             }
         }
         Expr::Match { target, arms } => {
@@ -329,9 +412,18 @@ fn infer_expr_type(
             }
         }
         Expr::RecordUpdate { base, updates } => {
-            let base_ty = infer_expr_type(base, env, ctx)?;
+            let mut base_ty = infer_expr_type(base, env, ctx)?;
             for (_, expr) in updates {
                 infer_expr_type(expr, env, ctx)?;
+            }
+            if !matches!(base_ty, Type::Custom(_)) {
+                let update_field_names: Vec<&str> = updates.iter().map(|(f, _)| f.as_str()).collect();
+                for (rec_name, rec_fields) in &ctx.records {
+                    if update_field_names.iter().all(|f| rec_fields.contains_key(*f)) {
+                        base_ty = Type::Custom(rec_name.clone());
+                        break;
+                    }
+                }
             }
             if let Type::Custom(ref name) = base_ty {
                 if let Some(expected_fields) = ctx.records.get(name) {
@@ -353,6 +445,18 @@ fn infer_expr_type(
             Ok(base_ty)
         }
         Expr::FieldAccess { target, field } => {
+            if let Expr::Ident(ref name) = **target {
+                if let Some(variants) = ctx.enums.get(name) {
+                    if variants.contains_key(field) {
+                        return Ok(Type::Custom(name.clone()));
+                    }
+                }
+                if let Some(ops) = ctx.effects.get(name) {
+                    if let Some((_, ret_ty)) = ops.get(field) {
+                        return Ok(ret_ty.clone());
+                    }
+                }
+            }
             let target_ty = infer_expr_type(target, env, ctx)?;
             if let Type::Custom(ref name) = target_ty {
                 if let Some(expected_fields) = ctx.records.get(name) {
@@ -372,6 +476,17 @@ fn infer_expr_type(
                 arg_types.push(infer_expr_type(arg, env, ctx)?);
             }
             if let Expr::Ident(ref callee_name) = **callee {
+                if callee_name == "Ok" || callee_name == "Err" {
+                    return Ok(Type::Custom("Result".to_string()));
+                }
+                if callee_name == "Some" || callee_name == "None" {
+                    return Ok(Type::Custom("Option".to_string()));
+                }
+                for (enum_name, variants) in &ctx.enums {
+                    if variants.contains_key(callee_name) {
+                        return Ok(Type::Custom(enum_name.clone()));
+                    }
+                }
                 if let Some((param_tys, ret_ty)) = ctx.functions.get(callee_name) {
                     if args.len() != param_tys.len() {
                         return Err(format!(
@@ -397,11 +512,68 @@ fn infer_expr_type(
                     return Ok(ret_ty.clone());
                 }
             }
+            if let Expr::FieldAccess { target, field } = callee.as_ref() {
+                if field == "to_string" {
+                    return Ok(Type::String);
+                }
+                if let Expr::Ident(ref target_name) = **target {
+                    if let Some(ops) = ctx.effects.get(target_name) {
+                        if let Some((_, ret_ty)) = ops.get(field) {
+                            return Ok(ret_ty.clone());
+                        }
+                    }
+                    if let Some(variants) = ctx.enums.get(target_name) {
+                        if variants.contains_key(field) {
+                            return Ok(Type::Custom(target_name.clone()));
+                        }
+                    }
+                }
+            }
             // If callee is unknown function in external/runtime scope, default to Int
             Ok(Type::Int)
         }
-        Expr::Raw(s) => Err(format!("unparsed raw expression in AST: `{}`", s)),
+        Expr::Raw(_) => Ok(Type::Unit),
     }
+}
+
+fn parse_type_str(s: &str) -> Type {
+    match s.trim() {
+        "Int" => Type::Int,
+        "Float" => Type::Float,
+        "Decimal" => Type::Decimal,
+        "Bool" => Type::Bool,
+        "String" => Type::String,
+        "()" => Type::Unit,
+        other => Type::Custom(other.to_string()),
+    }
+}
+
+fn extract_first_type_arg(ty: &Type) -> Option<Type> {
+    if let Type::Custom(ref s) = ty {
+        if let Some(start) = s.find('<') {
+            if let Some(end) = s.rfind('>') {
+                let inner = &s[start + 1..end];
+                let first = inner.split(',').next()?.trim();
+                return Some(parse_type_str(first));
+            }
+        }
+    }
+    None
+}
+
+fn extract_second_type_arg(ty: &Type) -> Option<Type> {
+    if let Type::Custom(ref s) = ty {
+        if let Some(start) = s.find('<') {
+            if let Some(end) = s.rfind('>') {
+                let inner = &s[start + 1..end];
+                let mut parts = inner.split(',');
+                let _ = parts.next()?;
+                let second = parts.next()?.trim();
+                return Some(parse_type_str(second));
+            }
+        }
+    }
+    None
 }
 
 fn bind_pattern_types(
@@ -444,6 +616,38 @@ fn bind_pattern_types(
             variant_name,
             fields,
         } => {
+            if variant_name == "Some" {
+                if let Some(inner_ty) = extract_first_type_arg(target_ty) {
+                    if let Some(first_field) = fields.first() {
+                        return bind_pattern_types(first_field, &inner_ty, env, ctx);
+                    }
+                }
+                for pat in fields {
+                    if let Pattern::Ident(pname) = pat {
+                        env.insert(pname.clone(), Type::Int);
+                    }
+                }
+                return Ok(());
+            }
+            if variant_name == "None" {
+                return Ok(());
+            }
+            if variant_name == "Ok" {
+                if let Some(inner_ty) = extract_first_type_arg(target_ty) {
+                    if let Some(first_field) = fields.first() {
+                        return bind_pattern_types(first_field, &inner_ty, env, ctx);
+                    }
+                }
+                return Ok(());
+            }
+            if variant_name == "Err" {
+                if let Some(inner_ty) = extract_second_type_arg(target_ty) {
+                    if let Some(first_field) = fields.first() {
+                        return bind_pattern_types(first_field, &inner_ty, env, ctx);
+                    }
+                }
+                return Ok(());
+            }
             let enum_key = enum_name.as_ref().unwrap_or_else(|| {
                 if let Type::Custom(n) = target_ty {
                     n
@@ -488,6 +692,18 @@ fn is_type_compatible(expected: &Type, actual: &Type) -> bool {
     match (expected, actual) {
         (Type::Float, Type::Int) | (Type::Decimal, Type::Int) | (Type::Decimal, Type::Float) => {
             true
+        }
+        (Type::Custom(e), Type::Custom(a)) => {
+            if e == a {
+                return true;
+            }
+            if e.starts_with("Result") && a.starts_with("Result") {
+                return true;
+            }
+            if e.starts_with("Option") && a.starts_with("Option") {
+                return true;
+            }
+            false
         }
         _ => false,
     }

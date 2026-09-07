@@ -478,7 +478,13 @@ fn expr_to_smt(expr: &Expr) -> Result<String, String> {
                 BinaryOperator::Add => "+",
                 BinaryOperator::Subtract => "-",
                 BinaryOperator::Multiply => "*",
-                BinaryOperator::Divide => "/",
+                BinaryOperator::Divide => {
+                    if l.contains('.') || r.contains('.') {
+                        "/"
+                    } else {
+                        "div"
+                    }
+                }
                 BinaryOperator::Equal | BinaryOperator::Is => "=",
                 BinaryOperator::NotEqual => "distinct",
                 BinaryOperator::LessThan => "<",

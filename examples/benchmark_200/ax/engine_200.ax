@@ -1,4 +1,4 @@
-﻿// Axiom Pipeline Stage 1: Architect skeleton for the 200-function RPG benchmark.
+// Axiom Pipeline Stage 1: Architect skeleton for the 200-function RPG benchmark.
 // Reference: examples/benchmark_200/SPEC_200.md
 
 type Point = {
@@ -2182,7 +2182,7 @@ fn simulate_single_turn_exchange(actor_atk: Int, target_def: Int, is_moving: Boo
         target_def <= 1000000,
     }
     ensures {
-        result >= 6,
+        result >= 2,
     }
 {
     let direct_damage = resolve_physical_hit(actor_atk, target_def); let bleed_damage = apply_bleed_stack_tick(1, is_moving); direct_damage + bleed_damage

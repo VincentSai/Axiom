@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use axiom_agent_pool::{AgentTaskPool, PoolError, PoolVerificationPolicy, SmtResult};
 use axiom_db::{AstDatabase, DbError, NodeHash};
 use axiom_diagnostics::{diagnose_module, diagnose_source, DiagnosticStatus};
 use axiom_ffi_gen::{
@@ -20,7 +21,9 @@ use axiom_hole_extractor::{extract_holes, HoleTask};
 use axiom_parser::{parse_module, ParseError};
 use axiom_smt::{find_z3_executable, generate_smtlib2_with_module};
 use axiom_transpiler::{transpile_source_to_rust, TranspileError};
-use axiom_vfs::{export_database_module, sync_source_to_database, VfsError};
+use axiom_vfs::{
+    export_database_module, export_module_to_source, sync_source_to_database, VfsError,
+};
 use axiom_wit::{generate_wit_from_source, WitError};
 use bridge::generate_unity_bridge;
 use clap::{Parser, Subcommand};
@@ -146,6 +149,58 @@ pub enum Commands {
         #[command(subcommand)]
         command: DatabaseCommands,
     },
+
+    /// Manage and coordinate multi-agent hole-filling tasks with SMT verification.
+    Pool {
+        #[command(subcommand)]
+        action: PoolAction,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum PoolAction {
+    /// Show current hole tasks, pending holes, and resolution status in an Axiom file.
+    Status {
+        file: PathBuf,
+
+        /// Strict verification policy: require formal SMT proof for contracted functions.
+        #[arg(long)]
+        strict: bool,
+    },
+
+    /// Submit a candidate expression solution for a specific hole and verify with SMT.
+    Submit {
+        file: PathBuf,
+
+        /// Hole ID to resolve (e.g. `calc_gem_pickup_range_h0`).
+        #[arg(long)]
+        hole: String,
+
+        /// Axiom expression string fulfilling the hole, or path to file containing expression.
+        #[arg(long)]
+        expr: String,
+
+        /// Strict verification policy: require formal SMT proof.
+        #[arg(long)]
+        strict: bool,
+    },
+
+    /// Assemble verified module from solutions into a target Axiom file or stdout.
+    Assemble {
+        file: PathBuf,
+
+        /// Optional solutions JSON mapping hole_id -> expression string.
+        #[arg(long)]
+        solutions: Option<PathBuf>,
+
+        /// Write assembled module to a file instead of stdout.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Strict verification policy: require formal SMT proof.
+        #[arg(long)]
+        strict: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -213,6 +268,8 @@ pub enum CliError {
     Ffi(FfiError),
     InvalidFfiLanguage(String),
     InvalidBridgeTarget(String),
+    Pool(PoolError),
+    HoleVerificationRejected(String),
 }
 
 impl fmt::Display for CliError {
@@ -279,6 +336,10 @@ impl fmt::Display for CliError {
                     "unsupported bridge target `{target}` (supported: unity)"
                 )
             }
+            Self::Pool(source) => write!(formatter, "{source}"),
+            Self::HoleVerificationRejected(reason) => {
+                write!(formatter, "hole verification rejected: {reason}")
+            }
         }
     }
 }
@@ -298,11 +359,13 @@ impl Error for CliError {
             Self::DatabaseProjection(source) => Some(source),
             Self::Wit(source) => Some(source),
             Self::Ffi(source) => Some(source),
+            Self::Pool(source) => Some(source),
             Self::InvalidFfiLanguage(_)
             | Self::InvalidBridgeTarget(_)
             | Self::RustCompilationFailed(_)
             | Self::ProgramFailed(_)
-            | Self::VerificationFailed => None,
+            | Self::VerificationFailed
+            | Self::HoleVerificationRejected(_) => None,
         }
     }
 }
@@ -343,6 +406,7 @@ pub fn run(cli: Cli) -> Result<(), CliError> {
                 database_export(&hash, &db, out.as_deref())
             }
         },
+        Commands::Pool { action } => handle_pool_action(action),
     }
 }
 
@@ -862,5 +926,186 @@ impl TemporaryBuildDirectory {
 impl Drop for TemporaryBuildDirectory {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.path);
+    }
+}
+
+fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
+    match action {
+        PoolAction::Status { file, strict } => {
+            let source = read_source(&file)?;
+            let policy = if strict {
+                PoolVerificationPolicy::StrictProved
+            } else {
+                PoolVerificationPolicy::Permissive
+            };
+            let pool = AgentTaskPool::from_source(&source)
+                .map_err(CliError::Pool)?
+                .with_policy(policy);
+            let tasks = pool.dispatch_tasks();
+            let pending = pool.pending_hole_ids();
+            println!("Axiom Task Pool: {}", file.display());
+            println!("Policy: {:?}", pool.policy());
+            println!("Total Dispatched Tasks: {}", tasks.len());
+            println!("Pending Holes: {}", pending.len());
+            for task in &tasks {
+                let is_pending = pending.contains(&task.hole_id);
+                let status_str = if is_pending { "[PENDING]" } else { "[RESOLVED]" };
+                let eff_str = if task.allowed_effects.is_empty() {
+                    "pure".to_string()
+                } else {
+                    format!("effects: [{}]", task.allowed_effects.join(", "))
+                };
+                println!(
+                    "  {} ?{} in function `{}` ({})",
+                    status_str,
+                    task.hole_id,
+                    task.target_function,
+                    eff_str
+                );
+            }
+            Ok(())
+        }
+        PoolAction::Submit {
+            file,
+            hole,
+            expr,
+            strict,
+        } => {
+            let source = read_source(&file)?;
+            let solution_expr = if Path::new(&expr).exists() {
+                fs::read_to_string(&expr)
+                    .map_err(|source| CliError::ReadSource {
+                        path: PathBuf::from(&expr),
+                        source,
+                    })?
+                    .trim()
+                    .to_string()
+            } else {
+                expr.trim().to_string()
+            };
+            let policy = if strict {
+                PoolVerificationPolicy::StrictProved
+            } else {
+                PoolVerificationPolicy::Permissive
+            };
+            let mut pool = AgentTaskPool::from_source(&source)
+                .map_err(CliError::Pool)?
+                .with_policy(policy);
+            println!(
+                "Submitting candidate solution for hole `?{hole}` in `{}`...",
+                file.display()
+            );
+            let verify_result = pool
+                .submit_solution(&hole, &solution_expr)
+                .map_err(CliError::Pool)?;
+            match verify_result {
+                SmtResult::Proved { solver } => {
+                    println!(
+                        "[ACCEPTED] Hole `?{hole}` formally verified with SMT proof ({solver})."
+                    );
+                    Ok(())
+                }
+                SmtResult::Sampled { points_checked } => {
+                    if strict {
+                        println!(
+                            "[REJECTED] Verification sampled {} points but strict formal proof is required.",
+                            points_checked
+                        );
+                        Err(CliError::HoleVerificationRejected(format!(
+                            "sampled {} points without formal proof",
+                            points_checked
+                        )))
+                    } else {
+                        println!(
+                            "[ACCEPTED] Hole `?{hole}` verified via sampling ({} points checked).",
+                            points_checked
+                        );
+                        Ok(())
+                    }
+                }
+                SmtResult::CounterExample(inputs) => {
+                    println!("[REJECTED] SMT counter-example found");
+                    println!("Counter-example inputs: {:?}", inputs);
+                    Err(CliError::HoleVerificationRejected(format!(
+                        "counter-example found with inputs: {:?}",
+                        inputs
+                    )))
+                }
+                SmtResult::Unknown(reason) => {
+                    println!("[REJECTED] SMT solver returned unknown: {reason}");
+                    Err(CliError::HoleVerificationRejected(format!(
+                        "solver unknown: {reason}"
+                    )))
+                }
+                SmtResult::Skipped(reason) => {
+                    println!("[REJECTED] Verification skipped: {reason}");
+                    Err(CliError::HoleVerificationRejected(format!(
+                        "verification skipped: {reason}"
+                    )))
+                }
+            }
+        }
+        PoolAction::Assemble {
+            file,
+            solutions,
+            output,
+            strict,
+        } => {
+            let source = read_source(&file)?;
+            let policy = if strict {
+                PoolVerificationPolicy::StrictProved
+            } else {
+                PoolVerificationPolicy::Permissive
+            };
+            let mut pool = AgentTaskPool::from_source(&source)
+                .map_err(CliError::Pool)?
+                .with_policy(policy);
+            if let Some(solutions_path) = solutions {
+                let sol_content = fs::read_to_string(&solutions_path).map_err(|source| {
+                    CliError::ReadSource {
+                        path: solutions_path.clone(),
+                        source,
+                    }
+                })?;
+                let map: std::collections::HashMap<String, String> =
+                    serde_json::from_str(&sol_content).map_err(CliError::Serialize)?;
+                for (hole_id, expr_str) in map {
+                    println!("Applying solution for ?{hole_id}...");
+                    let res = pool
+                        .submit_solution(&hole_id, &expr_str)
+                        .map_err(CliError::Pool)?;
+                    match res {
+                        SmtResult::CounterExample(inputs) => {
+                            return Err(CliError::HoleVerificationRejected(format!(
+                                "counter-example for ?{hole_id} with inputs: {inputs:?}"
+                            )));
+                        }
+                        SmtResult::Unknown(reason) | SmtResult::Skipped(reason) => {
+                            return Err(CliError::HoleVerificationRejected(format!(
+                                "verification failed for ?{hole_id}: {reason}"
+                            )));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            let verified_module = pool
+                .assemble_verified_module()
+                .map_err(CliError::Pool)?;
+            let assembled_source = export_module_to_source(&verified_module);
+            if let Some(out_path) = output {
+                fs::write(&out_path, &assembled_source).map_err(|source| CliError::WriteFile {
+                    path: out_path.clone(),
+                    source,
+                })?;
+                println!(
+                    "Assembled verified module written to `{}`",
+                    out_path.display()
+                );
+            } else {
+                print!("{assembled_source}");
+            }
+            Ok(())
+        }
     }
 }

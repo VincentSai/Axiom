@@ -1,4 +1,4 @@
-﻿# Axiom: 面向 AI 协作的确定性游戏逻辑 DSL 与形式化验证原型
+# Axiom: 面向 AI 协作的确定性游戏逻辑 DSL 与形式化验证原型
 
 > **Languages / 语言 / 語言**: [English](README.en.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md)
 
@@ -44,27 +44,24 @@
 
 ---
 
-## 🚀 一键极速安装 (One-Liner Install)
+## 🚀 安装与构建 (Installation & Build)
 
-无需手动克隆编译，可直接安装预构建的 `axiom` CLI 工具链：
+通过 Cargo 从源码一键编译并安装 `axiom` CLI 工具链：
 
-- **Windows (PowerShell)**:
-  ```powershell
-  irm https://raw.githubusercontent.com/axiom-lang/axiom/main/scripts/install.ps1 | iex
-  ```
-- **Linux & macOS (Bash)**:
-  ```bash
-  curl -fsSL https://raw.githubusercontent.com/axiom-lang/axiom/main/scripts/install.sh | bash
-  ```
+```bash
+# 从源码安装 axiom CLI 到本地 PATH
+cargo install --path crates/axiom-cli
+
+# 验证安装
+axiom --help
+```
 
 ---
 
-## 🎨 VS Code 官方插件 (IDE Support)
+## 🎨 IDE 支持与工具链生态 (IDE Support)
 
-位于 [`editors/vscode-axiom`](editors/vscode-axiom) 的 VS Code 插件提供基础开发者体验：
-- **语法高亮**：对 `.ax` 的关键字、类型、Effect 与模式匹配提供 TextMate 着色；
-- **保存即检查 (Verify on Save)**：保存文件时调用 `axiom check` / `verify`，在问题面板提示语法错误、类型不匹配或 SMT 反例；
-- **智能代码片段 (Snippets)**：内置 `fn-contract`、`type-record`、`type-enum` 等脚手架模板。
+- **VS Code 扩展 (规划中)**：语言服务器协议 (LSP) 与 TextMate 语法高亮正在规划和开发中（相关目录位于 [`editors/vscode-axiom`](editors/vscode-axiom)）。
+- **当前推荐**：直接使用 `axiom check` 与 `axiom verify` 命令行工具链配合编辑器终端进行语法、类型与契约验证。
 
 ---
 
@@ -74,23 +71,29 @@
 # 1. 语法与静态类型检查、打洞统计
 axiom check examples/transfer.ax
 
-# 2. 形式化契约验证 (自动探测 Z3 求解器，回退至内置符号引擎)
-axiom verify examples/game_survivor/ax/survivor_core.ax
+# 2. 形式化契约验证 (自动探测 Z3 求解器，回退至内置符号引擎；支持 --strict 模式)
+axiom verify examples/benchmark_200/ax/engine_200.ax
+axiom verify examples/benchmark_200/ax/engine_200.ax --strict
 
-# 3. 导出标准 SMT-LIB2 (.smt2) 文件供第三方求解器 (Z3/CVC5) 独立验证
+# 3. 多智能体打洞任务池调度与验证 (Agent Task Pool)
+axiom pool status examples/benchmark_200/ax/engine_200_holes.ax
+axiom pool submit examples/math.ax --hole calc_h0 --expr "x + 1"
+axiom pool assemble examples/math.ax --solutions solutions.json -o math_verified.ax
+
+# 4. 导出标准 SMT-LIB2 (.smt2) 文件供第三方求解器 (Z3/CVC5) 独立验证
 axiom export-smt2 examples/transfer.ax -o transfer.smt2
 
-# 4. 机械化提取打洞任务 JSON (派发给 Worker Agents 并发填洞)
+# 5. 机械化提取打洞任务 JSON (派发给 Worker Agents 并发填洞)
 axiom extract-holes examples/transfer.ax --out-dir .scratch/hole-tasks
 
-# 5. Unity 跨端代码生成与零拷贝双缓冲桥接
+# 6. Unity 跨端代码生成与零拷贝双缓冲桥接
 axiom bridge examples/game_survivor/ax/survivor_core.ax --target unity --out examples/game_survivor/Assets/Scripts/AxiomBridge --library-name axiom_survivor
 
-# 6. 转译至 Rust 源码并由 rustc 编译运行
+# 7. 转译至 Rust 源码并由 rustc 编译运行
 axiom emit-rust examples/game_loop.ax -o game_loop.rs
 axiom run path/to/program_with_main.ax
 
-# 7. 多语言接口绑定导出 (TypeScript / C / WIT)
+# 8. 多语言接口绑定导出 (TypeScript / C / WIT)
 axiom export-ffi examples/game_loop.ax --lang ts -o game_loop.d.ts
 axiom export-ffi examples/game_loop.ax --lang c -o game_loop.h
 axiom export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit

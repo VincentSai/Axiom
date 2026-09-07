@@ -1,4 +1,4 @@
-﻿# Axiom: A Deterministic Game Logic DSL & Formal Verification Research Prototype
+# Axiom: A Deterministic Game Logic DSL & Formal Verification Research Prototype
 
 > **Languages / 语言 / 語言**: [English](README.en.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md)
 
@@ -34,27 +34,24 @@ A complete 2D roguelite survivor game is provided in [`examples/game_survivor/`]
 
 ---
 
-## 🚀 One-Liner Quick Install
+## 🚀 Installation & Build
 
-Install prebuilt `axiom` CLI binaries directly:
+Compile and install the `axiom` CLI toolchain directly from source using Cargo:
 
-- **Windows (PowerShell)**:
-  ```powershell
-  irm https://raw.githubusercontent.com/axiom-lang/axiom/main/scripts/install.ps1 | iex
-  ```
-- **Linux & macOS (Bash)**:
-  ```bash
-  curl -fsSL https://raw.githubusercontent.com/axiom-lang/axiom/main/scripts/install.sh | bash
-  ```
+```bash
+# Install axiom CLI to local PATH from source
+cargo install --path crates/axiom-cli
+
+# Verify installation
+axiom --help
+```
 
 ---
 
-## 🎨 Official VS Code Extension (IDE Support)
+## 🎨 IDE Support & Ecosystem (Planned)
 
-Located in [`editors/vscode-axiom`](editors/vscode-axiom):
-- **Syntax Highlighting**: TextMate grammar for Axiom keywords, types, effects, and patterns.
-- **Verify on Save**: Automatically runs `axiom check` / `verify` on save, surfacing parse errors, type mismatches, or SMT counterexamples in the Problems panel.
-- **Snippets**: Scaffolds for `fn-contract`, `type-record`, `type-enum`, and more.
+- **VS Code Extension (In Progress)**: Language Server Protocol (LSP) and TextMate syntax highlighting are currently in development under [`editors/vscode-axiom`](editors/vscode-axiom).
+- **Current Recommendation**: Use the `axiom check` and `axiom verify` CLI commands integrated into your editor's terminal workflow for instant static type and formal contract feedback.
 
 ---
 
@@ -64,21 +61,32 @@ Located in [`editors/vscode-axiom`](editors/vscode-axiom):
 # 1. Syntax, static type checking, and hole count
 axiom check examples/transfer.ax
 
-# 2. Formal contract verification (auto-probes Z3, falls back to symbolic engine)
-axiom verify examples/game_survivor/ax/survivor_core.ax
+# 2. Formal contract verification (auto-probes Z3, falls back to symbolic engine; supports --strict)
+axiom verify examples/benchmark_200/ax/engine_200.ax
+axiom verify examples/benchmark_200/ax/engine_200.ax --strict
 
-# 3. Export standard SMT-LIB2 (.smt2) for third-party solvers (Z3/CVC5)
+# 3. Multi-agent hole task pool coordination and verification (Agent Task Pool)
+axiom pool status examples/benchmark_200/ax/engine_200_holes.ax
+axiom pool submit examples/math.ax --hole calc_h0 --expr "x + 1"
+axiom pool assemble examples/math.ax --solutions solutions.json -o math_verified.ax
+
+# 4. Export standard SMT-LIB2 (.smt2) for third-party solvers (Z3/CVC5)
 axiom export-smt2 examples/transfer.ax -o transfer.smt2
 
-# 4. Extract hole tasks as JSON
+# 5. Extract hole tasks as JSON
 axiom extract-holes examples/transfer.ax --out-dir .scratch/hole-tasks
 
-# 5. Unity bridge code generation
+# 6. Unity cross-target codegen & zero-copy double-buffer bridge
 axiom bridge examples/game_survivor/ax/survivor_core.ax --target unity --out examples/game_survivor/Assets/Scripts/AxiomBridge --library-name axiom_survivor
 
-# 6. Transpile and execute via Rust/rustc
+# 7. Transpile to Rust and execute
 axiom emit-rust examples/game_loop.ax -o game_loop.rs
 axiom run path/to/program_with_main.ax
+
+# 8. Export multi-language bindings (TypeScript / C / WIT)
+axiom export-ffi examples/game_loop.ax --lang ts -o game_loop.d.ts
+axiom export-ffi examples/game_loop.ax --lang c -o game_loop.h
+axiom export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
 ```
 
 ---
