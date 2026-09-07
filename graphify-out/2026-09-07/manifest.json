@@ -5,8 +5,8 @@
     "semantic_hash": "39049ef0df28208094f07607745cb275"
   },
   "crates/axiom-cli/src/lib.rs": {
-    "mtime": 1788516144.3848832,
-    "ast_hash": "d11cf38366f5a53c75e67ef5bb18dcdc",
+    "mtime": 1788772901.4434874,
+    "ast_hash": "5f01ec6bdf4cab38f123ef0ba07c6cb0",
     "semantic_hash": ""
   },
   "crates/axiom-cli/src/main.rs": {
@@ -55,8 +55,8 @@
     "semantic_hash": "47080b760b89ca907959f9e661bbcbbd"
   },
   "crates/axiom-transpiler/src/lib.rs": {
-    "mtime": 1787798725.4339025,
-    "ast_hash": "af6b8443fccbb223e211ff75af4d9898",
+    "mtime": 1788772720.839522,
+    "ast_hash": "0f2e56b262aa119a25b13c5e790dbeba",
     "semantic_hash": ""
   },
   "crates/axiom-transpiler/tests/transpiler_test.rs": {
@@ -300,23 +300,23 @@
     "semantic_hash": ""
   },
   "README.en.md": {
-    "mtime": 1788494277.549401,
-    "ast_hash": "e8f8aad47acfefb8be33a0daa1f74312",
+    "mtime": 1788773058.8911128,
+    "ast_hash": "9c853618a8c1f20315605fdbd41b9de7",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1788494269.3116164,
-    "ast_hash": "62ff93301a76705eee8f1db953962be9",
+    "mtime": 1788773021.8010738,
+    "ast_hash": "6256aecf4416a4a801f2b849b5b0693c",
     "semantic_hash": ""
   },
   "README.zh-CN.md": {
-    "mtime": 1788494269.3116164,
-    "ast_hash": "62ff93301a76705eee8f1db953962be9",
+    "mtime": 1788773032.1751347,
+    "ast_hash": "6256aecf4416a4a801f2b849b5b0693c",
     "semantic_hash": ""
   },
   "README.zh-TW.md": {
-    "mtime": 1788494269.3116164,
-    "ast_hash": "62ff93301a76705eee8f1db953962be9",
+    "mtime": 1788773044.0141265,
+    "ast_hash": "fe90c32139e78abedd0c3dcf38705018",
     "semantic_hash": ""
   },
   "docs/ARCHITECTURE.md": {
@@ -400,8 +400,8 @@
     "semantic_hash": ""
   },
   "examples/benchmark_200/Benchmark_ax.md": {
-    "mtime": 1788506284.9842143,
-    "ast_hash": "e98ffd694a27238142b236713cdc6fce",
+    "mtime": 1788773073.3771765,
+    "ast_hash": "ca0144cde0a54a0b581276b1eaaa6144",
     "semantic_hash": ""
   },
   "examples/benchmark_200/Benchmark_py.md": {
@@ -485,18 +485,18 @@
     "semantic_hash": ""
   },
   "crates/axiom-diagnostics/src/typecheck.rs": {
-    "mtime": 1788509617.9518433,
-    "ast_hash": "19517c89eabb36b4719118a8d46255ba",
+    "mtime": 1788772683.1175873,
+    "ast_hash": "cb9fdf0c166d446f755bdf3dabb9f062",
     "semantic_hash": ""
   },
   "crates/axiom-smt/src/internal_solver.rs": {
-    "mtime": 1788516219.4690304,
-    "ast_hash": "7dc6ac4012994c8eaf8df6530b9eef8a",
+    "mtime": 1788773298.3256361,
+    "ast_hash": "e201406b5306a461e04b110e44713d1c",
     "semantic_hash": ""
   },
   "crates/axiom-smt/src/smtlib2.rs": {
-    "mtime": 1788515872.36788,
-    "ast_hash": "71778d988859e933aaec7207b3efe124",
+    "mtime": 1788772252.7738962,
+    "ast_hash": "2bb3a4ce47b380ab333f3f06f7ef62d8",
     "semantic_hash": ""
   },
   "crates/axiom-smt/src/z3_solver.rs": {
@@ -505,22 +505,22 @@
     "semantic_hash": ""
   },
   "examples/game_survivor/Assets/Scripts/AxiomBridge/AxiomAssetRegistry.cs": {
-    "mtime": 1788170919.1870098,
+    "mtime": 1788518881.6526074,
     "ast_hash": "dddfec56a50c3a4987074af6ec2cc069",
     "semantic_hash": ""
   },
   "examples/game_survivor/Assets/Scripts/AxiomBridge/AxiomDoubleBuffer.cs": {
-    "mtime": 1788170919.1870098,
+    "mtime": 1788518881.6526074,
     "ast_hash": "50e609e02a9ee8a9d72c44a4fdbb6af1",
     "semantic_hash": ""
   },
   "examples/game_survivor/Assets/Scripts/AxiomBridge/AxiomNative.cs": {
-    "mtime": 1788170919.1870098,
+    "mtime": 1788518881.6526074,
     "ast_hash": "ddbf5c359644d47749ad54ea48264175",
     "semantic_hash": ""
   },
   "examples/game_survivor/Assets/Scripts/AxiomBridge/AxiomRunner.cs": {
-    "mtime": 1788170919.1870098,
+    "mtime": 1788518881.6536045,
     "ast_hash": "e79e0318988339813e98292d13dc1575",
     "semantic_hash": ""
   },
@@ -662,6 +662,11 @@
   "graphify-out/memory/query_20260904_092510_axiom\u6709\u66f4\u65b0\u4e86_\u91cd\u65b0\u5206\u6790\u8bc4\u4ef7.md": {
     "mtime": 1788513910.0407455,
     "ast_hash": "e0fbecc3df6eb10908edaefb54e94514",
+    "semantic_hash": ""
+  },
+  "crates/axiom-cli/tests/pool_e2e_test.rs": {
+    "mtime": 1788772969.8652985,
+    "ast_hash": "6e277d51a9f9aef8e2b77e819ac1b980",
     "semantic_hash": ""
   }
 }

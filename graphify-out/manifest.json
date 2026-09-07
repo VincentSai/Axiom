@@ -55,13 +55,13 @@
     "semantic_hash": "47080b760b89ca907959f9e661bbcbbd"
   },
   "crates/axiom-transpiler/src/lib.rs": {
-    "mtime": 1788772720.839522,
-    "ast_hash": "0f2e56b262aa119a25b13c5e790dbeba",
+    "mtime": 1788776873.7311316,
+    "ast_hash": "af392c3617c8be28d31aff0a3ae769f1",
     "semantic_hash": ""
   },
   "crates/axiom-transpiler/tests/transpiler_test.rs": {
-    "mtime": 1787800319.3643758,
-    "ast_hash": "2dc99891c49b694f3c417bcf6bf8c286",
+    "mtime": 1788776926.649655,
+    "ast_hash": "afcd091de443efe12fa1e1f46c11f83d",
     "semantic_hash": ""
   },
   ".axiom/astdb.json": {
