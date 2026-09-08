@@ -282,18 +282,43 @@ def list_available_models(opener, api_key: str, base_url: str):
     return res.get("models", [])
 
 
-def run_preflight_check(opener, api_key: str, model: str, base_url: str):
+def get_supported_count_tokens_models(opener, api_key: str, base_url: str):
+    """获取所有支持 countTokens 的官方 Gemini 模型代号列表"""
+    all_models = list_available_models(opener, api_key, base_url)
+    supported = []
+    for m in all_models:
+        methods = m.get("supportedGenerationMethods", [])
+        if "countTokens" in methods:
+            name = m.get("name", "").replace("models/", "").strip()
+            supported.append(name)
+    return supported
+
+
+def resolve_best_model(opener, api_key: str, user_model: str, base_url: str):
     """
-    预检函数：在正式评测前发送 1 个极轻量探测请求。
-    验证网络通路、API Key 授权与目标模型可用性。
+    智能自愈解析最佳模型:
+    1. 若指定模型在支持列表中，直接使用；
+    2. 若不在支持列表（例如 Google 升级后 gemini-1.5-flash 需用具体后缀）：
+       自动在当前 Key 支持的列表中匹配最适模型并返回自适应提示。
     """
-    clean_m = clean_model_name(model)
-    test_text = "test"
-    try:
-        token_count = call_gemini_count_tokens(opener, api_key, clean_m, test_text, base_url)
-        return True, f"探测成功 (模型 '{clean_m}' 响应正常，测试词元计为 {token_count})"
-    except Exception as e:
-        return False, str(e)
+    clean_user = clean_model_name(user_model)
+    supported = get_supported_count_tokens_models(opener, api_key, base_url)
+    if not supported:
+        raise RuntimeError("未在当前 API Key 下检索到任何支持 countTokens 的模型。")
+
+    if clean_user in supported:
+        return clean_user, False, ""
+
+    # 优先匹配 1.5-flash 系列 (如 gemini-1.5-flash-latest, gemini-1.5-flash-001, gemini-1.5-flash-002)
+    candidates = [s for s in supported if "1.5-flash" in s]
+    if not candidates:
+        # 其次匹配任意 flash 系列 (如 gemini-2.0-flash)
+        candidates = [s for s in supported if "flash" in s]
+    if not candidates:
+        candidates = supported
+
+    best = candidates[0]
+    return best, True, f"目标模型 '{clean_user}' 不支持 countTokens，已自动适配为当前 Key 支持的最佳模型: '{best}'"
 
 
 def main():
@@ -332,29 +357,27 @@ def main():
 
     if args.probe:
         print("=" * 70)
-        print("🔍 正在执行 API 连通性与模型探测 (Pre-flight Probe)...")
+        print("🔍 正在执行 API 连通性与可用模型探测 (Pre-flight Probe)...")
         print(f"API 端点: {args.base_url}")
         print(f"网络代理: {target_proxy or '系统默认 / 直连'}")
-        print(f"测试模型: {clean_model_name(args.model)}")
         print("=" * 70)
         sys.stdout.flush()
-        ok, msg = run_preflight_check(opener, api_key, args.model, args.base_url)
-        if ok:
-            print(f"✅ {msg}")
-            try:
-                models = list_available_models(opener, api_key, args.base_url)
-                print(f"\n📋 该 API Key 可用的官方模型列表 (共 {len(models)} 个):\n")
-                for m in models:
-                    name = m.get("name", "").replace("models/", "")
-                    methods = m.get("supportedGenerationMethods", [])
-                    if "countTokens" in methods:
-                        print(f"  • {name:<32} [支持 countTokens & generateContent]")
-            except Exception as le:
-                print(f"  (获取完整模型列表失败: {le})")
-            print("\n🚀 探测完成，配置完全正常！可以直接运行评测。")
+        try:
+            supported_models = get_supported_count_tokens_models(opener, api_key, args.base_url)
+            print(f"✅ API Key 连通成功！当前 Key 支持 countTokens 的模型 (共 {len(supported_models)} 个):\n")
+            for m in supported_models:
+                is_rec = ("1.5-flash" in m or "flash" in m)
+                tag = " [推荐首选]" if is_rec else ""
+                print(f"  • {m:<32}{tag}")
+
+            test_m = clean_model_name(args.model) if clean_model_name(args.model) in supported_models else supported_models[0]
+            cnt = call_gemini_count_tokens(opener, api_key, test_m, "test", args.base_url)
+            print(f"\n🎯 接口测算实测: 模型 '{test_m}' 响应正常，测试 Token 计为 {cnt}")
+            print("\n🚀 自检完全正常！你可以直接执行真实评测命令:")
+            print(f"   python examples/benchmark_eval/eval_runner.py --model {test_m} --mode count\n")
             sys.exit(0)
-        else:
-            print(f"\n❌ 连通性测试失败:\n{msg}\n", file=sys.stderr)
+        except Exception as e:
+            print(f"\n❌ 探测失败:\n{e}\n", file=sys.stderr)
             sys.exit(1)
 
     all_tasks = load_golden_tasks()
@@ -366,28 +389,34 @@ def main():
 
     print("=" * 70)
     print("🚀 Axiom 经验性真实 A/B 对照评测启动 (Empirical Benchmark Runner)")
-    print(f"模型目标: {clean_model_name(args.model)} | 评测模式: {args.mode} | 任务总数: {len(eval_tasks)}")
-    print(f"API 端点: {args.base_url}")
+    print(f"评测模式: {args.mode} | 任务总数: {len(eval_tasks)} | API 端点: {args.base_url}")
     if target_proxy:
         print(f"网络代理: {target_proxy}")
     print("=" * 70)
 
-    print("⏳ 正在进行 API 连通性与目标模型预检...", end="", flush=True)
-    ok, msg = run_preflight_check(opener, api_key, args.model, args.base_url)
-    if not ok:
+    print("⏳ 正在进行 API 连通性与模型可用性预检...", end="", flush=True)
+    try:
+        active_model, switched, reason = resolve_best_model(opener, api_key, args.model, args.base_url)
+        call_gemini_count_tokens(opener, api_key, active_model, "test", args.base_url)
+        if switched:
+            print(" 自动适配 ⚠️\n", flush=True)
+            print(f"💡 {reason}\n")
+        else:
+            print(" 通过 ✅\n", flush=True)
+    except Exception as e:
         print(" 失败 ❌\n", flush=True)
-        print(f"{msg}\n")
+        print(f"{e}\n")
         print("💡 快速排查指引:")
-        print("  1. 运行自检探测: python examples/benchmark_eval/eval_runner.py --probe")
+        print("  1. 运行自检探测查看可用模型列表: python examples/benchmark_eval/eval_runner.py --probe")
         if target_proxy:
             print(f"  2. 当前已启用代理: {target_proxy}")
         else:
             rec = detect_recommended_proxy()
             if rec:
                 print(f"  2. 尝试添加本地代理: --proxy {rec}")
-        print("  3. 若特定模型名称变更: 尝试 --model gemini-1.5-flash-latest 或 --model gemini-2.0-flash\n")
         sys.exit(1)
-    print(" 通过 ✅\n", flush=True)
+
+    print(f"🎯 当前使用的评测模型: {active_model}\n")
 
     results = []
     total_g1 = 0
@@ -404,11 +433,11 @@ def main():
         p3 = build_group3_prompt(task)
 
         if args.mode == "count":
-            tokens_1 = call_gemini_count_tokens(opener, api_key, args.model, p1, args.base_url)
+            tokens_1 = call_gemini_count_tokens(opener, api_key, active_model, p1, args.base_url)
             time.sleep(0.1)
-            tokens_2 = call_gemini_count_tokens(opener, api_key, args.model, p2, args.base_url)
+            tokens_2 = call_gemini_count_tokens(opener, api_key, active_model, p2, args.base_url)
             time.sleep(0.1)
-            tokens_3 = call_gemini_count_tokens(opener, api_key, args.model, p3, args.base_url)
+            tokens_3 = call_gemini_count_tokens(opener, api_key, active_model, p3, args.base_url)
             time.sleep(0.1)
 
             total_g1 += tokens_1
@@ -426,11 +455,11 @@ def main():
                 "group3_axiom_hole": {"prompt_tokens": tokens_3}
             })
         else:
-            res1 = call_gemini_generate(opener, api_key, args.model, p1, args.base_url)
+            res1 = call_gemini_generate(opener, api_key, active_model, p1, args.base_url)
             time.sleep(0.5)
-            res2 = call_gemini_generate(opener, api_key, args.model, p2, args.base_url)
+            res2 = call_gemini_generate(opener, api_key, active_model, p2, args.base_url)
             time.sleep(0.5)
-            res3 = call_gemini_generate(opener, api_key, args.model, p3, args.base_url)
+            res3 = call_gemini_generate(opener, api_key, active_model, p3, args.base_url)
             time.sleep(0.5)
 
             total_g1 += res1["total_tokens"]
@@ -464,7 +493,7 @@ def main():
         "version": "1.0",
         "status": "completed_authentic",
         "experiment_metadata": {
-            "target_model": clean_model_name(args.model),
+            "target_model": active_model,
             "mode": args.mode,
             "evaluated_tasks_count": len(eval_tasks),
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
