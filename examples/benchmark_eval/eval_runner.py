@@ -121,7 +121,7 @@ def get_http_opener(proxy: str = None):
     return urllib.request.build_opener()
 
 
-def send_api_request(opener, url: str, payload: dict = None, method: str = "POST", timeout: int = 30, retries: int = 2):
+def send_api_request(opener, url: str, payload: dict = None, method: str = "POST", timeout: int = 40, retries: int = 4):
     """统一执行 API HTTP 请求，包含结构化 HTTPError 解析与自动退避重试"""
     data_bytes = json.dumps(payload).encode("utf-8") if payload is not None else None
     headers = {"Content-Type": "application/json"} if payload is not None else {}
@@ -154,10 +154,11 @@ def send_api_request(opener, url: str, payload: dict = None, method: str = "POST
                 else:
                     err_msg = str(err_info)
 
-            # 429 配额限制，自动退避重试
-            if e.code == 429 and attempt < retries:
-                wait_sec = (attempt + 1) * 3
-                print(f" [触发配额限流 429，等待 {wait_sec} 秒后重试...]", end="", flush=True)
+            # 503 (服务端高负载高峰), 429 (配额限流), 500/502/504 (网关与临时错误)，自动退避重试
+            if e.code in (429, 500, 502, 503, 504) and attempt < retries:
+                wait_sec = (attempt + 1) * 4
+                tag = "配额限流 429" if e.code == 429 else f"服务器高负载/临时不可用 {e.code}"
+                print(f" [{tag}，等待 {wait_sec}s 自动重试 ({attempt + 1}/{retries})...]", end="", flush=True)
                 time.sleep(wait_sec)
                 continue
 
@@ -168,7 +169,9 @@ def send_api_request(opener, url: str, payload: dict = None, method: str = "POST
                 snippet = err_body[:200].replace("\n", " ")
                 diag_lines.append(f"响应内容片段: {snippet}")
 
-            if e.code == 404:
+            if e.code == 503:
+                diag_lines.append("💡 排查建议: 当前模型正在经历全球高负载高峰 (Spikes in demand)。建议稍后重试，或指定其他稳定模型，例如: --model gemini-2.0-flash 或 --model gemini-1.5-flash-latest")
+            elif e.code == 404:
                 diag_lines.append("💡 排查建议: 模型名称不存在或网关路由不支持该端点。可尝试运行: python examples/benchmark_eval/eval_runner.py --probe 查看可用模型列表。")
             elif e.code in (400, 403):
                 diag_lines.append("💡 排查建议: 请检查 API Key 是否有效，或是否在 Google Cloud Console 中启用了 Generative Language API。")
@@ -176,13 +179,15 @@ def send_api_request(opener, url: str, payload: dict = None, method: str = "POST
             raise RuntimeError("\n".join(diag_lines))
 
         except urllib.error.URLError as e:
+            if attempt < retries:
+                wait_sec = (attempt + 1) * 3
+                print(f" [网络抖动 ({e.reason})，等待 {wait_sec}s 重试 ({attempt + 1}/{retries})...]", end="", flush=True)
+                time.sleep(wait_sec)
+                continue
             rec_proxy = detect_recommended_proxy()
             hint = ""
             if rec_proxy:
                 hint = f"\n💡 检测到本地存在可用代理端口: {rec_proxy}。建议运行时增加参数: --proxy {rec_proxy}"
-            if attempt < retries:
-                time.sleep(2)
-                continue
             raise RuntimeError(f"网络连接失败: {e.reason}{hint}")
 
 
@@ -445,7 +450,7 @@ def call_gemini_generate(opener, api_key: str, model: str, text: str, base_url: 
             "temperature": 0.2
         }
     }
-    res = send_api_request(opener, url, payload=payload, method="POST")
+    res = send_api_request(opener, url, payload=payload, method="POST", timeout=45, retries=5)
     usage = res.get("usageMetadata", {})
     candidates = res.get("candidates", [])
     text_out = ""
@@ -654,11 +659,11 @@ def main():
             # Group 1: 单体大上下文生成 (基准对照)
             res1 = call_gemini_generate(opener, api_key, active_model, p1, args.base_url)
             total_g1 += res1["total_tokens"]
-            time.sleep(0.3)
+            time.sleep(0.8)
 
             # Group 2: 单任务隔离微任务生成 + rustc 单元测试与编译错误自愈重试
             res2 = call_gemini_generate(opener, api_key, active_model, p2, args.base_url)
-            time.sleep(0.3)
+            time.sleep(0.8)
             g2_tokens = res2["total_tokens"]
             g2_ok, g2_err = run_rust_test(res2["text"], task)
             g2_pass1 = g2_ok
@@ -673,7 +678,7 @@ def main():
 
 Please fix the implementation and return ONLY the corrected complete Rust function:"""
                     heal_res = call_gemini_generate(opener, api_key, active_model, heal_prompt, args.base_url)
-                    time.sleep(0.3)
+                    time.sleep(0.8)
                     g2_tokens += heal_res["total_tokens"]
                     g2_attempts += 1
                     current_code = heal_res["text"]
@@ -689,7 +694,7 @@ Please fix the implementation and return ONLY the corrected complete Rust functi
 
             # Group 3: Axiom 契约打洞生成 + SMT 求解器验证与反例自愈重试
             res3 = call_gemini_generate(opener, api_key, active_model, p3, args.base_url)
-            time.sleep(0.3)
+            time.sleep(0.8)
             g3_tokens = res3["total_tokens"]
             g3_ok, g3_diag, g3_ce = run_axiom_verify(res3["text"], task, axiom_bin)
             g3_pass1 = g3_ok
@@ -706,7 +711,7 @@ Diagnostic: {g3_diag}{ce_info}
 Please refine your pure expression to satisfy all formal contracts and eliminate counterexamples.
 Return ONLY the corrected pure expression to fill `?hole`:"""
                     heal_res = call_gemini_generate(opener, api_key, active_model, heal_prompt, args.base_url)
-                    time.sleep(0.3)
+                    time.sleep(0.8)
                     g3_tokens += heal_res["total_tokens"]
                     g3_attempts += 1
                     current_expr = heal_res["text"]
