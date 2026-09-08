@@ -4,7 +4,8 @@
 
 # 📊 200-Functions 跨语言多 Agent 协作对比实验
 
-> **实验目标**：依据 RPG 业务需求规范 [`SPEC_200.md`](./SPEC_200.md)，横向对比在 AI 大模型（OpenAI Codex CLI）多 Agent 并发协作开发 200 个业务函数时，**Axiom、Python、Rust 与 TypeScript** 四大语言体系在 **Tokens 消耗、上下文隔离与验证反馈** 维度的实际表现。
+> **实验目标**：依据 RPG 业务需求规范 [`SPEC_200.md`](./SPEC_200.md)，横向对比在 AI 大模型（OpenAI Codex CLI）多 Agent 并发协作开发 200 个业务函数时，**Axiom、Python、Rust 与 TypeScript** 四大语言体系在 **Tokens 消耗、上下文隔离与验证反馈** 维度的实际表现。  
+> 💡 **进阶科学对照研究**：为进一步消除工作流粒度差异（排除“微任务拆分”的变量干扰），请参阅最新的 **单一变量 A/B 科学对照评测套件** 👉 [`examples/benchmark_eval/EVALUATION_REPORT.md`](../benchmark_eval/EVALUATION_REPORT.md)。
 
 ---
 
@@ -41,6 +42,7 @@
 
 | 导航项目 | 描述说明 | 链接地址 |
 | :--- | :--- | :--- |
+| 🔬 **单一变量科学对照报告** | 解耦工作流与程序表示的 A/B 对照实验 | [`EVALUATION_REPORT.md`](../benchmark_eval/EVALUATION_REPORT.md) |
 | 📋 **业务规范设计书** | 200 个业务函数分层与数学逻辑设计 | [`SPEC_200.md`](./SPEC_200.md) |
 | 🌟 **Axiom 评测记录** | 打洞流水线分步 Token 消耗与验证记录 | [`Benchmark_ax.md`](./Benchmark_ax.md) |
 | 🐍 **Python 评测记录** | 5 个 Agent 消耗、Unittest 用例与结果 | [`Benchmark_py.md`](./Benchmark_py.md) |

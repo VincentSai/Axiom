@@ -1,0 +1,359 @@
+{
+  "version": "1.0",
+  "name": "Axiom Golden Evaluation Dataset (20 Tasks)",
+  "description": "Standardized evaluation task suite spanning 5 topological tiers of game engine/business logic to benchmark AI agent reliability, token efficiency, and contract verification.",
+  "tasks": [
+    {
+      "id": 1,
+      "tier": 0,
+      "subsystem": "Spatial Geometry",
+      "function_name": "calc_manhattan_dist",
+      "description": "Calculate Manhattan distance between two 2D grid coordinates: |x1 - x2| + |y1 - y2|",
+      "inputs": [
+        { "name": "x1", "type": "Int" },
+        { "name": "y1", "type": "Int" },
+        { "name": "x2", "type": "Int" },
+        { "name": "y2", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["x1 >= 0", "y1 >= 0", "x2 >= 0", "y2 >= 0"],
+        "ensures": ["result >= 0"]
+      },
+      "edge_cases": ["Coincident points (dist = 0)", "Large coordinate diffs"]
+    },
+    {
+      "id": 2,
+      "tier": 0,
+      "subsystem": "Spatial Geometry",
+      "function_name": "calc_chebyshev_dist",
+      "description": "Calculate Chebyshev distance (king movement on chessboard): max(|x1 - x2|, |y1 - y2|)",
+      "inputs": [
+        { "name": "x1", "type": "Int" },
+        { "name": "y1", "type": "Int" },
+        { "name": "x2", "type": "Int" },
+        { "name": "y2", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["x1 >= 0", "y1 >= 0", "x2 >= 0", "y2 >= 0"],
+        "ensures": ["result >= 0"]
+      },
+      "edge_cases": ["Equal delta in both dimensions", "Zero delta"]
+    },
+    {
+      "id": 3,
+      "tier": 0,
+      "subsystem": "Spatial Geometry",
+      "function_name": "is_aabb_intersect",
+      "description": "Check whether two 2D Axis-Aligned Bounding Boxes overlap: (min_x1 <= max_x2 && max_x1 >= min_x2 && min_y1 <= max_y2 && max_y1 >= min_y2)",
+      "inputs": [
+        { "name": "min_x1", "type": "Int" },
+        { "name": "min_y1", "type": "Int" },
+        { "name": "max_x1", "type": "Int" },
+        { "name": "max_y1", "type": "Int" },
+        { "name": "min_x2", "type": "Int" },
+        { "name": "min_y2", "type": "Int" },
+        { "name": "max_x2", "type": "Int" },
+        { "name": "max_y2", "type": "Int" }
+      ],
+      "output": "Bool",
+      "contracts": {
+        "requires": ["max_x1 >= min_x1", "max_y1 >= min_y1", "max_x2 >= min_x2", "max_y2 >= min_y2"],
+        "ensures": ["result == true || result == false"]
+      },
+      "edge_cases": ["Touching edges only", "Completely containing", "Disjoint"]
+    },
+    {
+      "id": 4,
+      "tier": 0,
+      "subsystem": "Spatial Geometry",
+      "function_name": "pack_coords_to_hash",
+      "description": "Bijectively pack two non-negative 16-bit coordinates into a single 32-bit hash integer: x * 65536 + y",
+      "inputs": [
+        { "name": "x", "type": "Int" },
+        { "name": "y", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["x >= 0", "x < 65536", "y >= 0", "y < 65536"],
+        "ensures": ["result >= 0", "result < 4294967296"]
+      },
+      "edge_cases": ["Boundary at 65535", "Zero coordinate"]
+    },
+    {
+      "id": 5,
+      "tier": 1,
+      "subsystem": "Attribute Pipeline",
+      "function_name": "calc_strength_to_phys_atk",
+      "description": "Convert strength attribute to base physical attack power: base 10 + strength * 2",
+      "inputs": [
+        { "name": "strength", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["strength >= 0"],
+        "ensures": ["result >= 10"]
+      },
+      "edge_cases": ["Zero strength", "Very high strength scaling"]
+    },
+    {
+      "id": 6,
+      "tier": 1,
+      "subsystem": "Attribute Pipeline",
+      "function_name": "calc_armor_damage_reduction",
+      "description": "Calculate non-linear armor damage reduction: raw_damage - (raw_damage * armor) / (armor + 100). Minimum damage is 1.",
+      "inputs": [
+        { "name": "raw_damage", "type": "Int" },
+        { "name": "armor", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["raw_damage >= 1", "armor >= 0"],
+        "ensures": ["result >= 1", "result <= raw_damage"]
+      },
+      "edge_cases": ["Zero armor (no reduction)", "Huge armor (approaching 0 reduction cap)", "Damage truncation roundoff"]
+    },
+    {
+      "id": 7,
+      "tier": 1,
+      "subsystem": "Attribute Pipeline",
+      "function_name": "calc_crit_damage_multiplier",
+      "description": "Calculate critical damage: if is_crit is true, (base_damage * crit_mult_pct) / 100; else base_damage",
+      "inputs": [
+        { "name": "base_damage", "type": "Int" },
+        { "name": "crit_mult_pct", "type": "Int" },
+        { "name": "is_crit", "type": "Bool" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["base_damage >= 1", "crit_mult_pct >= 100"],
+        "ensures": ["result >= base_damage"]
+      },
+      "edge_cases": ["crit_mult_pct exactly 100", "Non-crit branch"]
+    },
+    {
+      "id": 8,
+      "tier": 1,
+      "subsystem": "Attribute Pipeline",
+      "function_name": "calc_dodge_chance",
+      "description": "Compute effective hit check: if agility_diff > 50, dodge chance is clamped to 75%; if diff <= 0, dodge chance is 5%.",
+      "inputs": [
+        { "name": "defender_agi", "type": "Int" },
+        { "name": "attacker_agi", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["defender_agi >= 0", "attacker_agi >= 0"],
+        "ensures": ["result >= 5", "result <= 75"]
+      },
+      "edge_cases": ["Negative agility delta clamped to minimum 5%", "Huge agility clamped to maximum 75%"]
+    },
+    {
+      "id": 9,
+      "tier": 2,
+      "subsystem": "Combat Pipeline",
+      "function_name": "resolve_physical_hit",
+      "description": "Resolve a single physical hit: apply armor reduction, apply crit multiplier if crit, clamp to minimum 1 damage.",
+      "inputs": [
+        { "name": "raw_atk", "type": "Int" },
+        { "name": "target_armor", "type": "Int" },
+        { "name": "is_crit", "type": "Bool" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["raw_atk >= 1", "target_armor >= 0"],
+        "ensures": ["result >= 1"]
+      },
+      "edge_cases": ["High armor absorbing full base damage", "Crit piercing high armor"]
+    },
+    {
+      "id": 10,
+      "tier": 2,
+      "subsystem": "Combat Pipeline",
+      "function_name": "apply_bleed_stack_tick",
+      "description": "Tick bleed stacks: damage = stacks * 5; return max(1, damage)",
+      "inputs": [
+        { "name": "stacks", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["stacks >= 1"],
+        "ensures": ["result >= 5"]
+      },
+      "edge_cases": ["1 stack gives exact 5", "High stack scaling"]
+    },
+    {
+      "id": 11,
+      "tier": 2,
+      "subsystem": "Combat Pipeline",
+      "function_name": "calc_mana_shield_absorb",
+      "description": "Mana shield absorption: shield absorbs incoming damage up to current shield HP. Return remaining damage after absorption.",
+      "inputs": [
+        { "name": "incoming_damage", "type": "Int" },
+        { "name": "shield_hp", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["incoming_damage >= 0", "shield_hp >= 0"],
+        "ensures": ["result >= 0", "result <= incoming_damage"]
+      },
+      "edge_cases": ["Shield fully absorbs damage (result = 0)", "Shield is 0 (result = incoming)", "Over-damage breaking shield"]
+    },
+    {
+      "id": 12,
+      "tier": 2,
+      "subsystem": "Combat Pipeline",
+      "function_name": "calc_stamina_skill_cost",
+      "description": "Calculate modified stamina cost with weight encumbrance penalty: base_cost + (weight > 100 ? (weight - 100) / 10 : 0)",
+      "inputs": [
+        { "name": "base_cost", "type": "Int" },
+        { "name": "weight", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["base_cost >= 1", "weight >= 0"],
+        "ensures": ["result >= base_cost"]
+      },
+      "edge_cases": ["Weight exactly 100", "Weight 0", "Excessive encumbrance"]
+    },
+    {
+      "id": 13,
+      "tier": 3,
+      "subsystem": "AI & Loot",
+      "function_name": "calc_threat_decay_by_dist",
+      "description": "Decay monster aggro threat by distance: threat - min(threat, distance * 2)",
+      "inputs": [
+        { "name": "initial_threat", "type": "Int" },
+        { "name": "distance", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["initial_threat >= 0", "distance >= 0"],
+        "ensures": ["result >= 0", "result <= initial_threat"]
+      },
+      "edge_cases": ["Distance so large threat drops to 0", "Zero distance (full threat)"]
+    },
+    {
+      "id": 14,
+      "tier": 3,
+      "subsystem": "AI & Loot",
+      "function_name": "evaluate_ai_behavior_state",
+      "description": "Finite state machine: if hp_pct < 20 return 3 (Flee); else if threat > 50 return 2 (Chase/Attack); else return 1 (Patrol)",
+      "inputs": [
+        { "name": "hp_pct", "type": "Int" },
+        { "name": "threat", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["hp_pct >= 0", "hp_pct <= 100", "threat >= 0"],
+        "ensures": ["result >= 1", "result <= 3"]
+      },
+      "edge_cases": ["hp_pct = 0", "hp_pct = 19 vs 20 boundary", "threat = 50 vs 51 boundary"]
+    },
+    {
+      "id": 15,
+      "tier": 3,
+      "subsystem": "AI & Loot",
+      "function_name": "calc_weighted_loot_tier",
+      "description": "Map random roll (0~9999) to loot tier: 0..9000 -> 1 (Common), 9001..9800 -> 2 (Rare), 9801..9999 -> 3 (Legendary)",
+      "inputs": [
+        { "name": "roll", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["roll >= 0", "roll < 10000"],
+        "ensures": ["result >= 1", "result <= 3"]
+      },
+      "edge_cases": ["Roll = 0", "Roll = 9000", "Roll = 9800", "Roll = 9999"]
+    },
+    {
+      "id": 16,
+      "tier": 3,
+      "subsystem": "AI & Loot",
+      "function_name": "calc_exp_gain_with_level_diff",
+      "description": "Calculate exp award: base_exp * max(10, 100 - (player_lvl - mob_lvl) * 10) / 100 if player_lvl >= mob_lvl; else base_exp * 120 / 100",
+      "inputs": [
+        { "name": "base_exp", "type": "Int" },
+        { "name": "player_lvl", "type": "Int" },
+        { "name": "mob_lvl", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["base_exp >= 10", "player_lvl >= 1", "mob_lvl >= 1"],
+        "ensures": ["result >= 1"]
+      },
+      "edge_cases": ["Player level vastly exceeding mob level (clamped to 10% floor)", "Mob level higher than player"]
+    },
+    {
+      "id": 17,
+      "tier": 4,
+      "subsystem": "World Engine",
+      "function_name": "determine_turn_initiative",
+      "description": "Calculate combat turn initiative score: speed * 10 + agility + seed_bias",
+      "inputs": [
+        { "name": "speed", "type": "Int" },
+        { "name": "agility", "type": "Int" },
+        { "name": "seed_bias", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["speed >= 0", "agility >= 0", "seed_bias >= 0"],
+        "ensures": ["result >= 0"]
+      },
+      "edge_cases": ["All zero inputs", "High speed dominance"]
+    },
+    {
+      "id": 18,
+      "tier": 4,
+      "subsystem": "World Engine",
+      "function_name": "resolve_boss_phase_transition",
+      "description": "Check boss phase by HP percentage: >= 70% -> Phase 1; >= 30% -> Phase 2; < 30% -> Phase 3 (Enrage)",
+      "inputs": [
+        { "name": "current_hp", "type": "Int" },
+        { "name": "max_hp", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["max_hp >= 1", "current_hp >= 0", "current_hp <= max_hp"],
+        "ensures": ["result >= 1", "result <= 3"]
+      },
+      "edge_cases": ["current_hp = 0 (dead, Phase 3)", "current_hp = max_hp (Phase 1)", "Exact 70% and 30% boundary points"]
+    },
+    {
+      "id": 19,
+      "tier": 4,
+      "subsystem": "World Engine",
+      "function_name": "simulate_single_turn_exchange",
+      "description": "Simulate single turn total damage: resolve_physical_hit(atk, def_armor, false) + apply_bleed_stack_tick(bleed_stacks)",
+      "inputs": [
+        { "name": "atk", "type": "Int" },
+        { "name": "def_armor", "type": "Int" },
+        { "name": "bleed_stacks", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["atk >= 1", "def_armor >= 0", "bleed_stacks >= 1"],
+        "ensures": ["result >= 2"]
+      },
+      "edge_cases": ["Minimum physical (1) + minimum bleed (5) -> result >= 6 >= 2"]
+    },
+    {
+      "id": 20,
+      "tier": 4,
+      "subsystem": "World Engine",
+      "function_name": "resolve_terrain_hazard_tick",
+      "description": "Apply terrain hazard damage: base hazard dmg reduced by elemental resistance percentage, clamped to min 0 and max base hazard dmg.",
+      "inputs": [
+        { "name": "hazard_dmg", "type": "Int" },
+        { "name": "res_pct", "type": "Int" }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": ["hazard_dmg >= 0", "res_pct >= 0", "res_pct <= 100"],
+        "ensures": ["result >= 0", "result <= hazard_dmg"]
+      },
+      "edge_cases": ["100% resistance (result = 0)", "0% resistance (result = hazard_dmg)"]
+    }
+  ]
+}
