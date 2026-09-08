@@ -1,56 +1,89 @@
-# 🔬 Axiom 单一变量科学对照评测报告 (A/B Evaluation Report)
+# 🔬 Axiom 单一变量科学对照评测方法与基准规范报告 (A/B Evaluation Protocol)
 
-> **评测日期**：2026-09-08  
-> **评测目标**：严格控制基座大模型（OpenAI Codex / GPT-4o Class, Temperature = 0.2）与业务需求单一变量，通过 **三组对照实验** 彻底解耦 **“工作流拆解（Micro-Task Workflow）”** 与 **“语言程序表示（Axiom Formal Contract & SMT）”** 的独立贡献，验证 Axiom 是否真正让 AI 编码变得更可靠、更少幻觉、更低成本。
-
----
-
-## 📊 一、核心实验数据对照总表
-
-从 [`SPEC_200.md`](../benchmark_200/SPEC_200.md) 跨越 5 层拓扑依赖的 200 个业务函数中，精选 20 个覆盖空间几何、非线性抗性、战斗数值、掉落状态机与世界仿真的标准黄金任务，实测数据如下：
-
-| 度量指标 (Metrics) | Group 1: 传统大文件 (Rust Monolith) | Group 2: 单函数微任务 (Rust Micro-Worker) | Group 3: Axiom 契约流水线 (Axiom Hole Pipeline) | Axiom 相对 Group 2 净增益 (语言层真实护城河) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Pass@1 首次通过率** | 65.0% (13/20) | 75.0% (15/20) | **95.0% (19/20)** | **🔥 +20.0% 首次正确率** |
-| **边界缺陷漏检率 (Defect Leak Rate)** | 35.0% (7/20 潜伏 Bug) | 30.0% (6/20 潜伏 Bug) | **0.00% (全域形式化定理证明)** | **🛡️ 消除全部潜伏边界反例** |
-| **平均自愈收敛轮次 (Fix Turns)** | 2.40 轮 | 1.90 轮 | **1.10 轮 (单步收敛)** | **⚡ 修复效率提升 72.7%** |
-| **单任务平均 Tokens 消耗** | 2,180 Tokens | 940 Tokens | **385 Tokens** | **💰 额外节省 59.0% Tokens** |
-| **20 任务总 Tokens 消耗** | 43,600 Tokens | 18,800 Tokens | **7,700 Tokens** | **🔥 较传统方式节省 82.3%** |
-| **有效上下文尺寸 (Context Window)** | ~1,850 Tokens (长文件) | ~420 Tokens (单签名+文档) | **~160 Tokens (`hole-task.json`)** | **极度收敛的语义工作空间** |
+> **核心原则**：科学、可复现、严禁伪造。  
+> **评测设计目标**：严格控制基座大模型（Google Gemini / OpenAI Codex）与业务需求单一变量，通过 **三组对照实验** 彻底解耦 **“工作流拆解（Micro-Task Workflow）”** 与 **“语言程序表示（Axiom Formal Contract & SMT）”** 的独立贡献，客观验证 Axiom 是否真正让 AI 编码变得更可靠、更少幻觉、更低成本。
 
 ---
 
-## 🔍 二、解耦分析：谁贡献了 Token 节省？谁贡献了可靠性？
+## 🎯 一、三组对照实验架构设计
 
-外部评测曾提出过一个致命问题：  
-> *“Axiom 的节省到底是因为语言本身，还是仅仅因为你们把任务拆成了 200 个微型 Worker？”*
+外部评测曾提出过一个核心质疑：  
+> *“Axiom 的 Token 节省与可靠性，到底是因为语言本身，还是仅仅因为你们把任务切成了微型任务？”*
 
-通过引入 **Group 2（Rust 也拆成单函数微任务）**，我们首次实现了科学解耦：
+为了彻底解耦变量，我们在完全相同的 20 个黄金业务算法任务（[`golden_tasks.json`](./golden_tasks.json)）下，设立了三组对照协议（[`protocols/prompt_templates.md`](./protocols/prompt_templates.md)）：
 
-### 1. Token 消耗的双重解耦
-- **第一级节省（工作流切小）**：  
-  从 Group 1（2,180 tokens）到 Group 2（940 tokens），Token 下降了 **56.8%**。这部分确实归功于 **任务上下文隔离**（Micro-Task Workflow），消除了大文件中 40~50 个无关函数的冗余注意力。
-- **第二级节省（Axiom 语言与数据表示）**：  
-  从 Group 2（940 tokens）到 Group 3（385 tokens），Token 在已经切小的基础上**再度下降了 59.0%**！  
-  - **根因分析**：Group 2 依然需要输入冗长的自然语言注释需求、Rust 类型声明与函数签名模板；而 Axiom 的 `hole-task.json` 只有纯数学契约（Pre/Post），Worker 仅需输出**单行无副作用纯表达式**，彻底去除了模板样板代码与自然语言描述的冗余。
+```mermaid
+graph TD
+    LLM["基座大模型 (Google Gemini / OpenAI)"]
+    
+    subgraph Group1["Group 1: 传统语言大文件 (Rust Monolith)"]
+        P1["大模块上下文 (多个相关函数长代码)"] --> R1["Agent 读写完整长代码文件"]
+        R1 --> C1["cargo check / cargo test"]
+    end
+    
+    subgraph Group2["Group 2: 单函数微任务 (Rust Micro-Worker)"]
+        P2["单函数上下文 (仅签名 + 自然语言需求注释)"] --> R2["消除任务拆解差异，仅实现单函数"]
+        R2 --> C2["cargo test 有限抽样断言"]
+    end
+    
+    subgraph Group3["Group 3: Axiom 契约打洞 (Axiom Hole Pipeline)"]
+        P3["hole-task.json (纯输入输出 + 数学契约)"] --> R3["Worker 仅需输出单个纯表达式"]
+        R3 --> C3["Axiom SMT / Z3 全域定理证明与反例拦截"]
+    end
 
-### 2. 软件可靠性与反例防御（Axiom 真正的绝对壁垒）
-这是本次对照实验中最具震撼力的发现：
-- **即便把传统语言拆到单函数（Group 2），AI 依然会在 30% 的任务中写出危险的边界 Bug**：
-  - 例如在 `calc_armor_damage_reduction` 中，LLM 未考虑整数除法截断导致除以 `armor + 100` 后结果偏小甚至为 0，破坏了“最低伤害为 1”的游戏设计基准；
-  - 在 `calc_mana_shield_absorb` 中，未处理吸收量大于剩余伤害的情况，导致输出负数；
-  - 在 `calc_weighted_loot_tier` 中，轮盘边界判断使用 `<` 而非 `<=`，导致边缘数值掉落空缺。
-- **传统单元测试的有限性**：  
-  开发者手写的 10~20 个单元测试用例无法穷举所有整数组合，导致上述缺陷直接溜进主干（漏检率 30%~35%）。
-- **Axiom 的 SMT 反例防御体系**：  
-  在 Group 3 中，编译器在合入代码前将契约与函数体编译为 SMT-LIB2 命题并交由求解器证明。任何违反后置条件的解（如 $x=0$ 时的下溢反例）都会被 **100% 物理拦截**，并给出精确的输入反例赋值字典（如 `{"raw_damage": 1, "armor": 0}`）。Worker 基于具体数值反例单步自愈，使逻辑收敛轮次从 1.9~2.4 轮直接压缩至 **1.1 轮**。
+    LLM --> Group1
+    LLM --> Group2
+    LLM --> Group3
+```
 
 ---
 
-## 💡 三、总结结论
+## 🛠️ 二、官方 API 真实测算工具链 (`eval_runner.py`)
 
-本次单一变量对照评测证实了评测报告的根本断言：
-1. **Axiom 不是一门为了替代现有语言的通用编程语言**，而是一套 **面向 AI Agent 协作的高可靠程序表示、局部打洞任务编排与形式化验证系统**；
-2. **AI 的确因为 Axiom 的程序表示方式而变得显著更可靠、更容易自愈、更便宜**：
-   - 相比传统大文件 Agent：Token 节省 **82.3%**，缺陷漏检率从 **35% 归零**；
-   - 相比同等粒度的传统微任务：Token 额外节省 **59.0%**，Pass@1 提高 **20%**，边界反例防御率实现 **100% 形式化闭环**。
+为了杜绝任何人为估算与虚假数据，我们提供了基于 Google Gemini 官方 API 的真实运行器 [`eval_runner.py`](./eval_runner.py)：
+
+### 1. 真实 Token 测算模式 (`--mode count`)
+- 直接调用 Google Gemini 官方端点 `models/{model}:countTokens`；
+- 使用官方 Tokenizer 精确计算三组 Prompt 实际消耗的每个 Token，无模型生成随机性，0 成本秒级完成。
+
+### 2. 真实生成与定理证明自愈模式 (`--mode generate`)
+- 调用官方 `generateContent` 端点（Temperature = 0.2）；
+- 捕获 API 随响应返回的官方 `usageMetadata`（`promptTokenCount`, `candidatesTokenCount`, `totalTokenCount`）；
+- 将生成的代码交由本地 `axiom verify` / `axiom pool submit` 与本地 `rustc` 进行真实编译与 SMT 定理证明，验证反例拦截能力。
+
+---
+
+## 🖥️ 本地一键运行真实测算
+
+```powershell
+# 设置你的 Google Gemini API Key
+$env:GEMINI_API_KEY="AIzaSy..."
+
+# 运行真实 Token 测算（调用官方 countTokens 接口，输出到 eval_matrix_data.json）
+python examples/benchmark_eval/eval_runner.py --mode count
+
+# 或者指定仅评测前 5 个任务做快速验证
+python examples/benchmark_eval/eval_runner.py --mode count --tasks 5
+```
+
+---
+
+## 📊 三、已在本地完成 100% 真实实机编译的配套基准
+
+除了等待通过 API Key 批量调用的在线评测外，Axiom 本地编译器与验证器已完成以下实打实通过的代码资产：
+1. **200 函数真实业务验证**：
+   ```powershell
+   cargo run -p axiom-cli -- verify examples/benchmark_200/ax/engine_200.ax
+   ```
+   👉 **实机运行退出码 0，200/200 全部通过**。
+2. **旗舰游戏内核 Rust 原生机器码编译**：
+   ```powershell
+   cargo run -p axiom-cli -- emit-rust examples/game_loop.ax -o game_loop.rs
+   rustc --crate-type lib game_loop.rs -o game_loop.rlib
+   ```
+   👉 **实机运行退出码 0，包含代数效应 Trait 生成与 Handler 注入，0 错误编译出 `.rlib`**。
+3. **多 Agent 打洞反例拦截实测**：
+   ```powershell
+   cargo run -p axiom-cli -- pool submit examples/math.ax --hole calc_h0 --expr "x - 1"
+   ```
+   👉 **精准捕获反例并拦截（退出码 1）**。

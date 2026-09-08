@@ -42,22 +42,18 @@ When building game logic and mission-critical systems with AI agents, traditiona
 
 ---
 
-## 🔬 Rigorous Empirical Proof: Single-Variable A/B Evaluation
+## 🔬 Empirical Scientific Evaluation: Single-Variable A/B Eval Suite
 
 A common question is: *“Are Axiom’s token savings and reliability gains genuinely from the language representation, or simply from breaking tasks down into micro-workers?”*
 
-To scientifically decouple these variables, we conducted a **three-group controlled benchmark** using the exact same foundation model (OpenAI Codex / GPT-4o Class, T=0.2) across 20 golden domain algorithm tasks (see [`examples/benchmark_eval/EVALUATION_REPORT.md`](examples/benchmark_eval/EVALUATION_REPORT.md)):
-
-| Metric | Group 1: Monolithic Rust (Full File Context) | Group 2: Micro-Worker Rust (Isolated Function Task) | Group 3: Axiom Hole Pipeline (Formal Contracts + SMT) | Axiom Net Gain vs Group 2 (True Language Moat) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Pass@1 Accuracy** | 65.0% | 75.0% | **95.0%** | **🔥 +20.0% First-Pass Accuracy** |
-| **Defect Leak Rate** | 35.0% (Latent Bugs) | 30.0% (Latent Bugs) | **0.00% (Formally Proved)** | **🛡️ Zero Latent Edge-Case Bugs** |
-| **Average Fix Turns** | 2.40 turns | 1.90 turns | **1.10 turns (Single-Step)** | **⚡ 72.7% Faster Convergence** |
-| **Avg Tokens / Task** | 2,180 tokens | 940 tokens | **385 tokens** | **💰 Additional 59.0% Token Savings** |
-| **Total Tokens (20 Tasks)**| 43,600 tokens | 18,800 tokens | **7,700 tokens** | **🔥 82.3% Savings vs Traditional** |
-
-- **Key Finding**: Task isolation (Group 2) delivers a 56.8% token reduction. On top of that, Axiom’s pure contract representation eliminates natural language and boilerplate overhead, **slashing tokens by another 59.0%** while SMT verification **eliminates 100% of latent boundary defects**.
-- You can also review the full 200-function stress benchmark at [`examples/benchmark_200/Benchmark_ax.md`](examples/benchmark_200/Benchmark_ax.md).
+To scientifically decouple these variables, we established a rigorous **Single-Variable A/B Benchmark Eval Suite** located in [`examples/benchmark_eval/`](examples/benchmark_eval/):
+- **Golden Task Suite ([`golden_tasks.json`](examples/benchmark_eval/golden_tasks.json))**: 20 golden domain algorithm tasks spanning spatial geometry, non-linear resistance, combat mechanics, loot drop state machines, and world simulation.
+- **Three-Group Controlled Protocol ([`prompt_templates.md`](examples/benchmark_eval/protocols/prompt_templates.md))**:
+  1. **Group 1**: Traditional monolithic file workflow (Rust Monolith, large context);
+  2. **Group 2 (Critical Decoupling)**: Traditional single-function micro-tasks (Rust Micro-Worker, eliminating task granularity differences);
+  3. **Group 3**: Axiom contract hole pipeline (Axiom Hole Pipeline, powered by formal contracts and SMT verification).
+- **Official API Runner ([`eval_runner.py`](examples/benchmark_eval/eval_runner.py))**:
+  Powered directly by the official Google Gemini REST API (`countTokens` and `generateContent`), **measuring genuine physical tokens via the official tokenizer and usageMetadata**, strictly eliminating subjective or unverified claims. Anyone can run the reproduction suite with `GEMINI_API_KEY`.
 
 ---
 
@@ -129,7 +125,7 @@ axiom export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
 
 ## 📂 Documentation
 
-- 🔬 [Single-Variable A/B Evaluation Report (examples/benchmark_eval/EVALUATION_REPORT.md)](examples/benchmark_eval/EVALUATION_REPORT.md)
+- 🔬 [Single-Variable A/B Evaluation Suite (examples/benchmark_eval/README.md)](examples/benchmark_eval/README.md)
 - 📊 [200-Function Stress Benchmark (examples/benchmark_200/Benchmark_ax.md)](examples/benchmark_200/Benchmark_ax.md)
 - 📘 [Architecture Whitepaper (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)
 - 📝 [Language Specification Draft (docs/SPECIFICATION.md)](docs/SPECIFICATION.md)

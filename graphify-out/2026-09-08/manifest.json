@@ -300,23 +300,23 @@
     "semantic_hash": ""
   },
   "README.en.md": {
-    "mtime": 1788773058.8911128,
-    "ast_hash": "9c853618a8c1f20315605fdbd41b9de7",
+    "mtime": 1788836803.441638,
+    "ast_hash": "dec42b06aeb683f3cb635658d4a9e883",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1788773021.8010738,
-    "ast_hash": "6256aecf4416a4a801f2b849b5b0693c",
+    "mtime": 1788836785.6503637,
+    "ast_hash": "957a754239d58327015b02b2d8ad1927",
     "semantic_hash": ""
   },
   "README.zh-CN.md": {
-    "mtime": 1788773032.1751347,
-    "ast_hash": "6256aecf4416a4a801f2b849b5b0693c",
+    "mtime": 1788836777.2721694,
+    "ast_hash": "957a754239d58327015b02b2d8ad1927",
     "semantic_hash": ""
   },
   "README.zh-TW.md": {
-    "mtime": 1788773044.0141265,
-    "ast_hash": "fe90c32139e78abedd0c3dcf38705018",
+    "mtime": 1788836794.293655,
+    "ast_hash": "5cc3c3da71b55c3329a052cb4d446981",
     "semantic_hash": ""
   },
   "docs/ARCHITECTURE.md": {
@@ -425,8 +425,8 @@
     "semantic_hash": ""
   },
   "examples/benchmark_200/README.md": {
-    "mtime": 1788506284.9826972,
-    "ast_hash": "e577fe1bbd154a0e2b51a014ae5352a1",
+    "mtime": 1788836822.9917943,
+    "ast_hash": "1ed986b50a2b86d2ba356255cf0840ab",
     "semantic_hash": ""
   },
   "examples/benchmark_200/README.zh-CN.md": {
@@ -667,6 +667,31 @@
   "crates/axiom-cli/tests/pool_e2e_test.rs": {
     "mtime": 1788772969.8652985,
     "ast_hash": "6e277d51a9f9aef8e2b77e819ac1b980",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_eval/data/eval_matrix_data.json": {
+    "mtime": 1788836737.871237,
+    "ast_hash": "a47b6dc484601bff8a2cd5ebe47e8917",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_eval/golden_tasks.json": {
+    "mtime": 1788836595.3289464,
+    "ast_hash": "52e59204d3410ec11af14ef42c0e78dd",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_eval/EVALUATION_REPORT.md": {
+    "mtime": 1788836749.7012079,
+    "ast_hash": "e933882e57de9ff35f257d9162fc2b09",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_eval/README.md": {
+    "mtime": 1788836755.207718,
+    "ast_hash": "cbb5cee241287b6fe49bfc71184d6c92",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_eval/protocols/prompt_templates.md": {
+    "mtime": 1788836603.457384,
+    "ast_hash": "2e0f995d7852572778fa26165c97b589",
     "semantic_hash": ""
   }
 }

@@ -3926,8 +3926,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "axiom-ffi-gen/src/lib.rs"
     },
     {
@@ -3937,8 +3937,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_ffierror",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "ffierror"
     },
     {
@@ -3948,8 +3948,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_string",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "string"
     },
     {
@@ -3959,8 +3959,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_display",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "display"
     },
     {
@@ -3970,8 +3970,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_ffierror_fmt",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": ".fmt()"
     },
     {
@@ -3981,8 +3981,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_formatter",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "formatter"
     },
     {
@@ -3992,8 +3992,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_result",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "result"
     },
     {
@@ -4003,8 +4003,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_error",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "error"
     },
     {
@@ -4014,8 +4014,8 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_ffierror_source",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": ".source()"
     },
     {
@@ -4025,8 +4025,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_option",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "option"
     },
     {
@@ -4036,8 +4036,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_from",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "from"
     },
     {
@@ -4047,8 +4047,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_ffierror_from",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": ".from()"
     },
     {
@@ -4058,8 +4058,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_self",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "self"
     },
     {
@@ -4069,8 +4069,8 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_generate_typescript_bindings",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generate_typescript_bindings()"
     },
     {
@@ -4080,8 +4080,8 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_generate_c_header",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generate_c_header()"
     },
     {
@@ -4091,8 +4091,8 @@
       "source_location": "L164",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_generate_c_abi_rust_glue",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generate_c_abi_rust_glue()"
     },
     {
@@ -4102,8 +4102,8 @@
       "source_location": "L228",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_generate_typescript_from_source",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generate_typescript_from_source()"
     },
     {
@@ -4113,8 +4113,8 @@
       "source_location": "L233",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_generate_c_header_from_source",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generate_c_header_from_source()"
     },
     {
@@ -4124,8 +4124,8 @@
       "source_location": "L237",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_validate_module",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "validate_module()"
     },
     {
@@ -4135,8 +4135,8 @@
       "source_location": "L262",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_validate_fields",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "validate_fields()"
     },
     {
@@ -4146,8 +4146,8 @@
       "source_location": "L269",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_validate_identifier",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "validate_identifier()"
     },
     {
@@ -4157,8 +4157,8 @@
       "source_location": "L277",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_is_c_identifier",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "is_c_identifier()"
     },
     {
@@ -4168,8 +4168,8 @@
       "source_location": "L283",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_type_definition_name",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "type_definition_name()"
     },
     {
@@ -4179,8 +4179,8 @@
       "source_location": "L289",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_typescript_type",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "typescript_type()"
     },
     {
@@ -4190,8 +4190,8 @@
       "source_location": "L299",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_typescript_custom_type",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "typescript_custom_type()"
     },
     {
@@ -4201,8 +4201,8 @@
       "source_location": "L323",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_collect_list_types",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "collect_list_types()"
     },
     {
@@ -4212,8 +4212,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_btreemap",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "btreemap"
     },
     {
@@ -4223,8 +4223,8 @@
       "source_location": "L350",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_collect_list_type",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "collect_list_type()"
     },
     {
@@ -4234,8 +4234,8 @@
       "source_location": "L372",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_type_suffix",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "type_suffix()"
     },
     {
@@ -4245,8 +4245,8 @@
       "source_location": "L393",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_c_type",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "c_type()"
     },
     {
@@ -4256,8 +4256,8 @@
       "source_location": "L413",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_render_c_type_definition",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "render_c_type_definition()"
     },
     {
@@ -4267,8 +4267,8 @@
       "source_location": "L467",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_render_c_function",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "render_c_function()"
     },
     {
@@ -4278,8 +4278,8 @@
       "source_location": "L490",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_render_rust_type_definition",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "render_rust_type_definition()"
     },
     {
@@ -4289,8 +4289,8 @@
       "source_location": "L531",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_render_rust_variant_payloads",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "render_rust_variant_payloads()"
     },
     {
@@ -4300,8 +4300,8 @@
       "source_location": "L546",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rust_function_signature",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "rust_function_signature()"
     },
     {
@@ -4311,8 +4311,8 @@
       "source_location": "L560",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rust_ffi_type",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "rust_ffi_type()"
     },
     {
@@ -4322,8 +4322,8 @@
       "source_location": "L582",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_generic_arguments",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generic_arguments()"
     },
     {
@@ -4333,8 +4333,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_vec",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "vec"
     },
     {
@@ -4355,8 +4355,8 @@
       "source_location": "L618",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_screaming_snake",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "screaming_snake()"
     },
     {
@@ -4366,8 +4366,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_tests_ffi_gen_test",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "ffi_gen_test.rs"
     },
     {
@@ -4377,8 +4377,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_tests_ffi_gen_test_generates_typescript_records_discriminated_unions_and_functions",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generates_typescript_records_discriminated_unions_and_functions()"
     },
     {
@@ -4388,8 +4388,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_tests_ffi_gen_test_generates_guarded_c_header_with_primitives_and_cpp_linkage",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generates_guarded_c_header_with_primitives_and_cpp_linkage()"
     },
     {
@@ -4399,8 +4399,8 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_tests_ffi_gen_test_game_loop_c_abi_rust_glue_compiles",
-      "community": 5,
-      "community_name": "Module",
+      "community": 15,
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "game_loop_c_abi_rust_glue_compiles()"
     },
     {
@@ -7413,8 +7413,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "axiom-wit/src/lib.rs"
     },
     {
@@ -7424,8 +7424,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_witerror",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "witerror"
     },
     {
@@ -7435,8 +7435,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_rs_string",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "string"
     },
     {
@@ -7446,8 +7446,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_rs_display",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "display"
     },
     {
@@ -7457,8 +7457,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_witerror_fmt",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": ".fmt()"
     },
     {
@@ -7468,8 +7468,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_rs_formatter",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "formatter"
     },
     {
@@ -7479,8 +7479,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_rs_result",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "result"
     },
     {
@@ -7490,8 +7490,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_rs_error",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "error"
     },
     {
@@ -7501,8 +7501,8 @@
       "source_location": "L34",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_witerror_source",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": ".source()"
     },
     {
@@ -7512,8 +7512,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_rs_option",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "option"
     },
     {
@@ -7523,8 +7523,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_rs_from",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "from"
     },
     {
@@ -7534,8 +7534,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_witerror_from",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": ".from()"
     },
     {
@@ -7545,8 +7545,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_rs_self",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "self"
     },
     {
@@ -7556,8 +7556,8 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_generate_wit",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "generate_wit()"
     },
     {
@@ -7567,8 +7567,8 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_generate_wit_from_source",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "generate_wit_from_source()"
     },
     {
@@ -7578,8 +7578,8 @@
       "source_location": "L107",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_normalize_package_name",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "normalize_package_name()"
     },
     {
@@ -7589,8 +7589,8 @@
       "source_location": "L141",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_type_definition_name",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "type_definition_name()"
     },
     {
@@ -7600,8 +7600,8 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_render_type_definition",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "render_type_definition()"
     },
     {
@@ -7611,8 +7611,8 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_unit_variant",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "unit_variant()"
     },
     {
@@ -7622,8 +7622,8 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_render_variant",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "render_variant()"
     },
     {
@@ -7633,8 +7633,8 @@
       "source_location": "L199",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_render_effect",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "render_effect()"
     },
     {
@@ -7644,8 +7644,8 @@
       "source_location": "L222",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_render_use",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "render_use()"
     },
     {
@@ -7655,8 +7655,8 @@
       "source_location": "L229",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_render_function_export",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "render_function_export()"
     },
     {
@@ -7666,8 +7666,8 @@
       "source_location": "L238",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_render_function_type",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "render_function_type()"
     },
     {
@@ -7677,8 +7677,8 @@
       "source_location": "L253",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_render_type",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "render_type()"
     },
     {
@@ -7688,8 +7688,8 @@
       "source_location": "L264",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_render_custom_type",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "render_custom_type()"
     },
     {
@@ -7699,8 +7699,8 @@
       "source_location": "L306",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_split_type_arguments",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "split_type_arguments()"
     },
     {
@@ -7710,8 +7710,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_rs_vec",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "vec"
     },
     {
@@ -7721,8 +7721,8 @@
       "source_location": "L335",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_wit_identifier",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "wit_identifier()"
     },
     {
@@ -7732,8 +7732,8 @@
       "source_location": "L374",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_converts_axiom_names_to_wit_identifiers",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "converts_axiom_names_to_wit_identifiers()"
     },
     {
@@ -7743,8 +7743,8 @@
       "source_location": "L381",
       "_origin": "ast",
       "id": "crates_axiom_wit_src_lib_converts_nested_axiom_container_types",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "converts_nested_axiom_container_types()"
     },
     {
@@ -7754,8 +7754,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "crates_axiom_wit_tests_wit_generation_test",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "wit_generation_test.rs"
     },
     {
@@ -7765,8 +7765,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "crates_axiom_wit_tests_wit_generation_test_generates_records_enums_and_variants",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "generates_records_enums_and_variants()"
     },
     {
@@ -7776,8 +7776,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "crates_axiom_wit_tests_wit_generation_test_generates_transfer_effect_interfaces_and_export",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "generates_transfer_effect_interfaces_and_export()"
     },
     {
@@ -7787,8 +7787,8 @@
       "source_location": "L61",
       "_origin": "ast",
       "id": "crates_axiom_wit_tests_wit_generation_test_generates_game_loop_types_effects_and_exports",
-      "community": 15,
-      "community_name": "WitError",
+      "community": 5,
+      "community_name": "Module",
       "norm_label": "generates_game_loop_types_effects_and_exports()"
     },
     {
@@ -8051,8 +8051,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_bresenham_step_x",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 146,
+      "community_name": "bresenham_step_x",
       "norm_label": "bresenham_step_x()"
     },
     {
@@ -8150,8 +8150,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_check_aabb_overlap",
-      "community": 73,
-      "community_name": "check_aabb_overlap",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "check_aabb_overlap()"
     },
     {
@@ -8260,8 +8260,8 @@
       "source_location": "L173",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_024",
-      "community": 122,
-      "community_name": "spatial_subsys_024",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "spatial_subsys_024()"
     },
     {
@@ -8282,8 +8282,8 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_026",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 157,
+      "community_name": "spatial_subsys_026",
       "norm_label": "spatial_subsys_026()"
     },
     {
@@ -8359,8 +8359,8 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_033",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 29,
+      "community_name": "tier3_ai_loot.py",
       "norm_label": "spatial_subsys_033()"
     },
     {
@@ -8370,8 +8370,8 @@
       "source_location": "L237",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_034",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "spatial_subsys_034()"
     },
     {
@@ -8381,8 +8381,8 @@
       "source_location": "L244",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_035",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "spatial_subsys_035()"
     },
     {
@@ -8392,8 +8392,8 @@
       "source_location": "L251",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_036",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "spatial_subsys_036()"
     },
     {
@@ -8403,8 +8403,8 @@
       "source_location": "L256",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_037",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "spatial_subsys_037()"
     },
     {
@@ -8414,8 +8414,8 @@
       "source_location": "L263",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_038",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "spatial_subsys_038()"
     },
     {
@@ -8436,8 +8436,8 @@
       "source_location": "L277",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_040",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "spatial_subsys_040()"
     },
     {
@@ -8502,8 +8502,8 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_38",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 146,
+      "community_name": "bresenham_step_x",
       "norm_label": "return the horizontal sign step from ``x1`` toward ``x2``."
     },
     {
@@ -8601,8 +8601,8 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_100",
-      "community": 73,
-      "community_name": "check_aabb_overlap",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "return whether two valid axis-aligned boxes overlap inclusively."
     },
     {
@@ -8711,8 +8711,8 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_174",
-      "community": 122,
-      "community_name": "spatial_subsys_024",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "return the sum of the normalized directions of two axes."
     },
     {
@@ -8733,8 +8733,8 @@
       "source_location": "L186",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_186",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 157,
+      "community_name": "spatial_subsys_026",
       "norm_label": "return the floor midpoint of a nonnegative interval."
     },
     {
@@ -8810,8 +8810,8 @@
       "source_location": "L231",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_231",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 29,
+      "community_name": "tier3_ai_loot.py",
       "norm_label": "return the shared length of two origin-aligned intervals."
     },
     {
@@ -8821,8 +8821,8 @@
       "source_location": "L238",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_238",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "return the grid bucket containing coordinate ``a`` at resolution ``b``."
     },
     {
@@ -8832,8 +8832,8 @@
       "source_location": "L245",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_245",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "return nonnegative cell-local coordinate ``a`` modulo ``b``."
     },
     {
@@ -8843,8 +8843,8 @@
       "source_location": "L252",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_252",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "return 1 when ``a`` lies below half-plane boundary ``b``, else 0."
     },
     {
@@ -8854,8 +8854,8 @@
       "source_location": "L257",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_257",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "return row width in a radius-``a`` diamond at vertical offset ``b``."
     },
     {
@@ -8865,8 +8865,8 @@
       "source_location": "L264",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_264",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "return the start offset for range ``a`` with stride ``b + 1``."
     },
     {
@@ -8887,8 +8887,8 @@
       "source_location": "L278",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_278",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "return a bresenham-style doubled raster-error update."
     },
     {
@@ -9063,8 +9063,8 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_055",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 146,
+      "community_name": "bresenham_step_x",
       "norm_label": "stat_subsys_055()"
     },
     {
@@ -9162,8 +9162,8 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_064",
-      "community": 73,
-      "community_name": "check_aabb_overlap",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "stat_subsys_064()"
     },
     {
@@ -9272,8 +9272,8 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_074",
-      "community": 122,
-      "community_name": "spatial_subsys_024",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "stat_subsys_074()"
     },
     {
@@ -9294,8 +9294,8 @@
       "source_location": "L164",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_076",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 157,
+      "community_name": "spatial_subsys_026",
       "norm_label": "stat_subsys_076()"
     },
     {
@@ -9371,8 +9371,8 @@
       "source_location": "L192",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_083",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 29,
+      "community_name": "tier3_ai_loot.py",
       "norm_label": "stat_subsys_083()"
     },
     {
@@ -9382,8 +9382,8 @@
       "source_location": "L196",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_084",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "stat_subsys_084()"
     },
     {
@@ -9393,8 +9393,8 @@
       "source_location": "L200",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_085",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "stat_subsys_085()"
     },
     {
@@ -9404,8 +9404,8 @@
       "source_location": "L204",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_086",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "stat_subsys_086()"
     },
     {
@@ -9415,8 +9415,8 @@
       "source_location": "L208",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_087",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "stat_subsys_087()"
     },
     {
@@ -9426,8 +9426,8 @@
       "source_location": "L212",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_088",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "stat_subsys_088()"
     },
     {
@@ -9448,8 +9448,8 @@
       "source_location": "L220",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_090",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "stat_subsys_090()"
     },
     {
@@ -9624,8 +9624,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_105",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 146,
+      "community_name": "bresenham_step_x",
       "norm_label": "combat_subsys_105()"
     },
     {
@@ -9723,8 +9723,8 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_114",
-      "community": 73,
-      "community_name": "check_aabb_overlap",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "combat_subsys_114()"
     },
     {
@@ -9833,8 +9833,8 @@
       "source_location": "L162",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_124",
-      "community": 122,
-      "community_name": "spatial_subsys_024",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "combat_subsys_124()"
     },
     {
@@ -9855,8 +9855,8 @@
       "source_location": "L172",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_126",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 157,
+      "community_name": "spatial_subsys_026",
       "norm_label": "combat_subsys_126()"
     },
     {
@@ -9932,8 +9932,8 @@
       "source_location": "L207",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_133",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 29,
+      "community_name": "tier3_ai_loot.py",
       "norm_label": "combat_subsys_133()"
     },
     {
@@ -9943,8 +9943,8 @@
       "source_location": "L212",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_134",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "combat_subsys_134()"
     },
     {
@@ -9954,8 +9954,8 @@
       "source_location": "L217",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_135",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "combat_subsys_135()"
     },
     {
@@ -9965,8 +9965,8 @@
       "source_location": "L222",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_136",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "combat_subsys_136()"
     },
     {
@@ -9976,8 +9976,8 @@
       "source_location": "L227",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_137",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "combat_subsys_137()"
     },
     {
@@ -9987,8 +9987,8 @@
       "source_location": "L232",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_138",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "combat_subsys_138()"
     },
     {
@@ -10009,8 +10009,8 @@
       "source_location": "L242",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_140",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "combat_subsys_140()"
     },
     {
@@ -10152,8 +10152,8 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_152",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 146,
+      "community_name": "bresenham_step_x",
       "norm_label": "ai_loot_subsys_152()"
     },
     {
@@ -10251,8 +10251,8 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_161",
-      "community": 73,
-      "community_name": "check_aabb_overlap",
+      "community": 147,
+      "community_name": "tier0_spatial.py",
       "norm_label": "ai_loot_subsys_161()"
     },
     {
@@ -10361,8 +10361,8 @@
       "source_location": "L146",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_171",
-      "community": 122,
-      "community_name": "spatial_subsys_024",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "ai_loot_subsys_171()"
     },
     {
@@ -10383,8 +10383,8 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_173",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 157,
+      "community_name": "spatial_subsys_026",
       "norm_label": "ai_loot_subsys_173()"
     },
     {
@@ -10460,8 +10460,8 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_180",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 29,
+      "community_name": "tier3_ai_loot.py",
       "norm_label": "ai_loot_subsys_180()"
     },
     {
@@ -10548,8 +10548,8 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier4_world_world_engine_187",
-      "community": 30,
-      "community_name": "pack_coords_to_hash",
+      "community": 1,
+      "community_name": "tier4_world.py",
       "norm_label": "world_engine_187()"
     },
     {
@@ -10570,8 +10570,8 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier4_world_world_engine_189",
-      "community": 1,
-      "community_name": "tier4_world.py",
+      "community": 56,
+      "community_name": "wrap_map_coord_y",
       "norm_label": "world_engine_189()"
     },
     {
@@ -10790,8 +10790,8 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier4_world_rationale_105",
-      "community": 30,
-      "community_name": "pack_coords_to_hash",
+      "community": 1,
+      "community_name": "tier4_world.py",
       "norm_label": "compute a deterministic save-slot hash for a turn/cycle pair."
     },
     {
@@ -10812,8 +10812,8 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier4_world_rationale_118",
-      "community": 1,
-      "community_name": "tier4_world.py",
+      "community": 56,
+      "community_name": "wrap_map_coord_y",
       "norm_label": "return turns remaining until the next cycle boundary."
     },
     {
@@ -16737,8 +16737,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_assets_scripts_axiombridge_axiomdoublebuffer_axiom_generated_axiomdoublebuffer_get",
-      "community": 107,
-      "community_name": "AxiomRunner",
+      "community": 115,
+      "community_name": "AxiomDoubleBuffer.cs",
       "norm_label": ".get()"
     },
     {
@@ -16782,8 +16782,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_game_survivor_assets_scripts_axiombridge_axiomnative",
-      "community": 110,
-      "community_name": "AxiomAssetRegistry",
+      "community": 107,
+      "community_name": "AxiomRunner",
       "norm_label": "axiomnative.cs"
     },
     {
@@ -17069,8 +17069,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_assets_scripts_axiombridge_axiomrunner_axiom_generated_axiomrunner_getsnapshot",
-      "community": 107,
-      "community_name": "AxiomRunner",
+      "community": 112,
+      "community_name": "SurvivorRuntimeTests",
       "norm_label": ".getsnapshot()"
     },
     {
@@ -17508,8 +17508,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_assets_scripts_gameplay_survivorgamecontroller_axiom_survivor_survivorgamecontroller_ongui",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": ".ongui()"
     },
     {
@@ -17627,8 +17627,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_assets_scripts_gameplay_survivorgamecontroller_axiom_survivor_survivorgamecontroller_getorcreateproceduralsprite",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": ".getorcreateproceduralsprite()"
     },
     {
@@ -22951,8 +22951,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_nunit_framework_assert",
-      "community": 112,
-      "community_name": "SurvivorRuntimeTests",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": "assert"
     },
     {
@@ -23667,8 +23667,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "float",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": "float"
     },
     {
@@ -23837,8 +23837,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_color",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": "color"
     },
     {
@@ -23854,8 +23854,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_rect",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": "rect"
     },
     {
@@ -23871,8 +23871,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_vector2",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": "vector2"
     },
     {
@@ -23888,8 +23888,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_texture2d",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": "texture2d"
     },
     {
@@ -23905,8 +23905,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_texture2d_setpixel",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": ".setpixel()"
     },
     {
@@ -23922,8 +23922,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_texture2d_apply",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": ".apply()"
     },
     {
@@ -24194,8 +24194,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_gui",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": "gui"
     },
     {
@@ -24211,8 +24211,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_gui_box",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": ".box()"
     },
     {
@@ -24228,8 +24228,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_gui_label",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": ".label()"
     },
     {
@@ -24245,8 +24245,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_gui_drawtexture",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": ".drawtexture()"
     },
     {
@@ -24262,8 +24262,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_sprite",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": "sprite"
     },
     {
@@ -24279,8 +24279,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_sprite_create",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": ".create()"
     },
     {
@@ -24296,8 +24296,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_spriterenderer",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 71,
+      "community_name": ".GetOrCreateProceduralSprite",
       "norm_label": "spriterenderer"
     },
     {
@@ -25185,80 +25185,91 @@
       "norm_label": "readme.en.md"
     },
     {
-      "label": "Axiom: A Deterministic Game Logic DSL & Formal Verification Research Prototype",
+      "label": "Axiom: AI-Native Verified Logic Layer & Runtime",
       "file_type": "document",
       "source_file": "README.en.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "readme_en_axiom_a_deterministic_game_logic_dsl_formal_verification_research_prototype",
+      "id": "readme_en_axiom_ai_native_verified_logic_layer_runtime",
       "community": 70,
-      "community_name": "Axiom: A Deterministic Game Logic DSL & Formal Verification Research Prototype",
-      "norm_label": "axiom: a deterministic game logic dsl & formal verification research prototype"
+      "community_name": "Axiom: AI-Native Verified Logic Layer & Runtime",
+      "norm_label": "axiom: ai-native verified logic layer & runtime"
     },
     {
-      "label": "\ud83c\udf1f Core Concepts",
+      "label": "\ud83c\udf1f Architecture & Symbiotic Model",
       "file_type": "document",
       "source_file": "README.en.md",
-      "source_location": "L12",
+      "source_location": "L13",
       "_origin": "ast",
-      "id": "readme_en_core_concepts",
+      "id": "readme_en_architecture_symbiotic_model",
       "community": 70,
-      "community_name": "Axiom: A Deterministic Game Logic DSL & Formal Verification Research Prototype",
-      "norm_label": "\ud83c\udf1f core concepts"
+      "community_name": "Axiom: AI-Native Verified Logic Layer & Runtime",
+      "norm_label": "\ud83c\udf1f architecture & symbiotic model"
     },
     {
-      "label": "\ud83c\udfae Playable Demo: Axiom Survivors",
+      "label": "\ud83d\udd2c Rigorous Empirical Proof: Single-Variable A/B Evaluation",
       "file_type": "document",
       "source_file": "README.en.md",
-      "source_location": "L28",
+      "source_location": "L45",
       "_origin": "ast",
-      "id": "readme_en_playable_demo_axiom_survivors",
+      "id": "readme_en_rigorous_empirical_proof_single_variable_a_b_evaluation",
       "community": 70,
-      "community_name": "Axiom: A Deterministic Game Logic DSL & Formal Verification Research Prototype",
-      "norm_label": "\ud83c\udfae playable demo: axiom survivors"
+      "community_name": "Axiom: AI-Native Verified Logic Layer & Runtime",
+      "norm_label": "\ud83d\udd2c rigorous empirical proof: single-variable a/b evaluation"
+    },
+    {
+      "label": "\ud83c\udfae Hands-On Demo: Axiom Survivors",
+      "file_type": "document",
+      "source_file": "README.en.md",
+      "source_location": "L64",
+      "_origin": "ast",
+      "id": "readme_en_hands_on_demo_axiom_survivors",
+      "community": 70,
+      "community_name": "Axiom: AI-Native Verified Logic Layer & Runtime",
+      "norm_label": "\ud83c\udfae hands-on demo: axiom survivors"
     },
     {
       "label": "\ud83d\ude80 Installation & Build",
       "file_type": "document",
       "source_file": "README.en.md",
-      "source_location": "L37",
+      "source_location": "L73",
       "_origin": "ast",
       "id": "readme_en_installation_build",
       "community": 70,
-      "community_name": "Axiom: A Deterministic Game Logic DSL & Formal Verification Research Prototype",
+      "community_name": "Axiom: AI-Native Verified Logic Layer & Runtime",
       "norm_label": "\ud83d\ude80 installation & build"
     },
     {
-      "label": "\ud83c\udfa8 IDE Support & Ecosystem (Planned)",
+      "label": "\ud83c\udfa8 IDE Support & Tooling",
       "file_type": "document",
       "source_file": "README.en.md",
-      "source_location": "L51",
+      "source_location": "L87",
       "_origin": "ast",
-      "id": "readme_en_ide_support_ecosystem_planned",
+      "id": "readme_en_ide_support_tooling",
       "community": 70,
-      "community_name": "Axiom: A Deterministic Game Logic DSL & Formal Verification Research Prototype",
-      "norm_label": "\ud83c\udfa8 ide support & ecosystem (planned)"
+      "community_name": "Axiom: AI-Native Verified Logic Layer & Runtime",
+      "norm_label": "\ud83c\udfa8 ide support & tooling"
     },
     {
-      "label": "\ud83d\udcbb CLI Usage Guide",
+      "label": "\ud83d\udcbb CLI Toolchain Quickstart",
       "file_type": "document",
       "source_file": "README.en.md",
-      "source_location": "L58",
+      "source_location": "L94",
       "_origin": "ast",
-      "id": "readme_en_cli_usage_guide",
+      "id": "readme_en_cli_toolchain_quickstart",
       "community": 70,
-      "community_name": "Axiom: A Deterministic Game Logic DSL & Formal Verification Research Prototype",
-      "norm_label": "\ud83d\udcbb cli usage guide"
+      "community_name": "Axiom: AI-Native Verified Logic Layer & Runtime",
+      "norm_label": "\ud83d\udcbb cli toolchain quickstart"
     },
     {
       "label": "\ud83d\udcc2 Documentation",
       "file_type": "document",
       "source_file": "README.en.md",
-      "source_location": "L94",
+      "source_location": "L130",
       "_origin": "ast",
       "id": "readme_en_documentation",
       "community": 70,
-      "community_name": "Axiom: A Deterministic Game Logic DSL & Formal Verification Research Prototype",
+      "community_name": "Axiom: AI-Native Verified Logic Layer & Runtime",
       "norm_label": "\ud83d\udcc2 documentation"
     },
     {
@@ -25273,91 +25284,91 @@
       "norm_label": "readme.md"
     },
     {
-      "label": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "label": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
       "file_type": "document",
       "source_file": "README.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "id": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
       "community": 145,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "axiom: \u9762\u5411 ai \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 dsl \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b"
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
+      "norm_label": "axiom: \u9762\u5411 ai \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (ai-native verified logic layer)"
     },
     {
-      "label": "\ud83c\udf1f \u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5",
+      "label": "\ud83c\udf1f \u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5\u4e0e\u5171\u751f\u67b6\u6784",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L12",
+      "source_location": "L13",
       "_origin": "ast",
-      "id": "readme_\u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5",
+      "id": "readme_\u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5\u4e0e\u5171\u751f\u67b6\u6784",
       "community": 145,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "\ud83c\udf1f \u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5"
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
+      "norm_label": "\ud83c\udf1f \u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5\u4e0e\u5171\u751f\u67b6\u6784"
+    },
+    {
+      "label": "\ud83d\udd2c \u4e25\u8c28\u79d1\u5b66\u5b9e\u8bc1\uff1a\u5355\u4e00\u53d8\u91cf A/B \u5bf9\u7167\u8bc4\u6d4b",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L43",
+      "_origin": "ast",
+      "id": "readme_\u4e25\u8c28\u79d1\u5b66\u5b9e\u8bc1_\u5355\u4e00\u53d8\u91cf_a_b_\u5bf9\u7167\u8bc4\u6d4b",
+      "community": 145,
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
+      "norm_label": "\ud83d\udd2c \u4e25\u8c28\u79d1\u5b66\u5b9e\u8bc1:\u5355\u4e00\u53d8\u91cf a/b \u5bf9\u7167\u8bc4\u6d4b"
     },
     {
       "label": "\ud83c\udfae \u5b9e\u6218\u6f14\u793a\uff1aAxiom Survivors \u5272\u8349\u6e38\u620f",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L28",
+      "source_location": "L62",
       "_origin": "ast",
       "id": "readme_\u5b9e\u6218\u6f14\u793a_axiom_survivors_\u5272\u8349\u6e38\u620f",
       "community": 145,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
       "norm_label": "\ud83c\udfae \u5b9e\u6218\u6f14\u793a:axiom survivors \u5272\u8349\u6e38\u620f"
-    },
-    {
-      "label": "\ud83d\udd2c \u5b9e\u9a8c\u6027\u8bc4\u6d4b\uff1a200-Function \u5fae\u578b\u4efb\u52a1\u62c6\u89e3\u63a2\u7d22",
-      "file_type": "document",
-      "source_file": "README.md",
-      "source_location": "L37",
-      "_origin": "ast",
-      "id": "readme_\u5b9e\u9a8c\u6027\u8bc4\u6d4b_200_function_\u5fae\u578b\u4efb\u52a1\u62c6\u89e3\u63a2\u7d22",
-      "community": 145,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "\ud83d\udd2c \u5b9e\u9a8c\u6027\u8bc4\u6d4b:200-function \u5fae\u578b\u4efb\u52a1\u62c6\u89e3\u63a2\u7d22"
     },
     {
       "label": "\ud83d\ude80 \u5b89\u88c5\u4e0e\u6784\u5efa (Installation & Build)",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L47",
+      "source_location": "L71",
       "_origin": "ast",
       "id": "readme_\u5b89\u88c5\u4e0e\u6784\u5efa_installation_build",
       "community": 145,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
       "norm_label": "\ud83d\ude80 \u5b89\u88c5\u4e0e\u6784\u5efa (installation & build)"
     },
     {
-      "label": "\ud83c\udfa8 IDE \u652f\u6301\u4e0e\u5de5\u5177\u94fe\u751f\u6001 (IDE Support)",
+      "label": "\ud83c\udfa8 IDE \u652f\u6301\u4e0e\u751f\u6001\u89c4\u5212 (IDE Support)",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L61",
+      "source_location": "L85",
       "_origin": "ast",
-      "id": "readme_ide_\u652f\u6301\u4e0e\u5de5\u5177\u94fe\u751f\u6001_ide_support",
+      "id": "readme_ide_\u652f\u6301\u4e0e\u751f\u6001\u89c4\u5212_ide_support",
       "community": 145,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "\ud83c\udfa8 ide \u652f\u6301\u4e0e\u5de5\u5177\u94fe\u751f\u6001 (ide support)"
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
+      "norm_label": "\ud83c\udfa8 ide \u652f\u6301\u4e0e\u751f\u6001\u89c4\u5212 (ide support)"
     },
     {
       "label": "\ud83d\udcbb CLI \u5de5\u5177\u94fe\u6307\u5357",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L68",
+      "source_location": "L92",
       "_origin": "ast",
       "id": "readme_cli_\u5de5\u5177\u94fe\u6307\u5357",
       "community": 145,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
       "norm_label": "\ud83d\udcbb cli \u5de5\u5177\u94fe\u6307\u5357"
     },
     {
       "label": "\ud83d\udcc2 \u9879\u76ee\u6587\u6863\u5bfc\u822a",
       "file_type": "document",
       "source_file": "README.md",
-      "source_location": "L104",
+      "source_location": "L128",
       "_origin": "ast",
       "id": "readme_\u9879\u76ee\u6587\u6863\u5bfc\u822a",
       "community": 145,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
       "norm_label": "\ud83d\udcc2 \u9879\u76ee\u6587\u6863\u5bfc\u822a"
     },
     {
@@ -25372,91 +25383,91 @@
       "norm_label": "readme.zh-cn.md"
     },
     {
-      "label": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "label": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
       "file_type": "document",
       "source_file": "README.zh-CN.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "id": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
       "community": 60,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "axiom: \u9762\u5411 ai \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 dsl \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b"
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
+      "norm_label": "axiom: \u9762\u5411 ai \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (ai-native verified logic layer)"
     },
     {
-      "label": "\ud83c\udf1f \u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5",
+      "label": "\ud83c\udf1f \u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5\u4e0e\u5171\u751f\u67b6\u6784",
       "file_type": "document",
       "source_file": "README.zh-CN.md",
-      "source_location": "L12",
+      "source_location": "L13",
       "_origin": "ast",
-      "id": "readme_zh_cn_\u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5",
+      "id": "readme_zh_cn_\u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5\u4e0e\u5171\u751f\u67b6\u6784",
       "community": 60,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "\ud83c\udf1f \u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5"
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
+      "norm_label": "\ud83c\udf1f \u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5\u4e0e\u5171\u751f\u67b6\u6784"
+    },
+    {
+      "label": "\ud83d\udd2c \u4e25\u8c28\u79d1\u5b66\u5b9e\u8bc1\uff1a\u5355\u4e00\u53d8\u91cf A/B \u5bf9\u7167\u8bc4\u6d4b",
+      "file_type": "document",
+      "source_file": "README.zh-CN.md",
+      "source_location": "L43",
+      "_origin": "ast",
+      "id": "readme_zh_cn_\u4e25\u8c28\u79d1\u5b66\u5b9e\u8bc1_\u5355\u4e00\u53d8\u91cf_a_b_\u5bf9\u7167\u8bc4\u6d4b",
+      "community": 60,
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
+      "norm_label": "\ud83d\udd2c \u4e25\u8c28\u79d1\u5b66\u5b9e\u8bc1:\u5355\u4e00\u53d8\u91cf a/b \u5bf9\u7167\u8bc4\u6d4b"
     },
     {
       "label": "\ud83c\udfae \u5b9e\u6218\u6f14\u793a\uff1aAxiom Survivors \u5272\u8349\u6e38\u620f",
       "file_type": "document",
       "source_file": "README.zh-CN.md",
-      "source_location": "L28",
+      "source_location": "L62",
       "_origin": "ast",
       "id": "readme_zh_cn_\u5b9e\u6218\u6f14\u793a_axiom_survivors_\u5272\u8349\u6e38\u620f",
       "community": 60,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
       "norm_label": "\ud83c\udfae \u5b9e\u6218\u6f14\u793a:axiom survivors \u5272\u8349\u6e38\u620f"
-    },
-    {
-      "label": "\ud83d\udd2c \u5b9e\u9a8c\u6027\u8bc4\u6d4b\uff1a200-Function \u5fae\u578b\u4efb\u52a1\u62c6\u89e3\u63a2\u7d22",
-      "file_type": "document",
-      "source_file": "README.zh-CN.md",
-      "source_location": "L37",
-      "_origin": "ast",
-      "id": "readme_zh_cn_\u5b9e\u9a8c\u6027\u8bc4\u6d4b_200_function_\u5fae\u578b\u4efb\u52a1\u62c6\u89e3\u63a2\u7d22",
-      "community": 60,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "\ud83d\udd2c \u5b9e\u9a8c\u6027\u8bc4\u6d4b:200-function \u5fae\u578b\u4efb\u52a1\u62c6\u89e3\u63a2\u7d22"
     },
     {
       "label": "\ud83d\ude80 \u5b89\u88c5\u4e0e\u6784\u5efa (Installation & Build)",
       "file_type": "document",
       "source_file": "README.zh-CN.md",
-      "source_location": "L47",
+      "source_location": "L71",
       "_origin": "ast",
       "id": "readme_zh_cn_\u5b89\u88c5\u4e0e\u6784\u5efa_installation_build",
       "community": 60,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
       "norm_label": "\ud83d\ude80 \u5b89\u88c5\u4e0e\u6784\u5efa (installation & build)"
     },
     {
-      "label": "\ud83c\udfa8 IDE \u652f\u6301\u4e0e\u5de5\u5177\u94fe\u751f\u6001 (IDE Support)",
+      "label": "\ud83c\udfa8 IDE \u652f\u6301\u4e0e\u751f\u6001\u89c4\u5212 (IDE Support)",
       "file_type": "document",
       "source_file": "README.zh-CN.md",
-      "source_location": "L61",
+      "source_location": "L85",
       "_origin": "ast",
-      "id": "readme_zh_cn_ide_\u652f\u6301\u4e0e\u5de5\u5177\u94fe\u751f\u6001_ide_support",
+      "id": "readme_zh_cn_ide_\u652f\u6301\u4e0e\u751f\u6001\u89c4\u5212_ide_support",
       "community": 60,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "\ud83c\udfa8 ide \u652f\u6301\u4e0e\u5de5\u5177\u94fe\u751f\u6001 (ide support)"
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
+      "norm_label": "\ud83c\udfa8 ide \u652f\u6301\u4e0e\u751f\u6001\u89c4\u5212 (ide support)"
     },
     {
       "label": "\ud83d\udcbb CLI \u5de5\u5177\u94fe\u6307\u5357",
       "file_type": "document",
       "source_file": "README.zh-CN.md",
-      "source_location": "L68",
+      "source_location": "L92",
       "_origin": "ast",
       "id": "readme_zh_cn_cli_\u5de5\u5177\u94fe\u6307\u5357",
       "community": 60,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
       "norm_label": "\ud83d\udcbb cli \u5de5\u5177\u94fe\u6307\u5357"
     },
     {
       "label": "\ud83d\udcc2 \u9879\u76ee\u6587\u6863\u5bfc\u822a",
       "file_type": "document",
       "source_file": "README.zh-CN.md",
-      "source_location": "L104",
+      "source_location": "L128",
       "_origin": "ast",
       "id": "readme_zh_cn_\u9879\u76ee\u6587\u6863\u5bfc\u822a",
       "community": 60,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6 (AI-Native Verified Logic Layer)",
       "norm_label": "\ud83d\udcc2 \u9879\u76ee\u6587\u6863\u5bfc\u822a"
     },
     {
@@ -25471,92 +25482,92 @@
       "norm_label": "readme.zh-tw.md"
     },
     {
-      "label": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "label": "Axiom: \u9762\u5411 AI \u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642 (AI-Native Verified Logic Layer)",
       "file_type": "document",
       "source_file": "README.zh-TW.md",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "readme_zh_tw_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "id": "readme_zh_tw_axiom_\u9762\u5411_ai_\u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642_ai_native_verified_logic_layer",
       "community": 61,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "axiom: \u9762\u5411 ai \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 dsl \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b"
+      "community_name": "Axiom: \u9762\u5411 AI \u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642 (AI-Native Verified Logic Layer)",
+      "norm_label": "axiom: \u9762\u5411 ai \u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642 (ai-native verified logic layer)"
     },
     {
-      "label": "\ud83c\udf1f \u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5",
+      "label": "\ud83c\udf1f \u6838\u5fc3\u8a2d\u8a08\u7406\u5ff5\u8207\u5171\u751f\u67b6\u69cb",
       "file_type": "document",
       "source_file": "README.zh-TW.md",
-      "source_location": "L12",
+      "source_location": "L13",
       "_origin": "ast",
-      "id": "readme_zh_tw_\u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5",
+      "id": "readme_zh_tw_\u6838\u5fc3\u8a2d\u8a08\u7406\u5ff5\u8207\u5171\u751f\u67b6\u69cb",
       "community": 61,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "\ud83c\udf1f \u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5"
+      "community_name": "Axiom: \u9762\u5411 AI \u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642 (AI-Native Verified Logic Layer)",
+      "norm_label": "\ud83c\udf1f \u6838\u5fc3\u8a2d\u8a08\u7406\u5ff5\u8207\u5171\u751f\u67b6\u69cb"
     },
     {
-      "label": "\ud83c\udfae \u5b9e\u6218\u6f14\u793a\uff1aAxiom Survivors \u5272\u8349\u6e38\u620f",
+      "label": "\ud83d\udd2c \u56b4\u8b39\u79d1\u5b78\u5be6\u8b49\uff1a\u55ae\u4e00\u8b8a\u6578 A/B \u5c0d\u7167\u8a55\u6e2c",
       "file_type": "document",
       "source_file": "README.zh-TW.md",
-      "source_location": "L28",
+      "source_location": "L43",
       "_origin": "ast",
-      "id": "readme_zh_tw_\u5b9e\u6218\u6f14\u793a_axiom_survivors_\u5272\u8349\u6e38\u620f",
+      "id": "readme_zh_tw_\u56b4\u8b39\u79d1\u5b78\u5be6\u8b49_\u55ae\u4e00\u8b8a\u6578_a_b_\u5c0d\u7167\u8a55\u6e2c",
       "community": 61,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "\ud83c\udfae \u5b9e\u6218\u6f14\u793a:axiom survivors \u5272\u8349\u6e38\u620f"
+      "community_name": "Axiom: \u9762\u5411 AI \u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642 (AI-Native Verified Logic Layer)",
+      "norm_label": "\ud83d\udd2c \u56b4\u8b39\u79d1\u5b78\u5be6\u8b49:\u55ae\u4e00\u8b8a\u6578 a/b \u5c0d\u7167\u8a55\u6e2c"
     },
     {
-      "label": "\ud83d\udd2c \u5b9e\u9a8c\u6027\u8bc4\u6d4b\uff1a200-Function \u5fae\u578b\u4efb\u52a1\u62c6\u89e3\u63a2\u7d22",
+      "label": "\ud83c\udfae \u5be6\u6230\u6f14\u793a\uff1aAxiom Survivors \u5272\u8349\u904a\u6232",
       "file_type": "document",
       "source_file": "README.zh-TW.md",
-      "source_location": "L37",
+      "source_location": "L62",
       "_origin": "ast",
-      "id": "readme_zh_tw_\u5b9e\u9a8c\u6027\u8bc4\u6d4b_200_function_\u5fae\u578b\u4efb\u52a1\u62c6\u89e3\u63a2\u7d22",
+      "id": "readme_zh_tw_\u5be6\u6230\u6f14\u793a_axiom_survivors_\u5272\u8349\u904a\u6232",
       "community": 61,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "\ud83d\udd2c \u5b9e\u9a8c\u6027\u8bc4\u6d4b:200-function \u5fae\u578b\u4efb\u52a1\u62c6\u89e3\u63a2\u7d22"
+      "community_name": "Axiom: \u9762\u5411 AI \u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642 (AI-Native Verified Logic Layer)",
+      "norm_label": "\ud83c\udfae \u5be6\u6230\u6f14\u793a:axiom survivors \u5272\u8349\u904a\u6232"
     },
     {
-      "label": "\ud83d\ude80 \u5b89\u88dd\u8207\u69cb\u5efa (Installation & Build)",
+      "label": "\ud83d\ude80 \u5b89\u88dd\u8207\u5efa\u7f6e (Installation & Build)",
       "file_type": "document",
       "source_file": "README.zh-TW.md",
-      "source_location": "L47",
+      "source_location": "L71",
       "_origin": "ast",
-      "id": "readme_zh_tw_\u5b89\u88dd\u8207\u69cb\u5efa_installation_build",
+      "id": "readme_zh_tw_\u5b89\u88dd\u8207\u5efa\u7f6e_installation_build",
       "community": 61,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "\ud83d\ude80 \u5b89\u88dd\u8207\u69cb\u5efa (installation & build)"
+      "community_name": "Axiom: \u9762\u5411 AI \u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642 (AI-Native Verified Logic Layer)",
+      "norm_label": "\ud83d\ude80 \u5b89\u88dd\u8207\u5efa\u7f6e (installation & build)"
     },
     {
-      "label": "\ud83c\udfa8 IDE \u652f\u63f4\u8207\u5de5\u5177\u93c8\u751f\u614b (IDE Support)",
+      "label": "\ud83c\udfa8 IDE \u652f\u63f4\u8207\u751f\u614b\u898f\u5283 (IDE Support)",
       "file_type": "document",
       "source_file": "README.zh-TW.md",
-      "source_location": "L61",
+      "source_location": "L85",
       "_origin": "ast",
-      "id": "readme_zh_tw_ide_\u652f\u63f4\u8207\u5de5\u5177\u93c8\u751f\u614b_ide_support",
+      "id": "readme_zh_tw_ide_\u652f\u63f4\u8207\u751f\u614b\u898f\u5283_ide_support",
       "community": 61,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "\ud83c\udfa8 ide \u652f\u63f4\u8207\u5de5\u5177\u93c8\u751f\u614b (ide support)"
+      "community_name": "Axiom: \u9762\u5411 AI \u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642 (AI-Native Verified Logic Layer)",
+      "norm_label": "\ud83c\udfa8 ide \u652f\u63f4\u8207\u751f\u614b\u898f\u5283 (ide support)"
     },
     {
       "label": "\ud83d\udcbb CLI \u5de5\u5177\u93c8\u6307\u5357",
       "file_type": "document",
       "source_file": "README.zh-TW.md",
-      "source_location": "L68",
+      "source_location": "L92",
       "_origin": "ast",
       "id": "readme_zh_tw_cli_\u5de5\u5177\u93c8\u6307\u5357",
       "community": 61,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "community_name": "Axiom: \u9762\u5411 AI \u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642 (AI-Native Verified Logic Layer)",
       "norm_label": "\ud83d\udcbb cli \u5de5\u5177\u93c8\u6307\u5357"
     },
     {
-      "label": "\ud83d\udcc2 \u9879\u76ee\u6587\u6863\u5bfc\u822a",
+      "label": "\ud83d\udcc2 \u5c08\u6848\u6587\u4ef6\u5c0e\u822a",
       "file_type": "document",
       "source_file": "README.zh-TW.md",
-      "source_location": "L104",
+      "source_location": "L128",
       "_origin": "ast",
-      "id": "readme_zh_tw_\u9879\u76ee\u6587\u6863\u5bfc\u822a",
+      "id": "readme_zh_tw_\u5c08\u6848\u6587\u4ef6\u5c0e\u822a",
       "community": 61,
-      "community_name": "Axiom: \u9762\u5411 AI \u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91 DSL \u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "norm_label": "\ud83d\udcc2 \u9879\u76ee\u6587\u6863\u5bfc\u822a"
+      "community_name": "Axiom: \u9762\u5411 AI \u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642 (AI-Native Verified Logic Layer)",
+      "norm_label": "\ud83d\udcc2 \u5c08\u6848\u6587\u4ef6\u5c0e\u822a"
     },
     {
       "label": "docs/ARCHITECTURE.md",
@@ -25697,8 +25708,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow_axiom_\u591a_agent_\u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
-      "community": 71,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "axiom \u591a agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b"
     },
     {
@@ -25708,8 +25719,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow_1_\u4e3a\u4ec0\u4e48\u4f20\u7edf_git_\u4e0d\u9002\u5408\u591a_agent_\u5e76\u884c",
-      "community": 71,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "1. \u4e3a\u4ec0\u4e48\u4f20\u7edf git \u4e0d\u9002\u5408\u591a agent \u5e76\u884c?"
     },
     {
@@ -25719,8 +25730,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow_2_axiom_\u7684\u5185\u5bb9\u5bfb\u5740_ast_\u89e3\u51b3\u65b9\u6848",
-      "community": 71,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "2. axiom \u7684\u5185\u5bb9\u5bfb\u5740 ast \u89e3\u51b3\u65b9\u6848"
     },
     {
@@ -25730,8 +25741,8 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow_\u6838\u5fc3\u7279\u6027",
-      "community": 71,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "\u6838\u5fc3\u7279\u6027:"
     },
     {
@@ -25741,8 +25752,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow_3_\u591a_agent_\u5e76\u53d1\u534f\u4f5c\u6807\u51c6\u4f5c\u4e1a\u6d41\u7a0b_sop",
-      "community": 71,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "3. \u591a agent \u5e76\u53d1\u534f\u4f5c\u6807\u51c6\u4f5c\u4e1a\u6d41\u7a0b (sop)"
     },
     {
@@ -25752,8 +25763,8 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow_4_\u81ea\u52a8\u53cd\u4f8b\u81ea\u6108\u534f\u8bae_auto_healing_with_counter_examples",
-      "community": 71,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "4. \u81ea\u52a8\u53cd\u4f8b\u81ea\u6108\u534f\u8bae (auto-healing with counter-examples)"
     },
     {
@@ -25763,8 +25774,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_research_language_comparison",
-      "community": 43,
-      "community_name": "README.md",
+      "community": 3,
+      "community_name": "\ud83d\udeab \u56db\u3001\u5176\u4ed6\u8bed\u8a00\u6709\u54ea\u4e9b\u7279\u6027\u662f Axiom \u523b\u610f\u4e0d\u4e88\u652f\u6301\u7684\uff1f(Anti-Features by Design)",
       "norm_label": "docs/research_language_comparison.md"
     },
     {
@@ -25774,8 +25785,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "docs_research_language_comparison_\u4e00_\u5168\u666f\u6280\u672f\u7279\u5f81\u5bf9\u6bd4\u77e9\u9635_feature_matrix",
-      "community": 43,
-      "community_name": "README.md",
+      "community": 3,
+      "community_name": "\ud83d\udeab \u56db\u3001\u5176\u4ed6\u8bed\u8a00\u6709\u54ea\u4e9b\u7279\u6027\u662f Axiom \u523b\u610f\u4e0d\u4e88\u652f\u6301\u7684\uff1f(Anti-Features by Design)",
       "norm_label": "\ud83d\udcca \u4e00\u3001\u5168\u666f\u6280\u672f\u7279\u5f81\u5bf9\u6bd4\u77e9\u9635 (feature matrix)"
     },
     {
@@ -25785,8 +25796,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "docs_research_language_comparison_\u4e8c_axiom_\u80fd\u505a\u5230_\u7684\u6740\u624b\u7ea7\u80fd\u529b_what_axiom_can_do",
-      "community": 116,
-      "community_name": "\ud83d\ude80 \u4e8c\u3001Axiom \u201c\u80fd\u505a\u5230\u201d\u7684\u6740\u624b\u7ea7\u80fd\u529b (What Axiom CAN Do)",
+      "community": 3,
+      "community_name": "\ud83d\udeab \u56db\u3001\u5176\u4ed6\u8bed\u8a00\u6709\u54ea\u4e9b\u7279\u6027\u662f Axiom \u523b\u610f\u4e0d\u4e88\u652f\u6301\u7684\uff1f(Anti-Features by Design)",
       "norm_label": "\ud83d\ude80 \u4e8c\u3001axiom \u201c\u80fd\u505a\u5230\u201d\u7684\u6740\u624b\u7ea7\u80fd\u529b (what axiom can do)"
     },
     {
@@ -25796,8 +25807,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "docs_research_language_comparison_1_o_1_\u5fae\u578b\u4e0a\u4e0b\u6587\u9694\u79bb_\u4f7f_ai_token_\u6d88\u8017\u66b4\u964d_60",
-      "community": 116,
-      "community_name": "\ud83d\ude80 \u4e8c\u3001Axiom \u201c\u80fd\u505a\u5230\u201d\u7684\u6740\u624b\u7ea7\u80fd\u529b (What Axiom CAN Do)",
+      "community": 3,
+      "community_name": "\ud83d\udeab \u56db\u3001\u5176\u4ed6\u8bed\u8a00\u6709\u54ea\u4e9b\u7279\u6027\u662f Axiom \u523b\u610f\u4e0d\u4e88\u652f\u6301\u7684\uff1f(Anti-Features by Design)",
       "norm_label": "1. $o(1)$ \u5fae\u578b\u4e0a\u4e0b\u6587\u9694\u79bb,\u4f7f ai token \u6d88\u8017\u66b4\u964d 60%"
     },
     {
@@ -25807,8 +25818,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "docs_research_language_comparison_2_\u5f62\u5f0f\u5316\u5951\u7ea6\u4e0e_smt_\u9759\u6001\u9a8c\u8bc1_\u4f18\u5148_z3_\u5b9a\u7406\u8bc1\u660e_fail_closed",
-      "community": 116,
-      "community_name": "\ud83d\ude80 \u4e8c\u3001Axiom \u201c\u80fd\u505a\u5230\u201d\u7684\u6740\u624b\u7ea7\u80fd\u529b (What Axiom CAN Do)",
+      "community": 3,
+      "community_name": "\ud83d\udeab \u56db\u3001\u5176\u4ed6\u8bed\u8a00\u6709\u54ea\u4e9b\u7279\u6027\u662f Axiom \u523b\u610f\u4e0d\u4e88\u652f\u6301\u7684\uff1f(Anti-Features by Design)",
       "norm_label": "2. \u5f62\u5f0f\u5316\u5951\u7ea6\u4e0e smt \u9759\u6001\u9a8c\u8bc1 (\u4f18\u5148 z3 \u5b9a\u7406\u8bc1\u660e,fail-closed)"
     },
     {
@@ -25818,8 +25829,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "docs_research_language_comparison_3_\u5185\u5bb9\u5bfb\u5740_ast_\u539f\u578b\u63a2\u7d22_\u51cf\u5c11\u4f20\u7edf\u884c\u7ea7\u5408\u5e76\u51b2\u7a81",
-      "community": 116,
-      "community_name": "\ud83d\ude80 \u4e8c\u3001Axiom \u201c\u80fd\u505a\u5230\u201d\u7684\u6740\u624b\u7ea7\u80fd\u529b (What Axiom CAN Do)",
+      "community": 3,
+      "community_name": "\ud83d\udeab \u56db\u3001\u5176\u4ed6\u8bed\u8a00\u6709\u54ea\u4e9b\u7279\u6027\u662f Axiom \u523b\u610f\u4e0d\u4e88\u652f\u6301\u7684\uff1f(Anti-Features by Design)",
       "norm_label": "3. \u5185\u5bb9\u5bfb\u5740 ast \u539f\u578b\u63a2\u7d22,\u51cf\u5c11\u4f20\u7edf\u884c\u7ea7\u5408\u5e76\u51b2\u7a81"
     },
     {
@@ -25829,8 +25840,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "docs_research_language_comparison_4_\u663e\u5f0f\u4ee3\u6570\u6548\u5e94_algebraic_effects_\u9694\u79bb_\u6d88\u9664_\u5f02\u6b65\u4f20\u67d3\u75c5",
-      "community": 116,
-      "community_name": "\ud83d\ude80 \u4e8c\u3001Axiom \u201c\u80fd\u505a\u5230\u201d\u7684\u6740\u624b\u7ea7\u80fd\u529b (What Axiom CAN Do)",
+      "community": 3,
+      "community_name": "\ud83d\udeab \u56db\u3001\u5176\u4ed6\u8bed\u8a00\u6709\u54ea\u4e9b\u7279\u6027\u662f Axiom \u523b\u610f\u4e0d\u4e88\u652f\u6301\u7684\uff1f(Anti-Features by Design)",
       "norm_label": "4. \u663e\u5f0f\u4ee3\u6570\u6548\u5e94 (algebraic effects) \u9694\u79bb,\u6d88\u9664\u201c\u5f02\u6b65\u4f20\u67d3\u75c5\u201d"
     },
     {
@@ -25840,8 +25851,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "docs_research_language_comparison_\u4e09_axiom_\u505a\u4e0d\u5230_\u7684\u7269\u7406\u4e0e\u7406\u8bba\u5c40\u9650_what_axiom_cannot_do",
-      "community": 144,
-      "community_name": "\u26a0\ufe0f \u4e09\u3001Axiom \u201c\u505a\u4e0d\u5230\u201d\u7684\u7269\u7406\u4e0e\u7406\u8bba\u5c40\u9650 (What Axiom CANNOT Do)",
+      "community": 3,
+      "community_name": "\ud83d\udeab \u56db\u3001\u5176\u4ed6\u8bed\u8a00\u6709\u54ea\u4e9b\u7279\u6027\u662f Axiom \u523b\u610f\u4e0d\u4e88\u652f\u6301\u7684\uff1f(Anti-Features by Design)",
       "norm_label": "\u26a0\ufe0f \u4e09\u3001axiom \u201c\u505a\u4e0d\u5230\u201d\u7684\u7269\u7406\u4e0e\u7406\u8bba\u5c40\u9650 (what axiom cannot do)"
     },
     {
@@ -25851,8 +25862,8 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "docs_research_language_comparison_1_\u5305\u542b\u672a\u53d7\u63a7\u526f\u4f5c\u7528\u903b\u8f91\u7684_smt_\u5f62\u5f0f\u5316\u5168\u57df\u8bc1\u660e",
-      "community": 144,
-      "community_name": "\u26a0\ufe0f \u4e09\u3001Axiom \u201c\u505a\u4e0d\u5230\u201d\u7684\u7269\u7406\u4e0e\u7406\u8bba\u5c40\u9650 (What Axiom CANNOT Do)",
+      "community": 3,
+      "community_name": "\ud83d\udeab \u56db\u3001\u5176\u4ed6\u8bed\u8a00\u6709\u54ea\u4e9b\u7279\u6027\u662f Axiom \u523b\u610f\u4e0d\u4e88\u652f\u6301\u7684\uff1f(Anti-Features by Design)",
       "norm_label": "1. \u5305\u542b\u672a\u53d7\u63a7\u526f\u4f5c\u7528\u903b\u8f91\u7684 smt \u5f62\u5f0f\u5316\u5168\u57df\u8bc1\u660e"
     },
     {
@@ -25862,8 +25873,8 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "docs_research_language_comparison_2_\u9ad8\u7ef4\u590d\u6742\u975e\u7ebf\u6027\u8d85\u8d8a\u65b9\u7a0b\u7684\u5feb\u901f\u9759\u6001\u5b8c\u5907\u8bc1\u660e",
-      "community": 144,
-      "community_name": "\u26a0\ufe0f \u4e09\u3001Axiom \u201c\u505a\u4e0d\u5230\u201d\u7684\u7269\u7406\u4e0e\u7406\u8bba\u5c40\u9650 (What Axiom CANNOT Do)",
+      "community": 3,
+      "community_name": "\ud83d\udeab \u56db\u3001\u5176\u4ed6\u8bed\u8a00\u6709\u54ea\u4e9b\u7279\u6027\u662f Axiom \u523b\u610f\u4e0d\u4e88\u652f\u6301\u7684\uff1f(Anti-Features by Design)",
       "norm_label": "2. \u9ad8\u7ef4\u590d\u6742\u975e\u7ebf\u6027\u8d85\u8d8a\u65b9\u7a0b\u7684\u5feb\u901f\u9759\u6001\u5b8c\u5907\u8bc1\u660e"
     },
     {
@@ -25873,8 +25884,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "docs_research_language_comparison_3_\u539f\u751f\u6784\u5efa\u53cc\u5411\u5faa\u73af\u5f15\u7528\u5bf9\u8c61\u56fe_cyclic_graphs",
-      "community": 144,
-      "community_name": "\u26a0\ufe0f \u4e09\u3001Axiom \u201c\u505a\u4e0d\u5230\u201d\u7684\u7269\u7406\u4e0e\u7406\u8bba\u5c40\u9650 (What Axiom CANNOT Do)",
+      "community": 3,
+      "community_name": "\ud83d\udeab \u56db\u3001\u5176\u4ed6\u8bed\u8a00\u6709\u54ea\u4e9b\u7279\u6027\u662f Axiom \u523b\u610f\u4e0d\u4e88\u652f\u6301\u7684\uff1f(Anti-Features by Design)",
       "norm_label": "3. \u539f\u751f\u6784\u5efa\u53cc\u5411\u5faa\u73af\u5f15\u7528\u5bf9\u8c61\u56fe (cyclic graphs)"
     },
     {
@@ -25950,8 +25961,8 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "docs_research_language_comparison_\u4e94_\u603b\u7ed3_axiom_\u7684\u751f\u6001\u5b9a\u4f4d",
-      "community": 43,
-      "community_name": "README.md",
+      "community": 3,
+      "community_name": "\ud83d\udeab \u56db\u3001\u5176\u4ed6\u8bed\u8a00\u6709\u54ea\u4e9b\u7279\u6027\u662f Axiom \u523b\u610f\u4e0d\u4e88\u652f\u6301\u7684\uff1f(Anti-Features by Design)",
       "norm_label": "\ud83c\udfaf \u4e94\u3001\u603b\u7ed3:axiom \u7684\u751f\u6001\u5b9a\u4f4d"
     },
     {
@@ -25961,8 +25972,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_roadmap",
-      "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community": 43,
+      "community_name": "README.md",
       "norm_label": "docs/roadmap.md"
     },
     {
@@ -25972,8 +25983,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "docs_roadmap_axiom_\u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe_roadmap",
-      "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community": 138,
+      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
       "norm_label": "axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (roadmap)"
     },
     {
@@ -25983,8 +25994,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "docs_roadmap_\u9636\u6bb5\u4e00_\u539f\u578b\u4e0e\u9a8c\u8bc1\u7f16\u8bd1\u5668_mvp_prototype_q1",
-      "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community": 138,
+      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
       "norm_label": "\u9636\u6bb5\u4e00:\u539f\u578b\u4e0e\u9a8c\u8bc1\u7f16\u8bd1\u5668 (mvp prototype - q1)"
     },
     {
@@ -25994,8 +26005,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "docs_roadmap_\u9636\u6bb5\u4e8c_effect_\u7cfb\u7edf\u4e0e\u5951\u7ea6\u9a8c\u8bc1_q2",
-      "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community": 138,
+      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
       "norm_label": "\u9636\u6bb5\u4e8c:effect \u7cfb\u7edf\u4e0e\u5951\u7ea6\u9a8c\u8bc1 (q2)"
     },
     {
@@ -26005,8 +26016,8 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "docs_roadmap_\u9636\u6bb5\u4e09_\u5185\u5bb9\u5bfb\u5740_ast_\u4ee3\u7801\u5e93\u4e0e\u591a_agent_\u534f\u540c_q3",
-      "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community": 138,
+      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
       "norm_label": "\u9636\u6bb5\u4e09:\u5185\u5bb9\u5bfb\u5740 ast \u4ee3\u7801\u5e93\u4e0e\u591a agent \u534f\u540c (q3)"
     },
     {
@@ -26016,8 +26027,8 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "docs_roadmap_\u9636\u6bb5\u56db_\u5168\u5e73\u53f0\u4e0e\u751f\u6001\u4e92\u64cd\u4f5c_q4",
-      "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community": 138,
+      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
       "norm_label": "\u9636\u6bb5\u56db:\u5168\u5e73\u53f0\u4e0e\u751f\u6001\u4e92\u64cd\u4f5c (q4)"
     },
     {
@@ -26402,7 +26413,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "en/roadmap.md"
     },
     {
@@ -26413,7 +26424,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_axiom_project_roadmap",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "axiom project roadmap"
     },
     {
@@ -26424,7 +26435,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_phase_1_mvp_prototype_core_compiler_q1",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "phase 1: mvp prototype & core compiler (q1)"
     },
     {
@@ -26435,7 +26446,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_phase_2_effect_system_formal_contract_verification_q2",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "phase 2: effect system & formal contract verification (q2)"
     },
     {
@@ -26446,7 +26457,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_phase_3_content_addressed_ast_codebase_multi_agent_concurrency_q3",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "phase 3: content-addressed ast codebase & multi-agent concurrency (q3)"
     },
     {
@@ -26457,7 +26468,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_phase_4_cross_platform_runtimes_ecosystem_interop_q4",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "phase 4: cross-platform runtimes & ecosystem interop (q4)"
     },
     {
@@ -26852,8 +26863,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow_axiom_\u591a_agent_\u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
-      "community": 146,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "axiom \u591a agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b"
     },
     {
@@ -26863,8 +26874,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow_1_\u4e3a\u4ec0\u4e48\u4f20\u7edf_git_\u4e0d\u9002\u5408\u591a_agent_\u5e76\u884c",
-      "community": 146,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "1. \u4e3a\u4ec0\u4e48\u4f20\u7edf git \u4e0d\u9002\u5408\u591a agent \u5e76\u884c?"
     },
     {
@@ -26874,8 +26885,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow_2_axiom_\u7684\u5185\u5bb9\u5bfb\u5740_ast_\u89e3\u51b3\u65b9\u6848",
-      "community": 146,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "2. axiom \u7684\u5185\u5bb9\u5bfb\u5740 ast \u89e3\u51b3\u65b9\u6848"
     },
     {
@@ -26885,8 +26896,8 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow_\u6838\u5fc3\u7279\u6027",
-      "community": 146,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "\u6838\u5fc3\u7279\u6027:"
     },
     {
@@ -26896,8 +26907,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow_3_\u591a_agent_\u5e76\u53d1\u534f\u4f5c\u6807\u51c6\u4f5c\u4e1a\u6d41\u7a0b_sop",
-      "community": 146,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "3. \u591a agent \u5e76\u53d1\u534f\u4f5c\u6807\u51c6\u4f5c\u4e1a\u6d41\u7a0b (sop)"
     },
     {
@@ -26907,8 +26918,8 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow_4_\u81ea\u52a8\u53cd\u4f8b\u81ea\u6108\u534f\u8bae_auto_healing_with_counter_examples",
-      "community": 146,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "4. \u81ea\u52a8\u53cd\u4f8b\u81ea\u6108\u534f\u8bae (auto-healing with counter-examples)"
     },
     {
@@ -27117,7 +27128,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "zh-cn/roadmap.md"
     },
     {
@@ -27128,7 +27139,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_axiom_\u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe_roadmap",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (roadmap)"
     },
     {
@@ -27139,7 +27150,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_\u9636\u6bb5\u4e00_\u539f\u578b\u4e0e\u9a8c\u8bc1\u7f16\u8bd1\u5668_mvp_prototype_q1",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u9636\u6bb5\u4e00:\u539f\u578b\u4e0e\u9a8c\u8bc1\u7f16\u8bd1\u5668 (mvp prototype - q1)"
     },
     {
@@ -27150,7 +27161,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_\u9636\u6bb5\u4e8c_effect_\u7cfb\u7edf\u4e0e\u5951\u7ea6\u9a8c\u8bc1_q2",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u9636\u6bb5\u4e8c:effect \u7cfb\u7edf\u4e0e\u5951\u7ea6\u9a8c\u8bc1 (q2)"
     },
     {
@@ -27161,7 +27172,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_\u9636\u6bb5\u4e09_\u5185\u5bb9\u5bfb\u5740_ast_\u4ee3\u7801\u5e93\u4e0e\u591a_agent_\u534f\u540c_q3",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u9636\u6bb5\u4e09:\u5185\u5bb9\u5bfb\u5740 ast \u4ee3\u7801\u5e93\u4e0e\u591a agent \u534f\u540c (q3)"
     },
     {
@@ -27172,7 +27183,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_\u9636\u6bb5\u56db_\u5168\u5e73\u53f0\u4e0e\u751f\u6001\u4e92\u64cd\u4f5c_q4",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u9636\u6bb5\u56db:\u5168\u5e73\u53f0\u4e0e\u751f\u6001\u4e92\u64cd\u4f5c (q4)"
     },
     {
@@ -27490,8 +27501,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow_axiom_\u591a_agent_\u4e26\u884c\u958b\u767c\u5354\u5b9a\u8207\u5167\u5bb9\u5b9a\u5740\u6a21\u578b",
-      "community": 32,
-      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
+      "community": 122,
+      "community_name": "Axiom \u591a Agent \u4e26\u884c\u958b\u767c\u5354\u5b9a\u8207\u5167\u5bb9\u5b9a\u5740\u6a21\u578b",
       "norm_label": "axiom \u591a agent \u4e26\u884c\u958b\u767c\u5354\u5b9a\u8207\u5167\u5bb9\u5b9a\u5740\u6a21\u578b"
     },
     {
@@ -27501,8 +27512,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow_1_\u70ba\u4ec0\u9ebc\u50b3\u7d71_git_\u4e0d\u9069\u5408\u591a_agent_\u4e26\u884c",
-      "community": 32,
-      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
+      "community": 122,
+      "community_name": "Axiom \u591a Agent \u4e26\u884c\u958b\u767c\u5354\u5b9a\u8207\u5167\u5bb9\u5b9a\u5740\u6a21\u578b",
       "norm_label": "1. \u70ba\u4ec0\u9ebc\u50b3\u7d71 git \u4e0d\u9069\u5408\u591a agent \u4e26\u884c?"
     },
     {
@@ -27512,8 +27523,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow_2_axiom_\u7684\u5167\u5bb9\u5b9a\u5740_ast_\u89e3\u6c7a\u65b9\u6848",
-      "community": 32,
-      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
+      "community": 122,
+      "community_name": "Axiom \u591a Agent \u4e26\u884c\u958b\u767c\u5354\u5b9a\u8207\u5167\u5bb9\u5b9a\u5740\u6a21\u578b",
       "norm_label": "2. axiom \u7684\u5167\u5bb9\u5b9a\u5740 ast \u89e3\u6c7a\u65b9\u6848"
     },
     {
@@ -27523,8 +27534,8 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow_\u6838\u5fc3\u7279\u6027",
-      "community": 32,
-      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
+      "community": 122,
+      "community_name": "Axiom \u591a Agent \u4e26\u884c\u958b\u767c\u5354\u5b9a\u8207\u5167\u5bb9\u5b9a\u5740\u6a21\u578b",
       "norm_label": "\u6838\u5fc3\u7279\u6027:"
     },
     {
@@ -27534,8 +27545,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow_3_\u591a_agent_\u4e26\u767c\u5354\u4f5c\u6a19\u6e96\u4f5c\u696d\u7a0b\u5e8f_sop",
-      "community": 32,
-      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
+      "community": 122,
+      "community_name": "Axiom \u591a Agent \u4e26\u884c\u958b\u767c\u5354\u5b9a\u8207\u5167\u5bb9\u5b9a\u5740\u6a21\u578b",
       "norm_label": "3. \u591a agent \u4e26\u767c\u5354\u4f5c\u6a19\u6e96\u4f5c\u696d\u7a0b\u5e8f (sop)"
     },
     {
@@ -27545,8 +27556,8 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow_4_\u81ea\u52d5\u53cd\u4f8b\u81ea\u7652\u5354\u5b9a_auto_healing_with_counter_examples",
-      "community": 32,
-      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
+      "community": 122,
+      "community_name": "Axiom \u591a Agent \u4e26\u884c\u958b\u767c\u5354\u5b9a\u8207\u5167\u5bb9\u5b9a\u5740\u6a21\u578b",
       "norm_label": "4. \u81ea\u52d5\u53cd\u4f8b\u81ea\u7652\u5354\u5b9a (auto-healing with counter-examples)"
     },
     {
@@ -27557,7 +27568,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "zh-tw/roadmap.md"
     },
     {
@@ -27568,7 +27579,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_axiom_\u5c08\u6848\u767c\u5c55\u85cd\u5716_roadmap",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "axiom \u5c08\u6848\u767c\u5c55\u85cd\u5716 (roadmap)"
     },
     {
@@ -27579,7 +27590,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_\u968e\u6bb5\u4e00_\u539f\u578b\u8207\u9a57\u8b49\u7de8\u8b6f\u5668_mvp_prototype_q1",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u968e\u6bb5\u4e00:\u539f\u578b\u8207\u9a57\u8b49\u7de8\u8b6f\u5668 (mvp prototype - q1)"
     },
     {
@@ -27590,7 +27601,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_\u968e\u6bb5\u4e8c_effect_\u7cfb\u7d71\u8207\u5951\u7d04\u9a57\u8b49_q2",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u968e\u6bb5\u4e8c:effect \u7cfb\u7d71\u8207\u5951\u7d04\u9a57\u8b49 (q2)"
     },
     {
@@ -27601,7 +27612,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_\u968e\u6bb5\u4e09_\u5167\u5bb9\u5b9a\u5740_ast_\u4ee3\u78bc\u5eab\u8207\u591a_agent_\u5354\u540c_q3",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u968e\u6bb5\u4e09:\u5167\u5bb9\u5b9a\u5740 ast \u4ee3\u78bc\u5eab\u8207\u591a agent \u5354\u540c (q3)"
     },
     {
@@ -27612,7 +27623,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_\u968e\u6bb5\u56db_\u5168\u5e73\u81fa\u8207\u751f\u614b\u4e92\u64cd\u4f5c_q4",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u968e\u6bb5\u56db:\u5168\u5e73\u81fa\u8207\u751f\u614b\u4e92\u64cd\u4f5c (q4)"
     },
     {
@@ -27809,8 +27820,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_benchmark_200_benchmark_ax_200_functions_\u4e1a\u52a1\u51fd\u6570_axiom_\u6253\u6d1e\u6d41\u6c34\u7ebf\u5b9e\u9a8c\u8bb0\u5f55_benchmark_ax_md",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 144,
+      "community_name": "\ud83d\udcca 200-Functions \u4e1a\u52a1\u51fd\u6570 Axiom \u6253\u6d1e\u6d41\u6c34\u7ebf\u5b9e\u9a8c\u8bb0\u5f55 (Benchmark_ax.md)",
       "norm_label": "\ud83d\udcca 200-functions \u4e1a\u52a1\u51fd\u6570 axiom \u6253\u6d1e\u6d41\u6c34\u7ebf\u5b9e\u9a8c\u8bb0\u5f55 (benchmark_ax.md)"
     },
     {
@@ -27820,8 +27831,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "examples_benchmark_200_benchmark_ax_\u4e00_\u6253\u6d1e\u6d41\u6c34\u7ebf\u5b9e\u6d4b\u6570\u636e\u77e9\u9635_axiom_pipeline",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 144,
+      "community_name": "\ud83d\udcca 200-Functions \u4e1a\u52a1\u51fd\u6570 Axiom \u6253\u6d1e\u6d41\u6c34\u7ebf\u5b9e\u9a8c\u8bb0\u5f55 (Benchmark_ax.md)",
       "norm_label": "\ud83d\udcca \u4e00\u3001\u6253\u6d1e\u6d41\u6c34\u7ebf\u5b9e\u6d4b\u6570\u636e\u77e9\u9635 (/axiom-pipeline)"
     },
     {
@@ -27831,8 +27842,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "examples_benchmark_200_benchmark_ax_\u4e8c_\u8de8\u8bed\u8a00\u591a_agent_\u534f\u4f5c\u5bf9\u6bd4",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 144,
+      "community_name": "\ud83d\udcca 200-Functions \u4e1a\u52a1\u51fd\u6570 Axiom \u6253\u6d1e\u6d41\u6c34\u7ebf\u5b9e\u9a8c\u8bb0\u5f55 (Benchmark_ax.md)",
       "norm_label": "\ud83e\udd4a \u4e8c\u3001\u8de8\u8bed\u8a00\u591a agent \u534f\u4f5c\u5bf9\u6bd4"
     },
     {
@@ -27842,8 +27853,8 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "examples_benchmark_200_benchmark_ax_\u4e09_\u8bbe\u8ba1\u8981\u70b9\u5206\u6790",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 144,
+      "community_name": "\ud83d\udcca 200-Functions \u4e1a\u52a1\u51fd\u6570 Axiom \u6253\u6d1e\u6d41\u6c34\u7ebf\u5b9e\u9a8c\u8bb0\u5f55 (Benchmark_ax.md)",
       "norm_label": "\ud83d\udd2c \u4e09\u3001\u8bbe\u8ba1\u8981\u70b9\u5206\u6790"
     },
     {
@@ -27853,8 +27864,8 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "examples_benchmark_200_benchmark_ax_\u56db_\u5b9e\u673a\u9a8c\u8bc1\u72b6\u6001\u8bb0\u5f55_head_\u5b9e\u6d4b",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 144,
+      "community_name": "\ud83d\udcca 200-Functions \u4e1a\u52a1\u51fd\u6570 Axiom \u6253\u6d1e\u6d41\u6c34\u7ebf\u5b9e\u9a8c\u8bb0\u5f55 (Benchmark_ax.md)",
       "norm_label": "\ud83d\udcc8 \u56db\u3001\u5b9e\u673a\u9a8c\u8bc1\u72b6\u6001\u8bb0\u5f55 (head \u5b9e\u6d4b)"
     },
     {
@@ -28007,8 +28018,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_en_200_functions_cross_language_multi_agent_collaboration_benchmark",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 197,
+      "community_name": "\ud83d\udcca 200-Functions Cross-Language Multi-Agent Collaboration Benchmark",
       "norm_label": "\ud83d\udcca 200-functions cross-language multi-agent collaboration benchmark"
     },
     {
@@ -28018,8 +28029,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_en_1_multi_agent_benchmark_comparison",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 197,
+      "community_name": "\ud83d\udcca 200-Functions Cross-Language Multi-Agent Collaboration Benchmark",
       "norm_label": "\ud83d\udcca 1. multi-agent benchmark comparison"
     },
     {
@@ -28029,8 +28040,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_en_2_design_insights_task_decomposition_verification",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 197,
+      "community_name": "\ud83d\udcca 200-Functions Cross-Language Multi-Agent Collaboration Benchmark",
       "norm_label": "\ud83d\udd2c 2. design insights: task decomposition & verification"
     },
     {
@@ -28040,8 +28051,8 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_en_3_navigation_source_code",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 197,
+      "community_name": "\ud83d\udcca 200-Functions Cross-Language Multi-Agent Collaboration Benchmark",
       "norm_label": "\ud83d\udcc2 3. navigation & source code"
     },
     {
@@ -28051,8 +28062,8 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_en_4_reproduction_commands",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 197,
+      "community_name": "\ud83d\udcca 200-Functions Cross-Language Multi-Agent Collaboration Benchmark",
       "norm_label": "\ud83d\udda5\ufe0f 4. reproduction commands"
     },
     {
@@ -28073,52 +28084,52 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_200_functions_\u8de8\u8bed\u8a00\u591a_agent_\u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 196,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8bed\u8a00\u591a Agent \u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
       "norm_label": "\ud83d\udcca 200-functions \u8de8\u8bed\u8a00\u591a agent \u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c"
     },
     {
       "label": "\ud83d\udcca \u4e00\u3001\u56db\u5927\u8bed\u8a00\u591a Agent \u534f\u4f5c\u5b9e\u6d4b\u5bf9\u6bd4",
       "file_type": "document",
       "source_file": "examples/benchmark_200/README.md",
-      "source_location": "L11",
+      "source_location": "L12",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_\u4e00_\u56db\u5927\u8bed\u8a00\u591a_agent_\u534f\u4f5c\u5b9e\u6d4b\u5bf9\u6bd4",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 196,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8bed\u8a00\u591a Agent \u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
       "norm_label": "\ud83d\udcca \u4e00\u3001\u56db\u5927\u8bed\u8a00\u591a agent \u534f\u4f5c\u5b9e\u6d4b\u5bf9\u6bd4"
     },
     {
       "label": "\ud83d\udd2c \u4e8c\u3001\u6838\u5fc3\u8bbe\u8ba1\u63a2\u7d22\uff1aAxiom \u4efb\u52a1\u62c6\u89e3\u4e0e\u9a8c\u8bc1\u673a\u5236",
       "file_type": "document",
       "source_file": "examples/benchmark_200/README.md",
-      "source_location": "L24",
+      "source_location": "L25",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_\u4e8c_\u6838\u5fc3\u8bbe\u8ba1\u63a2\u7d22_axiom_\u4efb\u52a1\u62c6\u89e3\u4e0e\u9a8c\u8bc1\u673a\u5236",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 196,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8bed\u8a00\u591a Agent \u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
       "norm_label": "\ud83d\udd2c \u4e8c\u3001\u6838\u5fc3\u8bbe\u8ba1\u63a2\u7d22:axiom \u4efb\u52a1\u62c6\u89e3\u4e0e\u9a8c\u8bc1\u673a\u5236"
     },
     {
       "label": "\ud83d\udcc2 \u4e09\u3001\u8be6\u7ec6\u62a5\u544a\u4e0e\u5404\u8bed\u8a00\u6e90\u7801\u5bfc\u822a",
       "file_type": "document",
       "source_file": "examples/benchmark_200/README.md",
-      "source_location": "L40",
+      "source_location": "L41",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_\u4e09_\u8be6\u7ec6\u62a5\u544a\u4e0e\u5404\u8bed\u8a00\u6e90\u7801\u5bfc\u822a",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 196,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8bed\u8a00\u591a Agent \u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
       "norm_label": "\ud83d\udcc2 \u4e09\u3001\u8be6\u7ec6\u62a5\u544a\u4e0e\u5404\u8bed\u8a00\u6e90\u7801\u5bfc\u822a"
     },
     {
       "label": "\ud83d\udda5\ufe0f \u56db\u3001\u672c\u5730\u9a8c\u8bc1\u547d\u4ee4\u6307\u5357",
       "file_type": "document",
       "source_file": "examples/benchmark_200/README.md",
-      "source_location": "L56",
+      "source_location": "L58",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_\u56db_\u672c\u5730\u9a8c\u8bc1\u547d\u4ee4\u6307\u5357",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 196,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8bed\u8a00\u591a Agent \u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
       "norm_label": "\ud83d\udda5\ufe0f \u56db\u3001\u672c\u5730\u9a8c\u8bc1\u547d\u4ee4\u6307\u5357"
     },
     {
@@ -28139,8 +28150,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_zh_cn_200_functions_\u8de8\u8bed\u8a00\u591a_agent_\u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 198,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8bed\u8a00\u591a Agent \u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
       "norm_label": "\ud83d\udcca 200-functions \u8de8\u8bed\u8a00\u591a agent \u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c"
     },
     {
@@ -28150,8 +28161,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_zh_cn_\u4e00_\u56db\u5927\u8bed\u8a00\u591a_agent_\u534f\u4f5c\u5b9e\u6d4b\u5bf9\u6bd4",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 198,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8bed\u8a00\u591a Agent \u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
       "norm_label": "\ud83d\udcca \u4e00\u3001\u56db\u5927\u8bed\u8a00\u591a agent \u534f\u4f5c\u5b9e\u6d4b\u5bf9\u6bd4"
     },
     {
@@ -28161,8 +28172,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_zh_cn_\u4e8c_\u6838\u5fc3\u8bbe\u8ba1\u63a2\u7d22_axiom_\u4efb\u52a1\u62c6\u89e3\u4e0e\u9a8c\u8bc1\u673a\u5236",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 198,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8bed\u8a00\u591a Agent \u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
       "norm_label": "\ud83d\udd2c \u4e8c\u3001\u6838\u5fc3\u8bbe\u8ba1\u63a2\u7d22:axiom \u4efb\u52a1\u62c6\u89e3\u4e0e\u9a8c\u8bc1\u673a\u5236"
     },
     {
@@ -28172,8 +28183,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_zh_cn_\u4e09_\u8be6\u7ec6\u62a5\u544a\u4e0e\u5404\u8bed\u8a00\u6e90\u7801\u5bfc\u822a",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 198,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8bed\u8a00\u591a Agent \u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
       "norm_label": "\ud83d\udcc2 \u4e09\u3001\u8be6\u7ec6\u62a5\u544a\u4e0e\u5404\u8bed\u8a00\u6e90\u7801\u5bfc\u822a"
     },
     {
@@ -28183,8 +28194,8 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_zh_cn_\u56db_\u672c\u5730\u9a8c\u8bc1\u547d\u4ee4\u6307\u5357",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 198,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8bed\u8a00\u591a Agent \u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
       "norm_label": "\ud83d\udda5\ufe0f \u56db\u3001\u672c\u5730\u9a8c\u8bc1\u547d\u4ee4\u6307\u5357"
     },
     {
@@ -28205,8 +28216,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_zh_tw_200_functions_\u8de8\u8a9e\u8a00\u591a_agent_\u5354\u4f5c\u5c0d\u6bd4\u5be6\u9a57",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 199,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8a9e\u8a00\u591a Agent \u5354\u4f5c\u5c0d\u6bd4\u5be6\u9a57",
       "norm_label": "\ud83d\udcca 200-functions \u8de8\u8a9e\u8a00\u591a agent \u5354\u4f5c\u5c0d\u6bd4\u5be6\u9a57"
     },
     {
@@ -28216,8 +28227,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_zh_tw_\u4e00_\u56db\u5927\u8a9e\u8a00\u591a_agent_\u5354\u4f5c\u5be6\u6e2c\u5c0d\u6bd4",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 199,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8a9e\u8a00\u591a Agent \u5354\u4f5c\u5c0d\u6bd4\u5be6\u9a57",
       "norm_label": "\ud83d\udcca \u4e00\u3001\u56db\u5927\u8a9e\u8a00\u591a agent \u5354\u4f5c\u5be6\u6e2c\u5c0d\u6bd4"
     },
     {
@@ -28227,8 +28238,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_zh_tw_\u4e8c_\u6838\u5fc3\u8a2d\u8a08\u63a2\u7d22_axiom_\u4efb\u52d9\u62c6\u89e3\u8207\u9a57\u8b49\u6a5f\u5236",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 199,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8a9e\u8a00\u591a Agent \u5354\u4f5c\u5c0d\u6bd4\u5be6\u9a57",
       "norm_label": "\ud83d\udd2c \u4e8c\u3001\u6838\u5fc3\u8a2d\u8a08\u63a2\u7d22:axiom \u4efb\u52d9\u62c6\u89e3\u8207\u9a57\u8b49\u6a5f\u5236"
     },
     {
@@ -28238,8 +28249,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_zh_tw_\u4e09_\u8a73\u7d30\u5831\u544a\u8207\u5404\u8a9e\u8a00\u539f\u59cb\u78bc\u5c0e\u822a",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 199,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8a9e\u8a00\u591a Agent \u5354\u4f5c\u5c0d\u6bd4\u5be6\u9a57",
       "norm_label": "\ud83d\udcc2 \u4e09\u3001\u8a73\u7d30\u5831\u544a\u8207\u5404\u8a9e\u8a00\u539f\u59cb\u78bc\u5c0e\u822a"
     },
     {
@@ -28249,8 +28260,8 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "examples_benchmark_200_readme_zh_tw_\u56db_\u672c\u6a5f\u9a57\u8b49\u547d\u4ee4\u6307\u5357",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 199,
+      "community_name": "\ud83d\udcca 200-Functions \u8de8\u8a9e\u8a00\u591a Agent \u5354\u4f5c\u5c0d\u6bd4\u5be6\u9a57",
       "norm_label": "\ud83d\udda5\ufe0f \u56db\u3001\u672c\u6a5f\u9a57\u8b49\u547d\u4ee4\u6307\u5357"
     },
     {
@@ -28293,8 +28304,8 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "examples_benchmark_200_spec_200_\u4e09_5_\u5927\u5b50\u7cfb\u7edf_200_\u4e2a\u771f\u5b9e\u4e1a\u52a1\u51fd\u6570\u89c4\u683c",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 132,
+      "community_name": "\ud83d\udcd0 \u4e09\u30015 \u5927\u5b50\u7cfb\u7edf 200 \u4e2a\u771f\u5b9e\u4e1a\u52a1\u51fd\u6570\u89c4\u683c",
       "norm_label": "\ud83d\udcd0 \u4e09\u30015 \u5927\u5b50\u7cfb\u7edf 200 \u4e2a\u771f\u5b9e\u4e1a\u52a1\u51fd\u6570\u89c4\u683c"
     },
     {
@@ -28304,8 +28315,8 @@
       "source_location": "L96",
       "_origin": "ast",
       "id": "examples_benchmark_200_spec_200_\u6a21\u5757_1_\u7a7a\u95f4\u51e0\u4f55\u4e0e\u7f51\u683c\u7cfb\u7edf_40_\u51fd\u6570_grid_math_001_grid_math_040",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 132,
+      "community_name": "\ud83d\udcd0 \u4e09\u30015 \u5927\u5b50\u7cfb\u7edf 200 \u4e2a\u771f\u5b9e\u4e1a\u52a1\u51fd\u6570\u89c4\u683c",
       "norm_label": "\ud83d\udd39 \u6a21\u5757 1:\u7a7a\u95f4\u51e0\u4f55\u4e0e\u7f51\u683c\u7cfb\u7edf (40 \u51fd\u6570,`grid_math_001` ~ `grid_math_040`)"
     },
     {
@@ -28315,8 +28326,8 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "examples_benchmark_200_spec_200_\u6a21\u5757_2_\u5c5e\u6027\u6620\u5c04\u4e0e\u6297\u6027\u8ba1\u7b97\u7cfb\u7edf_50_\u51fd\u6570_stat_calc_041_stat_calc_090",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 132,
+      "community_name": "\ud83d\udcd0 \u4e09\u30015 \u5927\u5b50\u7cfb\u7edf 200 \u4e2a\u771f\u5b9e\u4e1a\u52a1\u51fd\u6570\u89c4\u683c",
       "norm_label": "\ud83d\udd39 \u6a21\u5757 2:\u5c5e\u6027\u6620\u5c04\u4e0e\u6297\u6027\u8ba1\u7b97\u7cfb\u7edf (50 \u51fd\u6570,`stat_calc_041` ~ `stat_calc_090`)"
     },
     {
@@ -28326,8 +28337,8 @@
       "source_location": "L140",
       "_origin": "ast",
       "id": "examples_benchmark_200_spec_200_\u6a21\u5757_3_\u6df7\u5408\u6218\u6597\u4e0e_buff_\u72b6\u6001\u673a\u7cfb\u7edf_50_\u51fd\u6570_combat_flow_091_combat_flow_140",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 132,
+      "community_name": "\ud83d\udcd0 \u4e09\u30015 \u5927\u5b50\u7cfb\u7edf 200 \u4e2a\u771f\u5b9e\u4e1a\u52a1\u51fd\u6570\u89c4\u683c",
       "norm_label": "\ud83d\udd39 \u6a21\u5757 3:\u6df7\u5408\u6218\u6597\u4e0e buff \u72b6\u6001\u673a\u7cfb\u7edf (50 \u51fd\u6570,`combat_flow_091` ~ `combat_flow_140`)"
     },
     {
@@ -28337,8 +28348,8 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "examples_benchmark_200_spec_200_\u6a21\u5757_4_\u602a\u7269_ai_\u51b3\u7b56\u4e0e\u52a0\u6743\u6389\u843d\u7cfb\u7edf_40_\u51fd\u6570_ai_loot_141_ai_loot_180",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 132,
+      "community_name": "\ud83d\udcd0 \u4e09\u30015 \u5927\u5b50\u7cfb\u7edf 200 \u4e2a\u771f\u5b9e\u4e1a\u52a1\u51fd\u6570\u89c4\u683c",
       "norm_label": "\ud83d\udd39 \u6a21\u5757 4:\u602a\u7269 ai \u51b3\u7b56\u4e0e\u52a0\u6743\u6389\u843d\u7cfb\u7edf (40 \u51fd\u6570,`ai_loot_141` ~ `ai_loot_180`)"
     },
     {
@@ -28348,8 +28359,8 @@
       "source_location": "L175",
       "_origin": "ast",
       "id": "examples_benchmark_200_spec_200_\u6a21\u5757_5_\u56de\u5408\u6d41\u8f6c\u4e0e\u4e16\u754c\u4eff\u771f\u5f15\u64ce_20_\u51fd\u6570_world_engine_181_world_engine_200",
-      "community": 12,
-      "community_name": "SPEC_200.md",
+      "community": 132,
+      "community_name": "\ud83d\udcd0 \u4e09\u30015 \u5927\u5b50\u7cfb\u7edf 200 \u4e2a\u771f\u5b9e\u4e1a\u52a1\u51fd\u6570\u89c4\u683c",
       "norm_label": "\ud83d\udd39 \u6a21\u5757 5:\u56de\u5408\u6d41\u8f6c\u4e0e\u4e16\u754c\u4eff\u771f\u5f15\u64ce (20 \u51fd\u6570,`world_engine_181` ~ `world_engine_200`)"
     },
     {
@@ -28362,6 +28373,215 @@
       "community": 12,
       "community_name": "SPEC_200.md",
       "norm_label": "\ud83c\udfaf \u56db\u3001\u8bc4\u6d4b\u9a8c\u8bc1\u8981\u6c42 (multi-language evaluation criteria)"
+    },
+    {
+      "label": "EVALUATION_REPORT.md",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_evaluation_report",
+      "community": 43,
+      "community_name": "README.md",
+      "norm_label": "evaluation_report.md"
+    },
+    {
+      "label": "\ud83d\udd2c Axiom \u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a (A/B Evaluation Report)",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_evaluation_report_axiom_\u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a_a_b_evaluation_report",
+      "community": 133,
+      "community_name": "\ud83d\udd2c Axiom \u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a (A/B Evaluation Report)",
+      "norm_label": "\ud83d\udd2c axiom \u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a (a/b evaluation report)"
+    },
+    {
+      "label": "\ud83d\udcca \u4e00\u3001\u6838\u5fc3\u5b9e\u9a8c\u6570\u636e\u5bf9\u7167\u603b\u8868",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_evaluation_report_\u4e00_\u6838\u5fc3\u5b9e\u9a8c\u6570\u636e\u5bf9\u7167\u603b\u8868",
+      "community": 133,
+      "community_name": "\ud83d\udd2c Axiom \u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a (A/B Evaluation Report)",
+      "norm_label": "\ud83d\udcca \u4e00\u3001\u6838\u5fc3\u5b9e\u9a8c\u6570\u636e\u5bf9\u7167\u603b\u8868"
+    },
+    {
+      "label": "\ud83d\udd0d \u4e8c\u3001\u89e3\u8026\u5206\u6790\uff1a\u8c01\u8d21\u732e\u4e86 Token \u8282\u7701\uff1f\u8c01\u8d21\u732e\u4e86\u53ef\u9760\u6027\uff1f",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L23",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_evaluation_report_\u4e8c_\u89e3\u8026\u5206\u6790_\u8c01\u8d21\u732e\u4e86_token_\u8282\u7701_\u8c01\u8d21\u732e\u4e86\u53ef\u9760\u6027",
+      "community": 133,
+      "community_name": "\ud83d\udd2c Axiom \u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a (A/B Evaluation Report)",
+      "norm_label": "\ud83d\udd0d \u4e8c\u3001\u89e3\u8026\u5206\u6790:\u8c01\u8d21\u732e\u4e86 token \u8282\u7701?\u8c01\u8d21\u732e\u4e86\u53ef\u9760\u6027?"
+    },
+    {
+      "label": "1. Token \u6d88\u8017\u7684\u53cc\u91cd\u89e3\u8026",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L30",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_evaluation_report_1_token_\u6d88\u8017\u7684\u53cc\u91cd\u89e3\u8026",
+      "community": 133,
+      "community_name": "\ud83d\udd2c Axiom \u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a (A/B Evaluation Report)",
+      "norm_label": "1. token \u6d88\u8017\u7684\u53cc\u91cd\u89e3\u8026"
+    },
+    {
+      "label": "2. \u8f6f\u4ef6\u53ef\u9760\u6027\u4e0e\u53cd\u4f8b\u9632\u5fa1\uff08Axiom \u771f\u6b63\u7684\u7edd\u5bf9\u58c1\u5792\uff09",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L37",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_evaluation_report_2_\u8f6f\u4ef6\u53ef\u9760\u6027\u4e0e\u53cd\u4f8b\u9632\u5fa1_axiom_\u771f\u6b63\u7684\u7edd\u5bf9\u58c1\u5792",
+      "community": 133,
+      "community_name": "\ud83d\udd2c Axiom \u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a (A/B Evaluation Report)",
+      "norm_label": "2. \u8f6f\u4ef6\u53ef\u9760\u6027\u4e0e\u53cd\u4f8b\u9632\u5fa1(axiom \u771f\u6b63\u7684\u7edd\u5bf9\u58c1\u5792)"
+    },
+    {
+      "label": "\ud83d\udca1 \u4e09\u3001\u603b\u7ed3\u7ed3\u8bba",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L50",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_evaluation_report_\u4e09_\u603b\u7ed3\u7ed3\u8bba",
+      "community": 133,
+      "community_name": "\ud83d\udd2c Axiom \u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a (A/B Evaluation Report)",
+      "norm_label": "\ud83d\udca1 \u4e09\u3001\u603b\u7ed3\u7ed3\u8bba"
+    },
+    {
+      "label": "benchmark_eval/README.md",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_readme",
+      "community": 73,
+      "community_name": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "norm_label": "benchmark_eval/readme.md"
+    },
+    {
+      "label": "\ud83d\udd2c Axiom A/B \u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u5957\u4ef6 (A/B Benchmark Eval Suite)",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/README.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_readme_axiom_a_b_\u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u5957\u4ef6_a_b_benchmark_eval_suite",
+      "community": 73,
+      "community_name": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "norm_label": "\ud83d\udd2c axiom a/b \u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u5957\u4ef6 (a/b benchmark eval suite)"
+    },
+    {
+      "label": "\ud83d\udcc2 \u76ee\u5f55\u5bfc\u822a\u4e0e\u6838\u5fc3\u8d44\u4ea7",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/README.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_readme_\u76ee\u5f55\u5bfc\u822a\u4e0e\u6838\u5fc3\u8d44\u4ea7",
+      "community": 73,
+      "community_name": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "norm_label": "\ud83d\udcc2 \u76ee\u5f55\u5bfc\u822a\u4e0e\u6838\u5fc3\u8d44\u4ea7"
+    },
+    {
+      "label": "\ud83d\udcca \u4e09\u7ec4\u5bf9\u7167\u5b9e\u9a8c\u6838\u5fc3\u6307\u6807\u901f\u67e5",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/README.md",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_readme_\u4e09\u7ec4\u5bf9\u7167\u5b9e\u9a8c\u6838\u5fc3\u6307\u6807\u901f\u67e5",
+      "community": 73,
+      "community_name": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "norm_label": "\ud83d\udcca \u4e09\u7ec4\u5bf9\u7167\u5b9e\u9a8c\u6838\u5fc3\u6307\u6807\u901f\u67e5"
+    },
+    {
+      "label": "\ud83d\udda5\ufe0f \u672c\u5730\u9a8c\u8bc1\u4e0e\u590d\u73b0\u6307\u4ee4",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/README.md",
+      "source_location": "L29",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_readme_\u672c\u5730\u9a8c\u8bc1\u4e0e\u590d\u73b0\u6307\u4ee4",
+      "community": 73,
+      "community_name": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "norm_label": "\ud83d\udda5\ufe0f \u672c\u5730\u9a8c\u8bc1\u4e0e\u590d\u73b0\u6307\u4ee4"
+    },
+    {
+      "label": "prompt_templates.md",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_protocols_prompt_templates",
+      "community": 73,
+      "community_name": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "norm_label": "prompt_templates.md"
+    },
+    {
+      "label": "\ud83d\udccb A/B \u5bf9\u7167\u8bc4\u6d4b\u63d0\u793a\u8bcd\u534f\u8bae\u89c4\u8303 (Evaluation Protocols)",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_protocols_prompt_templates_a_b_\u5bf9\u7167\u8bc4\u6d4b\u63d0\u793a\u8bcd\u534f\u8bae\u89c4\u8303_evaluation_protocols",
+      "community": 73,
+      "community_name": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "norm_label": "\ud83d\udccb a/b \u5bf9\u7167\u8bc4\u6d4b\u63d0\u793a\u8bcd\u534f\u8bae\u89c4\u8303 (evaluation protocols)"
+    },
+    {
+      "label": "\ud83c\udfaf \u4e00\u3001\u4e09\u7ec4\u5bf9\u7167\u67b6\u6784\u8bbe\u8ba1",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L7",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_protocols_prompt_templates_\u4e00_\u4e09\u7ec4\u5bf9\u7167\u67b6\u6784\u8bbe\u8ba1",
+      "community": 73,
+      "community_name": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "norm_label": "\ud83c\udfaf \u4e00\u3001\u4e09\u7ec4\u5bf9\u7167\u67b6\u6784\u8bbe\u8ba1"
+    },
+    {
+      "label": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L38",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_protocols_prompt_templates_\u4e8c_\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f_prompt_templates",
+      "community": 73,
+      "community_name": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "norm_label": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (prompt templates)"
+    },
+    {
+      "label": "1. Group 1 \u534f\u8bae\uff08\u4f20\u7edf Rust \u5927\u6587\u4ef6\u5168\u4e0a\u4e0b\u6587\uff09",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L40",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_protocols_prompt_templates_1_group_1_\u534f\u8bae_\u4f20\u7edf_rust_\u5927\u6587\u4ef6\u5168\u4e0a\u4e0b\u6587",
+      "community": 73,
+      "community_name": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "norm_label": "1. group 1 \u534f\u8bae(\u4f20\u7edf rust \u5927\u6587\u4ef6\u5168\u4e0a\u4e0b\u6587)"
+    },
+    {
+      "label": "2. Group 2 \u534f\u8bae\uff08\u4f20\u7edf Rust \u5355\u51fd\u6570\u5fae\u4efb\u52a1\uff0c\u6d88\u9664\u4efb\u52a1\u7c92\u5ea6\u5dee\u5f02\uff09",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L53",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_protocols_prompt_templates_2_group_2_\u534f\u8bae_\u4f20\u7edf_rust_\u5355\u51fd\u6570\u5fae\u4efb\u52a1_\u6d88\u9664\u4efb\u52a1\u7c92\u5ea6\u5dee\u5f02",
+      "community": 73,
+      "community_name": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "norm_label": "2. group 2 \u534f\u8bae(\u4f20\u7edf rust \u5355\u51fd\u6570\u5fae\u4efb\u52a1,\u6d88\u9664\u4efb\u52a1\u7c92\u5ea6\u5dee\u5f02)"
+    },
+    {
+      "label": "3. Group 3 \u534f\u8bae\uff08Axiom \u5f62\u5f0f\u5316\u5951\u7ea6\u6253\u6d1e\u5de5\u4f5c\u6d41\uff09",
+      "file_type": "document",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L75",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_protocols_prompt_templates_3_group_3_\u534f\u8bae_axiom_\u5f62\u5f0f\u5316\u5951\u7ea6\u6253\u6d1e\u5de5\u4f5c\u6d41",
+      "community": 73,
+      "community_name": "\ud83d\udcdd \u4e8c\u3001\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f (Prompt Templates)",
+      "norm_label": "3. group 3 \u534f\u8bae(axiom \u5f62\u5f0f\u5316\u5951\u7ea6\u6253\u6d1e\u5de5\u4f5c\u6d41)"
     },
     {
       "label": "game_survivor/README.en.md",
@@ -28579,8 +28799,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_axiom_survivors_\u5b8c\u6574_unity_showcase",
-      "community": 137,
-      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
+      "community": 116,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\ud83c\udfae axiom survivors:\u5b8c\u6574 unity showcase"
     },
     {
@@ -28590,8 +28810,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u4e3a\u4ec0\u4e48\u8fd9\u4e2a\u793a\u4f8b\u503c\u5f97\u5173\u6ce8",
-      "community": 137,
-      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
+      "community": 116,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u4e3a\u4ec0\u4e48\u8fd9\u4e2a\u793a\u4f8b\u503c\u5f97\u5173\u6ce8"
     },
     {
@@ -28601,8 +28821,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u67b6\u6784",
-      "community": 137,
-      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
+      "community": 116,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u67b6\u6784"
     },
     {
@@ -28612,8 +28832,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u73af\u5883\u8981\u6c42",
-      "community": 137,
-      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
+      "community": 116,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u73af\u5883\u8981\u6c42"
     },
     {
@@ -28623,8 +28843,8 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u4e00\u952e\u6784\u5efa\u6865\u63a5\u4e0e_dll",
-      "community": 137,
-      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
+      "community": 116,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u4e00\u952e\u6784\u5efa\u6865\u63a5\u4e0e dll"
     },
     {
@@ -28634,8 +28854,8 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u4e0d\u6253\u5f00_unity_\u6267\u884c_e2e_\u9a8c\u8bc1",
-      "community": 137,
-      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
+      "community": 116,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u4e0d\u6253\u5f00 unity \u6267\u884c e2e \u9a8c\u8bc1"
     },
     {
@@ -28645,8 +28865,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u5728_unity_\u4e2d\u8fd0\u884c",
-      "community": 137,
-      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
+      "community": 116,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u5728 unity \u4e2d\u8fd0\u884c"
     },
     {
@@ -28656,8 +28876,8 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u9a8c\u8bc1\u8fb9\u754c",
-      "community": 137,
-      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
+      "community": 116,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u9a8c\u8bc1\u8fb9\u754c"
     },
     {
@@ -28678,8 +28898,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_axiom_survivors_\u5b8c\u6574_unity_showcase",
-      "community": 138,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\ud83c\udfae axiom survivors:\u5b8c\u6574 unity showcase"
     },
     {
@@ -28689,8 +28909,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u70ba\u4ec0\u9ebc\u9019\u500b\u7bc4\u4f8b\u503c\u5f97\u95dc\u6ce8",
-      "community": 138,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u70ba\u4ec0\u9ebc\u9019\u500b\u7bc4\u4f8b\u503c\u5f97\u95dc\u6ce8"
     },
     {
@@ -28700,8 +28920,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u67b6\u69cb",
-      "community": 138,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u67b6\u69cb"
     },
     {
@@ -28711,8 +28931,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u74b0\u5883\u9700\u6c42",
-      "community": 138,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u74b0\u5883\u9700\u6c42"
     },
     {
@@ -28722,8 +28942,8 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u4e00\u9375\u5efa\u7f6e\u6a4b\u63a5\u8207_dll",
-      "community": 138,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u4e00\u9375\u5efa\u7f6e\u6a4b\u63a5\u8207 dll"
     },
     {
@@ -28733,8 +28953,8 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u4e0d\u958b\u555f_unity_\u57f7\u884c_e2e_\u9a57\u8b49",
-      "community": 138,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u4e0d\u958b\u555f unity \u57f7\u884c e2e \u9a57\u8b49"
     },
     {
@@ -28744,8 +28964,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u5728_unity_\u4e2d\u57f7\u884c",
-      "community": 138,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u5728 unity \u4e2d\u57f7\u884c"
     },
     {
@@ -28755,8 +28975,8 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u9a57\u8b49\u908a\u754c",
-      "community": 138,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u9a57\u8b49\u908a\u754c"
     },
     {
@@ -82076,7 +82296,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.en.md",
-      "source_location": "L96",
+      "source_location": "L134",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_en",
@@ -82087,7 +82307,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.en.md",
-      "source_location": "L98",
+      "source_location": "L136",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_en",
@@ -82098,7 +82318,18 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.en.md",
-      "source_location": "L97",
+      "source_location": "L137",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "readme_en",
+      "target": "docs_roadmap",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.en.md",
+      "source_location": "L135",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_en",
@@ -82109,7 +82340,29 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.en.md",
-      "source_location": "L99",
+      "source_location": "L60",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "readme_en",
+      "target": "examples_benchmark_200_benchmark_ax",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.en.md",
+      "source_location": "L49",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "readme_en",
+      "target": "examples_benchmark_eval_evaluation_report",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.en.md",
+      "source_location": "L138",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_en",
@@ -82124,7 +82377,7 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_en",
-      "target": "readme_en_axiom_a_deterministic_game_logic_dsl_formal_verification_research_prototype",
+      "target": "readme_en_axiom_ai_native_verified_logic_layer_runtime",
       "confidence_score": 1.0
     },
     {
@@ -82153,22 +82406,11 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.en.md",
-      "source_location": "L58",
+      "source_location": "L13",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_en_axiom_a_deterministic_game_logic_dsl_formal_verification_research_prototype",
-      "target": "readme_en_cli_usage_guide",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "README.en.md",
-      "source_location": "L12",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "readme_en_axiom_a_deterministic_game_logic_dsl_formal_verification_research_prototype",
-      "target": "readme_en_core_concepts",
+      "source": "readme_en_axiom_ai_native_verified_logic_layer_runtime",
+      "target": "readme_en_architecture_symbiotic_model",
       "confidence_score": 1.0
     },
     {
@@ -82178,7 +82420,18 @@
       "source_location": "L94",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_en_axiom_a_deterministic_game_logic_dsl_formal_verification_research_prototype",
+      "source": "readme_en_axiom_ai_native_verified_logic_layer_runtime",
+      "target": "readme_en_cli_toolchain_quickstart",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.en.md",
+      "source_location": "L130",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "readme_en_axiom_ai_native_verified_logic_layer_runtime",
       "target": "readme_en_documentation",
       "confidence_score": 1.0
     },
@@ -82186,21 +82439,32 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.en.md",
-      "source_location": "L51",
+      "source_location": "L64",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_en_axiom_a_deterministic_game_logic_dsl_formal_verification_research_prototype",
-      "target": "readme_en_ide_support_ecosystem_planned",
+      "source": "readme_en_axiom_ai_native_verified_logic_layer_runtime",
+      "target": "readme_en_hands_on_demo_axiom_survivors",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.en.md",
-      "source_location": "L37",
+      "source_location": "L87",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_en_axiom_a_deterministic_game_logic_dsl_formal_verification_research_prototype",
+      "source": "readme_en_axiom_ai_native_verified_logic_layer_runtime",
+      "target": "readme_en_ide_support_tooling",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.en.md",
+      "source_location": "L73",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "readme_en_axiom_ai_native_verified_logic_layer_runtime",
       "target": "readme_en_installation_build",
       "confidence_score": 1.0
     },
@@ -82208,18 +82472,18 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.en.md",
-      "source_location": "L28",
+      "source_location": "L45",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_en_axiom_a_deterministic_game_logic_dsl_formal_verification_research_prototype",
-      "target": "readme_en_playable_demo_axiom_survivors",
+      "source": "readme_en_axiom_ai_native_verified_logic_layer_runtime",
+      "target": "readme_en_rigorous_empirical_proof_single_variable_a_b_evaluation",
       "confidence_score": 1.0
     },
     {
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
-      "source_location": "L106",
+      "source_location": "L132",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme",
@@ -82230,7 +82494,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
-      "source_location": "L108",
+      "source_location": "L134",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme",
@@ -82241,18 +82505,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
-      "source_location": "L109",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "readme",
-      "target": "docs_research_language_comparison",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "source_file": "README.md",
-      "source_location": "L110",
+      "source_location": "L135",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme",
@@ -82263,7 +82516,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
-      "source_location": "L107",
+      "source_location": "L133",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme",
@@ -82274,18 +82527,29 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
-      "source_location": "L39",
+      "source_location": "L58",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme",
-      "target": "examples_benchmark_200_spec_200",
+      "target": "examples_benchmark_200_benchmark_ax",
       "confidence_score": 1.0
     },
     {
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
-      "source_location": "L111",
+      "source_location": "L47",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "readme",
+      "target": "examples_benchmark_eval_evaluation_report",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L136",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme",
@@ -82300,7 +82564,7 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme",
-      "target": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "target": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
       "confidence_score": 1.0
     },
     {
@@ -82329,10 +82593,10 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
-      "source_location": "L68",
+      "source_location": "L92",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
       "target": "readme_cli_\u5de5\u5177\u94fe\u6307\u5357",
       "confidence_score": 1.0
     },
@@ -82340,21 +82604,32 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
-      "source_location": "L61",
+      "source_location": "L85",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "target": "readme_ide_\u652f\u6301\u4e0e\u5de5\u5177\u94fe\u751f\u6001_ide_support",
+      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
+      "target": "readme_ide_\u652f\u6301\u4e0e\u751f\u6001\u89c4\u5212_ide_support",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
-      "source_location": "L47",
+      "source_location": "L43",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
+      "target": "readme_\u4e25\u8c28\u79d1\u5b66\u5b9e\u8bc1_\u5355\u4e00\u53d8\u91cf_a_b_\u5bf9\u7167\u8bc4\u6d4b",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L71",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
       "target": "readme_\u5b89\u88c5\u4e0e\u6784\u5efa_installation_build",
       "confidence_score": 1.0
     },
@@ -82362,10 +82637,10 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
-      "source_location": "L28",
+      "source_location": "L62",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
       "target": "readme_\u5b9e\u6218\u6f14\u793a_axiom_survivors_\u5272\u8349\u6e38\u620f",
       "confidence_score": 1.0
     },
@@ -82373,32 +82648,21 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
-      "source_location": "L37",
+      "source_location": "L13",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "target": "readme_\u5b9e\u9a8c\u6027\u8bc4\u6d4b_200_function_\u5fae\u578b\u4efb\u52a1\u62c6\u89e3\u63a2\u7d22",
+      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
+      "target": "readme_\u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5\u4e0e\u5171\u751f\u67b6\u6784",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.md",
-      "source_location": "L12",
+      "source_location": "L128",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "target": "readme_\u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "README.md",
-      "source_location": "L104",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "source": "readme_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
       "target": "readme_\u9879\u76ee\u6587\u6863\u5bfc\u822a",
       "confidence_score": 1.0
     },
@@ -82406,7 +82670,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-CN.md",
-      "source_location": "L106",
+      "source_location": "L132",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_cn",
@@ -82417,7 +82681,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-CN.md",
-      "source_location": "L108",
+      "source_location": "L134",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_cn",
@@ -82428,18 +82692,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-CN.md",
-      "source_location": "L109",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "readme_zh_cn",
-      "target": "docs_research_language_comparison",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "source_file": "README.zh-CN.md",
-      "source_location": "L110",
+      "source_location": "L135",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_cn",
@@ -82450,7 +82703,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-CN.md",
-      "source_location": "L107",
+      "source_location": "L133",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_cn",
@@ -82461,18 +82714,29 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-CN.md",
-      "source_location": "L39",
+      "source_location": "L58",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_cn",
-      "target": "examples_benchmark_200_spec_200",
+      "target": "examples_benchmark_200_benchmark_ax",
       "confidence_score": 1.0
     },
     {
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-CN.md",
-      "source_location": "L111",
+      "source_location": "L47",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "readme_zh_cn",
+      "target": "examples_benchmark_eval_evaluation_report",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.zh-CN.md",
+      "source_location": "L136",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_cn",
@@ -82487,7 +82751,7 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_cn",
-      "target": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "target": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
       "confidence_score": 1.0
     },
     {
@@ -82505,10 +82769,10 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-CN.md",
-      "source_location": "L68",
+      "source_location": "L92",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
       "target": "readme_zh_cn_cli_\u5de5\u5177\u94fe\u6307\u5357",
       "confidence_score": 1.0
     },
@@ -82516,21 +82780,32 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-CN.md",
-      "source_location": "L61",
+      "source_location": "L85",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "target": "readme_zh_cn_ide_\u652f\u6301\u4e0e\u5de5\u5177\u94fe\u751f\u6001_ide_support",
+      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
+      "target": "readme_zh_cn_ide_\u652f\u6301\u4e0e\u751f\u6001\u89c4\u5212_ide_support",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-CN.md",
-      "source_location": "L47",
+      "source_location": "L43",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
+      "target": "readme_zh_cn_\u4e25\u8c28\u79d1\u5b66\u5b9e\u8bc1_\u5355\u4e00\u53d8\u91cf_a_b_\u5bf9\u7167\u8bc4\u6d4b",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.zh-CN.md",
+      "source_location": "L71",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
       "target": "readme_zh_cn_\u5b89\u88c5\u4e0e\u6784\u5efa_installation_build",
       "confidence_score": 1.0
     },
@@ -82538,10 +82813,10 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-CN.md",
-      "source_location": "L28",
+      "source_location": "L62",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
       "target": "readme_zh_cn_\u5b9e\u6218\u6f14\u793a_axiom_survivors_\u5272\u8349\u6e38\u620f",
       "confidence_score": 1.0
     },
@@ -82549,32 +82824,21 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-CN.md",
-      "source_location": "L37",
+      "source_location": "L13",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "target": "readme_zh_cn_\u5b9e\u9a8c\u6027\u8bc4\u6d4b_200_function_\u5fae\u578b\u4efb\u52a1\u62c6\u89e3\u63a2\u7d22",
+      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
+      "target": "readme_zh_cn_\u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5\u4e0e\u5171\u751f\u67b6\u6784",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-CN.md",
-      "source_location": "L12",
+      "source_location": "L128",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "target": "readme_zh_cn_\u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "README.zh-CN.md",
-      "source_location": "L104",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "source": "readme_zh_cn_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u53ef\u9a8c\u8bc1\u903b\u8f91\u4e2d\u95f4\u5c42\u4e0e\u8fd0\u884c\u65f6_ai_native_verified_logic_layer",
       "target": "readme_zh_cn_\u9879\u76ee\u6587\u6863\u5bfc\u822a",
       "confidence_score": 1.0
     },
@@ -82582,7 +82846,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L106",
+      "source_location": "L132",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_tw",
@@ -82593,7 +82857,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L108",
+      "source_location": "L134",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_tw",
@@ -82604,18 +82868,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L109",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "readme_zh_tw",
-      "target": "docs_research_language_comparison",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "source_file": "README.zh-TW.md",
-      "source_location": "L110",
+      "source_location": "L135",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_tw",
@@ -82626,7 +82879,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L107",
+      "source_location": "L133",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_tw",
@@ -82637,18 +82890,29 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L39",
+      "source_location": "L58",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_tw",
-      "target": "examples_benchmark_200_spec_200",
+      "target": "examples_benchmark_200_benchmark_ax",
       "confidence_score": 1.0
     },
     {
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L111",
+      "source_location": "L47",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "readme_zh_tw",
+      "target": "examples_benchmark_eval_evaluation_report",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "README.zh-TW.md",
+      "source_location": "L136",
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_tw",
@@ -82663,17 +82927,17 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "readme_zh_tw",
-      "target": "readme_zh_tw_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "target": "readme_zh_tw_axiom_\u9762\u5411_ai_\u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642_ai_native_verified_logic_layer",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L68",
+      "source_location": "L92",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
+      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642_ai_native_verified_logic_layer",
       "target": "readme_zh_tw_cli_\u5de5\u5177\u93c8\u6307\u5357",
       "confidence_score": 1.0
     },
@@ -82681,66 +82945,66 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L61",
+      "source_location": "L85",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "target": "readme_zh_tw_ide_\u652f\u63f4\u8207\u5de5\u5177\u93c8\u751f\u614b_ide_support",
+      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642_ai_native_verified_logic_layer",
+      "target": "readme_zh_tw_ide_\u652f\u63f4\u8207\u751f\u614b\u898f\u5283_ide_support",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L47",
+      "source_location": "L43",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "target": "readme_zh_tw_\u5b89\u88dd\u8207\u69cb\u5efa_installation_build",
+      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642_ai_native_verified_logic_layer",
+      "target": "readme_zh_tw_\u56b4\u8b39\u79d1\u5b78\u5be6\u8b49_\u55ae\u4e00\u8b8a\u6578_a_b_\u5c0d\u7167\u8a55\u6e2c",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L28",
+      "source_location": "L71",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "target": "readme_zh_tw_\u5b9e\u6218\u6f14\u793a_axiom_survivors_\u5272\u8349\u6e38\u620f",
+      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642_ai_native_verified_logic_layer",
+      "target": "readme_zh_tw_\u5b89\u88dd\u8207\u5efa\u7f6e_installation_build",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L37",
+      "source_location": "L62",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "target": "readme_zh_tw_\u5b9e\u9a8c\u6027\u8bc4\u6d4b_200_function_\u5fae\u578b\u4efb\u52a1\u62c6\u89e3\u63a2\u7d22",
+      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642_ai_native_verified_logic_layer",
+      "target": "readme_zh_tw_\u5be6\u6230\u6f14\u793a_axiom_survivors_\u5272\u8349\u904a\u6232",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L12",
+      "source_location": "L128",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "target": "readme_zh_tw_\u6838\u5fc3\u8bbe\u8ba1\u7406\u5ff5",
+      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642_ai_native_verified_logic_layer",
+      "target": "readme_zh_tw_\u5c08\u6848\u6587\u4ef6\u5c0e\u822a",
       "confidence_score": 1.0
     },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "README.zh-TW.md",
-      "source_location": "L104",
+      "source_location": "L13",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u534f\u4f5c\u7684\u786e\u5b9a\u6027\u6e38\u620f\u903b\u8f91_dsl_\u4e0e\u5f62\u5f0f\u5316\u9a8c\u8bc1\u539f\u578b",
-      "target": "readme_zh_tw_\u9879\u76ee\u6587\u6863\u5bfc\u822a",
+      "source": "readme_zh_tw_axiom_\u9762\u5411_ai_\u5354\u4f5c\u7684\u53ef\u9a57\u8b49\u908f\u8f2f\u4e2d\u9593\u5c64\u8207\u57f7\u884c\u6642_ai_native_verified_logic_layer",
+      "target": "readme_zh_tw_\u6838\u5fc3\u8a2d\u8a08\u7406\u5ff5\u8207\u5171\u751f\u67b6\u69cb",
       "confidence_score": 1.0
     },
     {
@@ -85057,7 +85321,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_200/README.md",
-      "source_location": "L45",
+      "source_location": "L47",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_200_readme",
@@ -85189,7 +85453,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_200/README.md",
-      "source_location": "L46",
+      "source_location": "L48",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_200_readme",
@@ -85277,7 +85541,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_200/README.md",
-      "source_location": "L47",
+      "source_location": "L49",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_200_readme",
@@ -85365,7 +85629,7 @@
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_200/README.md",
-      "source_location": "L48",
+      "source_location": "L50",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_200_readme",
@@ -85549,10 +85813,21 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_200/README.md",
+      "source_location": "L8",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_200_readme",
+      "target": "examples_benchmark_eval_evaluation_report",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_200/README.md",
-      "source_location": "L11",
+      "source_location": "L12",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_200_readme_200_functions_\u8de8\u8bed\u8a00\u591a_agent_\u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
@@ -85563,7 +85838,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_200/README.md",
-      "source_location": "L40",
+      "source_location": "L41",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_200_readme_200_functions_\u8de8\u8bed\u8a00\u591a_agent_\u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
@@ -85574,7 +85849,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_200/README.md",
-      "source_location": "L24",
+      "source_location": "L25",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_200_readme_200_functions_\u8de8\u8bed\u8a00\u591a_agent_\u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
@@ -85585,7 +85860,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_200/README.md",
-      "source_location": "L56",
+      "source_location": "L58",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_200_readme_200_functions_\u8de8\u8bed\u8a00\u591a_agent_\u534f\u4f5c\u5bf9\u6bd4\u5b9e\u9a8c",
@@ -85780,6 +86055,17 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L10",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_evaluation_report",
+      "target": "examples_benchmark_200_spec_200",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_200/SPEC_200.md",
@@ -85832,6 +86118,204 @@
       "_origin": "ast",
       "source": "examples_benchmark_200_spec_200_\u4e09_5_\u5927\u5b50\u7cfb\u7edf_200_\u4e2a\u771f\u5b9e\u4e1a\u52a1\u51fd\u6570\u89c4\u683c",
       "target": "examples_benchmark_200_spec_200_\u6a21\u5757_5_\u56de\u5408\u6d41\u8f6c\u4e0e\u4e16\u754c\u4eff\u771f\u5f15\u64ce_20_\u51fd\u6570_world_engine_181_world_engine_200",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_evaluation_report",
+      "target": "examples_benchmark_eval_evaluation_report_axiom_\u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a_a_b_evaluation_report",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/README.md",
+      "source_location": "L14",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_readme",
+      "target": "examples_benchmark_eval_evaluation_report",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L8",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_evaluation_report_axiom_\u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a_a_b_evaluation_report",
+      "target": "examples_benchmark_eval_evaluation_report_\u4e00_\u6838\u5fc3\u5b9e\u9a8c\u6570\u636e\u5bf9\u7167\u603b\u8868",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L50",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_evaluation_report_axiom_\u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a_a_b_evaluation_report",
+      "target": "examples_benchmark_eval_evaluation_report_\u4e09_\u603b\u7ed3\u7ed3\u8bba",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L23",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_evaluation_report_axiom_\u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u62a5\u544a_a_b_evaluation_report",
+      "target": "examples_benchmark_eval_evaluation_report_\u4e8c_\u89e3\u8026\u5206\u6790_\u8c01\u8d21\u732e\u4e86_token_\u8282\u7701_\u8c01\u8d21\u732e\u4e86\u53ef\u9760\u6027",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L30",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_evaluation_report_\u4e8c_\u89e3\u8026\u5206\u6790_\u8c01\u8d21\u732e\u4e86_token_\u8282\u7701_\u8c01\u8d21\u732e\u4e86\u53ef\u9760\u6027",
+      "target": "examples_benchmark_eval_evaluation_report_1_token_\u6d88\u8017\u7684\u53cc\u91cd\u89e3\u8026",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/EVALUATION_REPORT.md",
+      "source_location": "L37",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_evaluation_report_\u4e8c_\u89e3\u8026\u5206\u6790_\u8c01\u8d21\u732e\u4e86_token_\u8282\u7701_\u8c01\u8d21\u732e\u4e86\u53ef\u9760\u6027",
+      "target": "examples_benchmark_eval_evaluation_report_2_\u8f6f\u4ef6\u53ef\u9760\u6027\u4e0e\u53cd\u4f8b\u9632\u5fa1_axiom_\u771f\u6b63\u7684\u7edd\u5bf9\u58c1\u5792",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/README.md",
+      "source_location": "L12",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_readme",
+      "target": "examples_benchmark_eval_protocols_prompt_templates",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/README.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_readme",
+      "target": "examples_benchmark_eval_readme_axiom_a_b_\u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u5957\u4ef6_a_b_benchmark_eval_suite",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/README.md",
+      "source_location": "L18",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_readme_axiom_a_b_\u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u5957\u4ef6_a_b_benchmark_eval_suite",
+      "target": "examples_benchmark_eval_readme_\u4e09\u7ec4\u5bf9\u7167\u5b9e\u9a8c\u6838\u5fc3\u6307\u6807\u901f\u67e5",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/README.md",
+      "source_location": "L29",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_readme_axiom_a_b_\u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u5957\u4ef6_a_b_benchmark_eval_suite",
+      "target": "examples_benchmark_eval_readme_\u672c\u5730\u9a8c\u8bc1\u4e0e\u590d\u73b0\u6307\u4ee4",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/README.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_readme_axiom_a_b_\u5355\u4e00\u53d8\u91cf\u79d1\u5b66\u5bf9\u7167\u8bc4\u6d4b\u5957\u4ef6_a_b_benchmark_eval_suite",
+      "target": "examples_benchmark_eval_readme_\u76ee\u5f55\u5bfc\u822a\u4e0e\u6838\u5fc3\u8d44\u4ea7",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_protocols_prompt_templates",
+      "target": "examples_benchmark_eval_protocols_prompt_templates_a_b_\u5bf9\u7167\u8bc4\u6d4b\u63d0\u793a\u8bcd\u534f\u8bae\u89c4\u8303_evaluation_protocols",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L7",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_protocols_prompt_templates_a_b_\u5bf9\u7167\u8bc4\u6d4b\u63d0\u793a\u8bcd\u534f\u8bae\u89c4\u8303_evaluation_protocols",
+      "target": "examples_benchmark_eval_protocols_prompt_templates_\u4e00_\u4e09\u7ec4\u5bf9\u7167\u67b6\u6784\u8bbe\u8ba1",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L38",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_protocols_prompt_templates_a_b_\u5bf9\u7167\u8bc4\u6d4b\u63d0\u793a\u8bcd\u534f\u8bae\u89c4\u8303_evaluation_protocols",
+      "target": "examples_benchmark_eval_protocols_prompt_templates_\u4e8c_\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f_prompt_templates",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L40",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_protocols_prompt_templates_\u4e8c_\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f_prompt_templates",
+      "target": "examples_benchmark_eval_protocols_prompt_templates_1_group_1_\u534f\u8bae_\u4f20\u7edf_rust_\u5927\u6587\u4ef6\u5168\u4e0a\u4e0b\u6587",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L53",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_protocols_prompt_templates_\u4e8c_\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f_prompt_templates",
+      "target": "examples_benchmark_eval_protocols_prompt_templates_2_group_2_\u534f\u8bae_\u4f20\u7edf_rust_\u5355\u51fd\u6570\u5fae\u4efb\u52a1_\u6d88\u9664\u4efb\u52a1\u7c92\u5ea6\u5dee\u5f02",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/protocols/prompt_templates.md",
+      "source_location": "L75",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_protocols_prompt_templates_\u4e8c_\u4e09\u7ec4\u5177\u4f53\u63d0\u793a\u8bcd\u534f\u8bae\u6a21\u677f_prompt_templates",
+      "target": "examples_benchmark_eval_protocols_prompt_templates_3_group_3_\u534f\u8bae_axiom_\u5f62\u5f0f\u5316\u5951\u7ea6\u6253\u6d1e\u5de5\u4f5c\u6d41",
       "confidence_score": 1.0
     },
     {
@@ -86892,5 +87376,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "7ce22a2f7e11ea881184214aa242f691f60e6bc7"
+  "built_at_commit": "0c2cb7edbb529c81fe27e0ead648501e947b10db"
 }

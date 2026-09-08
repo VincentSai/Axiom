@@ -40,22 +40,18 @@
 
 ---
 
-## 🔬 严谨科学实证：单一变量 A/B 对照评测
+## 🔬 严谨科学实证：单一变量 A/B 对照评测体系
 
 外部评测曾提出过一个核心问题：*“Axiom 的 Token 节省与可靠性，到底是因为语言本身，还是仅仅因为工作流切成了微任务？”*
 
-为了彻底解耦变量，我们在完全相同的基座大模型（OpenAI Codex / GPT-4o Class, T=0.2）与完全相同的 20 个黄金业务算法任务下，实施了 **三组对照实验**（详见 [`examples/benchmark_eval/EVALUATION_REPORT.md`](examples/benchmark_eval/EVALUATION_REPORT.md)）：
-
-| 度量指标 (Metrics) | Group 1: 传统大文件 (Rust Monolith) | Group 2: 单函数微任务 (Rust Micro-Worker) | Group 3: Axiom 契约打洞 (Axiom Hole Pipeline) | Axiom 相对 Group 2 净增益 (语言层真实护城河) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Pass@1 首次正确率** | 65.0% | 75.0% | **95.0%** | **🔥 +20.0% 首次正确率** |
-| **边界反例漏检率** | 35.0% (潜伏缺陷) | 30.0% (潜伏缺陷) | **0.00% (全域形式化定理证明)** | **🛡️ 消除全部潜伏边界反例** |
-| **平均自愈收敛轮次** | 2.40 轮 | 1.90 轮 | **1.10 轮 (单步收敛)** | **⚡ 修复效率提升 72.7%** |
-| **单任务平均 Tokens** | 2,180 | 940 | **385** | **💰 额外节省 59.0% Tokens** |
-| **20 任务总 Tokens** | 43,600 | 18,800 | **7,700** | **🔥 较传统方式节省 82.3%** |
-
-- **实验结论**：任务微型化（Group 2）贡献了 56.8% 的 Token 节约；而 Axiom 的纯数学契约表示去除了自然语言与样板代码冗余，**在此基础上额外再降 59% Token**，且凭借 SMT 定理证明将 **30% 的潜伏缺陷漏检率彻底清零**！
-- 亦可查阅包含 200 个函数的超大型全量基准报告：[`examples/benchmark_200/Benchmark_ax.md`](examples/benchmark_200/Benchmark_ax.md)。
+为了彻底解耦变量，我们在 [`examples/benchmark_eval/`](examples/benchmark_eval/) 中建立了严格的 **单一变量 A/B 科学对照评测套件**：
+- **黄金标准任务集 ([`golden_tasks.json`](examples/benchmark_eval/golden_tasks.json))**：精选覆盖空间几何、非线性抗性、战斗数值、掉落状态机与世界仿真的 20 个黄金业务任务；
+- **三组对照实验协议 ([`prompt_templates.md`](examples/benchmark_eval/protocols/prompt_templates.md))**：
+  1. **Group 1**：传统语言大文件工作流（Rust Monolith，长代码上下文）；
+  2. **Group 2（核心解耦）**：传统语言单函数微任务（Rust Micro-Worker，消除任务拆解颗粒度差异）；
+  3. **Group 3**：Axiom 契约打洞流水线（Axiom Hole Pipeline，基于数学契约与 SMT 定理证明）。
+- **官方 API 驱动脚本 ([`eval_runner.py`](examples/benchmark_eval/eval_runner.py))**：
+  基于 Google Gemini 官方 API（`countTokens` 与 `generateContent`），**使用官方真实分词器与官方 usageMetadata** 统计真实物理 Token 消耗与通过率，杜绝任何主观伪造数据。用户配置 `GEMINI_API_KEY` 后即可在本地一键运行复测。
 
 ---
 
@@ -127,7 +123,7 @@ axiom export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
 
 ## 📂 项目文档导航
 
-- 🔬 [单一变量 A/B 科学对照评测报告 (examples/benchmark_eval/EVALUATION_REPORT.md)](examples/benchmark_eval/EVALUATION_REPORT.md)
+- 🔬 [单一变量 A/B 科学对照评测方法与套件 (examples/benchmark_eval/README.md)](examples/benchmark_eval/README.md)
 - 📊 [200 函数高压基准实测报告 (examples/benchmark_200/Benchmark_ax.md)](examples/benchmark_200/Benchmark_ax.md)
 - 📘 [架构设计白皮书 (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)
 - 📝 [语言语法与语义规范草案 (docs/SPECIFICATION.md)](docs/SPECIFICATION.md)

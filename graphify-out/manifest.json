@@ -300,23 +300,23 @@
     "semantic_hash": ""
   },
   "README.en.md": {
-    "mtime": 1788836803.441638,
-    "ast_hash": "dec42b06aeb683f3cb635658d4a9e883",
+    "mtime": 1788837533.0207605,
+    "ast_hash": "03a9fd6ad4a1df0f44a60325482fdada",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1788836785.6503637,
-    "ast_hash": "957a754239d58327015b02b2d8ad1927",
+    "mtime": 1788837514.7082267,
+    "ast_hash": "c47b16e0c4032dd40dc71262b7e375be",
     "semantic_hash": ""
   },
   "README.zh-CN.md": {
-    "mtime": 1788836777.2721694,
-    "ast_hash": "957a754239d58327015b02b2d8ad1927",
+    "mtime": 1788837505.8675268,
+    "ast_hash": "c47b16e0c4032dd40dc71262b7e375be",
     "semantic_hash": ""
   },
   "README.zh-TW.md": {
-    "mtime": 1788836794.293655,
-    "ast_hash": "5cc3c3da71b55c3329a052cb4d446981",
+    "mtime": 1788837524.2672358,
+    "ast_hash": "982ac0e8941e2c594bfd4171f6fd769d",
     "semantic_hash": ""
   },
   "docs/ARCHITECTURE.md": {
@@ -670,8 +670,8 @@
     "semantic_hash": ""
   },
   "examples/benchmark_eval/data/eval_matrix_data.json": {
-    "mtime": 1788836737.871237,
-    "ast_hash": "a47b6dc484601bff8a2cd5ebe47e8917",
+    "mtime": 1788837463.5125935,
+    "ast_hash": "7b5809469b7e816436b9d19274a7bf38",
     "semantic_hash": ""
   },
   "examples/benchmark_eval/golden_tasks.json": {
@@ -680,18 +680,23 @@
     "semantic_hash": ""
   },
   "examples/benchmark_eval/EVALUATION_REPORT.md": {
-    "mtime": 1788836749.7012079,
-    "ast_hash": "e933882e57de9ff35f257d9162fc2b09",
+    "mtime": 1788837491.6390326,
+    "ast_hash": "5d5469e5e7de75b751c111cedd174b96",
     "semantic_hash": ""
   },
   "examples/benchmark_eval/README.md": {
-    "mtime": 1788836755.207718,
-    "ast_hash": "cbb5cee241287b6fe49bfc71184d6c92",
+    "mtime": 1788837496.4728968,
+    "ast_hash": "17fc629d025e05cf6d4394347861e5c8",
     "semantic_hash": ""
   },
   "examples/benchmark_eval/protocols/prompt_templates.md": {
     "mtime": 1788836603.457384,
     "ast_hash": "2e0f995d7852572778fa26165c97b589",
+    "semantic_hash": ""
+  },
+  "examples/benchmark_eval/eval_runner.py": {
+    "mtime": 1788837475.7532141,
+    "ast_hash": "5370c92a6282bfed9e57d2c7d482d536",
     "semantic_hash": ""
   }
 }

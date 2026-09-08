@@ -40,22 +40,18 @@
 
 ---
 
-## 🔬 嚴謹科學實證：單一變數 A/B 對照評測
+## 🔬 嚴謹科學實證：單一變數 A/B 對照評測體系
 
 外部評測曾提出過一個核心問題：*「Axiom 的 Token 節省與可靠性，到底是因為語言本身，還是僅僅因為工作流切成了微任務？」*
 
-為了徹底解耦變數，我們在完全相同的基座大模型（OpenAI Codex / GPT-4o Class, T=0.2）與完全相同的 20 個黃金業務演算法任務下，實施了 **三組對照實驗**（詳見 [`examples/benchmark_eval/EVALUATION_REPORT.md`](examples/benchmark_eval/EVALUATION_REPORT.md)）：
-
-| 度量指標 (Metrics) | Group 1: 傳統大檔案 (Rust Monolith) | Group 2: 單函數微任務 (Rust Micro-Worker) | Group 3: Axiom 契約打洞 (Axiom Hole Pipeline) | Axiom 相對 Group 2 淨增益 (語言層真實護城河) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Pass@1 首次正確率** | 65.0% | 75.0% | **95.0%** | **🔥 +20.0% 首次正確率** |
-| **邊界反例漏檢率** | 35.0% (潛伏缺陷) | 30.0% (潛伏缺陷) | **0.00% (全域形式化定理證明)** | **🛡️ 消除全部潛伏邊界反例** |
-| **平均自癒收斂輪次** | 2.40 輪 | 1.90 輪 | **1.10 輪 (單步收斂)** | **⚡ 修復效率提升 72.7%** |
-| **單任務平均 Tokens** | 2,180 | 940 | **385** | **💰 額外節省 59.0% Tokens** |
-| **20 任務總 Tokens** | 43,600 | 18,800 | **7,700** | **🔥 較傳統方式節省 82.3%** |
-
-- **實驗結論**：任務微型化（Group 2）貢獻了 56.8% 的 Token 節約；而 Axiom 的純數學契約表示去除了自然語言與樣板程式碼冗餘，**在此基礎上額外再降 59% Token**，且憑藉 SMT 定理證明將 **30% 的潛伏缺陷漏檢率徹底清零**！
-- 亦可查閱包含 200 個函數的超大型全量基準報告：[`examples/benchmark_200/Benchmark_ax.md`](examples/benchmark_200/Benchmark_ax.md)。
+為了徹底解耦變數，我們在 [`examples/benchmark_eval/`](examples/benchmark_eval/) 中建立了嚴格的 **單一變數 A/B 科學對照評測套件**：
+- **黃金標準任務集 ([`golden_tasks.json`](examples/benchmark_eval/golden_tasks.json))**：精選覆蓋空間幾何、非線性抗性、戰鬥數值、掉落狀態機與世界仿真的 20 個黃金業務任務；
+- **三組對照實驗協議 ([`prompt_templates.md`](examples/benchmark_eval/protocols/prompt_templates.md))**：
+  1. **Group 1**：傳統語言大檔案工作流（Rust Monolith，長程式碼上下文）；
+  2. **Group 2（核心解耦）**：傳統語言單函數微任務（Rust Micro-Worker，消除任務拆解顆粒度差異）；
+  3. **Group 3**：Axiom 契約打洞流水線（Axiom Hole Pipeline，基於數學契約與 SMT 定理證明）。
+- **官方 API 驅動指令碼 ([`eval_runner.py`](examples/benchmark_eval/eval_runner.py))**：
+  基於 Google Gemini 官方 API（`countTokens` 與 `generateContent`），**使用官方真實分詞器與官方 usageMetadata** 統計真實物理 Token 消耗與通過率，杜絕任何主觀偽造數據。使用者設定 `GEMINI_API_KEY` 後即可在本地一鍵執行複測。
 
 ---
 
@@ -127,7 +123,7 @@ axiom export-wit examples/transfer.ax --package axiom:transfer -o transfer.wit
 
 ## 📂 專案文件導航
 
-- 🔬 [單一變數 A/B 科學對照評測報告 (examples/benchmark_eval/EVALUATION_REPORT.md)](examples/benchmark_eval/EVALUATION_REPORT.md)
+- 🔬 [單一變數 A/B 科學對照評測方法與套件 (examples/benchmark_eval/README.md)](examples/benchmark_eval/README.md)
 - 📊 [200 函數高壓基準實測報告 (examples/benchmark_200/Benchmark_ax.md)](examples/benchmark_200/Benchmark_ax.md)
 - 📘 [架構設計白皮書 (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)
 - 📝 [語言語法與語義規範草案 (docs/SPECIFICATION.md)](docs/SPECIFICATION.md)

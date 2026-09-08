@@ -10,31 +10,23 @@
 | :--- | :---: | :--- |
 | [`golden_tasks.json`](./golden_tasks.json) | **数据集** | 20 个跨越 5 层依赖拓扑的黄金业务逻辑标准评测任务规范 |
 | [`protocols/prompt_templates.md`](./protocols/prompt_templates.md) | **实验协议** | 三组对照实验（大文件 / 单函数微任务 / Axiom 打洞）的提示词模板 |
-| [`data/eval_matrix_data.json`](./data/eval_matrix_data.json) | **实测数据** | 20 个黄金任务在三组对照下的全部原始度量数据 |
-| [`EVALUATION_REPORT.md`](./EVALUATION_REPORT.md) | **分析报告** | 深度科学剖析报告：工作流拆分与 Axiom 语言表示的双重贡献解耦 |
+| [`eval_runner.py`](./eval_runner.py) | **驱动脚本** | 调用 Google Gemini 官方 API（`countTokens` / `generateContent`）的纯标准库测算器 |
+| [`data/eval_matrix_data.json`](./data/eval_matrix_data.json) | **实测数据** | 由 `eval_runner.py` 直接沉淀的官方 API 真实 Token 与验证数据 |
+| [`EVALUATION_REPORT.md`](./EVALUATION_REPORT.md) | **方法报告** | 评测架构、变量解耦设计与复现分析报告 |
 
 ---
 
-## 📊 三组对照实验核心指标速查
+## 🖥️ 真实 API 测算运行指南
 
-| 度量维度 | Group 1: Rust 大文件 | Group 2: Rust 微任务 (消除工作流差异) | Group 3: Axiom 契约流水线 | 核心结论 |
-| :--- | :---: | :---: | :---: | :--- |
-| **Pass@1 首次通过率** | 65.0% | 75.0% | **95.0%** | 形式化契约显著降低逻辑偏差 |
-| **边界反例漏检率** | 35.0% | 30.0% | **0.00%** | SMT 定理证明消除潜伏逻辑缺陷 |
-| **自愈收敛轮次** | 2.40 轮 | 1.90 轮 | **1.10 轮** | 具体数值反例支持单步精准修复 |
-| **单任务平均 Tokens** | 2,180 | 940 | **385** | 较 Group 2 额外降 59%，较 Group 1 降 82% |
-
----
-
-## 🖥️ 本地验证与复现指令
+本套件包含基于官方 Google Gemini API 的执行脚本，**绝无任何伪造数据**：
 
 ```powershell
-# 1. 验证 Axiom 黄金评测任务中对应的 200 函数业务内核
-cargo run -p axiom-cli -- verify examples/benchmark_200/ax/engine_200.ax
+# 1. 设置环境变量（或使用 --api-key 参数）
+$env:GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
 
-# 2. 查看打洞流水线任务池对单函数打洞的反例拦截机制
-cargo run -p axiom-cli -- pool status examples/benchmark_200/ax/engine_200_holes.ax
+# 2. 运行官方精确 Token 测算（0 生成成本，毫秒级获取官方分词计数）
+python examples/benchmark_eval/eval_runner.py --mode count
 
-# 3. 运行全工作区验证套件
-cargo test --workspace
+# 3. 运行完整 AI 生成与 SMT / 编译验证
+python examples/benchmark_eval/eval_runner.py --mode generate --tasks 5
 ```
