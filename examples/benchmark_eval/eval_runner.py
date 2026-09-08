@@ -211,24 +211,29 @@ Return ONLY the complete function implementation code."""
 
 
 def build_group3_prompt(task):
-    """Group 3: Axiom Hole Task (Pure formal contracts & inputs, no boilerplate)."""
-    hole_task = {
-        "task_id": f"hole_{task['function_name']}",
-        "function_name": task["function_name"],
-        "inputs": task["inputs"],
-        "output_type": task["output"],
-        "effects": [],
-        "contracts": task["contracts"]
-    }
-    task_json_str = json.dumps(hole_task, indent=2)
+    """Group 3: Axiom Native Hole Task (Pure formal contracts & inputs, native ?hole syntax)."""
+    params_str = ", ".join([f"{p['name']}: {p['type']}" for p in task['inputs']])
+    requires_items = "\n        ".join([f"{req}," for req in task['contracts']['requires']])
+    ensures_items = "\n        ".join([f"{ens}," for ens in task['contracts']['ensures']])
 
-    prompt = f"""You are an Axiom micro-worker. Write ONLY a single pure expression to fill the hole for the task described below:
+    axiom_code = f"""fn {task['function_name']}({params_str}) -> {task['output']}
+    requires {{
+        {requires_items}
+    }}
+    ensures {{
+        {ensures_items}
+    }}
+{{
+    ?hole
+}}"""
 
-```json
-{task_json_str}
+    prompt = f"""You are an Axiom micro-worker. Write ONLY a single pure expression to fill the `?hole` in the function below:
+
+```axiom
+{axiom_code}
 ```
 
-Do NOT write full function signatures. The expression must be side-effect free and strictly satisfy the contracts."""
+Return ONLY the pure expression strictly satisfying the contracts. Do not output function signatures or boilerplate."""
     return prompt
 
 

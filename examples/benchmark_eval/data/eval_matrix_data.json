@@ -1,12 +1,279 @@
 {
   "version": "1.0",
-  "status": "pending_execution",
-  "note": "Awaiting real-world API execution via eval_runner.py. Run `python examples/benchmark_eval/eval_runner.py --api-key YOUR_KEY` to populate real token counts directly from the official Google Gemini API (usageMetadata / countTokens).",
+  "status": "completed_authentic",
   "experiment_metadata": {
-    "target_model": "gemini-1.5-flash",
-    "benchmark_tasks_count": 20,
-    "last_run_timestamp": null
+    "target_model": "gemini-3.8-flash",
+    "mode": "count",
+    "evaluated_tasks_count": 20,
+    "timestamp": "2026-09-08 11:46:06"
   },
-  "summary_metrics": null,
-  "detailed_tasks": []
+  "totals": {
+    "group1_rust_monolith_tokens": 7759,
+    "group2_rust_micro_tokens": 3175,
+    "group3_axiom_hole_tokens": 4854,
+    "net_savings_vs_micro": "-52.9%",
+    "net_savings_vs_monolith": "37.4%"
+  },
+  "detailed_tasks": [
+    {
+      "task_id": 1,
+      "function_name": "calc_manhattan_dist",
+      "group1_rust_monolith": {
+        "prompt_tokens": 379
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 164
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 277
+      }
+    },
+    {
+      "task_id": 2,
+      "function_name": "calc_chebyshev_dist",
+      "group1_rust_monolith": {
+        "prompt_tokens": 377
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 162
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 277
+      }
+    },
+    {
+      "task_id": 3,
+      "function_name": "is_aabb_intersect",
+      "group1_rust_monolith": {
+        "prompt_tokens": 468
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 253
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 402
+      }
+    },
+    {
+      "task_id": 4,
+      "function_name": "pack_coords_to_hash",
+      "group1_rust_monolith": {
+        "prompt_tokens": 391
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 178
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 252
+      }
+    },
+    {
+      "task_id": 5,
+      "function_name": "calc_strength_to_phys_atk",
+      "group1_rust_monolith": {
+        "prompt_tokens": 334
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 113
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 186
+      }
+    },
+    {
+      "task_id": 6,
+      "function_name": "calc_armor_damage_reduction",
+      "group1_rust_monolith": {
+        "prompt_tokens": 368
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 151
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 224
+      }
+    },
+    {
+      "task_id": 7,
+      "function_name": "calc_crit_damage_multiplier",
+      "group1_rust_monolith": {
+        "prompt_tokens": 379
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 160
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 250
+      }
+    },
+    {
+      "task_id": 8,
+      "function_name": "calc_dodge_chance",
+      "group1_rust_monolith": {
+        "prompt_tokens": 371
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 154
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 224
+      }
+    },
+    {
+      "task_id": 9,
+      "function_name": "resolve_physical_hit",
+      "group1_rust_monolith": {
+        "prompt_tokens": 361
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 142
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 239
+      }
+    },
+    {
+      "task_id": 10,
+      "function_name": "apply_bleed_stack_tick",
+      "group1_rust_monolith": {
+        "prompt_tokens": 331
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 110
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 181
+      }
+    },
+    {
+      "task_id": 11,
+      "function_name": "calc_mana_shield_absorb",
+      "group1_rust_monolith": {
+        "prompt_tokens": 384
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 142
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 230
+      }
+    },
+    {
+      "task_id": 12,
+      "function_name": "calc_stamina_skill_cost",
+      "group1_rust_monolith": {
+        "prompt_tokens": 394
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 150
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 218
+      }
+    },
+    {
+      "task_id": 13,
+      "function_name": "calc_threat_decay_by_dist",
+      "group1_rust_monolith": {
+        "prompt_tokens": 381
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 138
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 228
+      }
+    },
+    {
+      "task_id": 14,
+      "function_name": "evaluate_ai_behavior_state",
+      "group1_rust_monolith": {
+        "prompt_tokens": 408
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 169
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 235
+      }
+    },
+    {
+      "task_id": 15,
+      "function_name": "calc_weighted_loot_tier",
+      "group1_rust_monolith": {
+        "prompt_tokens": 412
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 171
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 201
+      }
+    },
+    {
+      "task_id": 16,
+      "function_name": "calc_exp_gain_with_level_diff",
+      "group1_rust_monolith": {
+        "prompt_tokens": 440
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 195
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 262
+      }
+    },
+    {
+      "task_id": 17,
+      "function_name": "determine_turn_initiative",
+      "group1_rust_monolith": {
+        "prompt_tokens": 376
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 137
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 241
+      }
+    },
+    {
+      "task_id": 18,
+      "function_name": "resolve_boss_phase_transition",
+      "group1_rust_monolith": {
+        "prompt_tokens": 409
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 170
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 238
+      }
+    },
+    {
+      "task_id": 19,
+      "function_name": "simulate_single_turn_exchange",
+      "group1_rust_monolith": {
+        "prompt_tokens": 400
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 159
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 249
+      }
+    },
+    {
+      "task_id": 20,
+      "function_name": "resolve_terrain_hazard_tick",
+      "group1_rust_monolith": {
+        "prompt_tokens": 396
+      },
+      "group2_rust_micro": {
+        "prompt_tokens": 157
+      },
+      "group3_axiom_hole": {
+        "prompt_tokens": 240
+      }
+    }
+  ]
 }

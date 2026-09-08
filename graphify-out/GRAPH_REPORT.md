@@ -1,16 +1,16 @@
 # Graph Report - Axiom  (2026-09-08)
 
 ## Corpus Check
-- 138 files · ~87,768 words
+- 138 files · ~88,210 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2639 nodes · 5003 edges · 196 communities (157 shown, 39 thin omitted)
+- 2639 nodes · 5003 edges · 194 communities (155 shown, 39 thin omitted)
 - Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 319 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `16d9cec1`
+- Built from commit: `42e7cab6`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -37,7 +37,7 @@
 - tier4_world.ts
 - Q: Axiom有更新了，重新分析评价
 - VfsError
-- Axiom Project Roadmap
+- docs/ROADMAP.md
 - tier3_ai_loot.rs
 - eval_runner.py
 - ecosystem_e2e_test.rs
@@ -82,7 +82,6 @@
 - spatial_subsys_018
 - SurvivorGameController
 - Axiom: AI-Native Verified Logic Layer & Runtime
-- .GetOrCreateProceduralSprite
 - spatial_subsys_025
 - 📝 二、三组具体提示词协议模板 (Prompt Templates)
 - spatial_subsys_027
@@ -200,7 +199,6 @@
 - com.unity.modules.xr
 - com.unity.test-framework
 - com.unity.ugui
-- Axiom 项目发展路线图 (Roadmap)
 - check_in_radius_sq
 - clamp_to_bounds_y
 - spatial_subsys_021
@@ -233,7 +231,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (196 total, 39 thin omitted)
+## Communities (194 total, 39 thin omitted)
 
 ### Community 0 - "parse_module"
 Cohesion: 0.09
@@ -319,9 +317,9 @@ Nodes (4): Answer, Outcome, Q: Axiom有更新了，重新分析评价, Source No
 Cohesion: 0.13
 Nodes (17): export_database_module(), export_module_to_source(), Display, Error, Formatter, From, Option, Result (+9 more)
 
-### Community 25 - "Axiom Project Roadmap"
-Cohesion: 0.12
-Nodes (15): Axiom Project Roadmap, Phase 1: MVP Prototype & Core Compiler (Q1), Phase 2: Effect System & Formal Contract Verification (Q2), Phase 3: Content-Addressed AST Codebase & Multi-Agent Concurrency (Q3), Phase 4: Cross-Platform Runtimes & Ecosystem Interop (Q4), Axiom 项目发展路线图 (Roadmap), 阶段一：原型与验证编译器 (MVP Prototype - Q1), 阶段三：内容寻址 AST 代码库与多 Agent 协同 (Q3) (+7 more)
+### Community 25 - "docs/ROADMAP.md"
+Cohesion: 0.09
+Nodes (20): Axiom Project Roadmap, Phase 1: MVP Prototype & Core Compiler (Q1), Phase 2: Effect System & Formal Contract Verification (Q2), Phase 3: Content-Addressed AST Codebase & Multi-Agent Concurrency (Q3), Phase 4: Cross-Platform Runtimes & Ecosystem Interop (Q4), Axiom 项目发展路线图 (Roadmap), 阶段一：原型与验证编译器 (MVP Prototype - Q1), 阶段三：内容寻址 AST 代码库与多 Agent 协同 (Q3) (+12 more)
 
 ### Community 26 - "tier3_ai_loot.rs"
 Cohesion: 0.11
@@ -392,7 +390,7 @@ Cohesion: 0.33
 Nodes (9): BaseAttributes, DerivedStats, Entity, Point, Rect, StatusEffect, Velocity, BinaryEngineFunction (+1 more)
 
 ### Community 43 - "README.md"
-Cohesion: 0.25
+Cohesion: 0.26
 Nodes (3): 🔬 Axiom A/B 单一变量科学对照评测套件 (A/B Benchmark Eval Suite), 📂 目录导航与核心资产, 🖥️ 真实 API 测算运行指南
 
 ### Community 44 - "com.unity.modules.jsonserialize"
@@ -440,8 +438,8 @@ Cohesion: 0.06
 Nodes (38): com.unity.2d.animation, com.unity.2d.aseprite, com.unity.2d.common, com.unity.2d.psdimporter, com.unity.2d.sprite, dependencies, depth, source (+30 more)
 
 ### Community 55 - "UnityStubs.cs"
-Cohesion: 0.09
-Nodes (29): Attribute, string, Assert, AssertionException, SetUpAttribute, TearDownAttribute, TestAttribute, TestFixtureAttribute (+21 more)
+Cohesion: 0.07
+Nodes (36): Attribute, string, AssertionException, SetUpAttribute, TearDownAttribute, TestAttribute, TestFixtureAttribute, TMP_Text (+28 more)
 
 ### Community 56 - "wrap_map_coord_y"
 Cohesion: 0.29
@@ -498,10 +496,6 @@ Nodes (10): ISurvivorVisualEffects, SurvivorGameController, bool, Dictionary, Re
 ### Community 70 - "Axiom: AI-Native Verified Logic Layer & Runtime"
 Cohesion: 0.25
 Nodes (8): 🌟 Architecture & Symbiotic Model, Axiom: AI-Native Verified Logic Layer & Runtime, 💻 CLI Toolchain Quickstart, 📂 Documentation, 🔬 Empirical Scientific Evaluation: Single-Variable A/B Eval Suite, 🎮 Hands-On Demo: Axiom Survivors, 🎨 IDE Support & Tooling, 🚀 Installation & Build
-
-### Community 71 - ".GetOrCreateProceduralSprite"
-Cohesion: 0.22
-Nodes (8): Color, GUI, Rect, Sprite, SpriteRenderer, Texture2D, Vector2, float
 
 ### Community 72 - "spatial_subsys_025"
 Cohesion: 0.40
@@ -664,8 +658,8 @@ Cohesion: 0.07
 Nodes (45): assembles_a_hole_free_module_that_transpiles_to_rust(), assert_success(), Drop, Output, Path, PathBuf, Self, String (+37 more)
 
 ### Community 112 - "SurvivorRuntimeTests"
-Cohesion: 0.15
-Nodes (11): SurvivorRuntimeTests, bool, Constraint, GreaterThanConstraint, Is, NotExpression, NullConstraint, IComparable (+3 more)
+Cohesion: 0.14
+Nodes (12): SurvivorRuntimeTests, bool, Assert, Constraint, GreaterThanConstraint, Is, NotExpression, NullConstraint (+4 more)
 
 ### Community 113 - "generated_core.rs"
 Cohesion: 0.15
@@ -676,7 +670,7 @@ Cohesion: 0.08
 Nodes (25): com.unity.2d.pixel-perfect, dependencies, depth, source, url, version, dependencies, depth (+17 more)
 
 ### Community 115 - "AxiomDoubleBuffer.cs"
-Cohesion: 0.18
+Cohesion: 0.19
 Nodes (20): double, AxiomDoubleBuffer, AxiomSlice, AxiomSnapshotBatch, AxiomString, AxiomVisualEventBatch, EntitySnapshot, GameState (+12 more)
 
 ### Community 116 - "generate_smtlib2_with_module"
@@ -818,10 +812,6 @@ Nodes (4): spatial_subsys_022(), stat_subsys_072(), combat_subsys_122(), ai_loot
 ### Community 157 - "spatial_subsys_026"
 Cohesion: 0.40
 Nodes (5): Return the floor midpoint of a nonnegative interval., spatial_subsys_026(), stat_subsys_076(), combat_subsys_126(), ai_loot_subsys_173()
-
-### Community 201 - "Axiom 项目发展路线图 (Roadmap)"
-Cohesion: 0.40
-Nodes (5): Axiom 项目发展路线图 (Roadmap), 阶段一：原型与验证编译器 (MVP Prototype - Q1), 阶段三：内容寻址 AST 代码库与多 Agent 协同 (Q3), 阶段二：Effect 系统与契约验证 (Q2), 阶段四：全平台与生态互操作 (Q4)
 
 ### Community 202 - "check_in_radius_sq"
 Cohesion: 0.40

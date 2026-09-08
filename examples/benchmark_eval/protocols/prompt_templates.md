@@ -73,28 +73,43 @@ graph TD
 ---
 
 ### 3. Group 3 协议（Axiom 形式化契约打洞工作流）
-- **输入环境**：由 `axiom extract-holes` 机械导出的标准任务 JSON（无任何自然语言模糊修饰，纯数学规范）：
-- **任务定义 (`hole-task.json`)**：
-  ```json
+- **输入环境**：Axiom 原生打洞骨架代码（纯代数效果约束与形式化契约，消除松散 JSON 带来的语法税）：
+- **打洞代码定义 (`calc_armor_damage_reduction.ax`)**：
+  ```axiom
+  fn calc_armor_damage_reduction(raw_damage: Int, armor: Int) -> Int
+      requires {
+          raw_damage >= 1,
+          armor >= 0,
+      }
+      ensures {
+          result >= 1,
+          result <= raw_damage,
+      }
   {
-    "task_id": "hole_calc_armor_damage_reduction",
-    "function_name": "calc_armor_damage_reduction",
-    "inputs": [
-      { "name": "raw_damage", "type": "Int" },
-      { "name": "armor", "type": "Int" }
-    ],
-    "output_type": "Int",
-    "effects": [],
-    "contracts": {
-      "requires": ["raw_damage >= 1", "armor >= 0"],
-      "ensures": ["result >= 1", "result <= raw_damage"]
-    }
+      ?hole
   }
   ```
 - **系统提示词 (System Prompt)**：
   ```markdown
-  You are an Axiom micro-worker. Write ONLY a single pure expression to fill the hole for the task described in JSON.
-  Do NOT write full function signatures. The expression must be side-effect free and strictly satisfy the contracts.
+  You are an Axiom micro-worker. Write ONLY a single pure expression to fill the `?hole` in the function below:
+
+  ```axiom
+  fn calc_armor_damage_reduction(raw_damage: Int, armor: Int) -> Int
+      requires {
+          raw_damage >= 1,
+          armor >= 0,
+      }
+      ensures {
+          result >= 1,
+          result <= raw_damage,
+      }
+  {
+      ?hole
+  }
+  ```
+
+  Return ONLY the pure expression strictly satisfying the contracts. Do not output function signatures or boilerplate.
   ```
 - **反馈自愈循环**：
   若 SMT 求解器捕获反例，Axiom 自动生成 `DiagnosticReport`，给出具体数学反例赋值（例如 `{"raw_damage": 1, "armor": 0}`），LLM 基于具体违规输入单步修复。
+

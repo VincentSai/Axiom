@@ -1,16 +1,16 @@
 # Graph Report - Axiom  (2026-09-08)
 
 ## Corpus Check
-- 138 files · ~87,641 words
+- 138 files · ~87,768 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2637 nodes · 5000 edges · 206 communities (166 shown, 40 thin omitted)
+- 2639 nodes · 5003 edges · 196 communities (157 shown, 39 thin omitted)
 - Extraction: 94% EXTRACTED · 6% INFERRED · 0% AMBIGUOUS · INFERRED: 319 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `22a54a7c`
+- Built from commit: `16d9cec1`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,7 +19,7 @@
 - tier4_world.py
 - CliError
 - 🚫 四、其他语言有哪些特性是 Axiom 刻意不予支持的？(Anti-Features by Design)
-- axiom-ffi-gen/src/lib.rs
+- Module
 - e2e_pipeline_test.rs
 - main.rs
 - AgentTaskPool
@@ -33,7 +33,7 @@
 - AstDatabase
 - calc_line_of_sight_cost
 - internal_solver.rs
-- tier1_stats.py
+- tier0_spatial.py
 - tier4_world.ts
 - Q: Axiom有更新了，重新分析评价
 - VfsError
@@ -77,8 +77,8 @@
 - ast_db_test.rs
 - bresenham_step_y
 - calc_euclidean_sq
-- tier2_combat.py
-- Type
+- tier1_stats.py
+- 🎮 Axiom Survivors：完整 Unity Showcase
 - spatial_subsys_018
 - SurvivorGameController
 - Axiom: AI-Native Verified Logic Layer & Runtime
@@ -136,20 +136,19 @@
 - 🔬 Axiom 单一变量科学对照评测方法与基准规范报告 (A/B Evaluation Protocol)
 - com.unity.ugui
 - unity_bridge_generates_native_double_buffer_asset_registry_and_runner
-- bridge.rs
+- 🎮 Axiom Survivors：完整 Unity Showcase
 - com.unity.modules.imageconversion
 - com.unity.2d.spriteshape
-- tier0_spatial.py
+- bresenham_step_x
 - dependencies
 - com.unity.modules.terrain
-- Module
+- spatial_subsys_017
 - 📐 三、5 大子系统 200 个真实业务函数规格
 - com.unity.ext.nunit
 - Vector3
 - Input
-- spatial_subsys_024
-- 🎮 Axiom Survivors: Complete Unity Showcase
-- z3_solver.rs
+- tier2_combat.py
+- game_survivor/README.md
 - 🛠️ 流水线具体执行步骤
 - 🛠️ 各主流 AI Agent 安装与配置指南
 - LAUNCH_SHOW_HN.md
@@ -157,10 +156,6 @@
 - com.unity.collab-proxy
 - 📊 200-Functions 业务函数 Axiom 打洞流水线实验记录 (Benchmark_ax.md)
 - Axiom: 面向 AI 协作的可验证逻辑中间层与运行时 (AI-Native Verified Logic Layer)
-- SmtResult
-- Projection
-- ModuleRecord
-- 🎮 Axiom Survivors：完整 Unity Showcase
 - Q: Ticket 04: Survivor Game Showcase Documentation and E2E Validation
 - Q: 分析代码，评估Axiom是不是像他描述的一样
 - Q: Axiom有更新了，重新分析评价
@@ -205,11 +200,6 @@
 - com.unity.modules.xr
 - com.unity.test-framework
 - com.unity.ugui
-- 📊 200-Functions 跨语言多 Agent 协作对比实验
-- 📊 200-Functions Cross-Language Multi-Agent Collaboration Benchmark
-- 📊 200-Functions 跨语言多 Agent 协作对比实验
-- 📊 200-Functions 跨語言多 Agent 協作對比實驗
-- Axiom 多 Agent 并发开发协议与内容寻址模型
 - Axiom 项目发展路线图 (Roadmap)
 - check_in_radius_sq
 - clamp_to_bounds_y
@@ -229,29 +219,29 @@
 10. `NodeHash` - 26 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `generates_nonlinear_real_query_for_sqrt2_counterexample()` --calls--> `parse_module()`  [INFERRED]
+  crates/axiom-smt/tests/smt_solver_test.rs → crates/axiom-parser/src/lib.rs
+- `generates_valid_smtlib2_query_script()` --calls--> `parse_module()`  [INFERRED]
+  crates/axiom-smt/tests/smt_solver_test.rs → crates/axiom-parser/src/lib.rs
 - `world_engine_192()` --calls--> `calc_max_hp_from_vit()`  [INFERRED]
   examples/benchmark_200/rs/src/tier4_world.rs → examples/benchmark_200/rs/src/tier1_stats.rs
 - `world_engine_195()` --calls--> `calc_weighted_loot_tier()`  [INFERRED]
   examples/benchmark_200/rs/src/tier4_world.rs → examples/benchmark_200/rs/src/tier3_ai_loot.rs
 - `assembles_a_hole_free_module_that_transpiles_to_rust()` --calls--> `transpile_to_rust()`  [INFERRED]
   crates/axiom-agent-pool/tests/concurrent_pool_test.rs → crates/axiom-transpiler/src/lib.rs
-- `unit_variant()` --references--> `VariantDef`  [EXTRACTED]
-  crates/axiom-wit/src/lib.rs → crates/axiom-ast/src/lib.rs
-- `type_definition_name()` --references--> `TypeDef`  [EXTRACTED]
-  crates/axiom-wit/src/lib.rs → crates/axiom-ast/src/lib.rs
 
 ## Import Cycles
 - None detected.
 
-## Communities (206 total, 40 thin omitted)
+## Communities (196 total, 39 thin omitted)
 
 ### Community 0 - "parse_module"
-Cohesion: 0.07
-Nodes (54): Box, Expr, accepts_calls_when_the_caller_declares_the_callee_effects(), MockHandler, rejects_a_call_when_the_caller_does_not_propagate_an_effect(), rejects_effect_names_without_a_declaration(), transfer_example_checks_and_resolves_mock_handlers(), parse_expr() (+46 more)
+Cohesion: 0.09
+Nodes (46): Box, Expr, accepts_calls_when_the_caller_declares_the_callee_effects(), MockHandler, rejects_a_call_when_the_caller_does_not_propagate_an_effect(), rejects_effect_names_without_a_declaration(), transfer_example_checks_and_resolves_mock_handlers(), parse_expr() (+38 more)
 
 ### Community 1 - "tier4_world.py"
-Cohesion: 0.07
-Nodes (53): calc_manhattan_dist(), Return the Manhattan distance between two grid coordinates., Wrap ``x`` into the half-open interval ``[0, width)``., wrap_map_coord_x(), calc_armor_damage_reduction(), calc_lifesteal_conversion(), calc_max_hp_from_vit(), calc_phys_atk_from_str() (+45 more)
+Cohesion: 0.08
+Nodes (48): calc_manhattan_dist(), Return the Manhattan distance between two grid coordinates., Wrap ``x`` into the half-open interval ``[0, width)``., wrap_map_coord_x(), calc_armor_damage_reduction(), calc_lifesteal_conversion(), calc_max_hp_from_vit(), calc_phys_atk_from_str() (+40 more)
 
 ### Community 2 - "CliError"
 Cohesion: 0.20
@@ -261,9 +251,9 @@ Nodes (34): check(), Cli, CliError, Commands, compile_and_run(), database_export
 Cohesion: 0.11
 Nodes (17): 1. $O(1)$ 微型上下文隔离，使 AI Token 消耗暴降 60%, 1. 包含未受控副作用逻辑的 SMT 形式化全域证明, 1. 隐式可变全局状态 (Global Mutable Variables), 2. 形式化契约与 SMT 静态验证 (优先 Z3 定理证明，Fail-Closed), 2. 面向对象类继承体系 (OOP Class Inheritance & Polymorphism), 2. 高维复杂非线性超越方程的快速静态完备证明, 3. 内容寻址 AST 原型探索，减少传统行级合并冲突, 3. 原生构建双向循环引用对象图 (Cyclic Graphs) (+9 more)
 
-### Community 5 - "axiom-ffi-gen/src/lib.rs"
-Cohesion: 0.15
-Nodes (38): c_type(), collect_list_type(), collect_list_types(), FfiError, generate_c_abi_rust_glue(), generate_c_header(), generate_c_header_from_source(), generate_typescript_bindings() (+30 more)
+### Community 5 - "Module"
+Cohesion: 0.06
+Nodes (91): EffectDecl, EffectOp, FieldDef, FunctionDecl, FunctionParam, Literal, MatchArm, Module (+83 more)
 
 ### Community 6 - "e2e_pipeline_test.rs"
 Cohesion: 0.29
@@ -282,8 +272,8 @@ Cohesion: 0.10
 Nodes (44): bresenham_step_x(), bresenham_step_y(), calc_chebyshev_dist(), calc_euclidean_sq(), calc_grid_index(), calc_line_of_sight_cost(), calc_manhattan_dist(), check_aabb_overlap() (+36 more)
 
 ### Community 12 - "SPEC_200.md"
-Cohesion: 0.20
-Nodes (12): 📊 一、5 个 Python Codex Agent 并发协作实测数据矩阵, 🔬 三、跨语言多 Agent 协作实测横向对比, ⚡ 二、单元测试性能, 📊 一、5 个 Rust Codex Agent 并发协作实测数据矩阵, 🔬 三、Rust 与 Axiom 多 Agent 协作维度对比, ⚡ 二、编译与测试性能, 📊 一、5 个 TypeScript Codex Agent 并发协作实测数据矩阵, 🔬 三、跨语言四大主流体系多 Agent 协作权威横向大比拼 (+4 more)
+Cohesion: 0.07
+Nodes (32): 📊 一、5 个 Python Codex Agent 并发协作实测数据矩阵, 🔬 三、跨语言多 Agent 协作实测横向对比, ⚡ 二、单元测试性能, 📊 一、5 个 Rust Codex Agent 并发协作实测数据矩阵, 🔬 三、Rust 与 Axiom 多 Agent 协作维度对比, ⚡ 二、编译与测试性能, 📊 一、5 个 TypeScript Codex Agent 并发协作实测数据矩阵, 🔬 三、跨语言四大主流体系多 Agent 协作权威横向大比拼 (+24 more)
 
 ### Community 14 - "diagnose_source"
 Cohesion: 0.09
@@ -313,9 +303,9 @@ Nodes (5): calc_line_of_sight_cost(), Return terrain-weighted line-of-sight ener
 Cohesion: 0.21
 Nodes (23): contains_hole_or_unsupported(), eval_expr(), eval_expr_internal(), expr_to_field_path(), extract_constants(), flatten_param(), flatten_record_into_env(), generate_grid() (+15 more)
 
-### Community 21 - "tier1_stats.py"
-Cohesion: 0.09
-Nodes (18): Return 1 when ``a`` lies below half-plane boundary ``b``, else 0., Return row width in a radius-``a`` diamond at vertical offset ``b``., Return collision penetration bounded by both nonnegative depths., Return a Bresenham-style doubled raster-error update., spatial_subsys_036(), spatial_subsys_037(), spatial_subsys_039(), spatial_subsys_040() (+10 more)
+### Community 21 - "tier0_spatial.py"
+Cohesion: 0.10
+Nodes (19): Public API for the pure five-tier roguelike engine benchmark., check_aabb_overlap(), Tier 0 spatial geometry and grid-math primitives. The functions in this module…, Return whether two valid axis-aligned boxes overlap inclusively., Return 1 when ``a`` lies below half-plane boundary ``b``, else 0., Return row width in a radius-``a`` diamond at vertical offset ``b``., Return collision penetration bounded by both nonnegative depths., spatial_subsys_036() (+11 more)
 
 ### Community 22 - "tier4_world.ts"
 Cohesion: 0.21
@@ -326,8 +316,8 @@ Cohesion: 0.40
 Nodes (4): Answer, Outcome, Q: Axiom有更新了，重新分析评价, Source Nodes
 
 ### Community 24 - "VfsError"
-Cohesion: 0.18
-Nodes (13): export_database_module(), export_module_to_source(), Display, Error, Formatter, Option, Result, sync_source_to_database() (+5 more)
+Cohesion: 0.13
+Nodes (17): export_database_module(), export_module_to_source(), Display, Error, Formatter, From, Option, Result (+9 more)
 
 ### Community 25 - "Axiom Project Roadmap"
 Cohesion: 0.12
@@ -338,16 +328,16 @@ Cohesion: 0.11
 Nodes (15): stat_subsys_057(), stat_subsys_060(), stat_subsys_062(), stat_subsys_065(), combat_subsys_107(), combat_subsys_110(), combat_subsys_112(), combat_subsys_115() (+7 more)
 
 ### Community 27 - "eval_runner.py"
-Cohesion: 0.14
-Nodes (26): build_endpoint_url(), build_group1_prompt(), build_group2_prompt(), build_group3_prompt(), call_gemini_count_tokens(), call_gemini_generate(), check_port_open(), clean_model_name() (+18 more)
+Cohesion: 0.13
+Nodes (28): build_endpoint_url(), build_group1_prompt(), build_group2_prompt(), build_group3_prompt(), call_gemini_count_tokens(), call_gemini_generate(), check_port_open(), clean_model_name() (+20 more)
 
 ### Community 28 - "ecosystem_e2e_test.rs"
 Cohesion: 0.28
 Nodes (12): assert_success(), axiom(), export_ffi_selects_typescript_and_c_outputs(), export_wit_writes_a_component_interface(), path_text(), Drop, Output, Path (+4 more)
 
 ### Community 29 - "tier3_ai_loot.py"
-Cohesion: 0.12
-Nodes (13): Public API for the pure five-tier roguelike engine benchmark., clamp_to_bounds_x(), Clamp ``x`` into the half-open map interval ``[0, width)``., calc_crit_chance_clamped(), stat_subsys_060(), stat_subsys_062(), combat_subsys_110(), combat_subsys_112() (+5 more)
+Cohesion: 0.09
+Nodes (20): clamp_to_bounds_x(), Return quadtree child ``b`` within parent-cell range ``a``., Return the shared length of two origin-aligned intervals., Clamp ``x`` into the half-open map interval ``[0, width)``., spatial_subsys_020(), spatial_subsys_033(), calc_crit_chance_clamped(), stat_subsys_062() (+12 more)
 
 ### Community 30 - "pack_coords_to_hash"
 Cohesion: 0.12
@@ -358,8 +348,8 @@ Cohesion: 0.12
 Nodes (12): spatial_subsys_035(), spatial_subsys_036(), spatial_subsys_038(), calc_effective_penetration(), calc_max_hp_from_vit(), stat_subsys_085(), stat_subsys_086(), stat_subsys_088() (+4 more)
 
 ### Community 32 - "docs/MULTI_AGENT_WORKFLOW.md"
-Cohesion: 0.10
-Nodes (18): 1. Why Traditional Git Fails Multi-Agent Concurrency, 2. Axiom's Content-Addressed AST Solution, 3. Standard Operating Procedure (SOP) for Multi-Agent Workflows, 4. Automated Healing via SMT Counterexamples, Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase, Core Capabilities:, 1. 为什么传统 Git 不适合多 Agent 并行？, 2. Axiom 的内容寻址 AST 解决方案 (+10 more)
+Cohesion: 0.08
+Nodes (24): 1. Why Traditional Git Fails Multi-Agent Concurrency, 2. Axiom's Content-Addressed AST Solution, 3. Standard Operating Procedure (SOP) for Multi-Agent Workflows, 4. Automated Healing via SMT Counterexamples, Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase, Core Capabilities:, 1. 为什么传统 Git 不适合多 Agent 并行？, 2. Axiom 的内容寻址 AST 解决方案 (+16 more)
 
 ### Community 33 - "calc_manhattan_dist"
 Cohesion: 0.13
@@ -438,8 +428,8 @@ Cohesion: 0.22
 Nodes (9): calc_grid_index(), Flatten a nonnegative grid coordinate into a row-major index., stat_subsys_065(), combat_subsys_115(), ai_loot_subsys_162(), Return P1 above 66%, P2 at 33%-66%, and P3 below 33%., Count completed world cycles and map them into checkpoint space., resolve_boss_phase_transition() (+1 more)
 
 ### Community 52 - "NodeHash"
-Cohesion: 0.22
-Nodes (13): AsRef, compute_effect_hash(), compute_function_hash(), compute_hash(), compute_module_hash(), compute_type_hash(), NodeHash, ParseNodeHashError (+5 more)
+Cohesion: 0.18
+Nodes (15): AsRef, compute_effect_hash(), compute_function_hash(), compute_hash(), compute_module_hash(), compute_type_hash(), ModuleRecord, NodeHash (+7 more)
 
 ### Community 53 - "rs/src/lib.rs"
 Cohesion: 0.39
@@ -489,13 +479,13 @@ Nodes (5): bresenham_step_y(), Return the vertical sign step from ``y1`` toward 
 Cohesion: 0.40
 Nodes (5): calc_euclidean_sq(), Return squared Euclidean distance without computing a square root., stat_subsys_053(), combat_subsys_103(), ai_loot_subsys_150()
 
-### Community 66 - "tier2_combat.py"
-Cohesion: 0.08
-Nodes (18): Return a Cartesian quadrant code: NE=0, NW=1, SW=2, SE=3., Return the product of two nonnegative projection scales., Return the grid bucket containing coordinate ``a`` at resolution ``b``., Return nonnegative cell-local coordinate ``a`` modulo ``b``., spatial_subsys_017(), spatial_subsys_022(), spatial_subsys_034(), spatial_subsys_035() (+10 more)
+### Community 66 - "tier1_stats.py"
+Cohesion: 0.09
+Nodes (17): Return the product of two nonnegative projection scales., Return the grid bucket containing coordinate ``a`` at resolution ``b``., Return nonnegative cell-local coordinate ``a`` modulo ``b``., spatial_subsys_022(), spatial_subsys_034(), spatial_subsys_035(), calc_effective_penetration(), stat_subsys_051() (+9 more)
 
-### Community 67 - "Type"
+### Community 67 - "🎮 Axiom Survivors：完整 Unity Showcase"
 Cohesion: 0.25
-Nodes (20): Type, bind_pattern_types(), check_function_types(), check_function_types_with_ctx(), check_module_types(), extract_first_type_arg(), extract_second_type_arg(), infer_expr_type() (+12 more)
+Nodes (8): 🎮 Axiom Survivors：完整 Unity Showcase, 一键构建桥接与 DLL, 不打开 Unity 执行 E2E 验证, 为什么这个示例值得关注, 在 Unity 中运行, 架构, 环境要求, 验证边界
 
 ### Community 68 - "spatial_subsys_018"
 Cohesion: 0.40
@@ -690,8 +680,8 @@ Cohesion: 0.18
 Nodes (20): double, AxiomDoubleBuffer, AxiomSlice, AxiomSnapshotBatch, AxiomString, AxiomVisualEventBatch, EntitySnapshot, GameState (+12 more)
 
 ### Community 116 - "generate_smtlib2_with_module"
-Cohesion: 0.27
-Nodes (18): bind_record_body_to_results(), build_block_smt(), expr_to_field_path(), expr_to_smt(), flatten_type_to_smt(), format_float(), generate_smtlib2(), generate_smtlib2_with_module() (+10 more)
+Cohesion: 0.09
+Nodes (48): CounterExample, HashMap, Result, String, SmtResult, SolverBackend, to_smtlib2(), verify_function() (+40 more)
 
 ### Community 117 - "dependencies"
 Cohesion: 0.09
@@ -725,9 +715,9 @@ Nodes (18): dependencies, depth, source, url, version, dependencies, depth, sour
 Cohesion: 0.21
 Nodes (12): assert_success(), axiom(), path_text(), read_generated(), Drop, Output, Path, PathBuf (+4 more)
 
-### Community 125 - "bridge.rs"
-Cohesion: 0.27
-Nodes (17): csharp_type(), escape_csharp_string(), generate_unity_bridge(), generic_constructor(), legacy_input_statement(), lower_first(), render_asset_registry(), render_double_buffer() (+9 more)
+### Community 125 - "🎮 Axiom Survivors：完整 Unity Showcase"
+Cohesion: 0.25
+Nodes (8): 🎮 Axiom Survivors：完整 Unity Showcase, 一鍵建置橋接與 DLL, 不開啟 Unity 執行 E2E 驗證, 在 Unity 中執行, 架構, 為什麼這個範例值得關注, 環境需求, 驗證邊界
 
 ### Community 126 - "com.unity.modules.imageconversion"
 Cohesion: 0.12
@@ -737,9 +727,9 @@ Nodes (16): dependencies, depth, source, version, dependencies, depth, source, v
 Cohesion: 0.14
 Nodes (14): com.unity.2d.spriteshape, dependencies, depth, source, url, version, dependencies, depth (+6 more)
 
-### Community 128 - "tier0_spatial.py"
-Cohesion: 0.08
-Nodes (23): bresenham_step_x(), check_aabb_overlap(), Tier 0 spatial geometry and grid-math primitives. The functions in this module…, Return whether two valid axis-aligned boxes overlap inclusively., Return quadtree child ``b`` within parent-cell range ``a``., Return the shared length of two origin-aligned intervals., Return the start offset for range ``a`` with stride ``b + 1``., Return the horizontal sign step from ``x1`` toward ``x2``. (+15 more)
+### Community 128 - "bresenham_step_x"
+Cohesion: 0.40
+Nodes (5): bresenham_step_x(), Return the horizontal sign step from ``x1`` toward ``x2``., stat_subsys_055(), combat_subsys_105(), ai_loot_subsys_152()
 
 ### Community 129 - "dependencies"
 Cohesion: 0.17
@@ -749,9 +739,9 @@ Nodes (11): com.unity.modules.unityanalytics, com.unity.modules.video, com.unity
 Cohesion: 0.17
 Nodes (12): dependencies, depth, source, version, dependencies, depth, source, version (+4 more)
 
-### Community 131 - "Module"
-Cohesion: 0.36
-Nodes (15): EffectDecl, EffectOp, FieldDef, FunctionDecl, FunctionParam, Literal, MatchArm, Module (+7 more)
+### Community 131 - "spatial_subsys_017"
+Cohesion: 0.40
+Nodes (5): Return a Cartesian quadrant code: NE=0, NW=1, SW=2, SE=3., spatial_subsys_017(), stat_subsys_067(), combat_subsys_117(), ai_loot_subsys_164()
 
 ### Community 132 - "📐 三、5 大子系统 200 个真实业务函数规格"
 Cohesion: 0.33
@@ -765,17 +755,13 @@ Nodes (13): com.unity.ext.nunit, dependencies, depth, source, url, version, depe
 Cohesion: 0.28
 Nodes (4): EqualConstraint, Vector3, IEquatable, object
 
-### Community 136 - "spatial_subsys_024"
-Cohesion: 0.40
-Nodes (5): Return the sum of the normalized directions of two axes., spatial_subsys_024(), stat_subsys_074(), combat_subsys_124(), ai_loot_subsys_171()
+### Community 136 - "tier2_combat.py"
+Cohesion: 0.09
+Nodes (16): Return the sum of the normalized directions of two axes., Return the start offset for range ``a`` with stride ``b + 1``., Return a Bresenham-style doubled raster-error update., spatial_subsys_024(), spatial_subsys_038(), spatial_subsys_040(), stat_subsys_060(), stat_subsys_074() (+8 more)
 
-### Community 137 - "🎮 Axiom Survivors: Complete Unity Showcase"
-Cohesion: 0.08
-Nodes (24): Architecture, 🎮 Axiom Survivors: Complete Unity Showcase, Build the bridge and DLL, Prerequisites, Run E2E validation without Unity, Run in Unity, Validation boundaries, Why this showcase matters (+16 more)
-
-### Community 138 - "z3_solver.rs"
-Cohesion: 0.31
-Nodes (12): extract_numeric_value(), find_z3_executable(), parse_z3_model(), parse_z3_output(), CounterExample, Option, Path, PathBuf (+4 more)
+### Community 137 - "game_survivor/README.md"
+Cohesion: 0.12
+Nodes (16): 🎮 Axiom Survivors：完整 Unity Showcase, Architecture, 🎮 Axiom Survivors: Complete Unity Showcase, Build the bridge and DLL, Prerequisites, Run E2E validation without Unity, Run in Unity, Validation boundaries (+8 more)
 
 ### Community 139 - "🛠️ 流水线具体执行步骤"
 Cohesion: 0.25
@@ -805,18 +791,6 @@ Nodes (5): 📊 200-Functions 业务函数 Axiom 打洞流水线实验记录 (Be
 Cohesion: 0.25
 Nodes (8): Axiom: 面向 AI 协作的可验证逻辑中间层与运行时 (AI-Native Verified Logic Layer), 💻 CLI 工具链指南, 🎨 IDE 支持与生态规划 (IDE Support), 🔬 严谨科学实证：单一变量 A/B 对照评测体系, 🚀 安装与构建 (Installation & Build), 🎮 实战演示：Axiom Survivors 割草游戏, 🌟 核心设计理念与共生架构, 📂 项目文档导航
 
-### Community 146 - "SmtResult"
-Cohesion: 0.38
-Nodes (10): CounterExample, HashMap, Result, String, SmtResult, SolverBackend, to_smtlib2(), verify_function_in_module() (+2 more)
-
-### Community 148 - "ModuleRecord"
-Cohesion: 0.25
-Nodes (6): ModuleRecord, Vec, From, Self, Vec, SyncSummary
-
-### Community 149 - "🎮 Axiom Survivors：完整 Unity Showcase"
-Cohesion: 0.25
-Nodes (8): 🎮 Axiom Survivors：完整 Unity Showcase, 一键构建桥接与 DLL, 不打开 Unity 执行 E2E 验证, 为什么这个示例值得关注, 在 Unity 中运行, 架构, 环境要求, 验证边界
-
 ### Community 150 - "Q: Ticket 04: Survivor Game Showcase Documentation and E2E Validation"
 Cohesion: 0.40
 Nodes (4): Answer, Outcome, Q: Ticket 04: Survivor Game Showcase Documentation and E2E Validation, Source Nodes
@@ -845,26 +819,6 @@ Nodes (4): spatial_subsys_022(), stat_subsys_072(), combat_subsys_122(), ai_loot
 Cohesion: 0.40
 Nodes (5): Return the floor midpoint of a nonnegative interval., spatial_subsys_026(), stat_subsys_076(), combat_subsys_126(), ai_loot_subsys_173()
 
-### Community 196 - "📊 200-Functions 跨语言多 Agent 协作对比实验"
-Cohesion: 0.40
-Nodes (5): 📊 200-Functions 跨语言多 Agent 协作对比实验, 📊 一、四大语言多 Agent 协作实测对比, 📂 三、详细报告与各语言源码导航, 🔬 二、核心设计探索：Axiom 任务拆解与验证机制, 🖥️ 四、本地验证命令指南
-
-### Community 197 - "📊 200-Functions Cross-Language Multi-Agent Collaboration Benchmark"
-Cohesion: 0.40
-Nodes (5): 📊 1. Multi-Agent Benchmark Comparison, 📊 200-Functions Cross-Language Multi-Agent Collaboration Benchmark, 🔬 2. Design Insights: Task Decomposition & Verification, 📂 3. Navigation & Source Code, 🖥️ 4. Reproduction Commands
-
-### Community 198 - "📊 200-Functions 跨语言多 Agent 协作对比实验"
-Cohesion: 0.40
-Nodes (5): 📊 200-Functions 跨语言多 Agent 协作对比实验, 📊 一、四大语言多 Agent 协作实测对比, 📂 三、详细报告与各语言源码导航, 🔬 二、核心设计探索：Axiom 任务拆解与验证机制, 🖥️ 四、本地验证命令指南
-
-### Community 199 - "📊 200-Functions 跨語言多 Agent 協作對比實驗"
-Cohesion: 0.40
-Nodes (5): 📊 200-Functions 跨語言多 Agent 協作對比實驗, 📊 一、四大語言多 Agent 協作實測對比, 📂 三、詳細報告與各語言原始碼導航, 🔬 二、核心設計探索：Axiom 任務拆解與驗證機制, 🖥️ 四、本機驗證命令指南
-
-### Community 200 - "Axiom 多 Agent 并发开发协议与内容寻址模型"
-Cohesion: 0.33
-Nodes (6): 1. 为什么传统 Git 不适合多 Agent 并行？, 2. Axiom 的内容寻址 AST 解决方案, 3. 多 Agent 并发协作标准作业流程 (SOP), 4. 自动反例自愈协议 (Auto-Healing with Counter-Examples), Axiom 多 Agent 并发开发协议与内容寻址模型, 核心特性：
-
 ### Community 201 - "Axiom 项目发展路线图 (Roadmap)"
 Cohesion: 0.40
 Nodes (5): Axiom 项目发展路线图 (Roadmap), 阶段一：原型与验证编译器 (MVP Prototype - Q1), 阶段三：内容寻址 AST 代码库与多 Agent 协同 (Q3), 阶段二：Effect 系统与契约验证 (Q2), 阶段四：全平台与生态互操作 (Q4)
@@ -888,7 +842,7 @@ Nodes (5): Return the smaller of two nonnegative axis extents., spatial_subsys_0
 ## Knowledge Gaps
 - **609 isolated node(s):** `Parser`, `SolverContext<'a>`, `SolverBackend`, `SmtContext<'a>`, `Velocity` (+604 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **40 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **39 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Work-memory lessons
 
@@ -904,17 +858,17 @@ Nodes (5): Return the smaller of two nonnegative axis extents., spatial_subsys_0
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `FunctionDecl` connect `Module` to `parse_module`, `Type`, `axiom-ffi-gen/src/lib.rs`, `AgentTaskPool`, `HandlerRegistry`, `diagnose_source`, `axiom-transpiler/src/lib.rs`, `WitError`, `AstDatabase`, `SmtResult`, `NodeHash`, `internal_solver.rs`, `generate_smtlib2_with_module`, `Projection`?**
+- **Why does `FunctionDecl` connect `Module` to `parse_module`, `AgentTaskPool`, `HandlerRegistry`, `diagnose_source`, `axiom-transpiler/src/lib.rs`, `WitError`, `AstDatabase`, `NodeHash`, `internal_solver.rs`, `generate_smtlib2_with_module`?**
   _High betweenness centrality (0.013) - this node is a cross-community bridge._
-- **Why does `parse_module()` connect `parse_module` to `CliError`, `Module`, `axiom-ffi-gen/src/lib.rs`, `AgentTaskPool`, `diagnose_source`, `axiom-transpiler/src/lib.rs`, `WitError`, `VfsError`?**
+- **Why does `parse_module()` connect `parse_module` to `CliError`, `Module`, `AgentTaskPool`, `diagnose_source`, `axiom-transpiler/src/lib.rs`, `WitError`, `generate_smtlib2_with_module`, `VfsError`?**
   _High betweenness centrality (0.012) - this node is a cross-community bridge._
-- **Why does `Module` connect `Module` to `parse_module`, `Type`, `axiom-ffi-gen/src/lib.rs`, `AgentTaskPool`, `diagnose_source`, `axiom-transpiler/src/lib.rs`, `WitError`, `AstDatabase`, `SmtResult`, `NodeHash`, `internal_solver.rs`, `generate_smtlib2_with_module`, `Projection`, `VfsError`, `bridge.rs`, `ast_db_test.rs`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
+- **Why does `Module` connect `Module` to `parse_module`, `AgentTaskPool`, `diagnose_source`, `axiom-transpiler/src/lib.rs`, `WitError`, `AstDatabase`, `NodeHash`, `internal_solver.rs`, `generate_smtlib2_with_module`, `VfsError`, `ast_db_test.rs`?**
+  _High betweenness centrality (0.010) - this node is a cross-community bridge._
 - **Are the 45 inferred relationships involving `parse_module()` (e.g. with `.from_source()` and `check()`) actually correct?**
   _`parse_module()` has 45 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `Parser`, `SolverContext<'a>`, `SolverBackend` to the rest of the system?**
   _609 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `parse_module` be split into smaller, more focused modules?**
-  _Cohesion score 0.07486930545182972 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08739418897277511 - nodes in this community are weakly interconnected._
 - **Should `tier4_world.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.07197763801537387 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08078231292517007 - nodes in this community are weakly interconnected._
