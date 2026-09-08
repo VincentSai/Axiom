@@ -11,18 +11,146 @@ Features:
 """
 
 import argparse
+import io
 import json
 import os
+import socket
 import sys
 import time
 import urllib.error
 import urllib.request
 
+# 解决 Windows 控制台默认 GBK 编码无法输出 Emoji 与 UTF-8 字符的问题
+if sys.platform == "win32":
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 GOLDEN_TASKS_PATH = os.path.join(SCRIPT_DIR, "golden_tasks.json")
 OUTPUT_DATA_PATH = os.path.join(SCRIPT_DIR, "data", "eval_matrix_data.json")
 
-GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
+DEFAULT_MODEL = "gemini-1.5-flash"
+
+
+def check_port_open(host, port, timeout=0.3):
+    """检测本地端口是否开放"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(timeout)
+    try:
+        s.connect((host, port))
+        s.close()
+        return True
+    except Exception:
+        return False
+
+
+def detect_recommended_proxy():
+    """检测本机是否运行了常用本地代理端口"""
+    for port in [7897, 7890, 10808, 10809, 8080]:
+        if check_port_open("127.0.0.1", port):
+            return f"http://127.0.0.1:{port}"
+    return None
+
+
+def clean_model_name(model: str) -> str:
+    """清洗模型名称，去除空白与冗余的 'models/' 前缀"""
+    m = model.strip()
+    if m.startswith("models/"):
+        m = m[len("models/"):]
+    return m
+
+
+def build_endpoint_url(base_url: str, model: str, action: str, api_key: str) -> str:
+    """智能组装 Gemini API 端点 URL，支持 countTokens/generateContent/listModels"""
+    clean_base = base_url.strip().rstrip("/")
+    if clean_base.endswith("/models"):
+        clean_base = clean_base[:-len("/models")]
+
+    if not action:
+        return f"{clean_base}/models?key={api_key}"
+
+    c_model = clean_model_name(model)
+    return f"{clean_base}/models/{c_model}:{action}?key={api_key}"
+
+
+def get_http_opener(proxy: str = None):
+    """构建支持代理的 urllib opener"""
+    if proxy:
+        proxy_handler = urllib.request.ProxyHandler({
+            "http": proxy,
+            "https": proxy
+        })
+        return urllib.request.build_opener(proxy_handler)
+    return urllib.request.build_opener()
+
+
+def send_api_request(opener, url: str, payload: dict = None, method: str = "POST", timeout: int = 30, retries: int = 2):
+    """统一执行 API HTTP 请求，包含结构化 HTTPError 解析与自动退避重试"""
+    data_bytes = json.dumps(payload).encode("utf-8") if payload is not None else None
+    headers = {"Content-Type": "application/json"} if payload is not None else {}
+
+    for attempt in range(retries + 1):
+        req = urllib.request.Request(url, data=data_bytes, headers=headers, method=method)
+        try:
+            with opener.open(req, timeout=timeout) as resp:
+                raw_body = resp.read().decode("utf-8")
+                return json.loads(raw_body)
+        except urllib.error.HTTPError as e:
+            err_body = ""
+            try:
+                err_body = e.read().decode("utf-8", errors="replace")
+            except Exception:
+                pass
+
+            err_json = {}
+            if err_body:
+                try:
+                    err_json = json.loads(err_body)
+                except Exception:
+                    pass
+
+            err_msg = ""
+            if isinstance(err_json, dict) and "error" in err_json:
+                err_info = err_json["error"]
+                if isinstance(err_info, dict):
+                    err_msg = err_info.get("message", "")
+                else:
+                    err_msg = str(err_info)
+
+            # 429 配额限制，自动退避重试
+            if e.code == 429 and attempt < retries:
+                wait_sec = (attempt + 1) * 3
+                print(f" [触发配额限流 429，等待 {wait_sec} 秒后重试...]", end="", flush=True)
+                time.sleep(wait_sec)
+                continue
+
+            diag_lines = [f"HTTP {e.code}: {e.reason}"]
+            if err_msg:
+                diag_lines.append(f"服务返回详情: {err_msg}")
+            elif err_body:
+                snippet = err_body[:200].replace("\n", " ")
+                diag_lines.append(f"响应内容片段: {snippet}")
+
+            if e.code == 404:
+                diag_lines.append("💡 排查建议: 模型名称不存在或网关路由不支持该端点。可尝试运行: python examples/benchmark_eval/eval_runner.py --probe 查看可用模型列表。")
+            elif e.code in (400, 403):
+                diag_lines.append("💡 排查建议: 请检查 API Key 是否有效，或是否在 Google Cloud Console 中启用了 Generative Language API。")
+
+            raise RuntimeError("\n".join(diag_lines))
+
+        except urllib.error.URLError as e:
+            rec_proxy = detect_recommended_proxy()
+            hint = ""
+            if rec_proxy:
+                hint = f"\n💡 检测到本地存在可用代理端口: {rec_proxy}。建议运行时增加参数: --proxy {rec_proxy}"
+            if attempt < retries:
+                time.sleep(2)
+                continue
+            raise RuntimeError(f"网络连接失败: {e.reason}{hint}")
 
 
 def load_golden_tasks():
@@ -104,9 +232,9 @@ Do NOT write full function signatures. The expression must be side-effect free a
     return prompt
 
 
-def call_gemini_count_tokens(api_key, model, text):
-    """Call the official Gemini countTokens REST endpoint."""
-    url = f"{GEMINI_BASE_URL}/{model}:countTokens?key={api_key}"
+def call_gemini_count_tokens(opener, api_key: str, model: str, text: str, base_url: str) -> int:
+    """调用官方 Gemini countTokens REST 端点"""
+    url = build_endpoint_url(base_url, model, "countTokens", api_key)
     payload = {
         "contents": [
             {
@@ -114,19 +242,13 @@ def call_gemini_count_tokens(api_key, model, text):
             }
         ]
     }
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"}
-    )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        res = json.loads(resp.read().decode("utf-8"))
-        return res.get("totalTokens", 0)
+    res = send_api_request(opener, url, payload=payload, method="POST")
+    return res.get("totalTokens", 0)
 
 
-def call_gemini_generate(api_key, model, text):
-    """Call the official Gemini generateContent REST endpoint."""
-    url = f"{GEMINI_BASE_URL}/{model}:generateContent?key={api_key}"
+def call_gemini_generate(opener, api_key: str, model: str, text: str, base_url: str) -> dict:
+    """调用官方 Gemini generateContent REST 端点"""
+    url = build_endpoint_url(base_url, model, "generateContent", api_key)
     payload = {
         "contents": [
             {
@@ -137,43 +259,103 @@ def call_gemini_generate(api_key, model, text):
             "temperature": 0.2
         }
     }
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"}
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        res = json.loads(resp.read().decode("utf-8"))
-        usage = res.get("usageMetadata", {})
-        candidates = res.get("candidates", [])
-        text_out = ""
-        if candidates and "content" in candidates[0]:
-            parts = candidates[0]["content"].get("parts", [])
-            if parts:
-                text_out = parts[0].get("text", "")
-        return {
-            "text": text_out,
-            "prompt_tokens": usage.get("promptTokenCount", 0),
-            "candidates_tokens": usage.get("candidatesTokenCount", 0),
-            "total_tokens": usage.get("totalTokenCount", 0)
-        }
+    res = send_api_request(opener, url, payload=payload, method="POST")
+    usage = res.get("usageMetadata", {})
+    candidates = res.get("candidates", [])
+    text_out = ""
+    if candidates and "content" in candidates[0]:
+        parts = candidates[0]["content"].get("parts", [])
+        if parts:
+            text_out = parts[0].get("text", "")
+    return {
+        "text": text_out,
+        "prompt_tokens": usage.get("promptTokenCount", 0),
+        "candidates_tokens": usage.get("candidatesTokenCount", 0),
+        "total_tokens": usage.get("totalTokenCount", 0)
+    }
+
+
+def list_available_models(opener, api_key: str, base_url: str):
+    """查询并列出当前 API Key 可用的官方 Gemini 模型"""
+    url = build_endpoint_url(base_url, "", "", api_key)
+    res = send_api_request(opener, url, payload=None, method="GET")
+    return res.get("models", [])
+
+
+def run_preflight_check(opener, api_key: str, model: str, base_url: str):
+    """
+    预检函数：在正式评测前发送 1 个极轻量探测请求。
+    验证网络通路、API Key 授权与目标模型可用性。
+    """
+    clean_m = clean_model_name(model)
+    test_text = "test"
+    try:
+        token_count = call_gemini_count_tokens(opener, api_key, clean_m, test_text, base_url)
+        return True, f"探测成功 (模型 '{clean_m}' 响应正常，测试词元计为 {token_count})"
+    except Exception as e:
+        return False, str(e)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Axiom Empirical A/B Benchmark Runner")
-    parser.add_argument("--api-key", help="Google Gemini API Key (or set GEMINI_API_KEY env var)")
-    parser.add_argument("--model", default="gemini-1.5-flash", help="Gemini model name (default: gemini-1.5-flash)")
+    parser = argparse.ArgumentParser(
+        description="Axiom Empirical A/B Benchmark Runner (Google Gemini API 真实评测工具)"
+    )
+    parser.add_argument("--api-key", help="Google Gemini API Key (也可通过环境变量 GEMINI_API_KEY / GOOGLE_API_KEY 配置)")
+    parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Gemini 模型名 (默认: {DEFAULT_MODEL})")
     parser.add_argument("--mode", choices=["count", "generate"], default="count",
-                        help="'count': Zero-cost exact tokenizer count; 'generate': Full LLM inference")
-    parser.add_argument("--tasks", default="all", help="Number of tasks to evaluate, e.g. '5' or 'all'")
+                        help="'count': 零成本精确 Token 计量 (推荐); 'generate': 完整模型推理生成")
+    parser.add_argument("--tasks", default="all", help="测试任务数，如 '5' 或 'all' (默认: all，共 20 个黄金任务)")
+    parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"Gemini API 基础端点 (默认: {DEFAULT_BASE_URL})")
+    parser.add_argument("--proxy", default=None, help="指定 HTTP/HTTPS 代理 (例如: http://127.0.0.1:7897)")
+    parser.add_argument("--probe", action="store_true", help="单步探测模式: 仅测试当前 Key、网络连通性并列出可用模型")
 
     args = parser.parse_args()
 
     api_key = args.api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not api_key:
-        print("\n❌ Error: Google Gemini API key is missing.", file=sys.stderr)
-        print("Please provide --api-key YOUR_KEY or set the GEMINI_API_KEY environment variable.\n", file=sys.stderr)
+        print("\n❌ 错误: 未检测到 Google Gemini API Key。", file=sys.stderr)
+        print("请通过以下方式之一提供:", file=sys.stderr)
+        print("  1. 命令行参数: python examples/benchmark_eval/eval_runner.py --api-key YOUR_KEY", file=sys.stderr)
+        print("  2. 设置环境变量: $env:GEMINI_API_KEY = 'YOUR_KEY' (PowerShell)", file=sys.stderr)
+        rec_proxy = detect_recommended_proxy()
+        if rec_proxy:
+            print(f"\n💡 提示: 检测到本地代理运行于 {rec_proxy}，若访问受限可附加 `--proxy {rec_proxy}`", file=sys.stderr)
         sys.exit(1)
+
+    target_proxy = args.proxy
+    if not target_proxy and not urllib.request.getproxies().get("https"):
+        rec_proxy = detect_recommended_proxy()
+        if rec_proxy:
+            target_proxy = rec_proxy
+
+    opener = get_http_opener(target_proxy)
+
+    if args.probe:
+        print("=" * 70)
+        print("🔍 正在执行 API 连通性与模型探测 (Pre-flight Probe)...")
+        print(f"API 端点: {args.base_url}")
+        print(f"网络代理: {target_proxy or '系统默认 / 直连'}")
+        print(f"测试模型: {clean_model_name(args.model)}")
+        print("=" * 70)
+        sys.stdout.flush()
+        ok, msg = run_preflight_check(opener, api_key, args.model, args.base_url)
+        if ok:
+            print(f"✅ {msg}")
+            try:
+                models = list_available_models(opener, api_key, args.base_url)
+                print(f"\n📋 该 API Key 可用的官方模型列表 (共 {len(models)} 个):\n")
+                for m in models:
+                    name = m.get("name", "").replace("models/", "")
+                    methods = m.get("supportedGenerationMethods", [])
+                    if "countTokens" in methods:
+                        print(f"  • {name:<32} [支持 countTokens & generateContent]")
+            except Exception as le:
+                print(f"  (获取完整模型列表失败: {le})")
+            print("\n🚀 探测完成，配置完全正常！可以直接运行评测。")
+            sys.exit(0)
+        else:
+            print(f"\n❌ 连通性测试失败:\n{msg}\n", file=sys.stderr)
+            sys.exit(1)
 
     all_tasks = load_golden_tasks()
     if args.tasks != "all":
@@ -182,9 +364,30 @@ def main():
     else:
         eval_tasks = all_tasks
 
-    print(f"🚀 Starting Axiom Empirical A/B Benchmark")
-    print(f"Model: {args.model} | Mode: {args.mode} | Tasks: {len(eval_tasks)}")
-    print("=" * 65)
+    print("=" * 70)
+    print("🚀 Axiom 经验性真实 A/B 对照评测启动 (Empirical Benchmark Runner)")
+    print(f"模型目标: {clean_model_name(args.model)} | 评测模式: {args.mode} | 任务总数: {len(eval_tasks)}")
+    print(f"API 端点: {args.base_url}")
+    if target_proxy:
+        print(f"网络代理: {target_proxy}")
+    print("=" * 70)
+
+    print("⏳ 正在进行 API 连通性与目标模型预检...", end="", flush=True)
+    ok, msg = run_preflight_check(opener, api_key, args.model, args.base_url)
+    if not ok:
+        print(" 失败 ❌\n", flush=True)
+        print(f"{msg}\n")
+        print("💡 快速排查指引:")
+        print("  1. 运行自检探测: python examples/benchmark_eval/eval_runner.py --probe")
+        if target_proxy:
+            print(f"  2. 当前已启用代理: {target_proxy}")
+        else:
+            rec = detect_recommended_proxy()
+            if rec:
+                print(f"  2. 尝试添加本地代理: --proxy {rec}")
+        print("  3. 若特定模型名称变更: 尝试 --model gemini-1.5-flash-latest 或 --model gemini-2.0-flash\n")
+        sys.exit(1)
+    print(" 通过 ✅\n", flush=True)
 
     results = []
     total_g1 = 0
@@ -194,25 +397,26 @@ def main():
     for idx, task in enumerate(eval_tasks):
         tid = task["id"]
         fname = task["function_name"]
-        print(f"[{idx+1}/{len(eval_tasks)}] Evaluating Task #{tid}: {fname}...", end="", flush=True)
+        print(f"[{idx+1}/{len(eval_tasks)}] 评测任务 #{tid}: {fname}...", end="", flush=True)
 
         p1 = build_group1_prompt(task, all_tasks)
         p2 = build_group2_prompt(task)
         p3 = build_group3_prompt(task)
 
         if args.mode == "count":
-            tokens_1 = call_gemini_count_tokens(api_key, args.model, p1)
+            tokens_1 = call_gemini_count_tokens(opener, api_key, args.model, p1, args.base_url)
             time.sleep(0.1)
-            tokens_2 = call_gemini_count_tokens(api_key, args.model, p2)
+            tokens_2 = call_gemini_count_tokens(opener, api_key, args.model, p2, args.base_url)
             time.sleep(0.1)
-            tokens_3 = call_gemini_count_tokens(api_key, args.model, p3)
+            tokens_3 = call_gemini_count_tokens(opener, api_key, args.model, p3, args.base_url)
             time.sleep(0.1)
 
             total_g1 += tokens_1
             total_g2 += tokens_2
             total_g3 += tokens_3
 
-            print(f" G1: {tokens_1}t | G2: {tokens_2}t | G3: {tokens_3}t (Axiom: -{round((1 - tokens_3/tokens_2)*100, 1)}% vs G2)")
+            diff_vs_g2 = round((1 - tokens_3 / tokens_2) * 100, 1) if tokens_2 > 0 else 0
+            print(f" G1(单体): {tokens_1}t | G2(隔离微任务): {tokens_2}t | G3(Axiom打洞): {tokens_3}t (较G2省: -{diff_vs_g2}%)")
 
             results.append({
                 "task_id": tid,
@@ -222,12 +426,11 @@ def main():
                 "group3_axiom_hole": {"prompt_tokens": tokens_3}
             })
         else:
-            # Generate mode
-            res1 = call_gemini_generate(api_key, args.model, p1)
+            res1 = call_gemini_generate(opener, api_key, args.model, p1, args.base_url)
             time.sleep(0.5)
-            res2 = call_gemini_generate(api_key, args.model, p2)
+            res2 = call_gemini_generate(opener, api_key, args.model, p2, args.base_url)
             time.sleep(0.5)
-            res3 = call_gemini_generate(api_key, args.model, p3)
+            res3 = call_gemini_generate(opener, api_key, args.model, p3, args.base_url)
             time.sleep(0.5)
 
             total_g1 += res1["total_tokens"]
@@ -244,24 +447,24 @@ def main():
                 "group3_axiom_hole": res3
             })
 
-    # Summary
-    print("=" * 65)
-    print("📊 BENCHMARK COMPLETE (Authentic Official Gemini API Data)")
-    print(f"Total Group 1 (Rust Monolith): {total_g1} tokens")
-    print(f"Total Group 2 (Rust Micro):    {total_g2} tokens")
-    print(f"Total Group 3 (Axiom Hole):    {total_g3} tokens")
-    if total_g2 > 0:
-        pct_vs_g2 = round((1.0 - total_g3 / total_g2) * 100, 1)
-        print(f"🔥 Axiom Net Token Savings vs Group 2 (Task-Isolated Rust): {pct_vs_g2}%")
-    if total_g1 > 0:
-        pct_vs_g1 = round((1.0 - total_g3 / total_g1) * 100, 1)
-        print(f"🔥 Axiom Total Token Savings vs Group 1 (Monolithic Rust):   {pct_vs_g1}%")
+    pct_vs_g2 = round((1.0 - total_g3 / total_g2) * 100, 1) if total_g2 > 0 else 0
+    pct_vs_g1 = round((1.0 - total_g3 / total_g1) * 100, 1) if total_g1 > 0 else 0
+
+    print("=" * 70)
+    print("📊 评测完成 (基于 Google 官方 Gemini API 真实实测数据)")
+    print(f"Group 1 (传统单体大文件长上下文) 总消耗: {total_g1:,} tokens")
+    print(f"Group 2 (单任务隔离 Rust 微任务) 总消耗:   {total_g2:,} tokens")
+    print(f"Group 3 (Axiom 契约打洞纯表达式) 总消耗:   {total_g3:,} tokens")
+    print("-" * 70)
+    print(f"🔥 核心指标 1: Axiom 较 Group 2 (单任务隔离微任务) 净节省 Token: {pct_vs_g2}%")
+    print(f"🔥 核心指标 2: Axiom 较 Group 1 (传统单体大文件上下文) 净节省 Token: {pct_vs_g1}%")
+    print("=" * 70)
 
     output_payload = {
         "version": "1.0",
         "status": "completed_authentic",
         "experiment_metadata": {
-            "target_model": args.model,
+            "target_model": clean_model_name(args.model),
             "mode": args.mode,
             "evaluated_tasks_count": len(eval_tasks),
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
@@ -270,15 +473,16 @@ def main():
             "group1_rust_monolith_tokens": total_g1,
             "group2_rust_micro_tokens": total_g2,
             "group3_axiom_hole_tokens": total_g3,
-            "net_savings_vs_micro": f"{pct_vs_g2}%" if total_g2 > 0 else "0%",
-            "net_savings_vs_monolith": f"{pct_vs_g1}%" if total_g1 > 0 else "0%"
+            "net_savings_vs_micro": f"{pct_vs_g2}%",
+            "net_savings_vs_monolith": f"{pct_vs_g1}%"
         },
         "detailed_tasks": results
     }
 
+    os.makedirs(os.path.dirname(OUTPUT_DATA_PATH), exist_ok=True)
     with open(OUTPUT_DATA_PATH, "w", encoding="utf-8") as f:
         json.dump(output_payload, f, indent=2, ensure_ascii=False)
-    print(f"💾 Authentic measurements saved to: {OUTPUT_DATA_PATH}\n")
+    print(f"💾 真实测量数据已写入持久化文件: {OUTPUT_DATA_PATH}\n")
 
 
 if __name__ == "__main__":

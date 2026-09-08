@@ -1,4 +1,4 @@
-﻿# Rust target
+# Rust target
 target/
 **/*.rs.bk
 Cargo.lock
@@ -62,3 +62,8 @@ Thumbs.db
 *.aab
 *.unitypackage
 *.app
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class

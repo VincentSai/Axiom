@@ -373,7 +373,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "axiom-ast/src/lib.rs"
     },
@@ -384,8 +384,8 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_type",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "type"
     },
     {
@@ -395,7 +395,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_rs_string",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "string"
     },
@@ -406,7 +406,7 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_fielddef",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "fielddef"
     },
@@ -417,7 +417,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_variantdef",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "variantdef"
     },
@@ -428,7 +428,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_rs_vec",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "vec"
     },
@@ -439,7 +439,7 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_typedef",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "typedef"
     },
@@ -450,7 +450,7 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_literal",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "literal"
     },
@@ -461,7 +461,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_pattern",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "pattern"
     },
@@ -472,7 +472,7 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_rs_option",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "option"
     },
@@ -483,7 +483,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_matcharm",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "matcharm"
     },
@@ -538,7 +538,7 @@
       "source_location": "L137",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_functionparam",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "functionparam"
     },
@@ -549,7 +549,7 @@
       "source_location": "L143",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_effectop",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "effectop"
     },
@@ -560,7 +560,7 @@
       "source_location": "L150",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_effectdecl",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "effectdecl"
     },
@@ -571,7 +571,7 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_functiondecl",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "functiondecl"
     },
@@ -582,7 +582,7 @@
       "source_location": "L167",
       "_origin": "ast",
       "id": "crates_axiom_ast_src_lib_module",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "module"
     },
@@ -593,8 +593,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "bridge.rs"
     },
     {
@@ -604,8 +604,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_unitybridgefiles",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "unitybridgefiles"
     },
     {
@@ -615,8 +615,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_rs_string",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "string"
     },
     {
@@ -626,8 +626,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_generate_unity_bridge",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "generate_unity_bridge()"
     },
     {
@@ -637,8 +637,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_render_native",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "render_native()"
     },
     {
@@ -648,8 +648,8 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_render_double_buffer",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "render_double_buffer()"
     },
     {
@@ -659,8 +659,8 @@
       "source_location": "L175",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_render_record",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "render_record()"
     },
     {
@@ -670,8 +670,8 @@
       "source_location": "L195",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_render_asset_registry",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "render_asset_registry()"
     },
     {
@@ -681,8 +681,8 @@
       "source_location": "L262",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_render_enum",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "render_enum()"
     },
     {
@@ -692,8 +692,8 @@
       "source_location": "L270",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_render_registry_lookup",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "render_registry_lookup()"
     },
     {
@@ -703,8 +703,8 @@
       "source_location": "L294",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_render_runner",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "render_runner()"
     },
     {
@@ -714,8 +714,8 @@
       "source_location": "L485",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_legacy_input_statement",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "legacy_input_statement()"
     },
     {
@@ -725,8 +725,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_rs_option",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "option"
     },
     {
@@ -736,8 +736,8 @@
       "source_location": "L504",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_csharp_type",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "csharp_type()"
     },
     {
@@ -747,8 +747,8 @@
       "source_location": "L517",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_generic_constructor",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "generic_constructor()"
     },
     {
@@ -758,8 +758,8 @@
       "source_location": "L521",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_lower_first",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "lower_first()"
     },
     {
@@ -769,8 +769,8 @@
       "source_location": "L529",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_unity_input_name",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "unity_input_name()"
     },
     {
@@ -780,8 +780,8 @@
       "source_location": "L549",
       "_origin": "ast",
       "id": "crates_axiom_cli_src_bridge_escape_csharp_string",
-      "community": 5,
-      "community_name": "Module",
+      "community": 125,
+      "community_name": "bridge.rs",
       "norm_label": "escape_csharp_string()"
     },
     {
@@ -2496,8 +2496,8 @@
       "source_location": "L107",
       "_origin": "ast",
       "id": "crates_axiom_db_src_lib_modulerecord",
-      "community": 52,
-      "community_name": "NodeHash",
+      "community": 148,
+      "community_name": "ModuleRecord",
       "norm_label": "modulerecord"
     },
     {
@@ -2507,8 +2507,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_db_src_lib_rs_vec",
-      "community": 52,
-      "community_name": "NodeHash",
+      "community": 148,
+      "community_name": "ModuleRecord",
       "norm_label": "vec"
     },
     {
@@ -2518,8 +2518,8 @@
       "source_location": "L116",
       "_origin": "ast",
       "id": "crates_axiom_db_src_lib_modulerecord_hash",
-      "community": 52,
-      "community_name": "NodeHash",
+      "community": 148,
+      "community_name": "ModuleRecord",
       "norm_label": ".hash()"
     },
     {
@@ -2595,7 +2595,7 @@
       "source_location": "L161",
       "_origin": "ast",
       "id": "crates_axiom_db_src_lib_databasestate",
-      "community": 5,
+      "community": 131,
       "community_name": "Module",
       "norm_label": "databasestate"
     },
@@ -2991,8 +2991,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "typecheck.rs"
     },
     {
@@ -3002,8 +3002,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_typeerror",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "typeerror"
     },
     {
@@ -3013,8 +3013,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_rs_string",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "string"
     },
     {
@@ -3024,8 +3024,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_modulecontext",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "modulecontext"
     },
     {
@@ -3035,8 +3035,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_rs_hashmap",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "hashmap"
     },
     {
@@ -3046,8 +3046,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_rs_vec",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "vec"
     },
     {
@@ -3057,8 +3057,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_modulecontext_from_module",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": ".from_module()"
     },
     {
@@ -3068,8 +3068,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_rs_self",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "self"
     },
     {
@@ -3079,8 +3079,8 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_check_module_types",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "check_module_types()"
     },
     {
@@ -3090,8 +3090,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_rs_result",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "result"
     },
     {
@@ -3101,8 +3101,8 @@
       "source_location": "L71",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_check_function_types",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "check_function_types()"
     },
     {
@@ -3112,8 +3112,8 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_check_function_types_with_ctx",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "check_function_types_with_ctx()"
     },
     {
@@ -3123,8 +3123,8 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_infer_expr_type",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "infer_expr_type()"
     },
     {
@@ -3134,8 +3134,8 @@
       "source_location": "L539",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_parse_type_str",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "parse_type_str()"
     },
     {
@@ -3145,8 +3145,8 @@
       "source_location": "L551",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_extract_first_type_arg",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "extract_first_type_arg()"
     },
     {
@@ -3156,8 +3156,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_rs_option",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "option"
     },
     {
@@ -3167,8 +3167,8 @@
       "source_location": "L564",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_extract_second_type_arg",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "extract_second_type_arg()"
     },
     {
@@ -3178,8 +3178,8 @@
       "source_location": "L579",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_bind_pattern_types",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "bind_pattern_types()"
     },
     {
@@ -3189,8 +3189,8 @@
       "source_location": "L684",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_is_numeric",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "is_numeric()"
     },
     {
@@ -3200,8 +3200,8 @@
       "source_location": "L688",
       "_origin": "ast",
       "id": "crates_axiom_diagnostics_src_typecheck_is_type_compatible",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "is_type_compatible()"
     },
     {
@@ -3927,7 +3927,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "axiom-ffi-gen/src/lib.rs"
     },
     {
@@ -3938,7 +3938,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_ffierror",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "ffierror"
     },
     {
@@ -3949,7 +3949,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_string",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "string"
     },
     {
@@ -3960,7 +3960,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_display",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "display"
     },
     {
@@ -3971,7 +3971,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_ffierror_fmt",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": ".fmt()"
     },
     {
@@ -3982,7 +3982,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_formatter",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "formatter"
     },
     {
@@ -3993,7 +3993,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_result",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "result"
     },
     {
@@ -4004,7 +4004,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_error",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "error"
     },
     {
@@ -4015,7 +4015,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_ffierror_source",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": ".source()"
     },
     {
@@ -4026,7 +4026,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_option",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "option"
     },
     {
@@ -4037,7 +4037,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_from",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "from"
     },
     {
@@ -4048,7 +4048,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_ffierror_from",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": ".from()"
     },
     {
@@ -4059,7 +4059,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_self",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "self"
     },
     {
@@ -4070,7 +4070,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_generate_typescript_bindings",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generate_typescript_bindings()"
     },
     {
@@ -4081,7 +4081,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_generate_c_header",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generate_c_header()"
     },
     {
@@ -4092,7 +4092,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_generate_c_abi_rust_glue",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generate_c_abi_rust_glue()"
     },
     {
@@ -4103,7 +4103,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_generate_typescript_from_source",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generate_typescript_from_source()"
     },
     {
@@ -4114,7 +4114,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_generate_c_header_from_source",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generate_c_header_from_source()"
     },
     {
@@ -4125,7 +4125,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_validate_module",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "validate_module()"
     },
     {
@@ -4136,7 +4136,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_validate_fields",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "validate_fields()"
     },
     {
@@ -4147,7 +4147,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_validate_identifier",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "validate_identifier()"
     },
     {
@@ -4158,7 +4158,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_is_c_identifier",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "is_c_identifier()"
     },
     {
@@ -4169,7 +4169,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_type_definition_name",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "type_definition_name()"
     },
     {
@@ -4180,7 +4180,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_typescript_type",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "typescript_type()"
     },
     {
@@ -4191,7 +4191,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_typescript_custom_type",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "typescript_custom_type()"
     },
     {
@@ -4202,7 +4202,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_collect_list_types",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "collect_list_types()"
     },
     {
@@ -4213,7 +4213,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_btreemap",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "btreemap"
     },
     {
@@ -4224,7 +4224,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_collect_list_type",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "collect_list_type()"
     },
     {
@@ -4235,7 +4235,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_type_suffix",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "type_suffix()"
     },
     {
@@ -4246,7 +4246,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_c_type",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "c_type()"
     },
     {
@@ -4257,7 +4257,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_render_c_type_definition",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "render_c_type_definition()"
     },
     {
@@ -4268,7 +4268,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_render_c_function",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "render_c_function()"
     },
     {
@@ -4279,7 +4279,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_render_rust_type_definition",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "render_rust_type_definition()"
     },
     {
@@ -4290,7 +4290,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_render_rust_variant_payloads",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "render_rust_variant_payloads()"
     },
     {
@@ -4301,7 +4301,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rust_function_signature",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "rust_function_signature()"
     },
     {
@@ -4312,7 +4312,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rust_ffi_type",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "rust_ffi_type()"
     },
     {
@@ -4323,7 +4323,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_generic_arguments",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generic_arguments()"
     },
     {
@@ -4334,7 +4334,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_rs_vec",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "vec"
     },
     {
@@ -4344,8 +4344,8 @@
       "source_location": "L606",
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_parse_formatted_type",
-      "community": 5,
-      "community_name": "Module",
+      "community": 67,
+      "community_name": "Type",
       "norm_label": "parse_formatted_type()"
     },
     {
@@ -4356,7 +4356,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_src_lib_screaming_snake",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "screaming_snake()"
     },
     {
@@ -4367,7 +4367,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_tests_ffi_gen_test",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "ffi_gen_test.rs"
     },
     {
@@ -4378,7 +4378,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_tests_ffi_gen_test_generates_typescript_records_discriminated_unions_and_functions",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generates_typescript_records_discriminated_unions_and_functions()"
     },
     {
@@ -4389,7 +4389,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_tests_ffi_gen_test_generates_guarded_c_header_with_primitives_and_cpp_linkage",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "generates_guarded_c_header_with_primitives_and_cpp_linkage()"
     },
     {
@@ -4400,7 +4400,7 @@
       "_origin": "ast",
       "id": "crates_axiom_ffi_gen_tests_ffi_gen_test_game_loop_c_abi_rust_glue_compiles",
       "community": 5,
-      "community_name": "Module",
+      "community_name": "axiom-ffi-gen/src/lib.rs",
       "norm_label": "game_loop_c_abi_rust_glue_compiles()"
     },
     {
@@ -5906,8 +5906,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_lib",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 146,
+      "community_name": "SmtResult",
       "norm_label": "axiom-smt/src/lib.rs"
     },
     {
@@ -5917,8 +5917,8 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_lib_solverbackend",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 146,
+      "community_name": "SmtResult",
       "norm_label": "solverbackend"
     },
     {
@@ -5928,8 +5928,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_lib_smtresult",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 146,
+      "community_name": "SmtResult",
       "norm_label": "smtresult"
     },
     {
@@ -5939,8 +5939,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_lib_rs_string",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 146,
+      "community_name": "SmtResult",
       "norm_label": "string"
     },
     {
@@ -5950,8 +5950,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_lib_rs_counterexample",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 146,
+      "community_name": "SmtResult",
       "norm_label": "counterexample"
     },
     {
@@ -5961,8 +5961,8 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_lib_to_smtlib2",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 146,
+      "community_name": "SmtResult",
       "norm_label": "to_smtlib2()"
     },
     {
@@ -5972,8 +5972,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_lib_rs_result",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 146,
+      "community_name": "SmtResult",
       "norm_label": "result"
     },
     {
@@ -5994,8 +5994,8 @@
       "source_location": "L74",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_lib_verify_function_in_module",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 146,
+      "community_name": "SmtResult",
       "norm_label": "verify_function_in_module()"
     },
     {
@@ -6005,8 +6005,8 @@
       "source_location": "L97",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_lib_verify_function_with_z3",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 146,
+      "community_name": "SmtResult",
       "norm_label": "verify_function_with_z3()"
     },
     {
@@ -6016,8 +6016,8 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_lib_verify_module",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 146,
+      "community_name": "SmtResult",
       "norm_label": "verify_module()"
     },
     {
@@ -6027,8 +6027,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_lib_rs_hashmap",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 146,
+      "community_name": "SmtResult",
       "norm_label": "hashmap"
     },
     {
@@ -6038,8 +6038,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "smtlib2.rs"
     },
     {
@@ -6049,8 +6049,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_smtcontext",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "smtcontext"
     },
     {
@@ -6060,8 +6060,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_rs_hashmap",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "hashmap"
     },
     {
@@ -6071,8 +6071,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_rs_string",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "string"
     },
     {
@@ -6082,8 +6082,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_rs_vec",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "vec"
     },
     {
@@ -6093,8 +6093,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_smtcontext_a",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "smtcontext<'a>"
     },
     {
@@ -6104,8 +6104,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_smtcontext_a_from_module",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": ".from_module()"
     },
     {
@@ -6115,8 +6115,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_rs_self",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "self"
     },
     {
@@ -6126,8 +6126,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_generate_smtlib2",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "generate_smtlib2()"
     },
     {
@@ -6137,8 +6137,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_rs_result",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "result"
     },
     {
@@ -6148,8 +6148,8 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_generate_smtlib2_with_module",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "generate_smtlib2_with_module()"
     },
     {
@@ -6159,8 +6159,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_rs_option",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "option"
     },
     {
@@ -6170,8 +6170,8 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_flatten_type_to_smt",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "flatten_type_to_smt()"
     },
     {
@@ -6181,8 +6181,8 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_bind_record_body_to_results",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "bind_record_body_to_results()"
     },
     {
@@ -6192,8 +6192,8 @@
       "source_location": "L210",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_inline_calls",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "inline_calls()"
     },
     {
@@ -6203,8 +6203,8 @@
       "source_location": "L326",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_substitute_expr",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "substitute_expr()"
     },
     {
@@ -6214,8 +6214,8 @@
       "source_location": "L439",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_expr_to_smt",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "expr_to_smt()"
     },
     {
@@ -6225,8 +6225,8 @@
       "source_location": "L562",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_expr_to_field_path",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "expr_to_field_path()"
     },
     {
@@ -6236,8 +6236,8 @@
       "source_location": "L573",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_build_block_smt",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "build_block_smt()"
     },
     {
@@ -6247,8 +6247,8 @@
       "source_location": "L593",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_smtlib2_format_float",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 116,
+      "community_name": "generate_smtlib2_with_module",
       "norm_label": "format_float()"
     },
     {
@@ -6258,8 +6258,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "z3_solver.rs"
     },
     {
@@ -6269,8 +6269,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver_z3result",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "z3result"
     },
     {
@@ -6280,8 +6280,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver_rs_counterexample",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "counterexample"
     },
     {
@@ -6291,8 +6291,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver_rs_string",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "string"
     },
     {
@@ -6302,8 +6302,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver_find_z3_executable",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "find_z3_executable()"
     },
     {
@@ -6313,8 +6313,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver_rs_option",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "option"
     },
     {
@@ -6324,8 +6324,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver_rs_pathbuf",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "pathbuf"
     },
     {
@@ -6335,8 +6335,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver_run_z3_query",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "run_z3_query()"
     },
     {
@@ -6346,8 +6346,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver_rs_path",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "path"
     },
     {
@@ -6357,8 +6357,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver_rs_result",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "result"
     },
     {
@@ -6368,8 +6368,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver_parse_z3_output",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "parse_z3_output()"
     },
     {
@@ -6379,8 +6379,8 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver_parse_z3_model",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "parse_z3_model()"
     },
     {
@@ -6390,8 +6390,8 @@
       "source_location": "L137",
       "_origin": "ast",
       "id": "crates_axiom_smt_src_z3_solver_extract_numeric_value",
-      "community": 20,
-      "community_name": "internal_solver.rs",
+      "community": 138,
+      "community_name": "z3_solver.rs",
       "norm_label": "extract_numeric_value()"
     },
     {
@@ -6918,8 +6918,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_syncsummary",
-      "community": 24,
-      "community_name": "VfsError",
+      "community": 148,
+      "community_name": "ModuleRecord",
       "norm_label": "syncsummary"
     },
     {
@@ -6929,8 +6929,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_rs_vec",
-      "community": 24,
-      "community_name": "VfsError",
+      "community": 148,
+      "community_name": "ModuleRecord",
       "norm_label": "vec"
     },
     {
@@ -6940,8 +6940,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_rs_from",
-      "community": 24,
-      "community_name": "VfsError",
+      "community": 148,
+      "community_name": "ModuleRecord",
       "norm_label": "from"
     },
     {
@@ -6951,8 +6951,8 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_syncsummary_from",
-      "community": 24,
-      "community_name": "VfsError",
+      "community": 148,
+      "community_name": "ModuleRecord",
       "norm_label": ".from()"
     },
     {
@@ -6962,8 +6962,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_rs_self",
-      "community": 24,
-      "community_name": "VfsError",
+      "community": 148,
+      "community_name": "ModuleRecord",
       "norm_label": "self"
     },
     {
@@ -7061,8 +7061,8 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_vfserror_from",
-      "community": 24,
-      "community_name": "VfsError",
+      "community": 148,
+      "community_name": "ModuleRecord",
       "norm_label": ".from()"
     },
     {
@@ -7116,8 +7116,8 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_projection",
-      "community": 5,
-      "community_name": "Module",
+      "community": 147,
+      "community_name": "Projection",
       "norm_label": "projection"
     },
     {
@@ -7127,8 +7127,8 @@
       "source_location": "L115",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_projection_module",
-      "community": 5,
-      "community_name": "Module",
+      "community": 147,
+      "community_name": "Projection",
       "norm_label": ".module()"
     },
     {
@@ -7138,8 +7138,8 @@
       "source_location": "L132",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_projection_separate_declaration",
-      "community": 5,
-      "community_name": "Module",
+      "community": 147,
+      "community_name": "Projection",
       "norm_label": ".separate_declaration()"
     },
     {
@@ -7149,8 +7149,8 @@
       "source_location": "L140",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_projection_type_definition",
-      "community": 5,
-      "community_name": "Module",
+      "community": 147,
+      "community_name": "Projection",
       "norm_label": ".type_definition()"
     },
     {
@@ -7160,8 +7160,8 @@
       "source_location": "L165",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_projection_variant",
-      "community": 5,
-      "community_name": "Module",
+      "community": 147,
+      "community_name": "Projection",
       "norm_label": ".variant()"
     },
     {
@@ -7171,8 +7171,8 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_projection_fields",
-      "community": 5,
-      "community_name": "Module",
+      "community": 147,
+      "community_name": "Projection",
       "norm_label": ".fields()"
     },
     {
@@ -7182,8 +7182,8 @@
       "source_location": "L184",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_projection_effect",
-      "community": 5,
-      "community_name": "Module",
+      "community": 147,
+      "community_name": "Projection",
       "norm_label": ".effect()"
     },
     {
@@ -7193,8 +7193,8 @@
       "source_location": "L197",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_projection_function",
-      "community": 5,
-      "community_name": "Module",
+      "community": 147,
+      "community_name": "Projection",
       "norm_label": ".function()"
     },
     {
@@ -7204,8 +7204,8 @@
       "source_location": "L213",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_projection_params",
-      "community": 5,
-      "community_name": "Module",
+      "community": 147,
+      "community_name": "Projection",
       "norm_label": ".params()"
     },
     {
@@ -7215,8 +7215,8 @@
       "source_location": "L223",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_projection_contract",
-      "community": 5,
-      "community_name": "Module",
+      "community": 147,
+      "community_name": "Projection",
       "norm_label": ".contract()"
     },
     {
@@ -7226,8 +7226,8 @@
       "source_location": "L235",
       "_origin": "ast",
       "id": "crates_axiom_vfs_src_lib_projection_function_body",
-      "community": 5,
-      "community_name": "Module",
+      "community": 147,
+      "community_name": "Projection",
       "norm_label": ".function_body()"
     },
     {
@@ -7798,8 +7798,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_init",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 29,
+      "community_name": "tier3_ai_loot.py",
       "norm_label": "__init__.py"
     },
     {
@@ -7809,8 +7809,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_init_rationale_1",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 29,
+      "community_name": "tier3_ai_loot.py",
       "norm_label": "public api for the pure five-tier roguelike engine benchmark."
     },
     {
@@ -7996,7 +7996,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial",
-      "community": 147,
+      "community": 128,
       "community_name": "tier0_spatial.py",
       "norm_label": "tier0_spatial.py"
     },
@@ -8040,8 +8040,8 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_check_in_radius_sq",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 202,
+      "community_name": "check_in_radius_sq",
       "norm_label": "check_in_radius_sq()"
     },
     {
@@ -8051,8 +8051,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_bresenham_step_x",
-      "community": 146,
-      "community_name": "bresenham_step_x",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "bresenham_step_x()"
     },
     {
@@ -8139,8 +8139,8 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_clamp_to_bounds_y",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 203,
+      "community_name": "clamp_to_bounds_y",
       "norm_label": "clamp_to_bounds_y()"
     },
     {
@@ -8150,7 +8150,7 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_check_aabb_overlap",
-      "community": 147,
+      "community": 128,
       "community_name": "tier0_spatial.py",
       "norm_label": "check_aabb_overlap()"
     },
@@ -8183,8 +8183,8 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_017",
-      "community": 131,
-      "community_name": "spatial_subsys_017",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "spatial_subsys_017()"
     },
     {
@@ -8217,7 +8217,7 @@
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_020",
       "community": 128,
-      "community_name": "spatial_subsys_020",
+      "community_name": "tier0_spatial.py",
       "norm_label": "spatial_subsys_020()"
     },
     {
@@ -8227,8 +8227,8 @@
       "source_location": "L154",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_021",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 204,
+      "community_name": "spatial_subsys_021",
       "norm_label": "spatial_subsys_021()"
     },
     {
@@ -8238,8 +8238,8 @@
       "source_location": "L159",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_022",
-      "community": 133,
-      "community_name": "spatial_subsys_022",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "spatial_subsys_022()"
     },
     {
@@ -8249,8 +8249,8 @@
       "source_location": "L166",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_023",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 205,
+      "community_name": "spatial_subsys_023",
       "norm_label": "spatial_subsys_023()"
     },
     {
@@ -8359,8 +8359,8 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_033",
-      "community": 138,
-      "community_name": "spatial_subsys_033",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "spatial_subsys_033()"
     },
     {
@@ -8381,8 +8381,8 @@
       "source_location": "L244",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_035",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "spatial_subsys_035()"
     },
     {
@@ -8392,8 +8392,8 @@
       "source_location": "L251",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_036",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "spatial_subsys_036()"
     },
     {
@@ -8414,8 +8414,8 @@
       "source_location": "L263",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_038",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "spatial_subsys_038()"
     },
     {
@@ -8425,8 +8425,8 @@
       "source_location": "L270",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_039",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "spatial_subsys_039()"
     },
     {
@@ -8436,8 +8436,8 @@
       "source_location": "L277",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_spatial_subsys_040",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "spatial_subsys_040()"
     },
     {
@@ -8447,7 +8447,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_1",
-      "community": 147,
+      "community": 128,
       "community_name": "tier0_spatial.py",
       "norm_label": "tier 0 spatial geometry and grid-math primitives. the functions in this module..."
     },
@@ -8491,8 +8491,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_31",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 202,
+      "community_name": "check_in_radius_sq",
       "norm_label": "return whether a nonnegative squared distance is within ``radius``."
     },
     {
@@ -8502,8 +8502,8 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_38",
-      "community": 146,
-      "community_name": "bresenham_step_x",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "return the horizontal sign step from ``x1`` toward ``x2``."
     },
     {
@@ -8590,8 +8590,8 @@
       "source_location": "L85",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_85",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 203,
+      "community_name": "clamp_to_bounds_y",
       "norm_label": "clamp ``y`` into the half-open map interval ``[0, height)``."
     },
     {
@@ -8601,7 +8601,7 @@
       "source_location": "L100",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_100",
-      "community": 147,
+      "community": 128,
       "community_name": "tier0_spatial.py",
       "norm_label": "return whether two valid axis-aligned boxes overlap inclusively."
     },
@@ -8634,8 +8634,8 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_129",
-      "community": 131,
-      "community_name": "spatial_subsys_017",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "return a cartesian quadrant code: ne=0, nw=1, sw=2, se=3."
     },
     {
@@ -8668,7 +8668,7 @@
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_148",
       "community": 128,
-      "community_name": "spatial_subsys_020",
+      "community_name": "tier0_spatial.py",
       "norm_label": "return quadtree child ``b`` within parent-cell range ``a``."
     },
     {
@@ -8678,8 +8678,8 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_155",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 204,
+      "community_name": "spatial_subsys_021",
       "norm_label": "return the squared displacement of grid vector ``(a, b)``."
     },
     {
@@ -8689,8 +8689,8 @@
       "source_location": "L160",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_160",
-      "community": 133,
-      "community_name": "spatial_subsys_022",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "return the product of two nonnegative projection scales."
     },
     {
@@ -8700,8 +8700,8 @@
       "source_location": "L167",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_167",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 205,
+      "community_name": "spatial_subsys_023",
       "norm_label": "return the smaller of two nonnegative axis extents."
     },
     {
@@ -8810,8 +8810,8 @@
       "source_location": "L231",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_231",
-      "community": 138,
-      "community_name": "spatial_subsys_033",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "return the shared length of two origin-aligned intervals."
     },
     {
@@ -8832,8 +8832,8 @@
       "source_location": "L245",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_245",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "return nonnegative cell-local coordinate ``a`` modulo ``b``."
     },
     {
@@ -8843,8 +8843,8 @@
       "source_location": "L252",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_252",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "return 1 when ``a`` lies below half-plane boundary ``b``, else 0."
     },
     {
@@ -8865,8 +8865,8 @@
       "source_location": "L264",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_264",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "return the start offset for range ``a`` with stride ``b + 1``."
     },
     {
@@ -8876,8 +8876,8 @@
       "source_location": "L271",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_271",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "return collision penetration bounded by both nonnegative depths."
     },
     {
@@ -8887,8 +8887,8 @@
       "source_location": "L278",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier0_spatial_rationale_278",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "return a bresenham-style doubled raster-error update."
     },
     {
@@ -9019,8 +9019,8 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_051",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 1,
+      "community_name": "tier4_world.py",
       "norm_label": "stat_subsys_051()"
     },
     {
@@ -9052,8 +9052,8 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_054",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 202,
+      "community_name": "check_in_radius_sq",
       "norm_label": "stat_subsys_054()"
     },
     {
@@ -9063,8 +9063,8 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_055",
-      "community": 146,
-      "community_name": "bresenham_step_x",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "stat_subsys_055()"
     },
     {
@@ -9118,8 +9118,8 @@
       "source_location": "L89",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_060",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 29,
+      "community_name": "tier3_ai_loot.py",
       "norm_label": "stat_subsys_060()"
     },
     {
@@ -9151,8 +9151,8 @@
       "source_location": "L101",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_063",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 203,
+      "community_name": "clamp_to_bounds_y",
       "norm_label": "stat_subsys_063()"
     },
     {
@@ -9162,7 +9162,7 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_064",
-      "community": 147,
+      "community": 128,
       "community_name": "tier0_spatial.py",
       "norm_label": "stat_subsys_064()"
     },
@@ -9195,8 +9195,8 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_067",
-      "community": 131,
-      "community_name": "spatial_subsys_017",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "stat_subsys_067()"
     },
     {
@@ -9229,7 +9229,7 @@
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_070",
       "community": 128,
-      "community_name": "spatial_subsys_020",
+      "community_name": "tier0_spatial.py",
       "norm_label": "stat_subsys_070()"
     },
     {
@@ -9239,8 +9239,8 @@
       "source_location": "L144",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_071",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 204,
+      "community_name": "spatial_subsys_021",
       "norm_label": "stat_subsys_071()"
     },
     {
@@ -9250,8 +9250,8 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_072",
-      "community": 133,
-      "community_name": "spatial_subsys_022",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "stat_subsys_072()"
     },
     {
@@ -9261,8 +9261,8 @@
       "source_location": "L152",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_073",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 205,
+      "community_name": "spatial_subsys_023",
       "norm_label": "stat_subsys_073()"
     },
     {
@@ -9371,8 +9371,8 @@
       "source_location": "L192",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_083",
-      "community": 138,
-      "community_name": "spatial_subsys_033",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "stat_subsys_083()"
     },
     {
@@ -9393,8 +9393,8 @@
       "source_location": "L200",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_085",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "stat_subsys_085()"
     },
     {
@@ -9404,8 +9404,8 @@
       "source_location": "L204",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_086",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "stat_subsys_086()"
     },
     {
@@ -9426,8 +9426,8 @@
       "source_location": "L212",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_088",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "stat_subsys_088()"
     },
     {
@@ -9437,8 +9437,8 @@
       "source_location": "L216",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_089",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "stat_subsys_089()"
     },
     {
@@ -9448,8 +9448,8 @@
       "source_location": "L220",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier1_stats_stat_subsys_090",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "stat_subsys_090()"
     },
     {
@@ -9580,8 +9580,8 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_101",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 1,
+      "community_name": "tier4_world.py",
       "norm_label": "combat_subsys_101()"
     },
     {
@@ -9613,8 +9613,8 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_104",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 202,
+      "community_name": "check_in_radius_sq",
       "norm_label": "combat_subsys_104()"
     },
     {
@@ -9624,8 +9624,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_105",
-      "community": 146,
-      "community_name": "bresenham_step_x",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "combat_subsys_105()"
     },
     {
@@ -9679,8 +9679,8 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_110",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 29,
+      "community_name": "tier3_ai_loot.py",
       "norm_label": "combat_subsys_110()"
     },
     {
@@ -9712,8 +9712,8 @@
       "source_location": "L107",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_113",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 203,
+      "community_name": "clamp_to_bounds_y",
       "norm_label": "combat_subsys_113()"
     },
     {
@@ -9723,8 +9723,8 @@
       "source_location": "L112",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_114",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 29,
+      "community_name": "tier3_ai_loot.py",
       "norm_label": "combat_subsys_114()"
     },
     {
@@ -9756,8 +9756,8 @@
       "source_location": "L127",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_117",
-      "community": 131,
-      "community_name": "spatial_subsys_017",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "combat_subsys_117()"
     },
     {
@@ -9790,7 +9790,7 @@
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_120",
       "community": 128,
-      "community_name": "spatial_subsys_020",
+      "community_name": "tier0_spatial.py",
       "norm_label": "combat_subsys_120()"
     },
     {
@@ -9800,8 +9800,8 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_121",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 204,
+      "community_name": "spatial_subsys_021",
       "norm_label": "combat_subsys_121()"
     },
     {
@@ -9811,8 +9811,8 @@
       "source_location": "L152",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_122",
-      "community": 133,
-      "community_name": "spatial_subsys_022",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "combat_subsys_122()"
     },
     {
@@ -9822,8 +9822,8 @@
       "source_location": "L157",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_123",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 205,
+      "community_name": "spatial_subsys_023",
       "norm_label": "combat_subsys_123()"
     },
     {
@@ -9932,8 +9932,8 @@
       "source_location": "L207",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_133",
-      "community": 138,
-      "community_name": "spatial_subsys_033",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "combat_subsys_133()"
     },
     {
@@ -9954,8 +9954,8 @@
       "source_location": "L217",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_135",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "combat_subsys_135()"
     },
     {
@@ -9965,8 +9965,8 @@
       "source_location": "L222",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_136",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "combat_subsys_136()"
     },
     {
@@ -9987,8 +9987,8 @@
       "source_location": "L232",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_138",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "combat_subsys_138()"
     },
     {
@@ -9998,8 +9998,8 @@
       "source_location": "L237",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_139",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "combat_subsys_139()"
     },
     {
@@ -10009,8 +10009,8 @@
       "source_location": "L242",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier2_combat_combat_subsys_140",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 21,
+      "community_name": "tier1_stats.py",
       "norm_label": "combat_subsys_140()"
     },
     {
@@ -10086,8 +10086,8 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_calc_exp_to_next_level",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 1,
+      "community_name": "tier4_world.py",
       "norm_label": "calc_exp_to_next_level()"
     },
     {
@@ -10141,8 +10141,8 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_151",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 202,
+      "community_name": "check_in_radius_sq",
       "norm_label": "ai_loot_subsys_151()"
     },
     {
@@ -10152,8 +10152,8 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_152",
-      "community": 146,
-      "community_name": "bresenham_step_x",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "ai_loot_subsys_152()"
     },
     {
@@ -10207,8 +10207,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_157",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 29,
+      "community_name": "tier3_ai_loot.py",
       "norm_label": "ai_loot_subsys_157()"
     },
     {
@@ -10240,8 +10240,8 @@
       "source_location": "L102",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_160",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 203,
+      "community_name": "clamp_to_bounds_y",
       "norm_label": "ai_loot_subsys_160()"
     },
     {
@@ -10251,8 +10251,8 @@
       "source_location": "L106",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_161",
-      "community": 147,
-      "community_name": "tier0_spatial.py",
+      "community": 29,
+      "community_name": "tier3_ai_loot.py",
       "norm_label": "ai_loot_subsys_161()"
     },
     {
@@ -10284,8 +10284,8 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_164",
-      "community": 131,
-      "community_name": "spatial_subsys_017",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "ai_loot_subsys_164()"
     },
     {
@@ -10318,7 +10318,7 @@
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_167",
       "community": 128,
-      "community_name": "spatial_subsys_020",
+      "community_name": "tier0_spatial.py",
       "norm_label": "ai_loot_subsys_167()"
     },
     {
@@ -10328,8 +10328,8 @@
       "source_location": "L134",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_168",
-      "community": 66,
-      "community_name": "tier2_combat.py",
+      "community": 204,
+      "community_name": "spatial_subsys_021",
       "norm_label": "ai_loot_subsys_168()"
     },
     {
@@ -10339,8 +10339,8 @@
       "source_location": "L138",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_169",
-      "community": 133,
-      "community_name": "spatial_subsys_022",
+      "community": 66,
+      "community_name": "tier2_combat.py",
       "norm_label": "ai_loot_subsys_169()"
     },
     {
@@ -10350,8 +10350,8 @@
       "source_location": "L142",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_170",
-      "community": 21,
-      "community_name": "tier1_stats.py",
+      "community": 205,
+      "community_name": "spatial_subsys_023",
       "norm_label": "ai_loot_subsys_170()"
     },
     {
@@ -10460,8 +10460,8 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier3_ai_loot_ai_loot_subsys_180",
-      "community": 138,
-      "community_name": "spatial_subsys_033",
+      "community": 128,
+      "community_name": "tier0_spatial.py",
       "norm_label": "ai_loot_subsys_180()"
     },
     {
@@ -10526,8 +10526,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier4_world_world_engine_185",
-      "community": 1,
-      "community_name": "tier4_world.py",
+      "community": 51,
+      "community_name": "calc_grid_index",
       "norm_label": "world_engine_185()"
     },
     {
@@ -10548,8 +10548,8 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier4_world_world_engine_187",
-      "community": 30,
-      "community_name": "pack_coords_to_hash",
+      "community": 1,
+      "community_name": "tier4_world.py",
       "norm_label": "world_engine_187()"
     },
     {
@@ -10647,8 +10647,8 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier4_world_world_engine_196",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 1,
+      "community_name": "tier4_world.py",
       "norm_label": "world_engine_196()"
     },
     {
@@ -10768,8 +10768,8 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier4_world_rationale_91",
-      "community": 1,
-      "community_name": "tier4_world.py",
+      "community": 51,
+      "community_name": "calc_grid_index",
       "norm_label": "count completed world cycles and map them into checkpoint space."
     },
     {
@@ -10790,8 +10790,8 @@
       "source_location": "L105",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier4_world_rationale_105",
-      "community": 30,
-      "community_name": "pack_coords_to_hash",
+      "community": 1,
+      "community_name": "tier4_world.py",
       "norm_label": "compute a deterministic save-slot hash for a turn/cycle pair."
     },
     {
@@ -10889,8 +10889,8 @@
       "source_location": "L175",
       "_origin": "ast",
       "id": "examples_benchmark_200_py_engine_200_tier4_world_rationale_175",
-      "community": 29,
-      "community_name": "tier3_ai_loot.py",
+      "community": 1,
+      "community_name": "tier4_world.py",
       "norm_label": "calculate the next-level experience target under the supported cap."
     },
     {
@@ -16262,10 +16262,76 @@
       "norm_label": "eval_runner.py"
     },
     {
+      "label": "check_port_open()",
+      "file_type": "code",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L39",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_check_port_open",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "check_port_open()"
+    },
+    {
+      "label": "detect_recommended_proxy()",
+      "file_type": "code",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L51",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_detect_recommended_proxy",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "detect_recommended_proxy()"
+    },
+    {
+      "label": "clean_model_name()",
+      "file_type": "code",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L59",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_clean_model_name",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "clean_model_name()"
+    },
+    {
+      "label": "build_endpoint_url()",
+      "file_type": "code",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L67",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_build_endpoint_url",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "build_endpoint_url()"
+    },
+    {
+      "label": "get_http_opener()",
+      "file_type": "code",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L80",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_get_http_opener",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "get_http_opener()"
+    },
+    {
+      "label": "send_api_request()",
+      "file_type": "code",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L91",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_send_api_request",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "send_api_request()"
+    },
+    {
       "label": "load_golden_tasks()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L28",
+      "source_location": "L156",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_load_golden_tasks",
       "community": 27,
@@ -16276,7 +16342,7 @@
       "label": "build_group1_prompt()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L34",
+      "source_location": "L162",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_build_group1_prompt",
       "community": 27,
@@ -16287,7 +16353,7 @@
       "label": "build_group2_prompt()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L60",
+      "source_location": "L188",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_build_group2_prompt",
       "community": 27,
@@ -16298,7 +16364,7 @@
       "label": "build_group3_prompt()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L85",
+      "source_location": "L213",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_build_group3_prompt",
       "community": 27,
@@ -16309,7 +16375,7 @@
       "label": "call_gemini_count_tokens()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L107",
+      "source_location": "L235",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_call_gemini_count_tokens",
       "community": 27,
@@ -16320,7 +16386,7 @@
       "label": "call_gemini_generate()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L127",
+      "source_location": "L249",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_call_gemini_generate",
       "community": 27,
@@ -16328,10 +16394,32 @@
       "norm_label": "call_gemini_generate()"
     },
     {
+      "label": "list_available_models()",
+      "file_type": "code",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L278",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_list_available_models",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "list_available_models()"
+    },
+    {
+      "label": "run_preflight_check()",
+      "file_type": "code",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L285",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_run_preflight_check",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "run_preflight_check()"
+    },
+    {
       "label": "main()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L162",
+      "source_location": "L299",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_main",
       "community": 27,
@@ -16339,12 +16427,56 @@
       "norm_label": "main()"
     },
     {
+      "label": "\u6e05\u6d17\u6a21\u578b\u540d\u79f0\uff0c\u53bb\u9664\u7a7a\u767d\u4e0e\u5197\u4f59\u7684 'models/' \u524d\u7f00",
+      "file_type": "rationale",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L60",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_rationale_60",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "\u6e05\u6d17\u6a21\u578b\u540d\u79f0,\u53bb\u9664\u7a7a\u767d\u4e0e\u5197\u4f59\u7684 'models/' \u524d\u7f00"
+    },
+    {
+      "label": "\u667a\u80fd\u7ec4\u88c5 Gemini API \u7aef\u70b9 URL\uff0c\u652f\u6301 countTokens/generateContent/listModels",
+      "file_type": "rationale",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L68",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_rationale_68",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "\u667a\u80fd\u7ec4\u88c5 gemini api \u7aef\u70b9 url,\u652f\u6301 counttokens/generatecontent/listmodels"
+    },
+    {
+      "label": "\u6784\u5efa\u652f\u6301\u4ee3\u7406\u7684 urllib opener",
+      "file_type": "rationale",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L81",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_rationale_81",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "\u6784\u5efa\u652f\u6301\u4ee3\u7406\u7684 urllib opener"
+    },
+    {
+      "label": "\u7edf\u4e00\u6267\u884c API HTTP \u8bf7\u6c42\uff0c\u5305\u542b\u7ed3\u6784\u5316 HTTPError \u89e3\u6790\u4e0e\u81ea\u52a8\u9000\u907f\u91cd\u8bd5",
+      "file_type": "rationale",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L92",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_rationale_92",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "\u7edf\u4e00\u6267\u884c api http \u8bf7\u6c42,\u5305\u542b\u7ed3\u6784\u5316 httperror \u89e3\u6790\u4e0e\u81ea\u52a8\u9000\u907f\u91cd\u8bd5"
+    },
+    {
       "label": "Group 1: Monolithic Rust file context with multiple functions.",
       "file_type": "rationale",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L35",
+      "source_location": "L163",
       "_origin": "ast",
-      "id": "examples_benchmark_eval_eval_runner_rationale_35",
+      "id": "examples_benchmark_eval_eval_runner_rationale_163",
       "community": 27,
       "community_name": "eval_runner.py",
       "norm_label": "group 1: monolithic rust file context with multiple functions."
@@ -16353,9 +16485,9 @@
       "label": "Group 2: Isolated Rust function signature with docstrings (Micro-Worker).",
       "file_type": "rationale",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L61",
+      "source_location": "L189",
       "_origin": "ast",
-      "id": "examples_benchmark_eval_eval_runner_rationale_61",
+      "id": "examples_benchmark_eval_eval_runner_rationale_189",
       "community": 27,
       "community_name": "eval_runner.py",
       "norm_label": "group 2: isolated rust function signature with docstrings (micro-worker)."
@@ -16364,34 +16496,56 @@
       "label": "Group 3: Axiom Hole Task (Pure formal contracts & inputs, no boilerplate).",
       "file_type": "rationale",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L86",
+      "source_location": "L214",
       "_origin": "ast",
-      "id": "examples_benchmark_eval_eval_runner_rationale_86",
+      "id": "examples_benchmark_eval_eval_runner_rationale_214",
       "community": 27,
       "community_name": "eval_runner.py",
       "norm_label": "group 3: axiom hole task (pure formal contracts & inputs, no boilerplate)."
     },
     {
-      "label": "Call the official Gemini countTokens REST endpoint.",
+      "label": "\u8c03\u7528\u5b98\u65b9 Gemini countTokens REST \u7aef\u70b9",
       "file_type": "rationale",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L108",
+      "source_location": "L236",
       "_origin": "ast",
-      "id": "examples_benchmark_eval_eval_runner_rationale_108",
+      "id": "examples_benchmark_eval_eval_runner_rationale_236",
       "community": 27,
       "community_name": "eval_runner.py",
-      "norm_label": "call the official gemini counttokens rest endpoint."
+      "norm_label": "\u8c03\u7528\u5b98\u65b9 gemini counttokens rest \u7aef\u70b9"
     },
     {
-      "label": "Call the official Gemini generateContent REST endpoint.",
+      "label": "\u8c03\u7528\u5b98\u65b9 Gemini generateContent REST \u7aef\u70b9",
       "file_type": "rationale",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L128",
+      "source_location": "L250",
       "_origin": "ast",
-      "id": "examples_benchmark_eval_eval_runner_rationale_128",
+      "id": "examples_benchmark_eval_eval_runner_rationale_250",
       "community": 27,
       "community_name": "eval_runner.py",
-      "norm_label": "call the official gemini generatecontent rest endpoint."
+      "norm_label": "\u8c03\u7528\u5b98\u65b9 gemini generatecontent rest \u7aef\u70b9"
+    },
+    {
+      "label": "\u67e5\u8be2\u5e76\u5217\u51fa\u5f53\u524d API Key \u53ef\u7528\u7684\u5b98\u65b9 Gemini \u6a21\u578b",
+      "file_type": "rationale",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L279",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_rationale_279",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "\u67e5\u8be2\u5e76\u5217\u51fa\u5f53\u524d api key \u53ef\u7528\u7684\u5b98\u65b9 gemini \u6a21\u578b"
+    },
+    {
+      "label": "\u9884\u68c0\u51fd\u6570\uff1a\u5728\u6b63\u5f0f\u8bc4\u6d4b\u524d\u53d1\u9001 1 \u4e2a\u6781\u8f7b\u91cf\u63a2\u6d4b\u8bf7\u6c42\u3002 \u9a8c\u8bc1\u7f51\u7edc\u901a\u8def\u3001API Key \u6388\u6743\u4e0e\u76ee\u6807\u6a21\u578b\u53ef\u7528\u6027\u3002",
+      "file_type": "rationale",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L286",
+      "_origin": "ast",
+      "id": "examples_benchmark_eval_eval_runner_rationale_286",
+      "community": 27,
+      "community_name": "eval_runner.py",
+      "norm_label": "\u9884\u68c0\u51fd\u6570:\u5728\u6b63\u5f0f\u8bc4\u6d4b\u524d\u53d1\u9001 1 \u4e2a\u6781\u8f7b\u91cf\u63a2\u6d4b\u8bf7\u6c42\u3002 \u9a8c\u8bc1\u7f51\u7edc\u901a\u8def\u3001api key \u6388\u6743\u4e0e\u76ee\u6807\u6a21\u578b\u53ef\u7528\u6027\u3002"
     },
     {
       "label": "AxiomAssetRegistry.cs",
@@ -19176,8 +19330,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_dependencies_com_unity_collections",
-      "community": 118,
-      "community_name": "com.unity.burst",
+      "community": 119,
+      "community_name": "com.unity.test-framework",
       "norm_label": "com.unity.collections"
     },
     {
@@ -19187,8 +19341,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "com_unity_collections",
-      "community": 118,
-      "community_name": "com.unity.burst",
+      "community": 119,
+      "community_name": "com.unity.test-framework",
       "norm_label": "com.unity.collections"
     },
     {
@@ -19220,8 +19374,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_dependencies_com_unity_modules_uielements",
-      "community": 54,
-      "community_name": "com.unity.2d.common",
+      "community": 118,
+      "community_name": "com.unity.mathematics",
       "norm_label": "com.unity.modules.uielements"
     },
     {
@@ -19231,8 +19385,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_json_com_unity_modules_uielements",
-      "community": 54,
-      "community_name": "com.unity.2d.common",
+      "community": 118,
+      "community_name": "com.unity.mathematics",
       "norm_label": "com.unity.modules.uielements"
     },
     {
@@ -19308,7 +19462,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_dependencies_com_unity_mathematics",
-      "community": 127,
+      "community": 118,
       "community_name": "com.unity.mathematics",
       "norm_label": "com.unity.mathematics"
     },
@@ -19319,7 +19473,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "com_unity_mathematics",
-      "community": 127,
+      "community": 118,
       "community_name": "com.unity.mathematics",
       "norm_label": "com.unity.mathematics"
     },
@@ -19374,8 +19528,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_2d_common_dependencies",
-      "community": 54,
-      "community_name": "com.unity.2d.common",
+      "community": 118,
+      "community_name": "com.unity.mathematics",
       "norm_label": "dependencies"
     },
     {
@@ -19386,7 +19540,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_dependencies_com_unity_burst",
       "community": 118,
-      "community_name": "com.unity.burst",
+      "community_name": "com.unity.mathematics",
       "norm_label": "com.unity.burst"
     },
     {
@@ -19397,7 +19551,7 @@
       "_origin": "ast",
       "id": "com_unity_burst",
       "community": 118,
-      "community_name": "com.unity.burst",
+      "community_name": "com.unity.mathematics",
       "norm_label": "com.unity.burst"
     },
     {
@@ -19628,7 +19782,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_dependencies_com_unity_2d_spriteshape",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "com.unity.2d.spriteshape"
     },
     {
@@ -19639,7 +19793,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_2d_spriteshape_version",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "version"
     },
     {
@@ -19650,7 +19804,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_2d_spriteshape_depth",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "depth"
     },
     {
@@ -19661,7 +19815,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_2d_spriteshape_source",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "source"
     },
     {
@@ -19672,7 +19826,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_2d_spriteshape_dependencies",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "dependencies"
     },
     {
@@ -19683,7 +19837,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_dependencies_com_unity_modules_physics2d",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "com.unity.modules.physics2d"
     },
     {
@@ -19694,7 +19848,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_json_com_unity_modules_physics2d",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "com.unity.modules.physics2d"
     },
     {
@@ -19705,7 +19859,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_2d_spriteshape_url",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "url"
     },
     {
@@ -19914,7 +20068,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_burst_version",
       "community": 118,
-      "community_name": "com.unity.burst",
+      "community_name": "com.unity.mathematics",
       "norm_label": "version"
     },
     {
@@ -19925,7 +20079,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_burst_depth",
       "community": 118,
-      "community_name": "com.unity.burst",
+      "community_name": "com.unity.mathematics",
       "norm_label": "depth"
     },
     {
@@ -19936,7 +20090,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_burst_source",
       "community": 118,
-      "community_name": "com.unity.burst",
+      "community_name": "com.unity.mathematics",
       "norm_label": "source"
     },
     {
@@ -19947,7 +20101,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_burst_dependencies",
       "community": 118,
-      "community_name": "com.unity.burst",
+      "community_name": "com.unity.mathematics",
       "norm_label": "dependencies"
     },
     {
@@ -19958,7 +20112,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_burst_url",
       "community": 118,
-      "community_name": "com.unity.burst",
+      "community_name": "com.unity.mathematics",
       "norm_label": "url"
     },
     {
@@ -20034,8 +20188,8 @@
       "source_location": "L117",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_collections_version",
-      "community": 118,
-      "community_name": "com.unity.burst",
+      "community": 119,
+      "community_name": "com.unity.test-framework",
       "norm_label": "version"
     },
     {
@@ -20045,8 +20199,8 @@
       "source_location": "L118",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_collections_depth",
-      "community": 118,
-      "community_name": "com.unity.burst",
+      "community": 119,
+      "community_name": "com.unity.test-framework",
       "norm_label": "depth"
     },
     {
@@ -20056,8 +20210,8 @@
       "source_location": "L119",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_collections_source",
-      "community": 118,
-      "community_name": "com.unity.burst",
+      "community": 119,
+      "community_name": "com.unity.test-framework",
       "norm_label": "source"
     },
     {
@@ -20067,8 +20221,8 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_collections_dependencies",
-      "community": 118,
-      "community_name": "com.unity.burst",
+      "community": 119,
+      "community_name": "com.unity.test-framework",
       "norm_label": "dependencies"
     },
     {
@@ -20079,7 +20233,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_dependencies_com_unity_test_framework",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "com.unity.test-framework"
     },
     {
@@ -20090,7 +20244,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_json_com_unity_test_framework",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "com.unity.test-framework"
     },
     {
@@ -20100,8 +20254,8 @@
       "source_location": "L124",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_collections_url",
-      "community": 118,
-      "community_name": "com.unity.burst",
+      "community": 119,
+      "community_name": "com.unity.test-framework",
       "norm_label": "url"
     },
     {
@@ -20111,7 +20265,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_dependencies_com_unity_ext_nunit",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "com.unity.ext.nunit"
     },
@@ -20122,7 +20276,7 @@
       "source_location": "L127",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ext_nunit_version",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "version"
     },
@@ -20133,7 +20287,7 @@
       "source_location": "L128",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ext_nunit_depth",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "depth"
     },
@@ -20144,7 +20298,7 @@
       "source_location": "L129",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ext_nunit_source",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "source"
     },
@@ -20155,7 +20309,7 @@
       "source_location": "L130",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ext_nunit_dependencies",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "dependencies"
     },
@@ -20166,7 +20320,7 @@
       "source_location": "L131",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ext_nunit_url",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "url"
     },
@@ -20255,7 +20409,7 @@
       "_origin": "ast",
       "id": "com_unity_2d_spriteshape",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "com.unity.2d.spriteshape"
     },
     {
@@ -20287,7 +20441,7 @@
       "source_location": "L148",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_dependencies_com_unity_ide_rider",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "com.unity.ide.rider"
     },
@@ -20298,7 +20452,7 @@
       "source_location": "L149",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ide_rider_version",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "version"
     },
@@ -20309,7 +20463,7 @@
       "source_location": "L150",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ide_rider_depth",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "depth"
     },
@@ -20320,7 +20474,7 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ide_rider_source",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "source"
     },
@@ -20331,7 +20485,7 @@
       "source_location": "L152",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ide_rider_dependencies",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "dependencies"
     },
@@ -20342,7 +20496,7 @@
       "source_location": "L153",
       "_origin": "ast",
       "id": "com_unity_ext_nunit",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "com.unity.ext.nunit"
     },
@@ -20353,7 +20507,7 @@
       "source_location": "L155",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ide_rider_url",
-      "community": 119,
+      "community": 133,
       "community_name": "com.unity.ext.nunit",
       "norm_label": "url"
     },
@@ -20365,7 +20519,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_dependencies_com_unity_ide_visualstudio",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "com.unity.ide.visualstudio"
     },
     {
@@ -20376,7 +20530,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ide_visualstudio_version",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "version"
     },
     {
@@ -20387,7 +20541,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ide_visualstudio_depth",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "depth"
     },
     {
@@ -20398,7 +20552,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ide_visualstudio_source",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "source"
     },
     {
@@ -20409,7 +20563,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ide_visualstudio_dependencies",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "dependencies"
     },
     {
@@ -20420,7 +20574,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_ide_visualstudio_url",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "url"
     },
     {
@@ -20430,7 +20584,7 @@
       "source_location": "L167",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_mathematics_version",
-      "community": 127,
+      "community": 118,
       "community_name": "com.unity.mathematics",
       "norm_label": "version"
     },
@@ -20441,7 +20595,7 @@
       "source_location": "L168",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_mathematics_depth",
-      "community": 127,
+      "community": 118,
       "community_name": "com.unity.mathematics",
       "norm_label": "depth"
     },
@@ -20452,7 +20606,7 @@
       "source_location": "L169",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_mathematics_source",
-      "community": 127,
+      "community": 118,
       "community_name": "com.unity.mathematics",
       "norm_label": "source"
     },
@@ -20463,7 +20617,7 @@
       "source_location": "L170",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_mathematics_dependencies",
-      "community": 127,
+      "community": 118,
       "community_name": "com.unity.mathematics",
       "norm_label": "dependencies"
     },
@@ -20474,7 +20628,7 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_mathematics_url",
-      "community": 127,
+      "community": 118,
       "community_name": "com.unity.mathematics",
       "norm_label": "url"
     },
@@ -20529,8 +20683,8 @@
       "source_location": "L177",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_render_pipelines_core_dependencies",
-      "community": 109,
-      "community_name": "com.unity.render-pipelines.core",
+      "community": 130,
+      "community_name": "com.unity.modules.terrain",
       "norm_label": "dependencies"
     },
     {
@@ -20860,7 +21014,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_test_framework_version",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "version"
     },
     {
@@ -20871,7 +21025,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_test_framework_depth",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "depth"
     },
     {
@@ -20882,7 +21036,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_test_framework_source",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "source"
     },
     {
@@ -20893,7 +21047,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_test_framework_dependencies",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "dependencies"
     },
     {
@@ -20904,7 +21058,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_test_framework_url",
       "community": 119,
-      "community_name": "com.unity.ext.nunit",
+      "community_name": "com.unity.test-framework",
       "norm_label": "url"
     },
     {
@@ -21828,7 +21982,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_modules_physics2d_version",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "version"
     },
     {
@@ -21839,7 +21993,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_modules_physics2d_depth",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "depth"
     },
     {
@@ -21850,7 +22004,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_modules_physics2d_source",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "source"
     },
     {
@@ -21861,7 +22015,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_modules_physics2d_dependencies",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "dependencies"
     },
     {
@@ -22125,7 +22279,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_modules_tilemap_dependencies",
       "community": 127,
-      "community_name": "com.unity.mathematics",
+      "community_name": "com.unity.2d.spriteshape",
       "norm_label": "dependencies"
     },
     {
@@ -22179,8 +22333,8 @@
       "source_location": "L400",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_modules_uielements_version",
-      "community": 54,
-      "community_name": "com.unity.2d.common",
+      "community": 118,
+      "community_name": "com.unity.mathematics",
       "norm_label": "version"
     },
     {
@@ -22190,8 +22344,8 @@
       "source_location": "L401",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_modules_uielements_depth",
-      "community": 54,
-      "community_name": "com.unity.2d.common",
+      "community": 118,
+      "community_name": "com.unity.mathematics",
       "norm_label": "depth"
     },
     {
@@ -22201,8 +22355,8 @@
       "source_location": "L402",
       "_origin": "ast",
       "id": "examples_game_survivor_packages_packages_lock_com_unity_modules_uielements_source",
-      "community": 54,
-      "community_name": "com.unity.2d.common",
+      "community": 118,
+      "community_name": "com.unity.mathematics",
       "norm_label": "source"
     },
     {
@@ -25840,8 +25994,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow",
-      "community": 43,
-      "community_name": "README.md",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "docs/multi_agent_workflow.md"
     },
     {
@@ -25851,8 +26005,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow_axiom_\u591a_agent_\u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
-      "community": 125,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "axiom \u591a agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b"
     },
     {
@@ -25862,8 +26016,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow_1_\u4e3a\u4ec0\u4e48\u4f20\u7edf_git_\u4e0d\u9002\u5408\u591a_agent_\u5e76\u884c",
-      "community": 125,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "1. \u4e3a\u4ec0\u4e48\u4f20\u7edf git \u4e0d\u9002\u5408\u591a agent \u5e76\u884c?"
     },
     {
@@ -25873,8 +26027,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow_2_axiom_\u7684\u5185\u5bb9\u5bfb\u5740_ast_\u89e3\u51b3\u65b9\u6848",
-      "community": 125,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "2. axiom \u7684\u5185\u5bb9\u5bfb\u5740 ast \u89e3\u51b3\u65b9\u6848"
     },
     {
@@ -25884,8 +26038,8 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow_\u6838\u5fc3\u7279\u6027",
-      "community": 125,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "\u6838\u5fc3\u7279\u6027:"
     },
     {
@@ -25895,8 +26049,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow_3_\u591a_agent_\u5e76\u53d1\u534f\u4f5c\u6807\u51c6\u4f5c\u4e1a\u6d41\u7a0b_sop",
-      "community": 125,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "3. \u591a agent \u5e76\u53d1\u534f\u4f5c\u6807\u51c6\u4f5c\u4e1a\u6d41\u7a0b (sop)"
     },
     {
@@ -25906,8 +26060,8 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "docs_multi_agent_workflow_4_\u81ea\u52a8\u53cd\u4f8b\u81ea\u6108\u534f\u8bae_auto_healing_with_counter_examples",
-      "community": 125,
-      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
+      "community": 32,
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "4. \u81ea\u52a8\u53cd\u4f8b\u81ea\u6108\u534f\u8bae (auto-healing with counter-examples)"
     },
     {
@@ -26115,8 +26269,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_roadmap",
-      "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community": 43,
+      "community_name": "README.md",
       "norm_label": "docs/roadmap.md"
     },
     {
@@ -26126,8 +26280,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "docs_roadmap_axiom_\u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe_roadmap",
-      "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community": 201,
+      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
       "norm_label": "axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (roadmap)"
     },
     {
@@ -26137,8 +26291,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "docs_roadmap_\u9636\u6bb5\u4e00_\u539f\u578b\u4e0e\u9a8c\u8bc1\u7f16\u8bd1\u5668_mvp_prototype_q1",
-      "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community": 201,
+      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
       "norm_label": "\u9636\u6bb5\u4e00:\u539f\u578b\u4e0e\u9a8c\u8bc1\u7f16\u8bd1\u5668 (mvp prototype - q1)"
     },
     {
@@ -26148,8 +26302,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "docs_roadmap_\u9636\u6bb5\u4e8c_effect_\u7cfb\u7edf\u4e0e\u5951\u7ea6\u9a8c\u8bc1_q2",
-      "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community": 201,
+      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
       "norm_label": "\u9636\u6bb5\u4e8c:effect \u7cfb\u7edf\u4e0e\u5951\u7ea6\u9a8c\u8bc1 (q2)"
     },
     {
@@ -26159,8 +26313,8 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "docs_roadmap_\u9636\u6bb5\u4e09_\u5185\u5bb9\u5bfb\u5740_ast_\u4ee3\u7801\u5e93\u4e0e\u591a_agent_\u534f\u540c_q3",
-      "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community": 201,
+      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
       "norm_label": "\u9636\u6bb5\u4e09:\u5185\u5bb9\u5bfb\u5740 ast \u4ee3\u7801\u5e93\u4e0e\u591a agent \u534f\u540c (q3)"
     },
     {
@@ -26170,8 +26324,8 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "docs_roadmap_\u9636\u6bb5\u56db_\u5168\u5e73\u53f0\u4e0e\u751f\u6001\u4e92\u64cd\u4f5c_q4",
-      "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community": 201,
+      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
       "norm_label": "\u9636\u6bb5\u56db:\u5168\u5e73\u53f0\u4e0e\u751f\u6001\u4e92\u64cd\u4f5c (q4)"
     },
     {
@@ -26479,7 +26633,7 @@
       "_origin": "ast",
       "id": "docs_en_multi_agent_workflow",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "en/multi_agent_workflow.md"
     },
     {
@@ -26490,7 +26644,7 @@
       "_origin": "ast",
       "id": "docs_en_multi_agent_workflow_axiom_multi_agent_collaboration_protocol_content_addressed_codebase",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "axiom multi-agent collaboration protocol & content-addressed codebase"
     },
     {
@@ -26501,7 +26655,7 @@
       "_origin": "ast",
       "id": "docs_en_multi_agent_workflow_1_why_traditional_git_fails_multi_agent_concurrency",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "1. why traditional git fails multi-agent concurrency"
     },
     {
@@ -26512,7 +26666,7 @@
       "_origin": "ast",
       "id": "docs_en_multi_agent_workflow_2_axiom_s_content_addressed_ast_solution",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "2. axiom's content-addressed ast solution"
     },
     {
@@ -26523,7 +26677,7 @@
       "_origin": "ast",
       "id": "docs_en_multi_agent_workflow_core_capabilities",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "core capabilities:"
     },
     {
@@ -26534,7 +26688,7 @@
       "_origin": "ast",
       "id": "docs_en_multi_agent_workflow_3_standard_operating_procedure_sop_for_multi_agent_workflows",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "3. standard operating procedure (sop) for multi-agent workflows"
     },
     {
@@ -26545,7 +26699,7 @@
       "_origin": "ast",
       "id": "docs_en_multi_agent_workflow_4_automated_healing_via_smt_counterexamples",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "4. automated healing via smt counterexamples"
     },
     {
@@ -26556,7 +26710,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "en/roadmap.md"
     },
     {
@@ -26567,7 +26721,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_axiom_project_roadmap",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "axiom project roadmap"
     },
     {
@@ -26578,7 +26732,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_phase_1_mvp_prototype_core_compiler_q1",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "phase 1: mvp prototype & core compiler (q1)"
     },
     {
@@ -26589,7 +26743,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_phase_2_effect_system_formal_contract_verification_q2",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "phase 2: effect system & formal contract verification (q2)"
     },
     {
@@ -26600,7 +26754,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_phase_3_content_addressed_ast_codebase_multi_agent_concurrency_q3",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "phase 3: content-addressed ast codebase & multi-agent concurrency (q3)"
     },
     {
@@ -26611,7 +26765,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_phase_4_cross_platform_runtimes_ecosystem_interop_q4",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "phase 4: cross-platform runtimes & ecosystem interop (q4)"
     },
     {
@@ -26996,7 +27150,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "zh-cn/multi_agent_workflow.md"
     },
     {
@@ -27006,8 +27160,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow_axiom_\u591a_agent_\u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
-      "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community": 200,
+      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
       "norm_label": "axiom \u591a agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b"
     },
     {
@@ -27017,8 +27171,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow_1_\u4e3a\u4ec0\u4e48\u4f20\u7edf_git_\u4e0d\u9002\u5408\u591a_agent_\u5e76\u884c",
-      "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community": 200,
+      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
       "norm_label": "1. \u4e3a\u4ec0\u4e48\u4f20\u7edf git \u4e0d\u9002\u5408\u591a agent \u5e76\u884c?"
     },
     {
@@ -27028,8 +27182,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow_2_axiom_\u7684\u5185\u5bb9\u5bfb\u5740_ast_\u89e3\u51b3\u65b9\u6848",
-      "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community": 200,
+      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
       "norm_label": "2. axiom \u7684\u5185\u5bb9\u5bfb\u5740 ast \u89e3\u51b3\u65b9\u6848"
     },
     {
@@ -27039,8 +27193,8 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow_\u6838\u5fc3\u7279\u6027",
-      "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community": 200,
+      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
       "norm_label": "\u6838\u5fc3\u7279\u6027:"
     },
     {
@@ -27050,8 +27204,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow_3_\u591a_agent_\u5e76\u53d1\u534f\u4f5c\u6807\u51c6\u4f5c\u4e1a\u6d41\u7a0b_sop",
-      "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community": 200,
+      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
       "norm_label": "3. \u591a agent \u5e76\u53d1\u534f\u4f5c\u6807\u51c6\u4f5c\u4e1a\u6d41\u7a0b (sop)"
     },
     {
@@ -27061,8 +27215,8 @@
       "source_location": "L80",
       "_origin": "ast",
       "id": "docs_zh_cn_multi_agent_workflow_4_\u81ea\u52a8\u53cd\u4f8b\u81ea\u6108\u534f\u8bae_auto_healing_with_counter_examples",
-      "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community": 200,
+      "community_name": "Axiom \u591a Agent \u5e76\u53d1\u5f00\u53d1\u534f\u8bae\u4e0e\u5185\u5bb9\u5bfb\u5740\u6a21\u578b",
       "norm_label": "4. \u81ea\u52a8\u53cd\u4f8b\u81ea\u6108\u534f\u8bae (auto-healing with counter-examples)"
     },
     {
@@ -27271,7 +27425,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "zh-cn/roadmap.md"
     },
     {
@@ -27282,7 +27436,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_axiom_\u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe_roadmap",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (roadmap)"
     },
     {
@@ -27293,7 +27447,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_\u9636\u6bb5\u4e00_\u539f\u578b\u4e0e\u9a8c\u8bc1\u7f16\u8bd1\u5668_mvp_prototype_q1",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u9636\u6bb5\u4e00:\u539f\u578b\u4e0e\u9a8c\u8bc1\u7f16\u8bd1\u5668 (mvp prototype - q1)"
     },
     {
@@ -27304,7 +27458,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_\u9636\u6bb5\u4e8c_effect_\u7cfb\u7edf\u4e0e\u5951\u7ea6\u9a8c\u8bc1_q2",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u9636\u6bb5\u4e8c:effect \u7cfb\u7edf\u4e0e\u5951\u7ea6\u9a8c\u8bc1 (q2)"
     },
     {
@@ -27315,7 +27469,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_\u9636\u6bb5\u4e09_\u5185\u5bb9\u5bfb\u5740_ast_\u4ee3\u7801\u5e93\u4e0e\u591a_agent_\u534f\u540c_q3",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u9636\u6bb5\u4e09:\u5185\u5bb9\u5bfb\u5740 ast \u4ee3\u7801\u5e93\u4e0e\u591a agent \u534f\u540c (q3)"
     },
     {
@@ -27326,7 +27480,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_\u9636\u6bb5\u56db_\u5168\u5e73\u53f0\u4e0e\u751f\u6001\u4e92\u64cd\u4f5c_q4",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u9636\u6bb5\u56db:\u5168\u5e73\u53f0\u4e0e\u751f\u6001\u4e92\u64cd\u4f5c (q4)"
     },
     {
@@ -27634,7 +27788,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "zh-tw/multi_agent_workflow.md"
     },
     {
@@ -27645,7 +27799,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow_axiom_\u591a_agent_\u4e26\u884c\u958b\u767c\u5354\u5b9a\u8207\u5167\u5bb9\u5b9a\u5740\u6a21\u578b",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "axiom \u591a agent \u4e26\u884c\u958b\u767c\u5354\u5b9a\u8207\u5167\u5bb9\u5b9a\u5740\u6a21\u578b"
     },
     {
@@ -27656,7 +27810,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow_1_\u70ba\u4ec0\u9ebc\u50b3\u7d71_git_\u4e0d\u9069\u5408\u591a_agent_\u4e26\u884c",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "1. \u70ba\u4ec0\u9ebc\u50b3\u7d71 git \u4e0d\u9069\u5408\u591a agent \u4e26\u884c?"
     },
     {
@@ -27667,7 +27821,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow_2_axiom_\u7684\u5167\u5bb9\u5b9a\u5740_ast_\u89e3\u6c7a\u65b9\u6848",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "2. axiom \u7684\u5167\u5bb9\u5b9a\u5740 ast \u89e3\u6c7a\u65b9\u6848"
     },
     {
@@ -27678,7 +27832,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow_\u6838\u5fc3\u7279\u6027",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "\u6838\u5fc3\u7279\u6027:"
     },
     {
@@ -27689,7 +27843,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow_3_\u591a_agent_\u4e26\u767c\u5354\u4f5c\u6a19\u6e96\u4f5c\u696d\u7a0b\u5e8f_sop",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "3. \u591a agent \u4e26\u767c\u5354\u4f5c\u6a19\u6e96\u4f5c\u696d\u7a0b\u5e8f (sop)"
     },
     {
@@ -27700,7 +27854,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_multi_agent_workflow_4_\u81ea\u52d5\u53cd\u4f8b\u81ea\u7652\u5354\u5b9a_auto_healing_with_counter_examples",
       "community": 32,
-      "community_name": "Axiom Multi-Agent Collaboration Protocol & Content-Addressed Codebase",
+      "community_name": "docs/MULTI_AGENT_WORKFLOW.md",
       "norm_label": "4. \u81ea\u52d5\u53cd\u4f8b\u81ea\u7652\u5354\u5b9a (auto-healing with counter-examples)"
     },
     {
@@ -27711,7 +27865,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "zh-tw/roadmap.md"
     },
     {
@@ -27722,7 +27876,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_axiom_\u5c08\u6848\u767c\u5c55\u85cd\u5716_roadmap",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "axiom \u5c08\u6848\u767c\u5c55\u85cd\u5716 (roadmap)"
     },
     {
@@ -27733,7 +27887,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_\u968e\u6bb5\u4e00_\u539f\u578b\u8207\u9a57\u8b49\u7de8\u8b6f\u5668_mvp_prototype_q1",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u968e\u6bb5\u4e00:\u539f\u578b\u8207\u9a57\u8b49\u7de8\u8b6f\u5668 (mvp prototype - q1)"
     },
     {
@@ -27744,7 +27898,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_\u968e\u6bb5\u4e8c_effect_\u7cfb\u7d71\u8207\u5951\u7d04\u9a57\u8b49_q2",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u968e\u6bb5\u4e8c:effect \u7cfb\u7d71\u8207\u5951\u7d04\u9a57\u8b49 (q2)"
     },
     {
@@ -27755,7 +27909,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_\u968e\u6bb5\u4e09_\u5167\u5bb9\u5b9a\u5740_ast_\u4ee3\u78bc\u5eab\u8207\u591a_agent_\u5354\u540c_q3",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u968e\u6bb5\u4e09:\u5167\u5bb9\u5b9a\u5740 ast \u4ee3\u78bc\u5eab\u8207\u591a agent \u5354\u540c (q3)"
     },
     {
@@ -27766,7 +27920,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_\u968e\u6bb5\u56db_\u5168\u5e73\u81fa\u8207\u751f\u614b\u4e92\u64cd\u4f5c_q4",
       "community": 25,
-      "community_name": "docs/ROADMAP.md",
+      "community_name": "Axiom Project Roadmap",
       "norm_label": "\u968e\u6bb5\u56db:\u5168\u5e73\u81fa\u8207\u751f\u614b\u4e92\u64cd\u4f5c (q4)"
     },
     {
@@ -28734,7 +28888,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_readme_en",
       "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "game_survivor/readme.en.md"
     },
     {
@@ -28745,7 +28899,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_readme_en_axiom_survivors_complete_unity_showcase",
       "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\ud83c\udfae axiom survivors: complete unity showcase"
     },
     {
@@ -28756,7 +28910,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_readme_en_why_this_showcase_matters",
       "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "why this showcase matters"
     },
     {
@@ -28767,7 +28921,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_readme_en_architecture",
       "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "architecture"
     },
     {
@@ -28778,7 +28932,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_readme_en_prerequisites",
       "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "prerequisites"
     },
     {
@@ -28789,7 +28943,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_readme_en_build_the_bridge_and_dll",
       "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "build the bridge and dll"
     },
     {
@@ -28800,7 +28954,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_readme_en_run_e2e_validation_without_unity",
       "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "run e2e validation without unity"
     },
     {
@@ -28811,7 +28965,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_readme_en_run_in_unity",
       "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "run in unity"
     },
     {
@@ -28822,7 +28976,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_readme_en_validation_boundaries",
       "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "validation boundaries"
     },
     {
@@ -28832,8 +28986,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_game_survivor_readme",
-      "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community": 43,
+      "community_name": "README.md",
       "norm_label": "game_survivor/readme.md"
     },
     {
@@ -28843,8 +28997,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_axiom_survivors_\u5b8c\u6574_unity_showcase",
-      "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community": 149,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\ud83c\udfae axiom survivors:\u5b8c\u6574 unity showcase"
     },
     {
@@ -28854,8 +29008,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_\u4e3a\u4ec0\u4e48\u8fd9\u4e2a\u793a\u4f8b\u503c\u5f97\u5173\u6ce8",
-      "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community": 149,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u4e3a\u4ec0\u4e48\u8fd9\u4e2a\u793a\u4f8b\u503c\u5f97\u5173\u6ce8"
     },
     {
@@ -28865,8 +29019,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_\u67b6\u6784",
-      "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community": 149,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u67b6\u6784"
     },
     {
@@ -28876,8 +29030,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_\u73af\u5883\u8981\u6c42",
-      "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community": 149,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u73af\u5883\u8981\u6c42"
     },
     {
@@ -28887,8 +29041,8 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_\u4e00\u952e\u6784\u5efa\u6865\u63a5\u4e0e_dll",
-      "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community": 149,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u4e00\u952e\u6784\u5efa\u6865\u63a5\u4e0e dll"
     },
     {
@@ -28898,8 +29052,8 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_\u4e0d\u6253\u5f00_unity_\u6267\u884c_e2e_\u9a8c\u8bc1",
-      "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community": 149,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u4e0d\u6253\u5f00 unity \u6267\u884c e2e \u9a8c\u8bc1"
     },
     {
@@ -28909,8 +29063,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_\u5728_unity_\u4e2d\u8fd0\u884c",
-      "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community": 149,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u5728 unity \u4e2d\u8fd0\u884c"
     },
     {
@@ -28920,8 +29074,8 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_\u9a8c\u8bc1\u8fb9\u754c",
-      "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community": 149,
+      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
       "norm_label": "\u9a8c\u8bc1\u8fb9\u754c"
     },
     {
@@ -28932,7 +29086,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn",
       "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "game_survivor/readme.zh-cn.md"
     },
     {
@@ -28942,8 +29096,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_axiom_survivors_\u5b8c\u6574_unity_showcase",
-      "community": 116,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\ud83c\udfae axiom survivors:\u5b8c\u6574 unity showcase"
     },
     {
@@ -28953,8 +29107,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u4e3a\u4ec0\u4e48\u8fd9\u4e2a\u793a\u4f8b\u503c\u5f97\u5173\u6ce8",
-      "community": 116,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u4e3a\u4ec0\u4e48\u8fd9\u4e2a\u793a\u4f8b\u503c\u5f97\u5173\u6ce8"
     },
     {
@@ -28964,8 +29118,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u67b6\u6784",
-      "community": 116,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u67b6\u6784"
     },
     {
@@ -28975,8 +29129,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u73af\u5883\u8981\u6c42",
-      "community": 116,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u73af\u5883\u8981\u6c42"
     },
     {
@@ -28986,8 +29140,8 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u4e00\u952e\u6784\u5efa\u6865\u63a5\u4e0e_dll",
-      "community": 116,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u4e00\u952e\u6784\u5efa\u6865\u63a5\u4e0e dll"
     },
     {
@@ -28997,8 +29151,8 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u4e0d\u6253\u5f00_unity_\u6267\u884c_e2e_\u9a8c\u8bc1",
-      "community": 116,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u4e0d\u6253\u5f00 unity \u6267\u884c e2e \u9a8c\u8bc1"
     },
     {
@@ -29008,8 +29162,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u5728_unity_\u4e2d\u8fd0\u884c",
-      "community": 116,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u5728 unity \u4e2d\u8fd0\u884c"
     },
     {
@@ -29019,8 +29173,8 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_cn_\u9a8c\u8bc1\u8fb9\u754c",
-      "community": 116,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u9a8c\u8bc1\u8fb9\u754c"
     },
     {
@@ -29031,7 +29185,7 @@
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw",
       "community": 137,
-      "community_name": "game_survivor/README.md",
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "game_survivor/readme.zh-tw.md"
     },
     {
@@ -29041,8 +29195,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_axiom_survivors_\u5b8c\u6574_unity_showcase",
-      "community": 67,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\ud83c\udfae axiom survivors:\u5b8c\u6574 unity showcase"
     },
     {
@@ -29052,8 +29206,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u70ba\u4ec0\u9ebc\u9019\u500b\u7bc4\u4f8b\u503c\u5f97\u95dc\u6ce8",
-      "community": 67,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u70ba\u4ec0\u9ebc\u9019\u500b\u7bc4\u4f8b\u503c\u5f97\u95dc\u6ce8"
     },
     {
@@ -29063,8 +29217,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u67b6\u69cb",
-      "community": 67,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u67b6\u69cb"
     },
     {
@@ -29074,8 +29228,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u74b0\u5883\u9700\u6c42",
-      "community": 67,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u74b0\u5883\u9700\u6c42"
     },
     {
@@ -29085,8 +29239,8 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u4e00\u9375\u5efa\u7f6e\u6a4b\u63a5\u8207_dll",
-      "community": 67,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u4e00\u9375\u5efa\u7f6e\u6a4b\u63a5\u8207 dll"
     },
     {
@@ -29096,8 +29250,8 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u4e0d\u958b\u555f_unity_\u57f7\u884c_e2e_\u9a57\u8b49",
-      "community": 67,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u4e0d\u958b\u555f unity \u57f7\u884c e2e \u9a57\u8b49"
     },
     {
@@ -29107,8 +29261,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u5728_unity_\u4e2d\u57f7\u884c",
-      "community": 67,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u5728 unity \u4e2d\u57f7\u884c"
     },
     {
@@ -29118,8 +29272,8 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "examples_game_survivor_readme_zh_tw_\u9a57\u8b49\u908a\u754c",
-      "community": 67,
-      "community_name": "\ud83c\udfae Axiom Survivors\uff1a\u5b8c\u6574 Unity Showcase",
+      "community": 137,
+      "community_name": "\ud83c\udfae Axiom Survivors: Complete Unity Showcase",
       "norm_label": "\u9a57\u8b49\u908a\u754c"
     },
     {
@@ -68783,66 +68937,11 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L34",
+      "source_location": "L67",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner",
-      "target": "examples_benchmark_eval_eval_runner_build_group1_prompt",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L60",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner",
-      "target": "examples_benchmark_eval_eval_runner_build_group2_prompt",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L85",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner",
-      "target": "examples_benchmark_eval_eval_runner_build_group3_prompt",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L107",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner",
-      "target": "examples_benchmark_eval_eval_runner_call_gemini_count_tokens",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L127",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner",
-      "target": "examples_benchmark_eval_eval_runner_call_gemini_generate",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L28",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner",
-      "target": "examples_benchmark_eval_eval_runner_load_golden_tasks",
+      "target": "examples_benchmark_eval_eval_runner_build_endpoint_url",
       "confidence_score": 1.0
     },
     {
@@ -68853,7 +68952,150 @@
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_build_group1_prompt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L188",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_build_group2_prompt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L213",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_build_group3_prompt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L235",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_call_gemini_count_tokens",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L249",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_call_gemini_generate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L39",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_check_port_open",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L59",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_clean_model_name",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L51",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_detect_recommended_proxy",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L80",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_get_http_opener",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L278",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_list_available_models",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L156",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_load_golden_tasks",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L299",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
       "target": "examples_benchmark_eval_eval_runner_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L285",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_run_preflight_check",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L91",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner",
+      "target": "examples_benchmark_eval_eval_runner_send_api_request",
       "confidence_score": 1.0
     },
     {
@@ -68861,7 +69103,207 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L178",
+      "source_location": "L54",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_detect_recommended_proxy",
+      "target": "examples_benchmark_eval_eval_runner_check_port_open",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L320",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_main",
+      "target": "examples_benchmark_eval_eval_runner_detect_recommended_proxy",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L146",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_send_api_request",
+      "target": "examples_benchmark_eval_eval_runner_detect_recommended_proxy",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L76",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_build_endpoint_url",
+      "target": "examples_benchmark_eval_eval_runner_clean_model_name",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L338",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_main",
+      "target": "examples_benchmark_eval_eval_runner_clean_model_name",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L60",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_rationale_60",
+      "target": "examples_benchmark_eval_eval_runner_clean_model_name",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L290",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_run_preflight_check",
+      "target": "examples_benchmark_eval_eval_runner_clean_model_name",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L237",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_call_gemini_count_tokens",
+      "target": "examples_benchmark_eval_eval_runner_build_endpoint_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L251",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_call_gemini_generate",
+      "target": "examples_benchmark_eval_eval_runner_build_endpoint_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L280",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_list_available_models",
+      "target": "examples_benchmark_eval_eval_runner_build_endpoint_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L68",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_rationale_68",
+      "target": "examples_benchmark_eval_eval_runner_build_endpoint_url",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L331",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_main",
+      "target": "examples_benchmark_eval_eval_runner_get_http_opener",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L81",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_rationale_81",
+      "target": "examples_benchmark_eval_eval_runner_get_http_opener",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L245",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_call_gemini_count_tokens",
+      "target": "examples_benchmark_eval_eval_runner_send_api_request",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L262",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_call_gemini_generate",
+      "target": "examples_benchmark_eval_eval_runner_send_api_request",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L281",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_list_available_models",
+      "target": "examples_benchmark_eval_eval_runner_send_api_request",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L92",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_rationale_92",
+      "target": "examples_benchmark_eval_eval_runner_send_api_request",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L360",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -68873,7 +69315,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L199",
+      "source_location": "L402",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -68884,10 +69326,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L35",
+      "source_location": "L163",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner_rationale_35",
+      "source": "examples_benchmark_eval_eval_runner_rationale_163",
       "target": "examples_benchmark_eval_eval_runner_build_group1_prompt",
       "confidence_score": 1.0
     },
@@ -68896,7 +69338,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L200",
+      "source_location": "L403",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -68907,10 +69349,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L61",
+      "source_location": "L189",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner_rationale_61",
+      "source": "examples_benchmark_eval_eval_runner_rationale_189",
       "target": "examples_benchmark_eval_eval_runner_build_group2_prompt",
       "confidence_score": 1.0
     },
@@ -68919,7 +69361,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L201",
+      "source_location": "L404",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -68930,10 +69372,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L86",
+      "source_location": "L214",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner_rationale_86",
+      "source": "examples_benchmark_eval_eval_runner_rationale_214",
       "target": "examples_benchmark_eval_eval_runner_build_group3_prompt",
       "confidence_score": 1.0
     },
@@ -68942,7 +69384,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L204",
+      "source_location": "L407",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -68953,10 +69395,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L108",
+      "source_location": "L236",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner_rationale_108",
+      "source": "examples_benchmark_eval_eval_runner_rationale_236",
       "target": "examples_benchmark_eval_eval_runner_call_gemini_count_tokens",
       "confidence_score": 1.0
     },
@@ -68965,7 +69407,19 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L226",
+      "source_location": "L293",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_run_preflight_check",
+      "target": "examples_benchmark_eval_eval_runner_call_gemini_count_tokens",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L429",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -68976,11 +69430,57 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L128",
+      "source_location": "L250",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner_rationale_128",
+      "source": "examples_benchmark_eval_eval_runner_rationale_250",
       "target": "examples_benchmark_eval_eval_runner_call_gemini_generate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L345",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_main",
+      "target": "examples_benchmark_eval_eval_runner_list_available_models",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L279",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_rationale_279",
+      "target": "examples_benchmark_eval_eval_runner_list_available_models",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L341",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_main",
+      "target": "examples_benchmark_eval_eval_runner_run_preflight_check",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "examples/benchmark_eval/eval_runner.py",
+      "source_location": "L286",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "examples_benchmark_eval_eval_runner_rationale_286",
+      "target": "examples_benchmark_eval_eval_runner_run_preflight_check",
       "confidence_score": 1.0
     },
     {
@@ -87767,5 +88267,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "c957c8d6abc951535941cba2c5b16b4f491eec67"
+  "built_at_commit": "22a54a7ca8e0818699b3d7d92a5d702cef9a4fb4"
 }
