@@ -473,43 +473,130 @@ def list_available_models(opener, api_key: str, base_url: str):
     return res.get("models", [])
 
 
-def get_supported_count_tokens_models(opener, api_key: str, base_url: str):
-    """获取所有支持 countTokens 的官方 Gemini 模型代号列表"""
+# 官方商业主力稳定模型优先级排序（算力池最充沛，最不易 503）
+STABLE_MODEL_PREFERENCES = [
+    "gemini-2.0-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-flash-002",
+    "gemini-1.5-flash-001",
+    "gemini-2.5-flash",
+    "gemini-1.5-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-pro",
+    "gemini-1.5-pro-latest",
+]
+
+
+def get_supported_models(opener, api_key: str, base_url: str, required_method: str = "generateContent"):
+    """获取支持指定操作（generateContent 或 countTokens）的官方模型代号列表"""
     all_models = list_available_models(opener, api_key, base_url)
     supported = []
     for m in all_models:
         methods = m.get("supportedGenerationMethods", [])
-        if "countTokens" in methods:
+        if required_method in methods:
             name = m.get("name", "").replace("models/", "").strip()
             supported.append(name)
     return supported
 
 
-def resolve_best_model(opener, api_key: str, user_model: str, base_url: str):
+def resolve_best_model(opener, api_key: str, user_model: str, base_url: str, mode: str = "count"):
     """
     智能自愈解析最佳模型:
-    1. 若指定模型在支持列表中，直接使用；
-    2. 若不在支持列表（例如 Google 升级后 gemini-1.5-flash 需用具体后缀）：
-       自动在当前 Key 支持的列表中匹配最适模型并返回自适应提示。
+    1. 根据当前模式严格检验模型是否支持目标操作 (countTokens 或 generateContent)；
+    2. 若用户指定模型可用，直接使用；
+    3. 若不可用或不可生成，优先从官方商业主力稳定模型列表 (STABLE_MODEL_PREFERENCES) 中选取。
     """
     clean_user = clean_model_name(user_model)
-    supported = get_supported_count_tokens_models(opener, api_key, base_url)
+    req_method = "generateContent" if mode == "generate" else "countTokens"
+    supported = get_supported_models(opener, api_key, base_url, req_method)
     if not supported:
-        raise RuntimeError("未在当前 API Key 下检索到任何支持 countTokens 的模型。")
+        raise RuntimeError(f"未在当前 API Key 下检索到任何支持 {req_method} 的可用模型。")
 
     if clean_user in supported:
         return clean_user, False, ""
 
-    # 优先匹配 1.5-flash 系列 (如 gemini-1.5-flash-latest, gemini-1.5-flash-001, gemini-1.5-flash-002)
-    candidates = [s for s in supported if "1.5-flash" in s]
+    # 优先匹配官方主力稳定列表
+    for pref in STABLE_MODEL_PREFERENCES:
+        if pref in supported:
+            return pref, True, f"目标模型 '{clean_user}' 不在当前 Key 支持的 {req_method} 列表中，已自动适配为官方主力模型: '{pref}'"
+
+    # 其次挑选名称包含 flash 的主流模型
+    candidates = [s for s in supported if "2.0-flash" in s or "1.5-flash" in s]
     if not candidates:
-        # 其次匹配任意 flash 系列 (如 gemini-2.0-flash)
         candidates = [s for s in supported if "flash" in s]
     if not candidates:
         candidates = supported
 
     best = candidates[0]
-    return best, True, f"目标模型 '{clean_user}' 不支持 countTokens，已自动适配为当前 Key 支持的最佳模型: '{best}'"
+    return best, True, f"目标模型 '{clean_user}' 不支持 {req_method}，已自动适配为可用模型: '{best}'"
+
+
+def mock_generate_response(task: dict, group: int, attempt: int) -> dict:
+    """提供离线物理自愈仿真数据，用于0成本验证端到端测试与SMT反例自愈流水线"""
+    tid = task["id"]
+    fname = task["function_name"]
+
+    if group == 1:
+        return {
+            "text": f"pub fn {fname}() {{ /* baseline implementation */ }}",
+            "total_tokens": 110,
+            "prompt_tokens": 90,
+            "candidates_tokens": 20
+        }
+    elif group == 2:
+        if attempt == 1:
+            # 首次尝试：生成有缺陷的实现（缺少绝对值或常量0），导致物理单元测试断言失败
+            if tid in (1, 2):
+                code = f"pub fn {fname}(x1: i64, y1: i64, x2: i64, y2: i64) -> i64 {{\n    (x1 - x2) + (y1 - y2)\n}}"
+            elif tid == 3:
+                code = f"pub fn {fname}(min_x1: i64, min_y1: i64, max_x1: i64, max_y1: i64, min_x2: i64, min_y2: i64, max_x2: i64, max_y2: i64) -> bool {{\n    false\n}}"
+            else:
+                code = f"pub fn {fname}({', '.join([f'{p}: i64' for p in [p['name'] for p in task['inputs']]])}) -> i64 {{\n    0\n}}"
+            return {"text": code, "total_tokens": 60, "prompt_tokens": 45, "candidates_tokens": 15}
+        else:
+            # 自愈修复：生成满足所有测试向量的正确代码
+            if tid == 1:
+                code = f"pub fn {fname}(x1: i64, y1: i64, x2: i64, y2: i64) -> i64 {{\n    (x1 - x2).abs() + (y1 - y2).abs()\n}}"
+            elif tid == 2:
+                code = f"pub fn {fname}(x1: i64, y1: i64, x2: i64, y2: i64) -> i64 {{\n    (x1 - x2).abs().max((y1 - y2).abs())\n}}"
+            elif tid == 3:
+                code = f"pub fn {fname}(min_x1: i64, min_y1: i64, max_x1: i64, max_y1: i64, min_x2: i64, min_y2: i64, max_x2: i64, max_y2: i64) -> bool {{\n    min_x1 <= max_x2 && max_x1 >= min_x2 && min_y1 <= max_y2 && max_y1 >= min_y2\n}}"
+            elif tid == 4:
+                code = f"pub fn {fname}(x: i64, y: i64) -> i64 {{\n    x * 65536 + y\n}}"
+            elif tid == 5:
+                code = f"pub fn {fname}(strength: i64) -> i64 {{\n    10 + strength * 2\n}}"
+            else:
+                code = f"pub fn {fname}({', '.join([f'{p}: i64' for p in [p['name'] for p in task['inputs']]])}) -> i64 {{\n    1\n}}"
+            return {"text": code, "total_tokens": 68, "prompt_tokens": 52, "candidates_tokens": 16}
+    else:
+        if attempt == 1:
+            # 首次尝试：生成未满足契约的表达式，触发 SMT 反例违约！
+            if tid in (1, 2):
+                expr = "(x1 - x2) + (y1 - y2)"
+            elif tid == 3:
+                expr = "false"
+            elif tid == 4:
+                expr = "x + y"
+            elif tid == 5:
+                expr = "strength * 2"
+            else:
+                expr = "0"
+            return {"text": expr, "total_tokens": 38, "prompt_tokens": 32, "candidates_tokens": 6}
+        else:
+            # 自愈修复：根据 SMT 反例修改为充要满足契约的纯表达式
+            if tid == 1:
+                expr = "match x1 >= x2 { true => x1 - x2, false => x2 - x1 } + match y1 >= y2 { true => y1 - y2, false => y2 - y1 }"
+            elif tid == 2:
+                expr = "match (match x1 >= x2 { true => x1 - x2, false => x2 - x1 }) >= (match y1 >= y2 { true => y1 - y2, false => y2 - y1 }) { true => match x1 >= x2 { true => x1 - x2, false => x2 - x1 }, false => match y1 >= y2 { true => y1 - y2, false => y2 - y1 } }"
+            elif tid == 3:
+                expr = "min_x1 <= max_x2 && max_x1 >= min_x2 && min_y1 <= max_y2 && max_y1 >= min_y2"
+            elif tid == 4:
+                expr = "x * 65536 + y"
+            elif tid == 5:
+                expr = "10 + strength * 2"
+            else:
+                expr = "1"
+            return {"text": expr, "total_tokens": 46, "prompt_tokens": 38, "candidates_tokens": 8}
 
 
 def main():
@@ -519,24 +606,29 @@ def main():
     parser.add_argument("--api-key", help="Google Gemini API Key (也可通过环境变量 GEMINI_API_KEY / GOOGLE_API_KEY 配置)")
     parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Gemini 模型名 (默认: {DEFAULT_MODEL})")
     parser.add_argument("--mode", choices=["count", "generate"], default="count",
-                        help="'count': 零成本精确 Token 计量 (推荐); 'generate': 完整模型推理生成")
+                        help="'count': 零成本精确 Token 计量 (推荐); 'generate': 完整模型推理生成与自愈闭环")
     parser.add_argument("--tasks", default="all", help="测试任务数，如 '5' 或 'all' (默认: all，共 20 个黄金任务)")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"Gemini API 基础端点 (默认: {DEFAULT_BASE_URL})")
     parser.add_argument("--proxy", default=None, help="指定 HTTP/HTTPS 代理 (例如: http://127.0.0.1:7897)")
     parser.add_argument("--probe", action="store_true", help="单步探测模式: 仅测试当前 Key、网络连通性并列出可用模型")
+    parser.add_argument("--mock", action="store_true", help="离线物理仿真模式: 无需网络和 API Key，0成本物理执行全套 rustc 与 SMT 反例自愈闭环")
 
     args = parser.parse_args()
 
-    api_key = args.api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not api_key:
-        print("\n❌ 错误: 未检测到 Google Gemini API Key。", file=sys.stderr)
-        print("请通过以下方式之一提供:", file=sys.stderr)
-        print("  1. 命令行参数: python examples/benchmark_eval/eval_runner.py --api-key YOUR_KEY", file=sys.stderr)
-        print("  2. 设置环境变量: $env:GEMINI_API_KEY = 'YOUR_KEY' (PowerShell)", file=sys.stderr)
-        rec_proxy = detect_recommended_proxy()
-        if rec_proxy:
-            print(f"\n💡 提示: 检测到本地代理运行于 {rec_proxy}，若访问受限可附加 `--proxy {rec_proxy}`", file=sys.stderr)
-        sys.exit(1)
+    if not args.mock:
+        api_key = args.api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            print("\n❌ 错误: 未检测到 Google Gemini API Key。", file=sys.stderr)
+            print("请通过以下方式之一提供:", file=sys.stderr)
+            print("  1. 命令行参数: python examples/benchmark_eval/eval_runner.py --api-key YOUR_KEY", file=sys.stderr)
+            print("  2. 设置环境变量: $env:GEMINI_API_KEY = 'YOUR_KEY' (PowerShell)", file=sys.stderr)
+            print("  3. 离线物理验证: python examples/benchmark_eval/eval_runner.py --mode generate --mock (无需 Key)", file=sys.stderr)
+            rec_proxy = detect_recommended_proxy()
+            if rec_proxy:
+                print(f"\n💡 提示: 检测到本地代理运行于 {rec_proxy}，若访问受限可附加 `--proxy {rec_proxy}`", file=sys.stderr)
+            sys.exit(1)
+    else:
+        api_key = "MOCK_KEY"
 
     target_proxy = args.proxy
     if not target_proxy and not urllib.request.getproxies().get("https"):
@@ -554,18 +646,27 @@ def main():
         print("=" * 70)
         sys.stdout.flush()
         try:
-            supported_models = get_supported_count_tokens_models(opener, api_key, args.base_url)
-            print(f"✅ API Key 连通成功！当前 Key 支持 countTokens 的模型 (共 {len(supported_models)} 个):\n")
-            for m in supported_models:
-                is_rec = ("1.5-flash" in m or "flash" in m)
+            gen_models = get_supported_models(opener, api_key, args.base_url, "generateContent")
+            cnt_models = get_supported_models(opener, api_key, args.base_url, "countTokens")
+            print(f"✅ API Key 连通成功！\n")
+            print(f"📌 支持生成推理 (generateContent) 的主力模型 (共 {len(gen_models)} 个):")
+            for m in gen_models:
+                is_rec = any(p in m for p in ("2.0-flash", "1.5-flash-latest", "1.5-flash-002"))
                 tag = " [推荐首选]" if is_rec else ""
                 print(f"  • {m:<32}{tag}")
 
-            test_m = clean_model_name(args.model) if clean_model_name(args.model) in supported_models else supported_models[0]
+            print(f"\n📌 支持精确分词计量 (countTokens) 的模型 (共 {len(cnt_models)} 个):")
+            for m in cnt_models[:8]:
+                print(f"  • {m}")
+            if len(cnt_models) > 8:
+                print(f"  • ... (共 {len(cnt_models)} 个模型支持 countTokens)")
+
+            test_m = clean_model_name(args.model) if clean_model_name(args.model) in cnt_models else cnt_models[0]
             cnt = call_gemini_count_tokens(opener, api_key, test_m, "test", args.base_url)
             print(f"\n🎯 接口测算实测: 模型 '{test_m}' 响应正常，测试 Token 计为 {cnt}")
             print("\n🚀 自检完全正常！你可以直接执行真实评测命令:")
-            print(f"   python examples/benchmark_eval/eval_runner.py --model {test_m} --mode count\n")
+            print(f"   python examples/benchmark_eval/eval_runner.py --model {test_m} --mode count")
+            print(f"   python examples/benchmark_eval/eval_runner.py --model {test_m} --mode generate\n")
             sys.exit(0)
         except Exception as e:
             print(f"\n❌ 探测失败:\n{e}\n", file=sys.stderr)
@@ -582,34 +683,58 @@ def main():
 
     print("=" * 70)
     print("🚀 Axiom 经验性真实 A/B 对照评测启动 (Empirical Benchmark Runner)")
-    print(f"评测模式: {args.mode} | 任务总数: {len(eval_tasks)} | API 端点: {args.base_url}")
+    print(f"评测模式: {args.mode} {'[离线仿真模式]' if args.mock else ''} | 任务总数: {len(eval_tasks)} | API 端点: {args.base_url}")
     if args.mode == "generate":
         print(f"验证后端: rustc + Axiom SMT ({axiom_bin}) | 最大自愈重试轮数: {MAX_HEALING_RETRIES}")
-    if target_proxy:
+    if target_proxy and not args.mock:
         print(f"网络代理: {target_proxy}")
     print("=" * 70)
 
-    print("⏳ 正在进行 API 连通性与模型可用性预检...", end="", flush=True)
-    try:
-        active_model, switched, reason = resolve_best_model(opener, api_key, args.model, args.base_url)
-        call_gemini_count_tokens(opener, api_key, active_model, "test", args.base_url)
-        if switched:
-            print(" 自动适配 ⚠️\n", flush=True)
-            print(f"💡 {reason}\n")
-        else:
-            print(" 通过 ✅\n", flush=True)
-    except Exception as e:
-        print(" 失败 ❌\n", flush=True)
-        print(f"{e}\n")
-        print("💡 快速排查指引:")
-        print("  1. 运行自检探测查看可用模型列表: python examples/benchmark_eval/eval_runner.py --probe")
-        if target_proxy:
-            print(f"  2. 当前已启用代理: {target_proxy}")
-        else:
-            rec = detect_recommended_proxy()
-            if rec:
-                print(f"  2. 尝试添加本地代理: --proxy {rec}")
-        sys.exit(1)
+    if not args.mock:
+        print("⏳ 正在进行 API 连通性与模型推理可用性预检...", end="", flush=True)
+        try:
+            active_model, switched, reason = resolve_best_model(opener, api_key, args.model, args.base_url, mode=args.mode)
+            if args.mode == "generate":
+                # 针对 generate 模式，执行轻量推理自检，若目标模型当前高负载 503，尝试故障转移到备选主力模型
+                try:
+                    call_gemini_generate(opener, api_key, active_model, "ping", args.base_url)
+                except Exception as e:
+                    if "503" in str(e):
+                        # 尝试依次探测 STABLE_MODEL_PREFERENCES 中的其他模型
+                        failover_success = False
+                        for alt in STABLE_MODEL_PREFERENCES:
+                            if alt != active_model:
+                                try:
+                                    call_gemini_generate(opener, api_key, alt, "ping", args.base_url)
+                                    print(f"\n⚠️ 原选模型 '{active_model}' 当前云端高负载 503，已自动故障转移到可用模型: '{alt}'")
+                                    active_model = alt
+                                    failover_success = True
+                                    break
+                                except Exception:
+                                    continue
+                        if not failover_success:
+                            raise e
+                    else:
+                        raise e
+            else:
+                call_gemini_count_tokens(opener, api_key, active_model, "test", args.base_url)
+
+            if switched:
+                print(" 自动适配 ⚠️\n", flush=True)
+                print(f"💡 {reason}\n")
+            else:
+                print(" 通过 ✅\n", flush=True)
+        except Exception as e:
+            print(" 失败 ❌\n", flush=True)
+            print(f"{e}\n")
+            print("💡 快速排查指引:")
+            print("  1. 运行自检探测查看可用模型列表: python examples/benchmark_eval/eval_runner.py --probe")
+            print("  2. 尝试指定其他商业主力模型: --model gemini-2.0-flash 或 --model gemini-1.5-flash-latest")
+            print("  3. 若外部网络受阻，可使用离线物理仿真验证: python examples/benchmark_eval/eval_runner.py --mode generate --mock")
+            sys.exit(1)
+    else:
+        active_model = "offline-mock-runner"
+        print("⏳ 离线仿真自检... 通过 ✅\n")
 
     print(f"🎯 当前使用的评测模型: {active_model}\n")
 
@@ -656,14 +781,21 @@ def main():
             })
         else:
             # 模式: generate (物理端到端生成、验证与自愈重试)
+            def do_generate(p_text, grp, att):
+                if args.mock:
+                    return mock_generate_response(task, grp, att)
+                return call_gemini_generate(opener, api_key, active_model, p_text, args.base_url)
+
             # Group 1: 单体大上下文生成 (基准对照)
-            res1 = call_gemini_generate(opener, api_key, active_model, p1, args.base_url)
+            res1 = do_generate(p1, 1, 1)
             total_g1 += res1["total_tokens"]
-            time.sleep(0.8)
+            if not args.mock:
+                time.sleep(0.8)
 
             # Group 2: 单任务隔离微任务生成 + rustc 单元测试与编译错误自愈重试
-            res2 = call_gemini_generate(opener, api_key, active_model, p2, args.base_url)
-            time.sleep(0.8)
+            res2 = do_generate(p2, 2, 1)
+            if not args.mock:
+                time.sleep(0.8)
             g2_tokens = res2["total_tokens"]
             g2_ok, g2_err = run_rust_test(res2["text"], task)
             g2_pass1 = g2_ok
@@ -677,8 +809,9 @@ def main():
 {g2_err}
 
 Please fix the implementation and return ONLY the corrected complete Rust function:"""
-                    heal_res = call_gemini_generate(opener, api_key, active_model, heal_prompt, args.base_url)
-                    time.sleep(0.8)
+                    heal_res = do_generate(heal_prompt, 2, retry + 2)
+                    if not args.mock:
+                        time.sleep(0.8)
                     g2_tokens += heal_res["total_tokens"]
                     g2_attempts += 1
                     current_code = heal_res["text"]
@@ -693,8 +826,9 @@ Please fix the implementation and return ONLY the corrected complete Rust functi
             total_g2 += g2_tokens
 
             # Group 3: Axiom 契约打洞生成 + SMT 求解器验证与反例自愈重试
-            res3 = call_gemini_generate(opener, api_key, active_model, p3, args.base_url)
-            time.sleep(0.8)
+            res3 = do_generate(p3, 3, 1)
+            if not args.mock:
+                time.sleep(0.8)
             g3_tokens = res3["total_tokens"]
             g3_ok, g3_diag, g3_ce = run_axiom_verify(res3["text"], task, axiom_bin)
             g3_pass1 = g3_ok
@@ -710,8 +844,9 @@ Diagnostic: {g3_diag}{ce_info}
 
 Please refine your pure expression to satisfy all formal contracts and eliminate counterexamples.
 Return ONLY the corrected pure expression to fill `?hole`:"""
-                    heal_res = call_gemini_generate(opener, api_key, active_model, heal_prompt, args.base_url)
-                    time.sleep(0.8)
+                    heal_res = do_generate(heal_prompt, 3, retry + 2)
+                    if not args.mock:
+                        time.sleep(0.8)
                     g3_tokens += heal_res["total_tokens"]
                     g3_attempts += 1
                     current_expr = heal_res["text"]
