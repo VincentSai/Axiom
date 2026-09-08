@@ -4,9 +4,10 @@
 
 ---
 
-> **Axiom** is a modern verifiable program representation and execution system designed specifically for **AI Agent Collaboration and Formal Verification**.  
-> **Core Strategic Positioning**: **Not a replacement for Rust / C# (Unity) / TypeScript**, but in deep symbiosis with them. Axiom focuses exclusively on the **core deterministic logic layer** that is most suited for AI generation and most in need of mathematical contract defenses (game mechanics, combat pipelines, state machines, financial settlement, agent tool permissions), while seamlessly transpiling and embedding into Rust, Unity C#, WebAssembly, and C.  
-> **Core Technical Moats**: **Hole-Driven Development + SMT Formal Contract Proving + Multi-Agent Local Semantic Collaboration**.
+> **Axiom** is a restricted pure-function DSL and formal verification pipeline prototype designed specifically for **AI Agent Collaboration**.  
+> **Core Strategic Positioning**: **Not a replacement for general-purpose languages (Rust / C# / TypeScript)**, but in deep symbiosis with them. Axiom focuses exclusively on the **core deterministic logic layer** where AI generation benefits most from constrained search spaces and mathematical contract defenses (combat pipelines, state transitions, rule evaluations, permission checks), while seamlessly transpiling and embedding into Rust, Unity C#, WebAssembly, and C.  
+> **Core Value Proposition**: Constraining LLM generation spaces via pure expressions and strong contracts; eliminating long-context token waste via hole-driven localization; and enabling closed-loop self-healing via SMT counterexample feedback.  
+> **Objective Verification Boundary**: Formal theorem proving guarantees only that code satisfies specified formal contracts, not that contracts perfectly mirror human business intent. Axiom is an evolving engineering prototype that stands alongside mature verification frameworks (e.g. Dafny, F*, Kani), exploring lightweight, LLM-specialized verification pipelines.
 
 ---
 
@@ -21,23 +22,23 @@
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │               Axiom Verified Logic Layer (Axiom Core)           │
-│  • Pure Functions (Immutable State Transitions)                 │
+│  • Pure Functions (Restricted Pure Expressions)                 │
 │  • Algebraic Effects (Explicit Side-Effect Isolation)           │
-│  • SMT Formal Contracts (Guaranteed Mathematical Satisfaction)  │
+│  • SMT Formal Contracts (Theorem Proving & Counterexamples)     │
 │  • Hole-Driven Micro-Workers & Task Pools                       │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 When building game logic and mission-critical systems with AI agents, traditional general-purpose languages face major hurdles:
-- **Runaway State & Hidden Regressions**: Implicit global state and random side effects cause AI-generated code to harbor latent boundary bugs and multiplayer desyncs.
-- **Context Bloat & Hallucination**: Forcing LLM agents to repeatedly read and edit massive monolithic files wastes tokens and invites hallucinations.
-- **Testing Limits vs Mathematical Proofs**: Hand-written unit tests can only sample inputs; they cannot formally prove the absence of contract violations.
+- **Runaway State & Hidden Regressions**: Implicit global state and unconstrained side effects cause AI-generated code to harbor latent boundary bugs and behavioral drift.
+- **Context Bloat & Attention Degradation**: Forcing LLM agents to repeatedly read and edit massive monolithic files wastes tokens and invites hallucinations.
+- **Testing Limits vs Mathematical Proofs**: Hand-written unit tests can only sample inputs, whereas constrained functions checked by SMT can be systematically searched for counterexamples.
 
-**Axiom** solves these challenges with an integrated toolchain:
-1. **Pure Functions + Algebraic Effects**: Core logic is expressed as pure immutable state transformations; side effects are declared explicitly via Effects, with the transpiler generating native Rust traits and dependency injection handlers automatically.
-2. **SMT-LIB2 / Microsoft Z3 Theorem Proving**: Built-in `requires` / `ensures` contracts are compiled to standard SMT-LIB2 scripts to prove properties or extract counterexamples, **mathematically guaranteeing that specified formal contracts are satisfied**.
-3. **Hole-Driven Development**: Declare unimplemented points with `?hole`. The compiler mechanically slices the AST into isolated `hole-task.json` units, allowing micro-workers to operate in $O(1)$ minimal local contexts.
-4. **Multi-Agent Task Pool (`axiom pool`)**: Built-in coordination subsystem for managing candidate submissions, automated SMT counterexample filtering, and verified code assembly.
+**Axiom** addresses these challenges with a streamlined pipeline:
+1. **Pure Functions + Algebraic Effects**: Core logic is expressed as pure immutable state transformations; host IO and side effects are declared explicitly via Effects, with the transpiler generating native Rust traits.
+2. **SMT-LIB2 / Microsoft Z3 Theorem Proving**: Built-in `requires` / `ensures` contracts are compiled to standard SMT-LIB2 scripts to prove properties or extract counterexamples; a lightweight local interval engine also provides discrete grid validation.
+3. **Hole-Driven Development**: Declare unimplemented points with `?hole`. The compiler mechanically slices the AST into isolated task units, allowing micro-workers to operate in minimal local contexts.
+4. **Multi-Agent Task Pool Prototype (`axiom pool`)**: In-memory task coordination prototype for managing candidate submissions, automated SMT counterexample filtering, and verified code assembly.
 5. **Unity Zero-Copy Double-Buffer Bridge (`axiom bridge`)**: Transpile to Rust and compile to native C-ABI libraries with automatic C# P/Invoke bindings and contiguous memory snapshots.
 
 ---

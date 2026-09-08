@@ -46,10 +46,13 @@ graph TD
 - 直接调用 Google Gemini 官方端点 `models/{model}:countTokens`；
 - 使用官方 Tokenizer 精确计算三组 Prompt 实际消耗的每个 Token，无模型生成随机性，0 成本秒级完成。
 
-### 2. 真实生成与定理证明自愈模式 (`--mode generate`)
+### 2. 真实物理生成与自愈重试流水线 (`--mode generate`)
 - 调用官方 `generateContent` 端点（Temperature = 0.2）；
 - 捕获 API 随响应返回的官方 `usageMetadata`（`promptTokenCount`, `candidatesTokenCount`, `totalTokenCount`）；
-- 将生成的代码交由本地 `axiom verify` / `axiom pool submit` 与本地 `rustc` 进行真实编译与 SMT 定理证明，验证反例拦截能力。
+- **物理端到端闭环验证与多轮自愈 (最多 3 轮重试)**：
+  - **Group 2 (Rust 微任务)**：生成代码注入测试脚手架，调用本地 `rustc --test` 编译并运行真实单元测试；若失败提取编译错误或断言 Panic 信息回传 LLM 自愈；
+  - **Group 3 (Axiom 打洞)**：纯表达式填入 `.ax` 契约骨架，调用本地 `axiom verify --json` 形式化验证；若违约提取结构化反例数值（`counter_example` 字典）回传 LLM 引导靶向修复；
+- 统计真实的 Pass@1（初次通过率）、Pass@Final（经自愈最终通过率）、自愈重试轮数与端到端真实累计 Token 开销。
 
 ---
 

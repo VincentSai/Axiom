@@ -83,6 +83,18 @@ pub fn generate_smtlib2_with_module(
     }
     smt.push('\n');
 
+    // 2.5 Physical representation bounds: 64-bit signed integer range to align with Rust backend
+    smt.push_str("; Physical representation bounds: 64-bit signed integer range\n");
+    for (name, smt_ty) in flat_params.iter().chain(flat_results.iter()) {
+        if *smt_ty == "Int" {
+            smt.push_str(&format!(
+                "(assert (and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807)))\n",
+                name, name
+            ));
+        }
+    }
+    smt.push('\n');
+
     // 3. Assert preconditions (Requires)
     if !func.requires.is_empty() {
         smt.push_str("; Preconditions (Requires)\n");

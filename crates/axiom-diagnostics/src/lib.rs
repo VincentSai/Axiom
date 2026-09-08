@@ -223,6 +223,11 @@ fn effect_report(error: EffectError) -> DiagnosticReport {
             format!("with [{effect}]"),
             format!("Add `{effect}` to function `{function}`'s `with` list."),
         ),
+        EffectError::DisallowedExternalCall { function, target } => (
+            function.clone(),
+            format!("external call `{target}`"),
+            format!("Remove unauthorized external host call `{target}` or wrap it behind a declared effect handler."),
+        ),
     };
 
     DiagnosticReport {

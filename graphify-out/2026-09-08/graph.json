@@ -16375,7 +16375,7 @@
       "label": "call_gemini_count_tokens()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L235",
+      "source_location": "L240",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_call_gemini_count_tokens",
       "community": 27,
@@ -16386,7 +16386,7 @@
       "label": "call_gemini_generate()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L249",
+      "source_location": "L254",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_call_gemini_generate",
       "community": 27,
@@ -16397,7 +16397,7 @@
       "label": "list_available_models()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L278",
+      "source_location": "L283",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_list_available_models",
       "community": 27,
@@ -16408,7 +16408,7 @@
       "label": "get_supported_count_tokens_models()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L285",
+      "source_location": "L290",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_get_supported_count_tokens_models",
       "community": 27,
@@ -16419,7 +16419,7 @@
       "label": "resolve_best_model()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L297",
+      "source_location": "L302",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_resolve_best_model",
       "community": 27,
@@ -16430,7 +16430,7 @@
       "label": "main()",
       "file_type": "code",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L324",
+      "source_location": "L329",
       "_origin": "ast",
       "id": "examples_benchmark_eval_eval_runner_main",
       "community": 27,
@@ -16504,7 +16504,7 @@
       "norm_label": "group 2: isolated rust function signature with docstrings (micro-worker)."
     },
     {
-      "label": "Group 3: Axiom Hole Task (Pure formal contracts & inputs, no boilerplate).",
+      "label": "Group 3: Axiom Native Hole Task (Pure formal contracts & inputs, native ?hole\u2026",
       "file_type": "rationale",
       "source_file": "examples/benchmark_eval/eval_runner.py",
       "source_location": "L214",
@@ -16512,15 +16512,15 @@
       "id": "examples_benchmark_eval_eval_runner_rationale_214",
       "community": 27,
       "community_name": "eval_runner.py",
-      "norm_label": "group 3: axiom hole task (pure formal contracts & inputs, no boilerplate)."
+      "norm_label": "group 3: axiom native hole task (pure formal contracts & inputs, native ?hole..."
     },
     {
       "label": "\u8c03\u7528\u5b98\u65b9 Gemini countTokens REST \u7aef\u70b9",
       "file_type": "rationale",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L236",
+      "source_location": "L241",
       "_origin": "ast",
-      "id": "examples_benchmark_eval_eval_runner_rationale_236",
+      "id": "examples_benchmark_eval_eval_runner_rationale_241",
       "community": 27,
       "community_name": "eval_runner.py",
       "norm_label": "\u8c03\u7528\u5b98\u65b9 gemini counttokens rest \u7aef\u70b9"
@@ -16529,9 +16529,9 @@
       "label": "\u8c03\u7528\u5b98\u65b9 Gemini generateContent REST \u7aef\u70b9",
       "file_type": "rationale",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L250",
+      "source_location": "L255",
       "_origin": "ast",
-      "id": "examples_benchmark_eval_eval_runner_rationale_250",
+      "id": "examples_benchmark_eval_eval_runner_rationale_255",
       "community": 27,
       "community_name": "eval_runner.py",
       "norm_label": "\u8c03\u7528\u5b98\u65b9 gemini generatecontent rest \u7aef\u70b9"
@@ -16540,9 +16540,9 @@
       "label": "\u67e5\u8be2\u5e76\u5217\u51fa\u5f53\u524d API Key \u53ef\u7528\u7684\u5b98\u65b9 Gemini \u6a21\u578b",
       "file_type": "rationale",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L279",
+      "source_location": "L284",
       "_origin": "ast",
-      "id": "examples_benchmark_eval_eval_runner_rationale_279",
+      "id": "examples_benchmark_eval_eval_runner_rationale_284",
       "community": 27,
       "community_name": "eval_runner.py",
       "norm_label": "\u67e5\u8be2\u5e76\u5217\u51fa\u5f53\u524d api key \u53ef\u7528\u7684\u5b98\u65b9 gemini \u6a21\u578b"
@@ -16551,9 +16551,9 @@
       "label": "\u83b7\u53d6\u6240\u6709\u652f\u6301 countTokens \u7684\u5b98\u65b9 Gemini \u6a21\u578b\u4ee3\u53f7\u5217\u8868",
       "file_type": "rationale",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L286",
+      "source_location": "L291",
       "_origin": "ast",
-      "id": "examples_benchmark_eval_eval_runner_rationale_286",
+      "id": "examples_benchmark_eval_eval_runner_rationale_291",
       "community": 27,
       "community_name": "eval_runner.py",
       "norm_label": "\u83b7\u53d6\u6240\u6709\u652f\u6301 counttokens \u7684\u5b98\u65b9 gemini \u6a21\u578b\u4ee3\u53f7\u5217\u8868"
@@ -16562,9 +16562,9 @@
       "label": "\u667a\u80fd\u81ea\u6108\u89e3\u6790\u6700\u4f73\u6a21\u578b: 1. \u82e5\u6307\u5b9a\u6a21\u578b\u5728\u652f\u6301\u5217\u8868\u4e2d\uff0c\u76f4\u63a5\u4f7f\u7528\uff1b 2. \u82e5\u4e0d\u5728\u652f\u6301\u5217\u8868\uff08\u4f8b\u5982 Google \u5347\u7ea7\u540e gemini-1.5-flash\u2026",
       "file_type": "rationale",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L298",
+      "source_location": "L303",
       "_origin": "ast",
-      "id": "examples_benchmark_eval_eval_runner_rationale_298",
+      "id": "examples_benchmark_eval_eval_runner_rationale_303",
       "community": 27,
       "community_name": "eval_runner.py",
       "norm_label": "\u667a\u80fd\u81ea\u6108\u89e3\u6790\u6700\u4f73\u6a21\u578b: 1. \u82e5\u6307\u5b9a\u6a21\u578b\u5728\u652f\u6301\u5217\u8868\u4e2d,\u76f4\u63a5\u4f7f\u7528; 2. \u82e5\u4e0d\u5728\u652f\u6301\u5217\u8868(\u4f8b\u5982 google \u5347\u7ea7\u540e gemini-1.5-flash..."
@@ -17056,8 +17056,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_assets_scripts_axiombridge_axiomdoublebuffer_axiom_generated_axiomdoublebuffer_get",
-      "community": 115,
-      "community_name": "AxiomDoubleBuffer.cs",
+      "community": 107,
+      "community_name": "AxiomRunner",
       "norm_label": ".get()"
     },
     {
@@ -17101,8 +17101,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "examples_game_survivor_assets_scripts_axiombridge_axiomnative",
-      "community": 107,
-      "community_name": "AxiomRunner",
+      "community": 110,
+      "community_name": "AxiomAssetRegistry",
       "norm_label": "axiomnative.cs"
     },
     {
@@ -17388,8 +17388,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_assets_scripts_axiombridge_axiomrunner_axiom_generated_axiomrunner_getsnapshot",
-      "community": 112,
-      "community_name": "SurvivorRuntimeTests",
+      "community": 107,
+      "community_name": "AxiomRunner",
       "norm_label": ".getsnapshot()"
     },
     {
@@ -17827,8 +17827,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_assets_scripts_gameplay_survivorgamecontroller_axiom_survivor_survivorgamecontroller_ongui",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": ".ongui()"
     },
     {
@@ -17946,8 +17946,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_assets_scripts_gameplay_survivorgamecontroller_axiom_survivor_survivorgamecontroller_getorcreateproceduralsprite",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": ".getorcreateproceduralsprite()"
     },
     {
@@ -23270,8 +23270,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_nunit_framework_assert",
-      "community": 55,
-      "community_name": "UnityStubs.cs",
+      "community": 112,
+      "community_name": "SurvivorRuntimeTests",
       "norm_label": "assert"
     },
     {
@@ -23986,8 +23986,8 @@
       "source_location": "",
       "_origin": "ast",
       "id": "float",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": "float"
     },
     {
@@ -24156,8 +24156,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_color",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": "color"
     },
     {
@@ -24173,8 +24173,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_rect",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": "rect"
     },
     {
@@ -24190,8 +24190,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_vector2",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": "vector2"
     },
     {
@@ -24207,8 +24207,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_texture2d",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": "texture2d"
     },
     {
@@ -24224,8 +24224,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_texture2d_setpixel",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": ".setpixel()"
     },
     {
@@ -24241,8 +24241,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_texture2d_apply",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": ".apply()"
     },
     {
@@ -24513,8 +24513,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_gui",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": "gui"
     },
     {
@@ -24530,8 +24530,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_gui_box",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": ".box()"
     },
     {
@@ -24547,8 +24547,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_gui_label",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": ".label()"
     },
     {
@@ -24564,8 +24564,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_gui_drawtexture",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": ".drawtexture()"
     },
     {
@@ -24581,8 +24581,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_sprite",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": "sprite"
     },
     {
@@ -24598,8 +24598,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_sprite_create",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": ".create()"
     },
     {
@@ -24615,8 +24615,8 @@
       },
       "_origin": "ast",
       "id": "examples_game_survivor_tests_standalone_unitystubs_unityengine_spriterenderer",
-      "community": 71,
-      "community_name": ".GetOrCreateProceduralSprite",
+      "community": 55,
+      "community_name": "UnityStubs.cs",
       "norm_label": "spriterenderer"
     },
     {
@@ -26291,8 +26291,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_roadmap",
-      "community": 43,
-      "community_name": "README.md",
+      "community": 25,
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "docs/roadmap.md"
     },
     {
@@ -26302,8 +26302,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "docs_roadmap_axiom_\u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe_roadmap",
-      "community": 201,
-      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
+      "community": 25,
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (roadmap)"
     },
     {
@@ -26313,8 +26313,8 @@
       "source_location": "L9",
       "_origin": "ast",
       "id": "docs_roadmap_\u9636\u6bb5\u4e00_\u539f\u578b\u4e0e\u9a8c\u8bc1\u7f16\u8bd1\u5668_mvp_prototype_q1",
-      "community": 201,
-      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
+      "community": 25,
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "\u9636\u6bb5\u4e00:\u539f\u578b\u4e0e\u9a8c\u8bc1\u7f16\u8bd1\u5668 (mvp prototype - q1)"
     },
     {
@@ -26324,8 +26324,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "docs_roadmap_\u9636\u6bb5\u4e8c_effect_\u7cfb\u7edf\u4e0e\u5951\u7ea6\u9a8c\u8bc1_q2",
-      "community": 201,
-      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
+      "community": 25,
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "\u9636\u6bb5\u4e8c:effect \u7cfb\u7edf\u4e0e\u5951\u7ea6\u9a8c\u8bc1 (q2)"
     },
     {
@@ -26335,8 +26335,8 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "docs_roadmap_\u9636\u6bb5\u4e09_\u5185\u5bb9\u5bfb\u5740_ast_\u4ee3\u7801\u5e93\u4e0e\u591a_agent_\u534f\u540c_q3",
-      "community": 201,
-      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
+      "community": 25,
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "\u9636\u6bb5\u4e09:\u5185\u5bb9\u5bfb\u5740 ast \u4ee3\u7801\u5e93\u4e0e\u591a agent \u534f\u540c (q3)"
     },
     {
@@ -26346,8 +26346,8 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "docs_roadmap_\u9636\u6bb5\u56db_\u5168\u5e73\u53f0\u4e0e\u751f\u6001\u4e92\u64cd\u4f5c_q4",
-      "community": 201,
-      "community_name": "Axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (Roadmap)",
+      "community": 25,
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "\u9636\u6bb5\u56db:\u5168\u5e73\u53f0\u4e0e\u751f\u6001\u4e92\u64cd\u4f5c (q4)"
     },
     {
@@ -26732,7 +26732,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "en/roadmap.md"
     },
     {
@@ -26743,7 +26743,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_axiom_project_roadmap",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "axiom project roadmap"
     },
     {
@@ -26754,7 +26754,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_phase_1_mvp_prototype_core_compiler_q1",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "phase 1: mvp prototype & core compiler (q1)"
     },
     {
@@ -26765,7 +26765,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_phase_2_effect_system_formal_contract_verification_q2",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "phase 2: effect system & formal contract verification (q2)"
     },
     {
@@ -26776,7 +26776,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_phase_3_content_addressed_ast_codebase_multi_agent_concurrency_q3",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "phase 3: content-addressed ast codebase & multi-agent concurrency (q3)"
     },
     {
@@ -26787,7 +26787,7 @@
       "_origin": "ast",
       "id": "docs_en_roadmap_phase_4_cross_platform_runtimes_ecosystem_interop_q4",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "phase 4: cross-platform runtimes & ecosystem interop (q4)"
     },
     {
@@ -27447,7 +27447,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "zh-cn/roadmap.md"
     },
     {
@@ -27458,7 +27458,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_axiom_\u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe_roadmap",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "axiom \u9879\u76ee\u53d1\u5c55\u8def\u7ebf\u56fe (roadmap)"
     },
     {
@@ -27469,7 +27469,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_\u9636\u6bb5\u4e00_\u539f\u578b\u4e0e\u9a8c\u8bc1\u7f16\u8bd1\u5668_mvp_prototype_q1",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "\u9636\u6bb5\u4e00:\u539f\u578b\u4e0e\u9a8c\u8bc1\u7f16\u8bd1\u5668 (mvp prototype - q1)"
     },
     {
@@ -27480,7 +27480,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_\u9636\u6bb5\u4e8c_effect_\u7cfb\u7edf\u4e0e\u5951\u7ea6\u9a8c\u8bc1_q2",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "\u9636\u6bb5\u4e8c:effect \u7cfb\u7edf\u4e0e\u5951\u7ea6\u9a8c\u8bc1 (q2)"
     },
     {
@@ -27491,7 +27491,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_\u9636\u6bb5\u4e09_\u5185\u5bb9\u5bfb\u5740_ast_\u4ee3\u7801\u5e93\u4e0e\u591a_agent_\u534f\u540c_q3",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "\u9636\u6bb5\u4e09:\u5185\u5bb9\u5bfb\u5740 ast \u4ee3\u7801\u5e93\u4e0e\u591a agent \u534f\u540c (q3)"
     },
     {
@@ -27502,7 +27502,7 @@
       "_origin": "ast",
       "id": "docs_zh_cn_roadmap_\u9636\u6bb5\u56db_\u5168\u5e73\u53f0\u4e0e\u751f\u6001\u4e92\u64cd\u4f5c_q4",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "\u9636\u6bb5\u56db:\u5168\u5e73\u53f0\u4e0e\u751f\u6001\u4e92\u64cd\u4f5c (q4)"
     },
     {
@@ -27887,7 +27887,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "zh-tw/roadmap.md"
     },
     {
@@ -27898,7 +27898,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_axiom_\u5c08\u6848\u767c\u5c55\u85cd\u5716_roadmap",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "axiom \u5c08\u6848\u767c\u5c55\u85cd\u5716 (roadmap)"
     },
     {
@@ -27909,7 +27909,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_\u968e\u6bb5\u4e00_\u539f\u578b\u8207\u9a57\u8b49\u7de8\u8b6f\u5668_mvp_prototype_q1",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "\u968e\u6bb5\u4e00:\u539f\u578b\u8207\u9a57\u8b49\u7de8\u8b6f\u5668 (mvp prototype - q1)"
     },
     {
@@ -27920,7 +27920,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_\u968e\u6bb5\u4e8c_effect_\u7cfb\u7d71\u8207\u5951\u7d04\u9a57\u8b49_q2",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "\u968e\u6bb5\u4e8c:effect \u7cfb\u7d71\u8207\u5951\u7d04\u9a57\u8b49 (q2)"
     },
     {
@@ -27931,7 +27931,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_\u968e\u6bb5\u4e09_\u5167\u5bb9\u5b9a\u5740_ast_\u4ee3\u78bc\u5eab\u8207\u591a_agent_\u5354\u540c_q3",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "\u968e\u6bb5\u4e09:\u5167\u5bb9\u5b9a\u5740 ast \u4ee3\u78bc\u5eab\u8207\u591a agent \u5354\u540c (q3)"
     },
     {
@@ -27942,7 +27942,7 @@
       "_origin": "ast",
       "id": "docs_zh_tw_roadmap_\u968e\u6bb5\u56db_\u5168\u5e73\u81fa\u8207\u751f\u614b\u4e92\u64cd\u4f5c_q4",
       "community": 25,
-      "community_name": "Axiom Project Roadmap",
+      "community_name": "docs/ROADMAP.md",
       "norm_label": "\u968e\u6bb5\u56db:\u5168\u5e73\u81fa\u8207\u751f\u614b\u4e92\u64cd\u4f5c (q4)"
     },
     {
@@ -69003,7 +69003,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L235",
+      "source_location": "L240",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner",
@@ -69014,7 +69014,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L249",
+      "source_location": "L254",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner",
@@ -69069,7 +69069,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L285",
+      "source_location": "L290",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner",
@@ -69080,7 +69080,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L278",
+      "source_location": "L283",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner",
@@ -69102,7 +69102,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L324",
+      "source_location": "L329",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner",
@@ -69113,7 +69113,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L297",
+      "source_location": "L302",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner",
@@ -69148,7 +69148,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L345",
+      "source_location": "L350",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -69184,7 +69184,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L373",
+      "source_location": "L378",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -69207,7 +69207,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L304",
+      "source_location": "L309",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_resolve_best_model",
@@ -69219,7 +69219,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L237",
+      "source_location": "L242",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_call_gemini_count_tokens",
@@ -69231,7 +69231,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L251",
+      "source_location": "L256",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_call_gemini_generate",
@@ -69243,7 +69243,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L280",
+      "source_location": "L285",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_list_available_models",
@@ -69266,7 +69266,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L356",
+      "source_location": "L361",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -69289,7 +69289,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L245",
+      "source_location": "L250",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_call_gemini_count_tokens",
@@ -69301,7 +69301,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L262",
+      "source_location": "L267",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_call_gemini_generate",
@@ -69313,7 +69313,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L281",
+      "source_location": "L286",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_list_available_models",
@@ -69336,7 +69336,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L383",
+      "source_location": "L388",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -69348,7 +69348,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L431",
+      "source_location": "L436",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -69371,7 +69371,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L432",
+      "source_location": "L437",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -69394,7 +69394,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L433",
+      "source_location": "L438",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -69417,7 +69417,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L374",
+      "source_location": "L379",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -69428,10 +69428,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L236",
+      "source_location": "L241",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner_rationale_236",
+      "source": "examples_benchmark_eval_eval_runner_rationale_241",
       "target": "examples_benchmark_eval_eval_runner_call_gemini_count_tokens",
       "confidence_score": 1.0
     },
@@ -69440,7 +69440,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L458",
+      "source_location": "L463",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -69451,10 +69451,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L250",
+      "source_location": "L255",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner_rationale_250",
+      "source": "examples_benchmark_eval_eval_runner_rationale_255",
       "target": "examples_benchmark_eval_eval_runner_call_gemini_generate",
       "confidence_score": 1.0
     },
@@ -69463,7 +69463,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L287",
+      "source_location": "L292",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_get_supported_count_tokens_models",
@@ -69474,10 +69474,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L279",
+      "source_location": "L284",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner_rationale_279",
+      "source": "examples_benchmark_eval_eval_runner_rationale_284",
       "target": "examples_benchmark_eval_eval_runner_list_available_models",
       "confidence_score": 1.0
     },
@@ -69486,7 +69486,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L366",
+      "source_location": "L371",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -69497,10 +69497,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L286",
+      "source_location": "L291",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner_rationale_286",
+      "source": "examples_benchmark_eval_eval_runner_rationale_291",
       "target": "examples_benchmark_eval_eval_runner_get_supported_count_tokens_models",
       "confidence_score": 1.0
     },
@@ -69509,7 +69509,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L305",
+      "source_location": "L310",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_resolve_best_model",
@@ -69521,7 +69521,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L399",
+      "source_location": "L404",
       "weight": 1.0,
       "_origin": "ast",
       "source": "examples_benchmark_eval_eval_runner_main",
@@ -69532,10 +69532,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "examples/benchmark_eval/eval_runner.py",
-      "source_location": "L298",
+      "source_location": "L303",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "examples_benchmark_eval_eval_runner_rationale_298",
+      "source": "examples_benchmark_eval_eval_runner_rationale_303",
       "target": "examples_benchmark_eval_eval_runner_resolve_best_model",
       "confidence_score": 1.0
     },
@@ -88323,5 +88323,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "16d9cec121cdc3b2b941a8fdd406e7573e6fe041"
+  "built_at_commit": "42e7cab6884e7f0865dfba6c41b51a72b8782eae"
 }

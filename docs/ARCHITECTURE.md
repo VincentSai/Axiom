@@ -1,4 +1,4 @@
-﻿> **Languages / 语言 / 語言**: [English](en/ARCHITECTURE.md) | [简体中文](zh-CN/ARCHITECTURE.md) | [繁體中文](zh-TW/ARCHITECTURE.md)
+> **Languages / 语言 / 語言**: [English](en/ARCHITECTURE.md) | [简体中文](zh-CN/ARCHITECTURE.md) | [繁體中文](zh-TW/ARCHITECTURE.md)
 
 ---
 
@@ -45,10 +45,11 @@ graph TD
 
 ### 决策 3：代码组织模型 —— 【内容寻址 AST (Content-Addressed)】
 - **机制**：代码底层以 AST 节点的 SHA-256 哈希作为唯一标识。
-- **协作革命**：
+- **协作特征与边界**：
   - 函数改名不会破坏引用；
   - 多个 Agent 同时编写同名函数不会覆盖，而是产生两个不同 Hash 的独立函数节点；
-  - 减少传统文本合并冲突，向“基于不可变 AST 哈希的引用装配”演进（注：当前原型通过原子任务池进行内存装配，分布式分支合并协议仍在探索设计中）。
+  - **消除代码文本合并冲突，但不消除业务概念冲突**：内容寻址 AST 可以杜绝 Git Merge 引起的行级文本语法冲突，但若多个 Agent 对同一业务需求产生逻辑理解分歧，仍需通过顶层契约与架构师进行概念裁决；
+  - **当前实现状态**：当前 `axiom-agent-pool` 是单机内存级协作原型，用于验证纯表达式局部填洞与并发 SMT 拦截的端到端有效性；分布式分支协议仍在演进中。
 
 ### 决策 4：表层语法设计 —— 【现代极简表达式】
 - **机制**：采用类似 Rust / TypeScript 的精简纯净子集。
@@ -63,7 +64,8 @@ graph TD
   1. 架构师 Agent 定义顶层数据结构、Effect 与函数骨架，在待实现逻辑处标注 `?hole_name`；
   2. 编译器提取每个 `?hole` 的输入类型、输出类型、允许的 Effects 以及前置/后置条件，生成结构化 JSON 任务；
   3. Worker Agents 并发认领任务，针对单一函数进行确定性数学填空；
-  4. 编译器结合轻量 SMT 求解器，若发现契约违背，直接生成导致出错的具体输入反例（Counter-Example），驱动 Worker Agent 自动单步自愈。
+  4. 编译器结合轻量 SMT 求解器，若发现契约违背，直接生成导致出错的具体输入反例（Counter-Example），驱动 Worker Agent 自动单步自愈；
+  - **关键边界认知**：SMT 求解器只能保证填入的代码满足写在签名上的形式化契约；如果人类或架构师编写的契约不充分（如仅要求 `result >= 0`），代码可能在证明通过的情况下依然偏离真实业务意图。因此高质量的充要契约是闭环有效性的前提。
 
 ### 决策 6：跨语言互操作 —— 【双轨驱动 (WIT + 声明式 FFI)】
 - **W3C WIT 标准**：无缝导入与导出 WebAssembly Component Model 模块；

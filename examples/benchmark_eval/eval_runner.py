@@ -14,8 +14,11 @@ import argparse
 import io
 import json
 import os
+import shutil
 import socket
+import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -34,6 +37,36 @@ OUTPUT_DATA_PATH = os.path.join(SCRIPT_DIR, "data", "eval_matrix_data.json")
 
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 DEFAULT_MODEL = "gemini-1.5-flash"
+MAX_HEALING_RETRIES = 3
+
+# 20 个黄金任务的 Ground-Truth 测试向量表 (输入元组, 预期输出)
+TEST_VECTORS = {
+    1: [((0, 0, 0, 0), 0), ((10, 5, 2, 1), 12), ((3, 7, 8, 2), 10), ((100, 200, 50, 80), 170)],
+    2: [((0, 0, 0, 0), 0), ((3, 5, 7, 2), 4), ((10, 10, 10, 20), 10), ((5, 12, 1, 3), 9)],
+    3: [
+        ((0, 0, 10, 10, 5, 5, 15, 15), True),
+        ((0, 0, 5, 5, 10, 10, 15, 15), False),
+        ((0, 0, 10, 10, 10, 10, 20, 20), True),
+        ((2, 2, 8, 8, 0, 0, 10, 10), True),
+    ],
+    4: [((0, 0), 0), ((1, 0), 65536), ((0, 1), 1), ((65535, 65535), 4294967295)],
+    5: [((0,), 10), ((5,), 20), ((50,), 110)],
+    6: [((100, 0), 100), ((100, 100), 50), ((1, 50), 1)],
+    7: [((50, 150, False), 50), ((50, 150, True), 75), ((100, 100, True), 100)],
+    8: [((100, 20), 75), ((20, 50), 5), ((50, 50), 5)],
+    9: [((100, 0, False), 100), ((100, 100, False), 50)],
+    10: [((1,), 5), ((3,), 15), ((10,), 50)],
+    11: [((50, 100), 0), ((100, 30), 70), ((50, 0), 50)],
+    12: [((20, 50), 20), ((20, 100), 20), ((20, 150), 25)],
+    13: [((100, 0), 100), ((100, 20), 60), ((100, 60), 0)],
+    14: [((15, 100), 3), ((50, 80), 2), ((50, 20), 1)],
+    15: [((0,), 1), ((9000,), 1), ((9001,), 2), ((9800,), 2), ((9801,), 3), ((9999,), 3)],
+    16: [((100, 10, 15), 120), ((100, 10, 10), 100), ((100, 15, 10), 50)],
+    17: [((10, 5, 2), 107), ((0, 0, 0), 0)],
+    18: [((100, 100), 1), ((70, 100), 1), ((69, 100), 2), ((30, 100), 2), ((29, 100), 3), ((0, 100), 3)],
+    19: [((100, 0, 2), 110)],
+    20: [((100, 0), 100), ((100, 100), 0), ((100, 25), 75)],
+}
 
 
 def check_port_open(host, port, timeout=0.3):
@@ -159,6 +192,153 @@ def load_golden_tasks():
     return data.get("tasks", [])
 
 
+def find_axiom_binary():
+    """定位本地编译的 axiom 可执行文件"""
+    root_dir = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+    exe_name = "axiom.exe" if sys.platform == "win32" else "axiom"
+    target_debug = os.path.join(root_dir, "target", "debug", exe_name)
+    if os.path.isfile(target_debug):
+        return target_debug
+    target_release = os.path.join(root_dir, "target", "release", exe_name)
+    if os.path.isfile(target_release):
+        return target_release
+    which_p = shutil.which("axiom")
+    if which_p:
+        return which_p
+    return target_debug
+
+
+def extract_code(text: str, target_kind: str = "rust") -> str:
+    """提取 markdown 代码块或纯表达式，清除前后注释与反引号"""
+    clean = text.strip()
+    if f"```{target_kind}" in clean:
+        parts = clean.split(f"```{target_kind}")
+        if len(parts) > 1:
+            clean = parts[1].split("```")[0].strip()
+    elif "```" in clean:
+        parts = clean.split("```")
+        if len(parts) > 1:
+            clean = parts[1].split("```")[0].strip()
+    return clean
+
+
+def run_rust_test(code: str, task: dict) -> tuple[bool, str]:
+    """编译并物理执行 Rust 单元测试"""
+    tid = task["id"]
+    fname = task["function_name"]
+    vectors = TEST_VECTORS.get(tid, [])
+
+    clean_code = extract_code(code, "rust")
+
+    test_lines = []
+    for args, expected in vectors:
+        args_str = ", ".join([str(a).lower() if isinstance(a, bool) else str(a) for a in args])
+        exp_str = str(expected).lower() if isinstance(expected, bool) else str(expected)
+        test_lines.append(f"    assert_eq!({fname}({args_str}), {exp_str});")
+    tests_body = "\n".join(test_lines)
+
+    full_source = f"""{clean_code}
+
+#[cfg(test)]
+mod tests {{
+    use super::*;
+    #[test]
+    fn test_task_vectors() {{
+{tests_body}
+    }}
+}}
+"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        src_path = os.path.join(tmpdir, "test.rs")
+        exe_path = os.path.join(tmpdir, "test.exe" if sys.platform == "win32" else "test")
+        with open(src_path, "w", encoding="utf-8") as f:
+            f.write(full_source)
+
+        compile_cmd = ["rustc", "--test", src_path, "-o", exe_path]
+        try:
+            c_res = subprocess.run(compile_cmd, capture_output=True, text=True, timeout=15)
+            if c_res.returncode != 0:
+                err = c_res.stderr.strip()
+                return False, f"Rust compilation error:\n{err[:600]}"
+        except Exception as e:
+            return False, f"Failed to execute rustc: {e}"
+
+        try:
+            r_res = subprocess.run([exe_path], capture_output=True, text=True, timeout=10)
+            if r_res.returncode != 0:
+                err = r_res.stdout.strip() or r_res.stderr.strip()
+                return False, f"Rust unit test assertion failed:\n{err[:600]}"
+        except Exception as e:
+            return False, f"Test runtime crash: {e}"
+
+    return True, "All unit tests passed"
+
+
+def run_axiom_verify(expr: str, task: dict, axiom_bin: str) -> tuple[bool, str, dict | None]:
+    """通过 Axiom SMT 求解器验证契约与效果安全"""
+    clean_expr = extract_code(expr, "axiom")
+    if clean_expr.startswith("fn "):
+        first_brace = clean_expr.find("{")
+        last_brace = clean_expr.rfind("}")
+        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+            clean_expr = clean_expr[first_brace + 1:last_brace].strip()
+
+    params_str = ", ".join([f"{p['name']}: {p['type']}" for p in task['inputs']])
+    requires_items = "\n        ".join([f"{req}," for req in task['contracts']['requires']])
+    ensures_items = "\n        ".join([f"{ens}," for ens in task['contracts']['ensures']])
+
+    axiom_source = f"""fn {task['function_name']}({params_str}) -> {task['output']}
+    requires {{
+        {requires_items}
+    }}
+    ensures {{
+        {ensures_items}
+    }}
+{{
+    {clean_expr}
+}}
+"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        src_path = os.path.join(tmpdir, "verify_task.ax")
+        with open(src_path, "w", encoding="utf-8") as f:
+            f.write(axiom_source)
+
+        cmd = [axiom_bin, "verify", "--json", src_path]
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            stdout = res.stdout.strip()
+            if not stdout:
+                return False, f"Axiom returned empty output (stderr: {res.stderr[:300]})", None
+
+            try:
+                reports = json.loads(stdout)
+            except Exception:
+                return False, f"Failed to parse Axiom diagnostic output: {stdout[:300]}", None
+
+            if isinstance(reports, list):
+                for r in reports:
+                    status = r.get("status")
+                    if status == "ContractViolation":
+                        diag = r.get("diagnosis", "Contract violation")
+                        clause = r.get("violated_clause", "")
+                        ce = r.get("counter_example")
+                        msg = f"Contract Violation ({clause}): {diag}"
+                        return False, msg, ce
+                    elif status in ("TypeError", "EffectViolation", "ParseError", "UnresolvedHole"):
+                        diag = r.get("diagnosis", f"Axiom diagnostic error: {status}")
+                        return False, diag, None
+                    elif status == "Skipped" and r.get("has_contracts"):
+                        diag = r.get("diagnosis", "Function contracts skipped (fail-closed)")
+                        return False, diag, None
+
+                return True, "Axiom formal verification passed", None
+            else:
+                return False, "Unexpected Axiom output format", None
+
+        except Exception as e:
+            return False, f"Axiom verify execution error: {e}", None
+
+
 def build_group1_prompt(task, all_tasks):
     """Group 1: Monolithic Rust file context with multiple functions."""
     other_funcs = []
@@ -216,7 +396,8 @@ def build_group3_prompt(task):
     requires_items = "\n        ".join([f"{req}," for req in task['contracts']['requires']])
     ensures_items = "\n        ".join([f"{ens}," for ens in task['contracts']['ensures']])
 
-    axiom_code = f"""fn {task['function_name']}({params_str}) -> {task['output']}
+    axiom_code = f"""// Description: {task['description']}
+fn {task['function_name']}({params_str}) -> {task['output']}
     requires {{
         {requires_items}
     }}
@@ -392,9 +573,13 @@ def main():
     else:
         eval_tasks = all_tasks
 
+    axiom_bin = find_axiom_binary()
+
     print("=" * 70)
     print("🚀 Axiom 经验性真实 A/B 对照评测启动 (Empirical Benchmark Runner)")
     print(f"评测模式: {args.mode} | 任务总数: {len(eval_tasks)} | API 端点: {args.base_url}")
+    if args.mode == "generate":
+        print(f"验证后端: rustc + Axiom SMT ({axiom_bin}) | 最大自愈重试轮数: {MAX_HEALING_RETRIES}")
     if target_proxy:
         print(f"网络代理: {target_proxy}")
     print("=" * 70)
@@ -428,6 +613,11 @@ def main():
     total_g2 = 0
     total_g3 = 0
 
+    g2_pass1_count = 0
+    g2_final_pass_count = 0
+    g3_pass1_count = 0
+    g3_final_pass_count = 0
+
     for idx, task in enumerate(eval_tasks):
         tid = task["id"]
         fname = task["function_name"]
@@ -460,25 +650,101 @@ def main():
                 "group3_axiom_hole": {"prompt_tokens": tokens_3}
             })
         else:
+            # 模式: generate (物理端到端生成、验证与自愈重试)
+            # Group 1: 单体大上下文生成 (基准对照)
             res1 = call_gemini_generate(opener, api_key, active_model, p1, args.base_url)
-            time.sleep(0.5)
-            res2 = call_gemini_generate(opener, api_key, active_model, p2, args.base_url)
-            time.sleep(0.5)
-            res3 = call_gemini_generate(opener, api_key, active_model, p3, args.base_url)
-            time.sleep(0.5)
-
             total_g1 += res1["total_tokens"]
-            total_g2 += res2["total_tokens"]
-            total_g3 += res3["total_tokens"]
+            time.sleep(0.3)
 
-            print(f" G1: {res1['total_tokens']}t | G2: {res2['total_tokens']}t | G3: {res3['total_tokens']}t")
+            # Group 2: 单任务隔离微任务生成 + rustc 单元测试与编译错误自愈重试
+            res2 = call_gemini_generate(opener, api_key, active_model, p2, args.base_url)
+            time.sleep(0.3)
+            g2_tokens = res2["total_tokens"]
+            g2_ok, g2_err = run_rust_test(res2["text"], task)
+            g2_pass1 = g2_ok
+            g2_attempts = 1
+
+            if not g2_ok:
+                current_code = res2["text"]
+                for retry in range(MAX_HEALING_RETRIES):
+                    heal_prompt = f"""Your previous Rust implementation for `{fname}` failed compilation or unit tests:
+
+{g2_err}
+
+Please fix the implementation and return ONLY the corrected complete Rust function:"""
+                    heal_res = call_gemini_generate(opener, api_key, active_model, heal_prompt, args.base_url)
+                    time.sleep(0.3)
+                    g2_tokens += heal_res["total_tokens"]
+                    g2_attempts += 1
+                    current_code = heal_res["text"]
+                    g2_ok, g2_err = run_rust_test(current_code, task)
+                    if g2_ok:
+                        break
+
+            if g2_pass1:
+                g2_pass1_count += 1
+            if g2_ok:
+                g2_final_pass_count += 1
+            total_g2 += g2_tokens
+
+            # Group 3: Axiom 契约打洞生成 + SMT 求解器验证与反例自愈重试
+            res3 = call_gemini_generate(opener, api_key, active_model, p3, args.base_url)
+            time.sleep(0.3)
+            g3_tokens = res3["total_tokens"]
+            g3_ok, g3_diag, g3_ce = run_axiom_verify(res3["text"], task, axiom_bin)
+            g3_pass1 = g3_ok
+            g3_attempts = 1
+            g3_ce_found = g3_ce is not None
+
+            if not g3_ok:
+                current_expr = res3["text"]
+                for retry in range(MAX_HEALING_RETRIES):
+                    ce_info = f"\nSpecific SMT Counterexample inputs: {json.dumps(g3_ce)}" if g3_ce else ""
+                    heal_prompt = f"""Axiom formal verification failed for `{fname}`:
+Diagnostic: {g3_diag}{ce_info}
+
+Please refine your pure expression to satisfy all formal contracts and eliminate counterexamples.
+Return ONLY the corrected pure expression to fill `?hole`:"""
+                    heal_res = call_gemini_generate(opener, api_key, active_model, heal_prompt, args.base_url)
+                    time.sleep(0.3)
+                    g3_tokens += heal_res["total_tokens"]
+                    g3_attempts += 1
+                    current_expr = heal_res["text"]
+                    g3_ok, g3_diag, g3_ce = run_axiom_verify(current_expr, task, axiom_bin)
+                    if g3_ce:
+                        g3_ce_found = True
+                    if g3_ok:
+                        break
+
+            if g3_pass1:
+                g3_pass1_count += 1
+            if g3_ok:
+                g3_final_pass_count += 1
+            total_g3 += g3_tokens
+
+            g2_tag = f"P1:{'✓' if g2_pass1 else '✗'}(try:{g2_attempts})"
+            g3_tag = f"P1:{'✓' if g3_pass1 else '✗'}(try:{g3_attempts}{',CE' if g3_ce_found else ''})"
+            print(f" G1: {res1['total_tokens']}t | G2: {g2_tokens}t [{g2_tag}] | G3: {g3_tokens}t [{g3_tag}]")
 
             results.append({
                 "task_id": tid,
                 "function_name": fname,
-                "group1_rust_monolith": res1,
-                "group2_rust_micro": res2,
-                "group3_axiom_hole": res3
+                "group1_rust_monolith": {
+                    "total_tokens": res1["total_tokens"],
+                },
+                "group2_rust_micro": {
+                    "total_tokens": g2_tokens,
+                    "pass_at_1": g2_pass1,
+                    "final_pass": g2_ok,
+                    "attempts": g2_attempts,
+                },
+                "group3_axiom_hole": {
+                    "total_tokens": g3_tokens,
+                    "pass_at_1": g3_pass1,
+                    "final_pass": g3_ok,
+                    "attempts": g3_attempts,
+                    "counterexample_encountered": g3_ce_found,
+                }
             })
 
     pct_vs_g2 = round((1.0 - total_g3 / total_g2) * 100, 1) if total_g2 > 0 else 0
@@ -492,10 +758,15 @@ def main():
     print("-" * 70)
     print(f"🔥 核心指标 1: Axiom 较 Group 2 (单任务隔离微任务) 净节省 Token: {pct_vs_g2}%")
     print(f"🔥 核心指标 2: Axiom 较 Group 1 (传统单体大文件上下文) 净节省 Token: {pct_vs_g1}%")
+    if args.mode == "generate":
+        print("-" * 70)
+        print(f"🛠️ 物理执行验证与自愈统计 (共 {len(eval_tasks)} 个任务):")
+        print(f"  • Group 2 (Rust): Pass@1 = {g2_pass1_count}/{len(eval_tasks)} ({round(g2_pass1_count/len(eval_tasks)*100, 1)}%) | 经自愈最终 Pass = {g2_final_pass_count}/{len(eval_tasks)} ({round(g2_final_pass_count/len(eval_tasks)*100, 1)}%)")
+        print(f"  • Group 3 (Axiom): Pass@1 = {g3_pass1_count}/{len(eval_tasks)} ({round(g3_pass1_count/len(eval_tasks)*100, 1)}%) | 经SMT自愈最终 Pass = {g3_final_pass_count}/{len(eval_tasks)} ({round(g3_final_pass_count/len(eval_tasks)*100, 1)}%)")
     print("=" * 70)
 
     output_payload = {
-        "version": "1.0",
+        "version": "2.0",
         "status": "completed_authentic",
         "experiment_metadata": {
             "target_model": active_model,
@@ -512,6 +783,18 @@ def main():
         },
         "detailed_tasks": results
     }
+
+    if args.mode == "generate":
+        output_payload["verification_summary"] = {
+            "group2_rust": {
+                "pass_at_1": f"{g2_pass1_count}/{len(eval_tasks)}",
+                "final_pass": f"{g2_final_pass_count}/{len(eval_tasks)}",
+            },
+            "group3_axiom": {
+                "pass_at_1": f"{g3_pass1_count}/{len(eval_tasks)}",
+                "final_pass": f"{g3_final_pass_count}/{len(eval_tasks)}",
+            }
+        }
 
     os.makedirs(os.path.dirname(OUTPUT_DATA_PATH), exist_ok=True)
     with open(OUTPUT_DATA_PATH, "w", encoding="utf-8") as f:

@@ -14,6 +14,11 @@ pub enum EffectError {
         effect: String,
         source: String,
     },
+    /// A function attempts an unauthorized external host call (e.g. std::fs).
+    DisallowedExternalCall {
+        function: String,
+        target: String,
+    },
 }
 
 impl fmt::Display for EffectError {
@@ -30,6 +35,10 @@ impl fmt::Display for EffectError {
             } => write!(
                 formatter,
                 "function `{function}` requires effect `{effect}` through `{source}` but does not declare it"
+            ),
+            Self::DisallowedExternalCall { function, target } => write!(
+                formatter,
+                "function `{function}` makes disallowed external host call `{target}` without an effect wrapper"
             ),
         }
     }
@@ -66,8 +75,17 @@ pub fn check_module_effects(module: &Module) -> Result<(), EffectError> {
         .map(|function| (function.name.as_str(), function))
         .collect::<HashMap<_, _>>();
 
+    let enums = module
+        .types
+        .iter()
+        .filter_map(|ty| match ty {
+            axiom_ast::TypeDef::Enum { name, .. } => Some(name.as_str()),
+            _ => None,
+        })
+        .collect::<HashSet<_>>();
+
     for function in &module.functions {
-        check_function(function, &functions, &effects)?;
+        check_function(function, &functions, &effects, &enums)?;
     }
 
     Ok(())
@@ -77,6 +95,7 @@ fn check_function(
     function: &FunctionDecl,
     functions: &HashMap<&str, &FunctionDecl>,
     effects: &HashSet<&str>,
+    enums: &HashSet<&str>,
 ) -> Result<(), EffectError> {
     let declared = function
         .effects
@@ -94,6 +113,16 @@ fn check_function(
                 for effect in &callee.effects {
                     require_effect(function, &declared, effect, &callee.name)?;
                 }
+            }
+        } else if call.len() >= 2 {
+            if enums.contains(call[0].as_str()) {
+                continue;
+            }
+            if call[0] == "std" || call[0] == "core" || call[0] == "alloc" {
+                return Err(EffectError::DisallowedExternalCall {
+                    function: function.name.clone(),
+                    target: call.join("::"),
+                });
             }
         }
     }
@@ -222,6 +251,12 @@ fn collect_raw_calls(source: &str, calls: &mut Vec<Vec<String>>) {
                 skip_ascii_whitespace(bytes, &mut offset);
                 if offset < bytes.len() && bytes[offset] == b'.' {
                     offset += 1;
+                    skip_ascii_whitespace(bytes, &mut offset);
+                    if offset < bytes.len() && is_ident_start(bytes[offset]) {
+                        continue;
+                    }
+                } else if offset + 1 < bytes.len() && bytes[offset] == b':' && bytes[offset + 1] == b':' {
+                    offset += 2;
                     skip_ascii_whitespace(bytes, &mut offset);
                     if offset < bytes.len() && is_ident_start(bytes[offset]) {
                         continue;

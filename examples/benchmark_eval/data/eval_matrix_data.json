@@ -5,14 +5,14 @@
     "target_model": "gemini-3.8-flash",
     "mode": "count",
     "evaluated_tasks_count": 20,
-    "timestamp": "2026-09-08 11:46:06"
+    "timestamp": "2026-09-08 13:50:40"
   },
   "totals": {
     "group1_rust_monolith_tokens": 7759,
     "group2_rust_micro_tokens": 3175,
-    "group3_axiom_hole_tokens": 4854,
-    "net_savings_vs_micro": "-52.9%",
-    "net_savings_vs_monolith": "37.4%"
+    "group3_axiom_hole_tokens": 2697,
+    "net_savings_vs_micro": "15.1%",
+    "net_savings_vs_monolith": "65.2%"
   },
   "detailed_tasks": [
     {
@@ -25,7 +25,7 @@
         "prompt_tokens": 164
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 277
+        "prompt_tokens": 144
       }
     },
     {
@@ -38,7 +38,7 @@
         "prompt_tokens": 162
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 277
+        "prompt_tokens": 144
       }
     },
     {
@@ -51,7 +51,7 @@
         "prompt_tokens": 253
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 402
+        "prompt_tokens": 198
       }
     },
     {
@@ -64,7 +64,7 @@
         "prompt_tokens": 178
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 252
+        "prompt_tokens": 153
       }
     },
     {
@@ -77,7 +77,7 @@
         "prompt_tokens": 113
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 186
+        "prompt_tokens": 107
       }
     },
     {
@@ -90,7 +90,7 @@
         "prompt_tokens": 151
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 224
+        "prompt_tokens": 127
       }
     },
     {
@@ -103,7 +103,7 @@
         "prompt_tokens": 160
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 250
+        "prompt_tokens": 136
       }
     },
     {
@@ -116,7 +116,7 @@
         "prompt_tokens": 154
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 224
+        "prompt_tokens": 129
       }
     },
     {
@@ -129,7 +129,7 @@
         "prompt_tokens": 142
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 239
+        "prompt_tokens": 127
       }
     },
     {
@@ -142,7 +142,7 @@
         "prompt_tokens": 110
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 181
+        "prompt_tokens": 104
       }
     },
     {
@@ -155,7 +155,7 @@
         "prompt_tokens": 142
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 230
+        "prompt_tokens": 132
       }
     },
     {
@@ -168,7 +168,7 @@
         "prompt_tokens": 150
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 218
+        "prompt_tokens": 121
       }
     },
     {
@@ -181,7 +181,7 @@
         "prompt_tokens": 138
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 228
+        "prompt_tokens": 129
       }
     },
     {
@@ -194,7 +194,7 @@
         "prompt_tokens": 169
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 235
+        "prompt_tokens": 137
       }
     },
     {
@@ -207,7 +207,7 @@
         "prompt_tokens": 171
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 201
+        "prompt_tokens": 122
       }
     },
     {
@@ -220,7 +220,7 @@
         "prompt_tokens": 195
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 262
+        "prompt_tokens": 143
       }
     },
     {
@@ -233,7 +233,7 @@
         "prompt_tokens": 137
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 241
+        "prompt_tokens": 128
       }
     },
     {
@@ -246,7 +246,7 @@
         "prompt_tokens": 170
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 238
+        "prompt_tokens": 140
       }
     },
     {
@@ -259,7 +259,7 @@
         "prompt_tokens": 159
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 249
+        "prompt_tokens": 134
       }
     },
     {
@@ -272,7 +272,7 @@
         "prompt_tokens": 157
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 240
+        "prompt_tokens": 142
       }
     }
   ]

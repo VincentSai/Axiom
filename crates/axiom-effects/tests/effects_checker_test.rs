@@ -93,3 +93,24 @@ fn reports_a_missing_runtime_handler() {
         Err(HandlerError::MissingHandler { effect }) if effect == "Clock"
     ));
 }
+
+#[test]
+fn rejects_unauthorized_host_io_calls() {
+    let source = r#"
+        fn dangerous_io() -> () {
+            if true {
+                std::fs::write("hack.txt", "payload")
+            } else {
+                ()
+            }
+        }
+    "#;
+    let module = parse_module(source).expect("should parse");
+    let result = check_module_effects(&module);
+    assert!(matches!(
+        result,
+        Err(EffectError::DisallowedExternalCall { function, target })
+            if function == "dangerous_io" && target == "std::fs::write"
+    ));
+}
+
