@@ -309,6 +309,7 @@ fn format_expr(expression: &Expr) -> String {
                 BinaryOperator::Subtract => "-",
                 BinaryOperator::Multiply => "*",
                 BinaryOperator::Divide => "/",
+                BinaryOperator::Modulo => "%",
                 BinaryOperator::GreaterThan => ">",
                 BinaryOperator::GreaterThanOrEqual => ">=",
                 BinaryOperator::LessThan => "<",

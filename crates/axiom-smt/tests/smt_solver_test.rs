@@ -274,3 +274,127 @@ fn detects_and_rejects_intermediate_arithmetic_overflow_even_if_result_cancels_o
         );
     }
 }
+
+#[test]
+fn detects_overflow_in_unused_let_binding() {
+    let module = parse_module(
+        r#"
+        fn unused_overflow(x: Int) -> Int
+            requires { x >= 0 }
+            ensures { result == 0 }
+        {
+            let overflowed = x + 1;
+            0
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let res = verify_function(&module.functions[0]);
+
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(res, SmtResult::CounterExample(_)),
+            "Z3 SMT must reject overflow in unused let binding `x + 1`! Got: {:?}",
+            res
+        );
+    }
+}
+
+#[test]
+fn does_not_false_alarm_on_dead_branch_division_by_zero() {
+    let module = parse_module(
+        r#"
+        fn safe_branch_division(d: Int) -> Int
+            requires { d >= 0 }
+            ensures { result >= 0 }
+        {
+            match d == 0 {
+                true => 0,
+                false => 100 / d,
+            }
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let res = verify_function(&module.functions[0]);
+
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(res, SmtResult::Proved { .. }),
+            "Dead-branch division 100 / d when d == 0 must not trigger false positive! Got: {:?}",
+            res
+        );
+    }
+}
+
+#[test]
+fn composite_real_expression_skips_integer_safety_bounds() {
+    let module = parse_module(
+        r#"
+        fn composite_real_calc(x: Float, y: Float) -> Float
+            requires { x > 0.0 && y > 0.0 }
+            ensures { result > 0.0 }
+        {
+            (x + 1.0) + (y * 2.0)
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let res = verify_function(&module.functions[0]);
+
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(res, SmtResult::Proved { .. }),
+            "Composite Real operations must not have 64-bit integer overflow bounds injected! Got: {:?}",
+            res
+        );
+    }
+}
+
+#[test]
+fn modulo_operation_generates_safety_obligations_and_verifies() {
+    let module = parse_module(
+        r#"
+        fn safe_modulo(a: Int, b: Int) -> Int
+            requires { a >= 0 && b > 0 }
+            ensures { result >= 0 }
+        {
+            a % b
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let res = verify_function(&module.functions[0]);
+
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(res, SmtResult::Proved { .. }),
+            "Modulo operation should be verified with zero-divisor check! Got: {:?}",
+            res
+        );
+    }
+
+    let zero_mod_module = parse_module(
+        r#"
+        fn dangerous_modulo(a: Int) -> Int
+            ensures { result >= 0 }
+        {
+            a % 0
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let zero_res = verify_function(&zero_mod_module.functions[0]);
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(zero_res, SmtResult::CounterExample(_)),
+            "Modulo by zero must be rejected with counterexample! Got: {:?}",
+            zero_res
+        );
+    }
+}

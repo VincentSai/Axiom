@@ -399,7 +399,7 @@ fn expr_precedence(expr: &Expr) -> u8 {
             | BinaryOperator::NotEqual
             | BinaryOperator::Is => 4,
             BinaryOperator::Add | BinaryOperator::Subtract => 5,
-            BinaryOperator::Multiply | BinaryOperator::Divide => 6,
+            BinaryOperator::Multiply | BinaryOperator::Divide | BinaryOperator::Modulo => 6,
         },
         Expr::UnaryOp { .. } => 7,
         Expr::Call { .. } | Expr::FieldAccess { .. } => 8,
@@ -413,6 +413,7 @@ fn binary_operator(operator: &BinaryOperator) -> &'static str {
         BinaryOperator::Subtract => "-",
         BinaryOperator::Multiply => "*",
         BinaryOperator::Divide => "/",
+        BinaryOperator::Modulo => "%",
         BinaryOperator::GreaterThan => ">",
         BinaryOperator::GreaterThanOrEqual => ">=",
         BinaryOperator::LessThan => "<",

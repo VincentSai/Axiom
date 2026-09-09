@@ -687,6 +687,23 @@ fn eval_expr_internal(
                         })
                     }
                 }
+                BinaryOperator::Modulo => {
+                    let l = l_val.as_f64().ok_or("type mismatch in %")?;
+                    let r = r_val.as_f64().ok_or("type mismatch in %")?;
+                    if r == 0.0 {
+                        Err("division/modulo by zero".into())
+                    } else if l_val.is_int() && r_val.is_int() {
+                        Ok(Value::Num {
+                            val: (l as i64 % r as i64) as f64,
+                            is_int: true,
+                        })
+                    } else {
+                        Ok(Value::Num {
+                            val: l % r,
+                            is_int: false,
+                        })
+                    }
+                }
                 BinaryOperator::GreaterThan => {
                     let l = l_val.as_f64().ok_or("type mismatch in >")?;
                     let r = r_val.as_f64().ok_or("type mismatch in >")?;

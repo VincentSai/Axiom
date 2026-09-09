@@ -60,6 +60,61 @@ pub fn find_z3_executable() -> Option<PathBuf> {
     None
 }
 
+/// Unified process timeout and polling watchdog policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TimeoutPolicy {
+    pub timeout: std::time::Duration,
+    pub poll_interval: std::time::Duration,
+}
+
+impl TimeoutPolicy {
+    pub const DEFAULT_VERSION_PROBE: Self = Self {
+        timeout: std::time::Duration::from_millis(3000),
+        poll_interval: std::time::Duration::from_millis(10),
+    };
+
+    pub const DEFAULT_SOLVER_QUERY: Self = Self {
+        timeout: std::time::Duration::from_millis(10000),
+        poll_interval: std::time::Duration::from_millis(20),
+    };
+
+    pub fn from_millis(ms: u32) -> Self {
+        Self {
+            timeout: std::time::Duration::from_millis(ms as u64),
+            poll_interval: std::time::Duration::from_millis(20),
+        }
+    }
+
+    /// Waits for the child process to exit, terminating it if it exceeds `self.timeout`.
+    pub fn wait_child_with_watchdog(
+        &self,
+        child: &mut std::process::Child,
+    ) -> Result<std::process::ExitStatus, String> {
+        let start = std::time::Instant::now();
+        loop {
+            match child.try_wait() {
+                Ok(Some(status)) => return Ok(status),
+                Ok(None) => {
+                    if start.elapsed() >= self.timeout {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        return Err(format!(
+                            "child process hard-killed: execution time exceeded timeout threshold of {}ms",
+                            self.timeout.as_millis()
+                        ));
+                    }
+                    std::thread::sleep(self.poll_interval);
+                }
+                Err(e) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!("error polling child process: {}", e));
+                }
+            }
+        }
+    }
+}
+
 /// Retrieves the dynamically detected version string of Z3 executable with hard timeout watchdog.
 pub fn get_z3_version(z3_path: &Path) -> String {
     let mut child = match Command::new(z3_path)
@@ -72,42 +127,25 @@ pub fn get_z3_version(z3_path: &Path) -> String {
         Err(_) => return "unknown".to_string(),
     };
 
-    let start = std::time::Instant::now();
-    let timeout = std::time::Duration::from_millis(3000);
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                if status.success() {
-                    if let Some(mut out) = child.stdout.take() {
-                        use std::io::Read;
-                        let mut buf = Vec::new();
-                        let _ = out.read_to_end(&mut buf);
-                        let s = String::from_utf8_lossy(&buf);
-                        if let Some(pos) = s.find("version ") {
-                            let rest = &s[pos + 8..];
-                            let ver = rest.split_whitespace().next().unwrap_or("").trim();
-                            if !ver.is_empty() {
-                                return ver.to_string();
-                            }
-                        }
+    let policy = TimeoutPolicy::DEFAULT_VERSION_PROBE;
+    match policy.wait_child_with_watchdog(&mut child) {
+        Ok(status) if status.success() => {
+            if let Some(mut out) = child.stdout.take() {
+                use std::io::Read;
+                let mut buf = Vec::new();
+                let _ = out.read_to_end(&mut buf);
+                let s = String::from_utf8_lossy(&buf);
+                if let Some(pos) = s.find("version ") {
+                    let rest = &s[pos + 8..];
+                    let ver = rest.split_whitespace().next().unwrap_or("").trim();
+                    if !ver.is_empty() {
+                        return ver.to_string();
                     }
                 }
-                return "unknown".to_string();
             }
-            Ok(None) => {
-                if start.elapsed() >= timeout {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    return "unknown".to_string();
-                }
-                std::thread::sleep(std::time::Duration::from_millis(10));
-            }
-            Err(_) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return "unknown".to_string();
-            }
+            "unknown".to_string()
         }
+        _ => "unknown".to_string(),
     }
 }
 
@@ -154,29 +192,8 @@ pub fn run_z3_query_with_timeout(
         buf
     });
 
-    let start = std::time::Instant::now();
-    let timeout = std::time::Duration::from_millis(timeout_ms as u64);
-    let mut is_timeout = false;
-
-    loop {
-        match child.try_wait() {
-            Ok(Some(_status)) => break,
-            Ok(None) => {
-                if start.elapsed() >= timeout {
-                    is_timeout = true;
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    break;
-                }
-                std::thread::sleep(std::time::Duration::from_millis(20));
-            }
-            Err(e) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!("error polling z3 child process: {}", e));
-            }
-        }
-    }
+    let policy = TimeoutPolicy::from_millis(timeout_ms);
+    let status_res = policy.wait_child_with_watchdog(&mut child);
 
     let stdout_bytes = stdout_join
         .join()
@@ -184,13 +201,7 @@ pub fn run_z3_query_with_timeout(
     let stderr_bytes = stderr_join
         .join()
         .map_err(|_| "stderr reader thread panicked")?;
-
-    if is_timeout {
-        return Err(format!(
-            "Z3 solver process hard-killed: execution time exceeded timeout threshold of {}ms",
-            timeout_ms
-        ));
-    }
+    status_res?;
 
     let stdout = String::from_utf8_lossy(&stdout_bytes);
     let stderr = String::from_utf8_lossy(&stderr_bytes);

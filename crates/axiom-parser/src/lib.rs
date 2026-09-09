@@ -518,6 +518,8 @@ impl<'a> Parser<'a> {
                 BinaryOperator::Multiply
             } else if self.consume_char('/') {
                 BinaryOperator::Divide
+            } else if self.consume_char('%') {
+                BinaryOperator::Modulo
             } else {
                 break;
             };

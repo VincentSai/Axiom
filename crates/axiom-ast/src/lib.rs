@@ -70,6 +70,7 @@ pub enum BinaryOperator {
     Subtract,
     Multiply,
     Divide,
+    Modulo,
     GreaterThan,
     GreaterThanOrEqual,
     LessThan,

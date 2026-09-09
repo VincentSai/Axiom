@@ -578,6 +578,7 @@ fn binary_operator(operator: &BinaryOperator) -> &'static str {
         BinaryOperator::Subtract => "-",
         BinaryOperator::Multiply => "*",
         BinaryOperator::Divide => "/",
+        BinaryOperator::Modulo => "%",
         BinaryOperator::GreaterThan => ">",
         BinaryOperator::GreaterThanOrEqual => ">=",
         BinaryOperator::LessThan => "<",

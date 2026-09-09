@@ -651,3 +651,96 @@ fn two_phase_cas_rejects_mismatched_base_root() {
 
     let _ = std::fs::remove_file(&db_path);
 }
+
+#[test]
+fn receipt_binds_verification_profile_hash_and_invalidates_on_profile_mismatch() {
+    use axiom_db::{
+        compute_receipt_hash, current_verification_profile_hash, ProofLevel, VerificationReceipt,
+    };
+
+    let current_hash = current_verification_profile_hash();
+    assert!(current_hash.as_str().starts_with("#vprof_"));
+
+    let rcpt1 = VerificationReceipt {
+        candidate_hash: "#cand_1111111111111111111111111111111111111111111111111111111111111111"
+            .parse()
+            .unwrap(),
+        proof_level: ProofLevel::Proved,
+        solver: "z3".into(),
+        solver_version: "4.12.0".into(),
+        obligations_checked: 5,
+        proof_obligation_hash:
+            "#obl_1111111111111111111111111111111111111111111111111111111111111111"
+                .parse()
+                .unwrap(),
+        verification_profile_hash: current_hash.clone(),
+        verified_at: 1000,
+    };
+
+    let mut rcpt_old = rcpt1.clone();
+    rcpt_old.verification_profile_hash =
+        "#vprof_0000000000000000000000000000000000000000000000000000000000000000"
+            .parse()
+            .unwrap();
+
+    assert_ne!(
+        compute_receipt_hash(&rcpt1),
+        compute_receipt_hash(&rcpt_old)
+    );
+    assert_ne!(
+        rcpt_old.verification_profile_hash,
+        current_verification_profile_hash()
+    );
+}
+
+#[test]
+fn persisted_database_persists_and_restores_draft_records() {
+    use axiom_db::DraftRecord;
+
+    let db_path = temporary_database_path("draft-persistence");
+    if db_path.exists() {
+        let _ = std::fs::remove_file(&db_path);
+    }
+
+    {
+        let mut db = AstDatabase::open(&db_path).expect("db open should succeed");
+        assert!(db.drafts().is_empty());
+
+        let draft = DraftRecord {
+            hole_id: "hole_add".into(),
+            agent_id: "worker_1".into(),
+            code: "a + b".into(),
+            timestamp: 1700000000,
+        };
+        db.insert_draft(draft.clone())
+            .expect("insert draft should succeed");
+
+        assert_eq!(db.get_draft("hole_add"), Some(&draft));
+        assert_eq!(db.drafts().len(), 1);
+    }
+
+    // Re-open from disk in a fresh instance
+    {
+        let mut db = AstDatabase::open(&db_path).expect("reopen should succeed");
+        assert_eq!(db.drafts().len(), 1);
+        let restored = db
+            .get_draft("hole_add")
+            .expect("draft should exist after reopen");
+        assert_eq!(restored.agent_id, "worker_1");
+        assert_eq!(restored.code, "a + b");
+
+        let removed = db
+            .remove_draft("hole_add")
+            .expect("remove draft should succeed");
+        assert!(removed.is_some());
+        assert!(db.drafts().is_empty());
+    }
+
+    // Verify disk state after removal
+    {
+        let db = AstDatabase::open(&db_path).expect("third open should succeed");
+        assert!(db.drafts().is_empty());
+    }
+
+    let _ = std::fs::remove_file(&db_path);
+}

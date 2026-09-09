@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 
 /// Detailed status tag of submitting a hole solution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SubmitStatus {
     Accepted,
     Provisional,
@@ -237,16 +238,33 @@ impl AgentTaskPool {
         // 3. 从持久化数据库的 commits 与 receipts 反向水合证据账本
         let mut hole_evidence = HashMap::new();
         let mut commits = Vec::new();
+        let current_profile_hash = axiom_db::current_verification_profile_hash();
         for commit in db.commits().values() {
             commits.push(commit.clone());
             if let Ok(Some(receipt)) = db.get_receipt(commit.receipt_hash()) {
                 if let Ok(Some(env)) = db.get_envelope(commit.envelope_hash()) {
-                    hole_evidence.insert(env.target_hole_id.clone(), receipt.proof_level);
+                    // [Spec 2] 校验 Profile Hash 是否一致；如果不一致，旧收据失效，降级为 Unverified
+                    if receipt.verification_profile_hash == current_profile_hash {
+                        hole_evidence.insert(env.target_hole_id.clone(), receipt.proof_level);
+                    } else {
+                        hole_evidence.insert(env.target_hole_id.clone(), ProofLevel::Unverified);
+                    }
                 }
             }
         }
 
-        // 4. 构造任务信封与静态提取真实依赖闭包（使用规范级 compute_contract_hash）
+        // 4. 从持久化数据库恢复草稿（Provisional Drafts）
+        let mut provisional_drafts = HashMap::new();
+        for (hole_id, draft_rec) in db.drafts() {
+            if pending_holes.contains(hole_id) {
+                if let Ok(expr) = parse_expr(&draft_rec.code) {
+                    provisional_drafts.insert(hole_id.clone(), expr);
+                    hole_evidence.insert(hole_id.clone(), ProofLevel::Sampled);
+                }
+            }
+        }
+
+        // 5. 构造任务信封与静态提取真实依赖闭包（使用规范级 compute_contract_hash）
         let mut envelopes = HashMap::new();
         for task in &tasks {
             let func_opt = authoritative_module
@@ -270,10 +288,10 @@ impl AgentTaskPool {
             envelopes.insert(task.hole_id.clone(), env);
         }
 
-        Ok(Self {
+        let mut pool = Self {
             verified_module: authoritative_module.clone(),
             provisional_module: authoritative_module,
-            provisional_drafts: HashMap::new(),
+            provisional_drafts,
             tasks,
             pending_holes,
             hole_evidence,
@@ -281,7 +299,9 @@ impl AgentTaskPool {
             db,
             envelopes,
             commits,
-        })
+        };
+        pool.rebuild_provisional_module();
+        Ok(pool)
     }
 
     /// Open or initialize a task pool backed by a persistent file database and skeleton source file.
@@ -396,13 +416,7 @@ impl AgentTaskPool {
         }
     }
 
-    fn apply_provisional_draft(&mut self, hole_id: &str, solution: Expr) {
-        self.provisional_drafts
-            .insert(hole_id.to_string(), solution);
-        // 注意：Provisional 状态的草稿解不移出 pending_holes，仍需升级为正式 Verified！
-        self.hole_evidence
-            .insert(hole_id.to_string(), ProofLevel::Sampled);
-
+    fn rebuild_provisional_module(&mut self) {
         let mut next_provisional = self.verified_module.clone();
         for (draft_id, draft_expr) in &self.provisional_drafts {
             for func in &mut next_provisional.functions {
@@ -410,6 +424,15 @@ impl AgentTaskPool {
             }
         }
         self.provisional_module = next_provisional;
+    }
+
+    fn apply_provisional_draft(&mut self, hole_id: &str, solution: Expr) {
+        self.provisional_drafts
+            .insert(hole_id.to_string(), solution);
+        // 注意：Provisional 状态的草稿解不移出 pending_holes，仍需升级为正式 Verified！
+        self.hole_evidence
+            .insert(hole_id.to_string(), ProofLevel::Sampled);
+        self.rebuild_provisional_module();
     }
 
     /// Submits a provisional draft solution without requiring SMT formal proof.
@@ -445,6 +468,19 @@ impl AgentTaskPool {
         }
 
         self.apply_provisional_draft(hole_id, solution);
+
+        // [Spec 4] 跨进程持久化草稿到底层数据库
+        let draft_rec = axiom_db::DraftRecord {
+            hole_id: hole_id.to_string(),
+            agent_id: "axiom-worker".to_string(),
+            code: solution_source.to_string(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+        };
+        let _ = self.db.insert_draft(draft_rec);
+
         Ok(())
     }
 
@@ -470,14 +506,11 @@ impl AgentTaskPool {
         self.hole_evidence
             .insert(hole_id.to_string(), ProofLevel::Proved);
 
+        // [Spec 4] 洞正式晋升为 Verified 后，从数据库持久化存储中清理该草稿
+        let _ = self.db.remove_draft(hole_id);
+
         // 刷新 provisional_module：基于最新 verified_module，叠加剩余所有草稿
-        let mut next_provisional = self.verified_module.clone();
-        for (draft_id, draft_expr) in &self.provisional_drafts {
-            for func in &mut next_provisional.functions {
-                replace_hole(&mut func.body, draft_id, draft_expr);
-            }
-        }
-        self.provisional_module = next_provisional;
+        self.rebuild_provisional_module();
 
         let latest_root = self.db.current_root();
         for env in self.envelopes.values_mut() {
@@ -500,6 +533,8 @@ impl AgentTaskPool {
         if current_status == HoleStatus::Verified {
             return Err(PoolError::AlreadyResolved(hole_id.to_owned()));
         }
+
+        let was_provisional = current_status == HoleStatus::Provisional;
 
         let solution = parse_expr(solution_source)?;
         if axiom_ast::expr_contains_hole(&solution) {
@@ -614,7 +649,7 @@ impl AgentTaskPool {
                 Ok(SubmitOutcome {
                     smt_result: precheck_result,
                     cas_events,
-                    upgraded_to_verified: true,
+                    upgraded_to_verified: was_provisional,
                 })
             }
             Err(CasError::StaleRoot { current, expected }) => {
@@ -699,7 +734,7 @@ impl AgentTaskPool {
                 Ok(SubmitOutcome {
                     smt_result: recheck_result,
                     cas_events,
-                    upgraded_to_verified: true,
+                    upgraded_to_verified: was_provisional,
                 })
             }
             Err(other) => Err(PoolError::CasFailure(other.to_string())),

@@ -619,6 +619,7 @@ fn task_b(y: Int) -> Int requires { y >= 0, y < 1000000 } ensures { result >= y 
             "final_commit_chain_length": commit_chain_len,
             "initial_root": initial_root,
             "final_root": final_root,
+            "eval_mode": "mock" if is_mock else "live",
             "is_mock": is_mock,
             "git_commit_sha": get_git_commit_sha(),
             "git_tree_hash": get_git_tree_hash(),
@@ -848,13 +849,39 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
             raise RuntimeError(f"Fail-Closed: 无法解析 pool status 输出为 JSON: {status_p.stdout}") from exc
 
     # Fail-Closed 强校验：启动 Worker 前，强制断言预期 5 个 hole 均存在合法完整的 TaskEnvelope
+    if len(envelopes_by_hole) != len(tasks):
+        raise RuntimeError(f"Fail-Closed: 提取到的信封数量 ({len(envelopes_by_hole)}) 与任务数 ({len(tasks)}) 不匹配")
+
     for task in tasks:
         expected_hole = f"{task['function_name']}_hole"
+        expected_func = task["function_name"]
         env = envelopes_by_hole.get(expected_hole)
-        if not env:
-            raise RuntimeError(f"Fail-Closed: 缺少洞 `{expected_hole}` 的权威 TaskEnvelope 信封数据")
-        if not env.get("contract_hash") or not env.get("target_hole_id"):
-            raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 的 TaskEnvelope Schema 不完整: {env}")
+        if not env or not isinstance(env, dict):
+            raise RuntimeError(f"Fail-Closed: 缺少洞 `{expected_hole}` 的权威 TaskEnvelope 字典数据")
+
+        # 校验 target_hole_id 与 target_function 的精确一致性
+        if env.get("target_hole_id") != expected_hole:
+            raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 的 target_hole_id 不匹配: {env.get('target_hole_id')}")
+        if env.get("target_function") != expected_func:
+            raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 的 target_function `{env.get('target_function')}` 与预期 `{expected_func}` 不匹配")
+
+        # 校验 contract_hash 格式
+        c_hash = env.get("contract_hash", "")
+        if not isinstance(c_hash, str) or not c_hash.startswith("#contract_"):
+            raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 的 contract_hash 无效: {c_hash}")
+
+        # 校验 base_root_hash 结构（存在时必须为以 #mod_ 开头的合法哈希）
+        base_root = env.get("base_root_hash")
+        if base_root is not None and (not isinstance(base_root, str) or not base_root.startswith("#mod_")):
+            raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 的 base_root_hash 格式无效: {base_root}")
+
+        # 校验 dependency_hashes 必须为数组且元素均为有效哈希
+        dep_hashes = env.get("dependency_hashes")
+        if not isinstance(dep_hashes, list):
+            raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 的 dependency_hashes 必须是列表: {type(dep_hashes)}")
+        for dep in dep_hashes:
+            if not isinstance(dep, str) or not dep.startswith("#"):
+                raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 包含非法依赖哈希: {dep}")
 
     # 2. 并发派发 5 个 Worker 填洞 (纯表达式)
     print(f"⏳ 派发 {len(tasks)} 个并发 Worker (各负责一个纯代数表达式打洞任务)...")
@@ -1062,6 +1089,7 @@ def main():
         "experiment_metadata": {
             "engine": args.engine,
             "mode": "concurrent_multi_agent",
+            "eval_mode": "mock" if args.mock else "live_codex",
             "is_mock": args.mock,
             "git_commit": get_git_commit_sha(),
             "git_tree_hash": get_git_tree_hash(),

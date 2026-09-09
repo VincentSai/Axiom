@@ -4,13 +4,14 @@
   "experiment_metadata": {
     "engine": "codex",
     "mode": "concurrent_multi_agent",
+    "eval_mode": "mock",
     "is_mock": true,
-    "git_commit": "516d62d9041b04f5cbcae90c14571316bab9c499",
-    "git_tree_hash": "0130d08e9bb929b403e40d4719ae88840c029f01",
+    "git_commit": "a1ab3b6f61e21690381cbbfe2e6ca1879a6cd67c",
+    "git_tree_hash": "39b3526db9ae9213ce03b5d1f09e2b50b44a9659",
     "z3_version": "Z3 version 4.13.0 - 64 bit",
     "platform": "win32",
     "python_version": "3.14.2",
-    "timestamp": "2026-09-09 16:14:03"
+    "timestamp": "2026-09-09 17:47:21"
   },
   "summary": {
     "rust_group": {
@@ -24,7 +25,7 @@
       "unit_test_passed": true
     },
     "axiom_group": {
-      "wall_clock_sec": 2.74,
+      "wall_clock_sec": 2.61,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -32,14 +33,14 @@
       "resolver_tax_billed_tokens": 0,
       "total_billed_tokens": 75070,
       "formal_proved": true,
-      "speedup_vs_rust": 0.61
+      "speedup_vs_rust": 0.64
     }
   },
   "detailed_runs": {
     "group2_rust": {
       "status": "success",
       "wall_clock_sec": 1.67,
-      "worker_concurrency_sec": 0.27,
+      "worker_concurrency_sec": 0.15,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -139,10 +140,10 @@
     },
     "group3_axiom": {
       "status": "success",
-      "wall_clock_sec": 2.74,
+      "wall_clock_sec": 2.61,
       "worker_concurrency_sec": 0.0,
-      "combinator_latency_ms": 1470.68,
-      "smt_verify_sec": 0.71,
+      "combinator_latency_ms": 1370.14,
+      "smt_verify_sec": 0.68,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -181,10 +182,10 @@
           "hole_id": null,
           "violated_clause": null,
           "counter_example": null,
-          "diagnosis": "Function `calc_stacked_counts` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 6.",
+          "diagnosis": "Function `calc_stacked_counts` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 7.",
           "suggested_action": "No action required.",
           "has_contracts": true,
-          "obligations_checked": 6,
+          "obligations_checked": 7,
           "solver_version": "4.13.0"
         },
         {
@@ -228,15 +229,16 @@
       "cas_concurrency_benchmark": {
         "race_workers": 2,
         "success_submissions": 2,
-        "concurrency_elapsed_sec": 0.47,
+        "concurrency_elapsed_sec": 0.479,
         "stale_root_conflicts_observed": 1,
         "fast_forward_retries_succeeded": 1,
         "final_commit_chain_length": 2,
         "initial_root": "#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed",
         "final_root": "#mod_8892410a4f9ec42e4507b5b4546f24373ed41f8430d7c1d8d71d0a8090dc4b56",
+        "eval_mode": "mock",
         "is_mock": true,
-        "git_commit_sha": "516d62d9041b04f5cbcae90c14571316bab9c499",
-        "git_tree_hash": "0130d08e9bb929b403e40d4719ae88840c029f01",
+        "git_commit_sha": "a1ab3b6f61e21690381cbbfe2e6ca1879a6cd67c",
+        "git_tree_hash": "39b3526db9ae9213ce03b5d1f09e2b50b44a9659",
         "cas_events_by_worker": {
           "worker_a": [],
           "worker_b": [
@@ -256,12 +258,12 @@
         },
         "worker_a": {
           "returncode": 0,
-          "stdout": "{\n  \"hole\": \"hole_a\",\n  \"status\": \"Accepted\",\n  \"proved\": true,\n  \"upgraded_to_verified\": true,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [],\n  \"counter_example\": null,\n  \"reason\": null\n}",
+          "stdout": "{\n  \"hole\": \"hole_a\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": false,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [],\n  \"counter_example\": null,\n  \"reason\": null\n}",
           "stderr": ""
         },
         "worker_b": {
           "returncode": 0,
-          "stdout": "{\n  \"hole\": \"hole_b\",\n  \"status\": \"Accepted\",\n  \"proved\": true,\n  \"upgraded_to_verified\": true,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [\n    {\n      \"StaleRootDetected\": {\n        \"expected\": \"#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed\",\n        \"current\": \"#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d\"\n      }\n    },\n    {\n      \"RebaseSucceeded\": {\n        \"rebased_root\": \"#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d\",\n        \"attempts\": 1\n      }\n    }\n  ],\n  \"counter_example\": null,\n  \"reason\": null\n}",
+          "stdout": "{\n  \"hole\": \"hole_b\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": false,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [\n    {\n      \"StaleRootDetected\": {\n        \"expected\": \"#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed\",\n        \"current\": \"#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d\"\n      }\n    },\n    {\n      \"RebaseSucceeded\": {\n        \"rebased_root\": \"#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d\",\n        \"attempts\": 1\n      }\n    }\n  ],\n  \"counter_example\": null,\n  \"reason\": null\n}",
           "stderr": ""
         }
       },

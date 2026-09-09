@@ -51,7 +51,7 @@ impl FromStr for NodeHash {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         let valid_prefix = [
             "#type_", "#fn_", "#effect_", "#mod_", "#env_", "#cand_", "#rcpt_", "#commit_",
-            "#obl_", "#null_",
+            "#obl_", "#vprof_", "#null_",
         ]
         .iter()
         .find(|prefix| value.starts_with(**prefix));
@@ -214,6 +214,15 @@ impl fmt::Display for ProofLevel {
     }
 }
 
+/// Current verification profile specification identifying SMT encoding rules,
+/// arithmetic overflow guards, division-by-zero path-condition rules, and solver requirements.
+pub const CURRENT_VERIFICATION_PROFILE: &str = "axiom-smt-v2-int64safe-pathcond-modulo";
+
+/// Returns the cryptographically secure hash of the current verification profile.
+pub fn current_verification_profile_hash() -> NodeHash {
+    compute_hash("vprof", &CURRENT_VERIFICATION_PROFILE)
+}
+
 /// Cryptographically signed verification receipt for an accepted candidate.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationReceipt {
@@ -223,12 +232,22 @@ pub struct VerificationReceipt {
     pub solver_version: String,
     pub obligations_checked: usize,
     pub proof_obligation_hash: NodeHash,
+    pub verification_profile_hash: NodeHash,
     pub verified_at: u64,
 }
 
 /// Computes content identifier for a verification receipt.
 pub fn compute_receipt_hash(rcpt: &VerificationReceipt) -> NodeHash {
     compute_hash("rcpt", rcpt)
+}
+
+/// Non-authoritative draft implementation for a hole under provisional trial.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DraftRecord {
+    pub hole_id: String,
+    pub agent_id: String,
+    pub code: String,
+    pub timestamp: u64,
 }
 
 /// The immutable data payload of a commit, excluding the commit's self-identifying hash.
@@ -497,6 +516,8 @@ pub struct DatabaseState {
     pub(crate) receipts: BTreeMap<NodeHash, VerificationReceipt>,
     #[serde(default)]
     pub(crate) commits: BTreeMap<NodeHash, CommitRecord>,
+    #[serde(default)]
+    pub(crate) drafts: BTreeMap<String, DraftRecord>,
 }
 
 /// A content-addressed AST database backed by a JSON file or memory.
@@ -914,6 +935,7 @@ impl AstDatabase {
             solver_version: certified.solver_version,
             obligations_checked: certified.obligations_checked,
             proof_obligation_hash: certified.proof_obligation_hash,
+            verification_profile_hash: current_verification_profile_hash(),
             verified_at: candidate.timestamp,
         };
         let rcpt_hash = compute_receipt_hash(&receipt);
@@ -1014,6 +1036,38 @@ impl AstDatabase {
     /// Retrieves a commit record by its content identifier.
     pub fn get_commit(&self, hash: &NodeHash) -> Result<Option<CommitRecord>, DbError> {
         Ok(self.state.commits.get(hash).cloned())
+    }
+
+    /// Returns all provisional drafts currently stored in the database.
+    pub fn drafts(&self) -> &BTreeMap<String, DraftRecord> {
+        &self.state.drafts
+    }
+
+    /// Retrieves a provisional draft by hole ID.
+    pub fn get_draft(&self, hole_id: &str) -> Option<&DraftRecord> {
+        self.state.drafts.get(hole_id)
+    }
+
+    /// Inserts or updates a provisional draft for a hole and persists state.
+    pub fn insert_draft(&mut self, draft: DraftRecord) -> Result<(), DbError> {
+        let _guard = self.lock_and_sync()?;
+        let mut next_state = self.state.clone();
+        next_state.drafts.insert(draft.hole_id.clone(), draft);
+        self.persist(&next_state)?;
+        self.state = next_state;
+        Ok(())
+    }
+
+    /// Removes a provisional draft for a hole (e.g. upon promotion to verified commit).
+    pub fn remove_draft(&mut self, hole_id: &str) -> Result<Option<DraftRecord>, DbError> {
+        let _guard = self.lock_and_sync()?;
+        let mut next_state = self.state.clone();
+        let removed = next_state.drafts.remove(hole_id);
+        if removed.is_some() {
+            self.persist(&next_state)?;
+            self.state = next_state;
+        }
+        Ok(removed)
     }
 
     /// Retrieves all candidates associated with a specific task envelope hash.

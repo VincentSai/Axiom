@@ -302,7 +302,10 @@ fn infer_expr_type(
                         Ok(l)
                     }
                 }
-                BinaryOperator::Subtract | BinaryOperator::Multiply | BinaryOperator::Divide => {
+                BinaryOperator::Subtract
+                | BinaryOperator::Multiply
+                | BinaryOperator::Divide
+                | BinaryOperator::Modulo => {
                     if !is_numeric(&l) || !is_numeric(&r) {
                         return Err(format!(
                             "cannot apply arithmetic operator to types `{:?}` and `{:?}`",

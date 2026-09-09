@@ -166,6 +166,7 @@ fn format_expr_at_precedence(expression: &Expr, parent_precedence: u8) -> String
                 BinaryOperator::Subtract => ("-", 4, 5),
                 BinaryOperator::Multiply => ("*", 5, 6),
                 BinaryOperator::Divide => ("/", 5, 6),
+                BinaryOperator::Modulo => ("%", 5, 6),
             };
             (
                 format!(

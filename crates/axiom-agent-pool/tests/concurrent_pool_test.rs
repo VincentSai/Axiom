@@ -387,7 +387,10 @@ fn persisted_pool_resumes_across_process_exits_seamlessly() {
             .submit_solution_with_outcome("step1_hole", "x + 1", "agent_worker_1")
             .unwrap();
         assert!(outcome1.smt_result.is_proved());
-        assert!(outcome1.upgraded_to_verified);
+        assert!(
+            !outcome1.upgraded_to_verified,
+            "First-time submission must not be reported as upgrade from provisional"
+        );
         assert_eq!(
             pool_p1.hole_status("step1_hole"),
             Some(HoleStatus::Verified)
@@ -414,7 +417,10 @@ fn persisted_pool_resumes_across_process_exits_seamlessly() {
             .submit_solution_with_outcome("step2_hole", "y + 5", "agent_worker_2")
             .unwrap();
         assert!(outcome2.smt_result.is_proved());
-        assert!(outcome2.upgraded_to_verified);
+        assert!(
+            !outcome2.upgraded_to_verified,
+            "Direct submission from Unresolved must not be marked upgraded"
+        );
         assert_eq!(
             pool_p2.hole_status("step2_hole"),
             Some(HoleStatus::Verified)
@@ -604,4 +610,74 @@ fn provisional_draft_stays_in_dispatch_tasks_until_verified() {
     assert_eq!(pool.hole_status("inc_hole"), Some(HoleStatus::Verified));
     assert_eq!(pool.dispatch_tasks().len(), 0);
     assert!(pool.is_complete());
+}
+
+#[test]
+fn persisted_pool_restores_provisional_draft_across_processes_and_upgrades() {
+    use axiom_agent_pool::HoleStatus;
+
+    const SKELETON: &str = r#"
+        fn compute(x: Int) -> Int
+            requires { x >= 0, x < 1000000 }
+            ensures { result > x }
+        {
+            ?comp_hole
+        }
+    "#;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let skel_path = std::env::temp_dir().join(format!("axiom_draft_skel_{nonce}.ax"));
+    let db_path = std::env::temp_dir().join(format!("axiom_draft_db_{nonce}.json"));
+
+    std::fs::write(&skel_path, SKELETON).unwrap();
+
+    // 进程 1：提交草稿后退出
+    {
+        let mut pool_p1 = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        pool_p1
+            .submit_draft_solution("comp_hole", "x + 99")
+            .unwrap();
+        assert_eq!(
+            pool_p1.hole_status("comp_hole"),
+            Some(HoleStatus::Provisional)
+        );
+    }
+
+    // 进程 2：重新打开，验证草稿从数据库成功水合为 Provisional，并成功升级为 Verified
+    {
+        let mut pool_p2 = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        assert_eq!(
+            pool_p2.hole_status("comp_hole"),
+            Some(HoleStatus::Provisional),
+            "Provisional draft must survive process restart via DB persistence"
+        );
+        // 验证 provisional_module 中草稿洞已被替换，不再含 hole
+        assert!(!axiom_agent_pool::ast_contains_any_hole(
+            pool_p2.provisional_module()
+        ));
+
+        // 提交正式证明，升级为 Verified
+        let outcome = pool_p2
+            .submit_solution_with_outcome("comp_hole", "x + 1", "worker_upgrader")
+            .unwrap();
+        assert!(outcome.smt_result.is_proved());
+        assert!(
+            outcome.upgraded_to_verified,
+            "Upgrading from provisional must report true"
+        );
+        assert_eq!(pool_p2.hole_status("comp_hole"), Some(HoleStatus::Verified));
+    }
+
+    // 进程 3：重新打开，验证已完全持久化为 Verified，并且 DB 草稿已被清理
+    {
+        let pool_p3 = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        assert_eq!(pool_p3.hole_status("comp_hole"), Some(HoleStatus::Verified));
+        assert!(pool_p3.database().drafts().is_empty());
+    }
+
+    let _ = std::fs::remove_file(&skel_path);
+    let _ = std::fs::remove_file(&db_path);
 }
