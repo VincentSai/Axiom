@@ -1,4 +1,4 @@
-﻿use std::fs;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -129,8 +129,10 @@ struct TestDirectory {
 impl TestDirectory {
     fn new() -> Self {
         let sequence = NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed);
-        let path =
-            std::env::temp_dir().join(format!("axiom-ecosystem-test-{}-{sequence}", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "axiom-ecosystem-test-{}-{sequence}",
+            std::process::id()
+        ));
         if path.exists() {
             fs::remove_dir_all(&path).expect("stale test directory should be removable");
         }

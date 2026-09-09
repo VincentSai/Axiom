@@ -127,7 +127,8 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
             violated_clause: None,
             counter_example: None,
             diagnosis: type_err.message,
-            suggested_action: "Ensure the function return expression matches its declared type signature.".into(),
+            suggested_action:
+                "Ensure the function return expression matches its declared type signature.".into(),
             has_contracts: false,
             ..Default::default()
         }];

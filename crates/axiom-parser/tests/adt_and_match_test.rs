@@ -1,12 +1,14 @@
 #![allow(clippy::approx_constant)]
 
-use axiom_ast::{BinaryOperator, Expr, FieldDef, Literal, MatchArm, Pattern, Type, TypeDef, VariantDef};
+use axiom_ast::{
+    BinaryOperator, Expr, FieldDef, Literal, MatchArm, Pattern, Type, TypeDef, VariantDef,
+};
 use axiom_parser::{parse_expr, parse_module};
 
 #[test]
 fn parses_record_type_definition() {
-    let module = parse_module("type Point = { x: Float, y: Float }")
-        .expect("the record type should parse");
+    let module =
+        parse_module("type Point = { x: Float, y: Float }").expect("the record type should parse");
 
     assert_eq!(
         module.types,
@@ -70,10 +72,8 @@ fn parses_enum_type_with_payload_and_unit_variants() {
 
 #[test]
 fn parses_generic_type_annotations() {
-    let module = parse_module(
-        "fn load(value: Option<T>) -> Result<String, IoError> { \"ok\" }",
-    )
-    .expect("generic type annotations should parse");
+    let module = parse_module("fn load(value: Option<T>) -> Result<String, IoError> { \"ok\" }")
+        .expect("generic type annotations should parse");
 
     let function = &module.functions[0];
     assert_eq!(function.params[0].ty, Type::Custom("Option<T>".into()));
@@ -101,8 +101,7 @@ fn parses_chained_field_access() {
 
 #[test]
 fn parses_named_record_construction() {
-    let expr = parse_expr("Point { x: 1.0, y: 2.0 }")
-        .expect("record construction should parse");
+    let expr = parse_expr("Point { x: 1.0, y: 2.0 }").expect("record construction should parse");
 
     assert_eq!(
         expr,
@@ -118,27 +117,22 @@ fn parses_named_record_construction() {
 
 #[test]
 fn parses_immutable_record_update() {
-    let expr = parse_expr("{ ...p1, x: 3.0 }")
-        .expect("immutable record update should parse");
+    let expr = parse_expr("{ ...p1, x: 3.0 }").expect("immutable record update should parse");
 
     assert_eq!(
         expr,
         Expr::RecordUpdate {
             base: Box::new(Expr::Ident("p1".into())),
-            updates: vec![(
-                "x".into(),
-                Expr::Literal(axiom_ast::Literal::Float(3.0)),
-            )],
+            updates: vec![("x".into(), Expr::Literal(axiom_ast::Literal::Float(3.0)),)],
         }
     );
 }
 
 #[test]
 fn parses_exhaustive_match_with_destructuring() {
-    let expr = parse_expr(
-        "match shape { Shape.Circle(r) => 3.14 * r * r, Shape.Point => 0.0, _ => 0.0 }",
-    )
-    .expect("match expression should parse");
+    let expr =
+        parse_expr("match shape { Shape.Circle(r) => 3.14 * r * r, Shape.Point => 0.0, _ => 0.0 }")
+            .expect("match expression should parse");
 
     assert_eq!(
         expr,
@@ -180,10 +174,8 @@ fn parses_exhaustive_match_with_destructuring() {
 
 #[test]
 fn parses_literal_patterns() {
-    let expr = parse_expr(
-        r#"match value { 0 => 1, true => 2, "ready" => 3, () => 4 }"#,
-    )
-    .expect("literal patterns should parse");
+    let expr = parse_expr(r#"match value { 0 => 1, true => 2, "ready" => 3, () => 4 }"#)
+        .expect("literal patterns should parse");
 
     let Expr::Match { arms, .. } = expr else {
         panic!("expected a match expression");

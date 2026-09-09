@@ -5,16 +5,16 @@
     "engine": "codex",
     "mode": "concurrent_multi_agent",
     "is_mock": true,
-    "git_commit": "7dcdb0ba254aed924cc4b7561be980d25d502885",
-    "git_tree_hash": "aa8bb48339730a2b8b3f4aac4169389ade098fb7",
+    "git_commit": "41983bace0ee19f291227a659323d9d21cda8fa7",
+    "git_tree_hash": "0f93596a6f632c3705ce591cb68dec084c23d37a",
     "z3_version": "Z3 version 4.13.0 - 64 bit",
     "platform": "win32",
     "python_version": "3.14.2",
-    "timestamp": "2026-09-09 12:42:56"
+    "timestamp": "2026-09-09 14:06:20"
   },
   "summary": {
     "rust_group": {
-      "wall_clock_sec": 1.68,
+      "wall_clock_sec": 1.59,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -32,14 +32,14 @@
       "resolver_tax_billed_tokens": 0,
       "total_billed_tokens": 75070,
       "formal_proved": true,
-      "speedup_vs_rust": 1.11
+      "speedup_vs_rust": 1.05
     }
   },
   "detailed_runs": {
     "group2_rust": {
       "status": "success",
-      "wall_clock_sec": 1.68,
-      "worker_concurrency_sec": 0.15,
+      "wall_clock_sec": 1.59,
+      "worker_concurrency_sec": 0.14,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -141,8 +141,8 @@
       "status": "success",
       "wall_clock_sec": 1.51,
       "worker_concurrency_sec": 0.0,
-      "combinator_latency_ms": 783.69,
-      "smt_verify_sec": 0.37,
+      "combinator_latency_ms": 774.13,
+      "smt_verify_sec": 0.38,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -228,23 +228,40 @@
       "cas_concurrency_benchmark": {
         "race_workers": 2,
         "success_submissions": 2,
-        "concurrency_elapsed_sec": 0.29,
+        "concurrency_elapsed_sec": 0.291,
         "stale_root_conflicts_observed": 1,
         "fast_forward_retries_succeeded": 1,
         "final_commit_chain_length": 2,
         "initial_root": "#mod_8f44aeb1f28767a06f08996f4fcfe4486c460247d5774f0e270db7e50bb77dc7",
         "final_root": "#mod_613e187ea693b2e490f73c7239853578555fffbac894da6faef0bb7d8be61d96",
         "is_mock": true,
-        "git_commit_sha": "7dcdb0ba254aed924cc4b7561be980d25d502885",
-        "git_tree_hash": "aa8bb48339730a2b8b3f4aac4169389ade098fb7",
+        "git_commit_sha": "41983bace0ee19f291227a659323d9d21cda8fa7",
+        "git_tree_hash": "0f93596a6f632c3705ce591cb68dec084c23d37a",
+        "cas_events_by_worker": {
+          "worker_a": [],
+          "worker_b": [
+            {
+              "StaleRootDetected": {
+                "current": "#mod_1523a09cf517acd3449f46b166a12bfcbfc9b0c7c3ec78c91f3da263adb195b1",
+                "expected": "#mod_8f44aeb1f28767a06f08996f4fcfe4486c460247d5774f0e270db7e50bb77dc7"
+              }
+            },
+            {
+              "RebaseSucceeded": {
+                "attempts": 1,
+                "rebased_root": "#mod_1523a09cf517acd3449f46b166a12bfcbfc9b0c7c3ec78c91f3da263adb195b1"
+              }
+            }
+          ]
+        },
         "worker_a": {
           "returncode": 0,
-          "stdout": "Submitting candidate solution for hole `?hole_a` in `C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\tmp1cq0c2cy\\race_skel.ax`...\n[ACCEPTED] Hole `?hole_a` formally verified with SMT proof (Microsoft Z3 (SMT-LIB2) v4.13.0, obligations: 1).",
+          "stdout": "{\n  \"cas_events\": [],\n  \"hole\": \"hole_a\",\n  \"obligations_checked\": 1,\n  \"proved\": true,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"status\": \"ACCEPTED\"\n}",
           "stderr": ""
         },
         "worker_b": {
           "returncode": 0,
-          "stdout": "Submitting candidate solution for hole `?hole_b` in `C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\tmp1cq0c2cy\\race_skel.ax`...\n[ACCEPTED] Hole `?hole_b` formally verified with SMT proof (Microsoft Z3 (SMT-LIB2) v4.13.0, obligations: 1).",
+          "stdout": "{\n  \"cas_events\": [\n    {\n      \"StaleRootDetected\": {\n        \"current\": \"#mod_1523a09cf517acd3449f46b166a12bfcbfc9b0c7c3ec78c91f3da263adb195b1\",\n        \"expected\": \"#mod_8f44aeb1f28767a06f08996f4fcfe4486c460247d5774f0e270db7e50bb77dc7\"\n      }\n    },\n    {\n      \"RebaseSucceeded\": {\n        \"attempts\": 1,\n        \"rebased_root\": \"#mod_1523a09cf517acd3449f46b166a12bfcbfc9b0c7c3ec78c91f3da263adb195b1\"\n      }\n    }\n  ],\n  \"hole\": \"hole_b\",\n  \"obligations_checked\": 1,\n  \"proved\": true,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"status\": \"ACCEPTED\"\n}",
           "stderr": ""
         }
       },

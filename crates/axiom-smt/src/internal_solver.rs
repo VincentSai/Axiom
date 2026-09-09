@@ -65,7 +65,10 @@ impl<'a> SolverContext<'a> {
             if let TypeDef::Record { name, fields } = ty_def {
                 records.insert(
                     name.clone(),
-                    fields.iter().map(|f| (f.name.clone(), f.ty.clone())).collect(),
+                    fields
+                        .iter()
+                        .map(|f| (f.name.clone(), f.ty.clone()))
+                        .collect(),
                 );
             }
         }
@@ -93,10 +96,7 @@ pub fn verify_with_internal_solver_context(
     }
 
     if func.ensures.is_empty() {
-        return SmtResult::Skipped(format!(
-            "function `{}` has no ensures clauses",
-            func.name
-        ));
+        return SmtResult::Skipped(format!("function `{}` has no ensures clauses", func.name));
     }
 
     if contains_hole_or_unsupported(&func.body, ctx) {
@@ -246,11 +246,15 @@ fn populate_env_records(
     env: &mut HashMap<String, Value>,
 ) {
     for (key, &val) in point {
-        let is_int = param_types.get(key).map_or(false, |ty| matches!(ty, Type::Int));
+        let is_int = param_types
+            .get(key)
+            .map_or(false, |ty| matches!(ty, Type::Int));
         env.insert(key.clone(), Value::Num { val, is_int });
     }
     for (key, &val) in point {
-        let is_int = param_types.get(key).map_or(false, |ty| matches!(ty, Type::Int));
+        let is_int = param_types
+            .get(key)
+            .map_or(false, |ty| matches!(ty, Type::Int));
         let parts: Vec<&str> = key.split('.').collect();
         if parts.len() > 1 {
             insert_nested_record(env, &parts, Value::Num { val, is_int });
@@ -286,7 +290,11 @@ fn insert_record_path(map: &mut HashMap<String, Value>, parts: &[&str], leaf: Va
     }
 }
 
-fn flatten_record_into_env(prefix: &str, map: &HashMap<String, Value>, env: &mut HashMap<String, Value>) {
+fn flatten_record_into_env(
+    prefix: &str,
+    map: &HashMap<String, Value>,
+    env: &mut HashMap<String, Value>,
+) {
     for (f_name, val) in map {
         let path = format!("{}.{}", prefix, f_name);
         env.insert(path.clone(), val.clone());
@@ -403,10 +411,7 @@ fn extract_constants(expr: &Expr, list: &mut Vec<f64>) {
     }
 }
 
-fn generate_grid(
-    params: &[(String, Type)],
-    candidates: &[f64],
-) -> Vec<HashMap<String, f64>> {
+fn generate_grid(params: &[(String, Type)], candidates: &[f64]) -> Vec<HashMap<String, f64>> {
     if params.is_empty() {
         return vec![HashMap::new()];
     }
@@ -625,14 +630,18 @@ fn eval_expr_internal(
             let val = eval_expr_internal(operand, env, ctx, depth + 1)?;
             match op {
                 UnaryOperator::Negate => {
-                    let num = val.as_f64().ok_or_else(|| "cannot negate non-number".to_string())?;
+                    let num = val
+                        .as_f64()
+                        .ok_or_else(|| "cannot negate non-number".to_string())?;
                     Ok(Value::Num {
                         val: -num,
                         is_int: val.is_int(),
                     })
                 }
                 UnaryOperator::Not => {
-                    let b = val.as_bool().ok_or_else(|| "cannot invert non-bool".to_string())?;
+                    let b = val
+                        .as_bool()
+                        .ok_or_else(|| "cannot invert non-bool".to_string())?;
                     Ok(Value::Bool(!b))
                 }
             }

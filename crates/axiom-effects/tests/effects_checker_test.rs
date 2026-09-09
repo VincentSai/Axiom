@@ -113,4 +113,3 @@ fn rejects_unauthorized_host_io_calls() {
             if function == "dangerous_io" && target == "std::fs::write"
     ));
 }
-

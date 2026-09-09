@@ -14,7 +14,7 @@ use axiom_ast::{FunctionDecl, Module};
 pub use smtlib2::{
     generate_precondition_check_smtlib2, generate_smtlib2, generate_smtlib2_with_module,
 };
-pub use z3_solver::{find_z3_executable, run_z3_query, Z3Result};
+pub use z3_solver::{find_z3_executable, get_z3_version, run_z3_query, Z3Result};
 
 /// Concrete numeric parameter assignments that demonstrate a contract violation.
 pub type CounterExample = HashMap<String, f64>;
@@ -113,7 +113,14 @@ pub fn to_smtlib2(func: &FunctionDecl) -> Result<String, String> {
 /// Verifies that a function body satisfies every `ensures` clause whenever all `requires` clauses hold.
 /// Automatically probes for external Z3 executable; falls back to internal symbolic engine if Z3 is absent.
 pub fn verify_function(func: &FunctionDecl) -> SmtResult {
-    verify_function_in_module(func, &Module { types: vec![], functions: vec![func.clone()], effects: vec![] })
+    verify_function_in_module(
+        func,
+        &Module {
+            types: vec![],
+            functions: vec![func.clone()],
+            effects: vec![],
+        },
+    )
 }
 
 /// Verifies a function using full module context for record flattening and pure function calls.
@@ -121,7 +128,9 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
     if let Some(z3_path) = find_z3_executable() {
         if let Ok(smt2_query) = generate_smtlib2_with_module(func, Some(module)) {
             // P0: Precondition Satisfiability Check (Vacuity Prevention)
-            if let Err(vacuity_err) = check_precondition_vacuity_fail_closed(&z3_path, func, Some(module)) {
+            if let Err(vacuity_err) =
+                check_precondition_vacuity_fail_closed(&z3_path, func, Some(module))
+            {
                 return vacuity_err;
             }
 
@@ -129,7 +138,7 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
                 Ok(Z3Result::Unsat) => {
                     return SmtResult::Proved {
                         solver: "Microsoft Z3 (SMT-LIB2)".into(),
-                        version: "4.13.0".into(),
+                        version: get_z3_version(&z3_path),
                         obligations_checked: func.ensures.len(),
                     }
                 }
@@ -148,8 +157,9 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
 
 /// Verifies a function explicitly using the Z3 solver via SMT-LIB2 pipe.
 pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String> {
-    let z3_path = find_z3_executable()
-        .ok_or_else(|| "Z3 executable not found in PATH or standard install directories".to_string())?;
+    let z3_path = find_z3_executable().ok_or_else(|| {
+        "Z3 executable not found in PATH or standard install directories".to_string()
+    })?;
 
     // P0: Precondition Satisfiability Check (Vacuity Prevention)
     if let Err(vacuity_err) = check_precondition_vacuity_fail_closed(&z3_path, func, None) {
@@ -157,11 +167,11 @@ pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String>
     }
 
     let smt2_query = generate_smtlib2(func)?;
-    
+
     match run_z3_query(&z3_path, &smt2_query)? {
         Z3Result::Unsat => Ok(SmtResult::Proved {
             solver: "Microsoft Z3 (SMT-LIB2)".into(),
-            version: "4.13.0".into(),
+            version: get_z3_version(&z3_path),
             obligations_checked: func.ensures.len(),
         }),
         Z3Result::Sat(ce) => Ok(SmtResult::CounterExample(ce)),
@@ -174,7 +184,11 @@ pub fn verify_module(module: &Module) -> HashMap<String, SmtResult> {
     module
         .functions
         .iter()
-        .map(|function| (function.name.clone(), verify_function_in_module(function, module)))
+        .map(|function| {
+            (
+                function.name.clone(),
+                verify_function_in_module(function, module),
+            )
+        })
         .collect()
 }
-

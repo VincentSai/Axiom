@@ -50,7 +50,8 @@ impl FromStr for NodeHash {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         let valid_prefix = [
-            "#type_", "#fn_", "#effect_", "#mod_", "#env_", "#cand_", "#rcpt_", "#commit_", "#obl_", "#null_",
+            "#type_", "#fn_", "#effect_", "#mod_", "#env_", "#cand_", "#rcpt_", "#commit_",
+            "#obl_", "#null_",
         ]
         .iter()
         .find(|prefix| value.starts_with(**prefix));
@@ -369,13 +370,22 @@ impl fmt::Display for CasError {
                 "CAS rejected: stale root ref (expected `{:?}`, current is `{:?}`)",
                 expected, current
             ),
-            Self::InvalidReceipt(msg) => write!(f, "CAS rejected: invalid verification receipt: {msg}"),
+            Self::InvalidReceipt(msg) => {
+                write!(f, "CAS rejected: invalid verification receipt: {msg}")
+            }
             Self::InvalidCandidate(msg) => write!(f, "CAS rejected: invalid candidate: {msg}"),
             Self::InvalidEnvelope(msg) => write!(f, "CAS rejected: invalid task envelope: {msg}"),
             Self::ForgedModule(msg) => write!(f, "CAS rejected: forged module mismatch: {msg}"),
-            Self::UnverifiedCandidate(msg) => write!(f, "CAS rejected: candidate does not meet proof bar: {msg}"),
-            Self::VacuousContract(msg) => write!(f, "CAS rejected: vacuous contract with unsatisfiable preconditions: {msg}"),
-            Self::VerificationRejected(msg) => write!(f, "CAS rejected: formal theorem verification failed: {msg}"),
+            Self::UnverifiedCandidate(msg) => {
+                write!(f, "CAS rejected: candidate does not meet proof bar: {msg}")
+            }
+            Self::VacuousContract(msg) => write!(
+                f,
+                "CAS rejected: vacuous contract with unsatisfiable preconditions: {msg}"
+            ),
+            Self::VerificationRejected(msg) => {
+                write!(f, "CAS rejected: formal theorem verification failed: {msg}")
+            }
             Self::Db(err) => write!(f, "database error during CAS: {err}"),
         }
     }
@@ -401,27 +411,40 @@ impl From<serde_json::Error> for CasError {
     }
 }
 
+/// Kernel-minted cryptographic verification certificate computed offline without database locks.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CertifiedVerification {
+    pub base_root_hash: Option<NodeHash>,
+    pub envelope_hash: NodeHash,
+    pub candidate_hash: NodeHash,
+    pub proof_obligation_hash: NodeHash,
+    pub derived_module: Module,
+    pub solver: String,
+    pub solver_version: String,
+    pub obligations_checked: usize,
+}
+
 /// Internal storage state of the AST database, accessible within transactions.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DatabaseState {
     #[serde(default)]
-    pub root_ref: Option<NodeHash>,
+    pub(crate) root_ref: Option<NodeHash>,
     #[serde(default)]
-    pub types: BTreeMap<NodeHash, TypeDef>,
+    pub(crate) types: BTreeMap<NodeHash, TypeDef>,
     #[serde(default)]
-    pub functions: BTreeMap<NodeHash, FunctionDecl>,
+    pub(crate) functions: BTreeMap<NodeHash, FunctionDecl>,
     #[serde(default)]
-    pub effects: BTreeMap<NodeHash, EffectDecl>,
+    pub(crate) effects: BTreeMap<NodeHash, EffectDecl>,
     #[serde(default)]
-    pub modules: BTreeMap<NodeHash, Module>,
+    pub(crate) modules: BTreeMap<NodeHash, Module>,
     #[serde(default)]
-    pub envelopes: BTreeMap<NodeHash, TaskEnvelope>,
+    pub(crate) envelopes: BTreeMap<NodeHash, TaskEnvelope>,
     #[serde(default)]
-    pub candidates: BTreeMap<NodeHash, Candidate>,
+    pub(crate) candidates: BTreeMap<NodeHash, Candidate>,
     #[serde(default)]
-    pub receipts: BTreeMap<NodeHash, VerificationReceipt>,
+    pub(crate) receipts: BTreeMap<NodeHash, VerificationReceipt>,
     #[serde(default)]
-    pub commits: BTreeMap<NodeHash, CommitRecord>,
+    pub(crate) commits: BTreeMap<NodeHash, CommitRecord>,
 }
 
 /// A content-addressed AST database backed by a JSON file or memory.
@@ -465,7 +488,11 @@ impl AstDatabase {
     }
 
     fn lock_and_sync(&mut self) -> Result<Option<FileLockGuard>, DbError> {
-        let lock = self.path.as_ref().map(|p| FileLockGuard::acquire(p)).transpose()?;
+        let lock = self
+            .path
+            .as_ref()
+            .map(|p| FileLockGuard::acquire(p))
+            .transpose()?;
         if let Some(path) = &self.path {
             if path.exists() {
                 let bytes = fs::read(path)?;
@@ -477,7 +504,10 @@ impl AstDatabase {
     }
 
     /// Executes a state-mutating transaction with an exclusive OS file lock and read-latest consistency.
-    pub fn locked_transaction<T, E>(&mut self, action: impl FnOnce(&mut DatabaseState) -> Result<T, E>) -> Result<T, E>
+    pub(crate) fn locked_transaction<T, E>(
+        &mut self,
+        action: impl FnOnce(&mut DatabaseState) -> Result<T, E>,
+    ) -> Result<T, E>
     where
         E: From<DbError>,
     {
@@ -489,18 +519,32 @@ impl AstDatabase {
         Ok(result)
     }
 
-    /// Sets the root module hash reference directly under lock.
-    pub fn set_root(&mut self, root: NodeHash) -> Result<(), DbError> {
+    /// Safely initializes the root module reference when no root exists yet.
+    pub fn initialize_root(&mut self, root: NodeHash) -> Result<(), DbError> {
         self.locked_transaction(|state| {
-            state.root_ref = Some(root);
+            if state.root_ref.is_none() {
+                state.root_ref = Some(root);
+            }
             Ok(())
         })
     }
 
     fn insert_module_to_state(state: &mut DatabaseState, module: &Module) -> ModuleRecord {
-        let type_hashes = module.types.iter().map(compute_type_hash).collect::<Vec<_>>();
-        let function_hashes = module.functions.iter().map(compute_function_hash).collect::<Vec<_>>();
-        let effect_hashes = module.effects.iter().map(compute_effect_hash).collect::<Vec<_>>();
+        let type_hashes = module
+            .types
+            .iter()
+            .map(compute_type_hash)
+            .collect::<Vec<_>>();
+        let function_hashes = module
+            .functions
+            .iter()
+            .map(compute_function_hash)
+            .collect::<Vec<_>>();
+        let effect_hashes = module
+            .effects
+            .iter()
+            .map(compute_effect_hash)
+            .collect::<Vec<_>>();
         let module_hash = compute_module_hash(module);
 
         for (hash, definition) in type_hashes.iter().zip(&module.types) {
@@ -560,33 +604,20 @@ impl AstDatabase {
         })
     }
 
-    /// Attempts an atomic CAS (Compare-And-Swap) commit of a verified candidate.
+    /// Performs offline Z3 formal verification of a candidate against the expected base module
+    /// without acquiring database file locks.
     ///
-    /// The database kernel independently parses and replaces the candidate expression into
-    /// the base module identified by `expected_root`, deriving `derived_new_module`.
-    /// It verifies that:
-    /// - `envelope.base_root_hash == expected_root`
-    /// - `envelope.target_function` exists in the base module with matching `contract_hash`
-    /// - all `envelope.dependency_hashes` exist in the database
-    /// - `candidate.envelope_hash` and `candidate.expression_hash` match their contents
-    /// - if `caller_module` is provided, its hash strictly matches `derived_new_module`
-    ///
-    /// The kernel directly verifies the candidate using SMT (`axiom_smt::verify_function_in_module`).
-    /// If formally proved, the kernel mints the `VerificationReceipt` and commits the new root.
-    ///
-    /// Preserves all envelopes and candidates regardless of CAS success or failure.
-    pub fn try_commit_candidate(
-        &mut self,
+    /// This allows expensive mathematical proving to run completely concurrently across workers
+    /// without freezing the CAS database write lock.
+    pub fn verify_candidate_offline(
+        &self,
         expected_root: &Option<NodeHash>,
-        envelope: TaskEnvelope,
-        candidate: Candidate,
+        envelope: &TaskEnvelope,
+        candidate: &Candidate,
         caller_module: Option<&Module>,
-    ) -> Result<CommitRecord, CasError> {
-        // 1. 获取跨进程排他锁并同步最新磁盘状态
-        let _lock = self.lock_and_sync()?;
-
-        // 2. 候选内容哈希自验
-        let env_hash = compute_envelope_hash(&envelope);
+    ) -> Result<CertifiedVerification, CasError> {
+        // 1. 候选内容哈希自验
+        let env_hash = compute_envelope_hash(envelope);
         if candidate.envelope_hash != env_hash {
             return Err(CasError::InvalidCandidate(format!(
                 "candidate envelope hash `{}` does not match computed `{}`",
@@ -604,31 +635,23 @@ impl AstDatabase {
             )));
         }
 
-        let cand_hash = compute_candidate_hash(&candidate);
+        let cand_hash = compute_candidate_hash(candidate);
 
-        let mut next_state = self.state.clone();
-        next_state.envelopes.insert(env_hash.clone(), envelope.clone());
-        next_state.candidates.insert(cand_hash.clone(), candidate.clone());
-
-        // 3. 信封基线根校验
+        // 2. 信封基线根校验
         if &envelope.base_root_hash != expected_root {
-            let _ = self.persist(&next_state);
-            self.state = next_state;
             return Err(CasError::InvalidEnvelope(format!(
                 "envelope base root `{:?}` does not match expected root `{:?}`",
                 envelope.base_root_hash, expected_root
             )));
         }
 
-        // 4. 信封依赖完整性校验
+        // 3. 信封依赖完整性校验
         for dep in &envelope.dependency_hashes {
             if !self.state.functions.contains_key(dep)
                 && !self.state.types.contains_key(dep)
                 && !self.state.effects.contains_key(dep)
                 && !self.state.modules.contains_key(dep)
             {
-                let _ = self.persist(&next_state);
-                self.state = next_state;
                 return Err(CasError::InvalidEnvelope(format!(
                     "envelope dependency `{}` not found in database",
                     dep
@@ -636,17 +659,7 @@ impl AstDatabase {
             }
         }
 
-        // 5. 比较当前 root 是否与 expected_root 匹配 (CAS 门禁)
-        if &self.state.root_ref != expected_root {
-            let _ = self.persist(&next_state);
-            self.state = next_state;
-            return Err(CasError::StaleRoot {
-                current: self.state.root_ref.clone(),
-                expected: expected_root.clone(),
-            });
-        }
-
-        // 6. 内核 AST 独立自推导与基线契约比对
+        // 4. 内核 AST 独立自推导与基线契约比对
         let base_module = match expected_root {
             Some(root) => self.state.modules.get(root).cloned().ok_or_else(|| {
                 CasError::Db(DbError::Io(std::io::Error::new(
@@ -693,7 +706,7 @@ impl AstDatabase {
             )));
         }
 
-        // 7. 防篡改断言：比对调用方模块与内核推导模块
+        // 5. 防篡改断言：比对调用方模块与内核推导模块
         if let Some(caller_mod) = caller_module {
             let derived_hash = compute_module_hash(&derived_module);
             let caller_hash = compute_module_hash(caller_mod);
@@ -704,7 +717,7 @@ impl AstDatabase {
             }
         }
 
-        // 8. 内核直接调用 SMT 定理证明
+        // 6. 内核无锁调用 SMT 定理证明
         let affected_func = derived_module
             .functions
             .iter()
@@ -713,44 +726,34 @@ impl AstDatabase {
 
         let smt_result = axiom_smt::verify_function_in_module(affected_func, &derived_module);
 
-        let (solver, version, obligations_checked) = match smt_result {
+        let (solver, solver_version, obligations_checked) = match smt_result {
             axiom_smt::SmtResult::Proved {
                 solver,
                 version,
                 obligations_checked,
             } => (solver, version, obligations_checked),
             axiom_smt::SmtResult::VacuousContract { reason } => {
-                let _ = self.persist(&next_state);
-                self.state = next_state;
                 return Err(CasError::VacuousContract(reason));
             }
             axiom_smt::SmtResult::CounterExample(ce) => {
-                let _ = self.persist(&next_state);
-                self.state = next_state;
                 return Err(CasError::VerificationRejected(format!(
                     "SMT counterexample found for `{}`: {:?}",
                     envelope.target_function, ce
                 )));
             }
-            axiom_smt::SmtResult::Sampled { .. } => {
-                let _ = self.persist(&next_state);
-                self.state = next_state;
+            axiom_smt::SmtResult::Sampled { points_checked } => {
                 return Err(CasError::UnverifiedCandidate(format!(
-                    "candidate for `{}` was only heuristically sampled, not mathematically proved",
+                    "candidate for `{}` was only heuristically sampled ({points_checked} points), strict mathematical proof required",
                     envelope.target_function
                 )));
             }
             axiom_smt::SmtResult::Unknown(reason) => {
-                let _ = self.persist(&next_state);
-                self.state = next_state;
                 return Err(CasError::UnverifiedCandidate(format!(
                     "SMT solver returned unknown for `{}`: {reason}",
                     envelope.target_function
                 )));
             }
             axiom_smt::SmtResult::Skipped(reason) => {
-                let _ = self.persist(&next_state);
-                self.state = next_state;
                 return Err(CasError::UnverifiedCandidate(format!(
                     "verification skipped for `{}`: {reason}",
                     envelope.target_function
@@ -758,27 +761,78 @@ impl AstDatabase {
             }
         };
 
-        // 9. 内核亲自铸造防伪证明收据 (Mint Kernel Verification Receipt)
         let proof_obligation_hash = compute_proof_obligation_hash(affected_func);
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
 
+        Ok(CertifiedVerification {
+            base_root_hash: expected_root.clone(),
+            envelope_hash: env_hash,
+            candidate_hash: cand_hash,
+            proof_obligation_hash,
+            derived_module,
+            solver,
+            solver_version,
+            obligations_checked,
+        })
+    }
+
+    /// Atomic CAS commit of a verified candidate using a short-lived exclusive OS lock.
+    ///
+    /// The lock is held ONLY for the microsecond duration of checking the root and persisting
+    /// the new state to disk. Mathematical theorem proving is NOT performed under lock.
+    pub fn try_commit_verified(
+        &mut self,
+        expected_root: &Option<NodeHash>,
+        envelope: TaskEnvelope,
+        candidate: Candidate,
+        certified: CertifiedVerification,
+    ) -> Result<CommitRecord, CasError> {
+        let env_hash = compute_envelope_hash(&envelope);
+        let cand_hash = compute_candidate_hash(&candidate);
+
+        if certified.envelope_hash != env_hash || certified.candidate_hash != cand_hash {
+            return Err(CasError::InvalidCandidate(
+                "certified verification does not match envelope or candidate".to_string(),
+            ));
+        }
+
+        // 1. 获取微秒级跨进程排他锁并同步最新磁盘状态
+        let _lock = self.lock_and_sync()?;
+
+        let mut next_state = self.state.clone();
+        next_state
+            .envelopes
+            .insert(env_hash.clone(), envelope.clone());
+        next_state
+            .candidates
+            .insert(cand_hash.clone(), candidate.clone());
+
+        // 2. 比较当前 root 是否与 expected_root 匹配 (CAS 门禁)
+        if &self.state.root_ref != expected_root {
+            let persist_res = self.persist(&next_state);
+            if persist_res.is_ok() {
+                self.state = next_state;
+            }
+            return Err(CasError::StaleRoot {
+                current: self.state.root_ref.clone(),
+                expected: expected_root.clone(),
+            });
+        }
+
+        // 3. 内核铸造防伪证明收据
         let receipt = VerificationReceipt {
             candidate_hash: cand_hash.clone(),
             proof_level: ProofLevel::Proved,
-            solver,
-            solver_version: version,
-            obligations_checked,
-            proof_obligation_hash,
-            verified_at: now,
+            solver: certified.solver,
+            solver_version: certified.solver_version,
+            obligations_checked: certified.obligations_checked,
+            proof_obligation_hash: certified.proof_obligation_hash,
+            verified_at: candidate.timestamp,
         };
         let rcpt_hash = compute_receipt_hash(&receipt);
         next_state.receipts.insert(rcpt_hash.clone(), receipt);
 
-        // 10. 录入新模块与生成 CommitRecord
-        let mod_record = Self::insert_module_to_state(&mut next_state, &derived_module);
+        // 4. 录入新模块与生成 CommitRecord
+        let mod_record = Self::insert_module_to_state(&mut next_state, &certified.derived_module);
         let new_root = mod_record.module_hash;
 
         let payload = CommitPayload {
@@ -790,13 +844,48 @@ impl AstDatabase {
             timestamp: candidate.timestamp,
         };
         let final_commit = CommitRecord::new(payload);
-        next_state.commits.insert(final_commit.commit_hash.clone(), final_commit.clone());
+        next_state
+            .commits
+            .insert(final_commit.commit_hash.clone(), final_commit.clone());
         next_state.root_ref = Some(new_root);
 
         self.persist(&next_state)?;
         self.state = next_state;
 
         Ok(final_commit)
+    }
+
+    /// Convenience atomic CAS combining offline verification and locked commit.
+    pub fn try_commit_candidate(
+        &mut self,
+        expected_root: &Option<NodeHash>,
+        envelope: TaskEnvelope,
+        candidate: Candidate,
+        caller_module: Option<&Module>,
+    ) -> Result<CommitRecord, CasError> {
+        let certified =
+            self.verify_candidate_offline(expected_root, &envelope, &candidate, caller_module)?;
+        self.try_commit_verified(expected_root, envelope, candidate, certified)
+    }
+
+    /// Returns a reference to all committed records.
+    pub fn commits(&self) -> &BTreeMap<NodeHash, CommitRecord> {
+        &self.state.commits
+    }
+
+    /// Returns a reference to all verification receipts.
+    pub fn receipts(&self) -> &BTreeMap<NodeHash, VerificationReceipt> {
+        &self.state.receipts
+    }
+
+    /// Returns a reference to all task envelopes.
+    pub fn envelopes(&self) -> &BTreeMap<NodeHash, TaskEnvelope> {
+        &self.state.envelopes
+    }
+
+    /// Returns a reference to all candidates.
+    pub fn candidates(&self) -> &BTreeMap<NodeHash, Candidate> {
+        &self.state.candidates
     }
 
     /// Retrieves a function by its content identifier.
@@ -899,12 +988,20 @@ impl FileLockGuard {
 
         loop {
             match Self::try_open_exclusive(&lock_path) {
-                Ok(file) => return Ok(Self { lock_path, file: Some(file) }),
+                Ok(file) => {
+                    return Ok(Self {
+                        lock_path,
+                        file: Some(file),
+                    })
+                }
                 Err(e) if Self::is_contended(&e) => {
                     if start.elapsed() > timeout {
                         return Err(DbError::Io(std::io::Error::new(
                             std::io::ErrorKind::TimedOut,
-                            format!("timed out waiting for exclusive OS file lock on `{}`", lock_path.display()),
+                            format!(
+                                "timed out waiting for exclusive OS file lock on `{}`",
+                                lock_path.display()
+                            ),
                         )));
                     }
                     std::thread::sleep(backoff);
@@ -927,7 +1024,22 @@ impl FileLockGuard {
             .open(path)
     }
 
-    #[cfg(not(windows))]
+    #[cfg(unix)]
+    fn try_open_exclusive(path: &Path) -> std::io::Result<fs::File> {
+        use std::os::unix::io::AsRawFd;
+        let file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path)?;
+        let ret = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
+        if ret != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(file)
+    }
+
+    #[cfg(not(any(windows, unix)))]
     fn try_open_exclusive(path: &Path) -> std::io::Result<fs::File> {
         fs::OpenOptions::new()
             .read(true)
@@ -944,16 +1056,23 @@ impl FileLockGuard {
                 || err.kind() == std::io::ErrorKind::PermissionDenied
                 || err.kind() == std::io::ErrorKind::AlreadyExists
         }
-        #[cfg(not(windows))]
+        #[cfg(unix)]
         {
-            err.kind() == std::io::ErrorKind::AlreadyExists || err.kind() == std::io::ErrorKind::WouldBlock
+            err.raw_os_error() == Some(libc::EWOULDBLOCK)
+                || err.raw_os_error() == Some(libc::EAGAIN)
+                || err.kind() == std::io::ErrorKind::WouldBlock
+        }
+        #[cfg(not(any(windows, unix)))]
+        {
+            err.kind() == std::io::ErrorKind::AlreadyExists
+                || err.kind() == std::io::ErrorKind::WouldBlock
         }
     }
 }
 
 impl Drop for FileLockGuard {
     fn drop(&mut self) {
-        // Drop the file handle first to release OS kernel lock
+        // Drop the file handle first to release OS kernel lock (Windows handle / Unix flock)
         self.file.take();
         let _ = fs::remove_file(&self.lock_path);
     }
@@ -962,14 +1081,26 @@ impl Drop for FileLockGuard {
 #[cfg(windows)]
 fn atomic_replace_file(from: &Path, to: &Path) -> Result<(), DbError> {
     use std::os::windows::ffi::OsStrExt;
-    let from_wide: Vec<u16> = from.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
-    let to_wide: Vec<u16> = to.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let from_wide: Vec<u16> = from
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let to_wide: Vec<u16> = to
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
 
     const MOVEFILE_REPLACE_EXISTING: u32 = 0x1;
     const MOVEFILE_WRITE_THROUGH: u32 = 0x8;
 
     extern "system" {
-        fn MoveFileExW(lpExistingFileName: *const u16, lpNewFileName: *const u16, dwFlags: u32) -> i32;
+        fn MoveFileExW(
+            lpExistingFileName: *const u16,
+            lpNewFileName: *const u16,
+            dwFlags: u32,
+        ) -> i32;
     }
 
     if !to.exists() {
@@ -978,7 +1109,11 @@ fn atomic_replace_file(from: &Path, to: &Path) -> Result<(), DbError> {
     }
 
     let ret = unsafe {
-        MoveFileExW(from_wide.as_ptr(), to_wide.as_ptr(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)
+        MoveFileExW(
+            from_wide.as_ptr(),
+            to_wide.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
     };
     if ret == 0 {
         let err = std::io::Error::last_os_error();
@@ -1002,7 +1137,8 @@ pub fn replace_hole_in_expr(expression: &mut Expr, hole_id: &str, solution: &Exp
             true
         }
         Expr::BinaryOp { left, right, .. } => {
-            replace_hole_in_expr(left, hole_id, solution) | replace_hole_in_expr(right, hole_id, solution)
+            replace_hole_in_expr(left, hole_id, solution)
+                | replace_hole_in_expr(right, hole_id, solution)
         }
         Expr::UnaryOp { operand, .. } | Expr::Let { value: operand, .. } => {
             replace_hole_in_expr(operand, hole_id, solution)

@@ -7,7 +7,10 @@ static NEXT_TEMP_DIR: AtomicUsize = AtomicUsize::new(0);
 
 fn temp_dir(prefix: &str) -> PathBuf {
     let nonce = NEXT_TEMP_DIR.fetch_add(1, Ordering::SeqCst);
-    let path = std::env::temp_dir().join(format!("axiom-cli-pool-test-{prefix}-{}-{nonce}", std::process::id()));
+    let path = std::env::temp_dir().join(format!(
+        "axiom-cli-pool-test-{prefix}-{}-{nonce}",
+        std::process::id()
+    ));
     fs::create_dir_all(&path).expect("temp dir should be created");
     path
 }
@@ -71,7 +74,10 @@ fn increment(x: Int) -> Int
         ])
         .output()
         .expect("pool submit bad should execute");
-    assert!(!submit_bad.status.success(), "submit bad should exit with non-zero");
+    assert!(
+        !submit_bad.status.success(),
+        "submit bad should exit with non-zero"
+    );
     let stderr_or_stdout = format!(
         "{}\n{}",
         String::from_utf8_lossy(&submit_bad.stdout),
@@ -92,7 +98,10 @@ fn increment(x: Int) -> Int
         ])
         .output()
         .expect("pool submit good should execute");
-    assert!(submit_good.status.success(), "submit good should exit with 0");
+    assert!(
+        submit_good.status.success(),
+        "submit good should exit with 0"
+    );
     let good_stdout = String::from_utf8_lossy(&submit_good.stdout);
     assert!(good_stdout.contains("[ACCEPTED]"));
 
@@ -113,9 +122,13 @@ fn increment(x: Int) -> Int
         ])
         .output()
         .expect("pool assemble should execute");
-    assert!(assemble_output.status.success(), "assemble should exit with 0");
+    assert!(
+        assemble_output.status.success(),
+        "assemble should exit with 0"
+    );
     assert!(out_file.exists(), "assembled file should be created");
-    let assembled_content = fs::read_to_string(&out_file).expect("assembled file should be readable");
+    let assembled_content =
+        fs::read_to_string(&out_file).expect("assembled file should be readable");
     assert!(assembled_content.contains("x + 2"));
     assert!(!assembled_content.contains("?inc_hole"));
 

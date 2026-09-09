@@ -75,7 +75,10 @@ fn concurrent_workers_get_counter_examples_without_contaminating_the_pool() {
         .join()
         .expect("double worker should finish");
     assert!(matches!(bad_result, SmtResult::CounterExample(_)));
-    assert!(matches!(double_result, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
+    assert!(matches!(
+        double_result,
+        SmtResult::Proved { .. } | SmtResult::Sampled { .. }
+    ));
 
     let mut pool = pool.lock().expect("pool lock should not be poisoned");
     assert_eq!(pool.pending_hole_ids(), vec!["increment_impl"]);
@@ -84,9 +87,13 @@ fn concurrent_workers_get_counter_examples_without_contaminating_the_pool() {
         Err(PoolError::Incomplete(ids)) if ids == vec!["increment_impl"]
     ));
 
-    let fix_res = pool.submit_solution("increment_impl", "value + 1")
+    let fix_res = pool
+        .submit_solution("increment_impl", "value + 1")
         .expect("fixed candidate should parse");
-    assert!(matches!(fix_res, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
+    assert!(matches!(
+        fix_res,
+        SmtResult::Proved { .. } | SmtResult::Sampled { .. }
+    ));
 }
 
 #[test]
@@ -94,12 +101,20 @@ fn assembles_a_hole_free_module_that_transpiles_to_rust() {
     let mut pool = AgentTaskPool::from_source(TWO_HOLE_SKELETON)
         .expect("skeleton should parse")
         .with_policy(PoolVerificationPolicy::Permissive);
-    let inc_res = pool.submit_solution("increment_impl", "value + 1")
+    let inc_res = pool
+        .submit_solution("increment_impl", "value + 1")
         .expect("increment solution should parse");
-    assert!(matches!(inc_res, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
-    let dbl_res = pool.submit_solution("double_impl", "value * 2")
+    assert!(matches!(
+        inc_res,
+        SmtResult::Proved { .. } | SmtResult::Sampled { .. }
+    ));
+    let dbl_res = pool
+        .submit_solution("double_impl", "value * 2")
         .expect("double solution should parse");
-    assert!(matches!(dbl_res, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
+    assert!(matches!(
+        dbl_res,
+        SmtResult::Proved { .. } | SmtResult::Sampled { .. }
+    ));
 
     assert!(pool.is_complete());
     assert!(pool.pending_hole_ids().is_empty());
@@ -131,7 +146,9 @@ fn default_strict_proved_policy_rejects_unproved_sampled_solutions() {
             .expect("candidate parses");
         assert!(matches!(res, SmtResult::Sampled { .. }));
         // Must NOT be resolved, pending holes remain
-        assert!(pool.pending_hole_ids().contains(&"increment_impl".to_string()));
+        assert!(pool
+            .pending_hole_ids()
+            .contains(&"increment_impl".to_string()));
     }
 }
 
@@ -146,7 +163,10 @@ fn verifies_cas_optimistic_commit_and_audit_receipts() {
     let res1 = pool
         .submit_solution_with_agent("increment_impl", "value + 1", "agent-alpha")
         .expect("submit should succeed");
-    assert!(matches!(res1, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
+    assert!(matches!(
+        res1,
+        SmtResult::Proved { .. } | SmtResult::Sampled { .. }
+    ));
 
     // Verify commit record was minted
     if axiom_smt::find_z3_executable().is_some() {
@@ -213,14 +233,22 @@ fn fast_forward_reverification_mints_clean_receipt_and_commits_successfully() {
         .with_policy(PoolVerificationPolicy::Permissive);
 
     // 第一个 Worker 解决 increment_impl
-    let res1 = pool.submit_solution_with_agent("increment_impl", "value + 1", "worker_1")
+    let res1 = pool
+        .submit_solution_with_agent("increment_impl", "value + 1", "worker_1")
         .expect("worker 1 should succeed");
-    assert!(matches!(res1, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
+    assert!(matches!(
+        res1,
+        SmtResult::Proved { .. } | SmtResult::Sampled { .. }
+    ));
 
     // 第二个 Worker 解决 double_impl
-    let res2 = pool.submit_solution_with_agent("double_impl", "value * 2", "worker_2")
+    let res2 = pool
+        .submit_solution_with_agent("double_impl", "value * 2", "worker_2")
         .expect("worker 2 should succeed");
-    assert!(matches!(res2, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
+    assert!(matches!(
+        res2,
+        SmtResult::Proved { .. } | SmtResult::Sampled { .. }
+    ));
 
     assert!(pool.is_complete());
     assert_eq!(pool.pending_hole_ids().len(), 0);
@@ -317,3 +345,141 @@ fn permissive_sampled_solution_rejected_by_assemble_verified_module() {
     }
 }
 
+#[test]
+fn persisted_pool_resumes_across_process_exits_seamlessly() {
+    use axiom_agent_pool::HoleStatus;
+
+    const MULTI_STEP_SKELETON: &str = r#"
+        fn step_one(x: Int) -> Int
+            requires { x >= 0 }
+            ensures { result > x }
+        {
+            ?step1_hole
+        }
+
+        fn step_two(y: Int) -> Int
+            requires { y >= 0 }
+            ensures { result >= y }
+        {
+            ?step2_hole
+        }
+    "#;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let skel_path = std::env::temp_dir().join(format!("axiom_resume_skel_{nonce}.ax"));
+    let db_path = std::env::temp_dir().join(format!("axiom_resume_db_{nonce}.json"));
+
+    std::fs::write(&skel_path, MULTI_STEP_SKELETON).unwrap();
+
+    // 进程 1：初始化并提交 step1_hole，随后“退出”
+    {
+        let mut pool_p1 = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        assert_eq!(pool_p1.pending_hole_ids().len(), 2);
+        assert_eq!(
+            pool_p1.hole_status("step1_hole"),
+            Some(HoleStatus::Unresolved)
+        );
+
+        let outcome1 = pool_p1
+            .submit_solution_with_outcome("step1_hole", "x + 1", "agent_worker_1")
+            .unwrap();
+        assert!(outcome1.smt_result.is_proved());
+        assert!(outcome1.upgraded_to_verified);
+        assert_eq!(
+            pool_p1.hole_status("step1_hole"),
+            Some(HoleStatus::Verified)
+        );
+    } // 模拟进程 1 退出，内存状态全部销毁
+
+    // 进程 2：从磁盘重新打开同一个 DB 和原始骨架，验证单源权威水合！
+    {
+        let mut pool_p2 = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        // 关键断言：step1_hole 必须已经被恢复为 Verified，不应出现在 pending 中！
+        assert_eq!(
+            pool_p2.hole_status("step1_hole"),
+            Some(HoleStatus::Verified)
+        );
+        assert_eq!(
+            pool_p2.hole_status("step2_hole"),
+            Some(HoleStatus::Unresolved)
+        );
+        assert_eq!(pool_p2.pending_hole_ids(), vec!["step2_hole".to_string()]);
+        assert!(!pool_p2.is_complete());
+
+        // 提交 step2_hole
+        let outcome2 = pool_p2
+            .submit_solution_with_outcome("step2_hole", "y + 5", "agent_worker_2")
+            .unwrap();
+        assert!(outcome2.smt_result.is_proved());
+        assert!(outcome2.upgraded_to_verified);
+        assert_eq!(
+            pool_p2.hole_status("step2_hole"),
+            Some(HoleStatus::Verified)
+        );
+        assert!(pool_p2.is_complete());
+    } // 进程 2 退出
+
+    // 进程 3：全新进程重新打开，验证全量完成且成功组装发布模块！
+    {
+        let pool_p3 = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        assert!(pool_p3.is_complete());
+        assert_eq!(pool_p3.pending_hole_ids().len(), 0);
+
+        let verified_module = pool_p3
+            .assemble_verified_module()
+            .expect("assembled module must succeed");
+        assert!(!axiom_agent_pool::ast_contains_any_hole(&verified_module));
+    }
+
+    let _ = std::fs::remove_file(&skel_path);
+    let _ = std::fs::remove_file(&db_path);
+}
+
+#[test]
+fn provisional_draft_can_be_upgraded_to_verified_status() {
+    use axiom_agent_pool::HoleStatus;
+
+    // 骨架包含带合约函数
+    const UPGRADE_SKELETON: &str = r#"
+        fn safe_inc(x: Int) -> Int
+            requires { x >= 0 }
+            ensures { result > x }
+        {
+            ?safe_inc_hole
+        }
+    "#;
+
+    let mut pool = AgentTaskPool::from_source(UPGRADE_SKELETON)
+        .unwrap()
+        .with_policy(PoolVerificationPolicy::Permissive);
+
+    assert_eq!(
+        pool.hole_status("safe_inc_hole"),
+        Some(HoleStatus::Unresolved)
+    );
+
+    // 1. 提交一个形式化证明成功的解，直接升级为 Verified
+    let outcome = pool
+        .submit_solution_with_outcome("safe_inc_hole", "x + 10", "expert_agent")
+        .unwrap();
+    assert!(outcome.smt_result.is_proved());
+    assert!(outcome.upgraded_to_verified);
+    assert_eq!(
+        pool.hole_status("safe_inc_hole"),
+        Some(HoleStatus::Verified)
+    );
+
+    // 2. 已是 Verified 后，再次提交将被安全拒绝 (AlreadyResolved)
+    let re_submit = pool.submit_solution("safe_inc_hole", "x + 20");
+    match re_submit {
+        Err(PoolError::AlreadyResolved(h)) => assert_eq!(h, "safe_inc_hole"),
+        other => panic!("expected AlreadyResolved error, got: {:?}", other),
+    }
+
+    // 最终成功交付正式模块
+    let final_mod = pool.assemble_verified_module().unwrap();
+    assert!(!axiom_agent_pool::ast_contains_any_hole(&final_mod));
+}

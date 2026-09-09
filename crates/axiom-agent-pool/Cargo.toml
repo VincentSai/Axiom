@@ -9,6 +9,7 @@ axiom-db = { path = "../axiom-db" }
 axiom-hole-extractor = { path = "../axiom-hole-extractor" }
 axiom-parser = { path = "../axiom-parser" }
 axiom-smt = { path = "../axiom-smt" }
+serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
 axiom-transpiler = { path = "../axiom-transpiler" }

@@ -534,8 +534,13 @@ fn task_b(y: Int) -> Int requires { y >= 0 } ensures { result >= y } { ?hole_b }
         results = {}
 
         def worker_submit(worker_id, hole, expr):
-            barrier.wait()  # 同步屏障：确保两个 Worker 同时发起提交
-            cmd = [axiom_bin, "pool", "submit", skel_file, "--db", db_file, "--hole", hole, "--expr", expr]
+            # 预先检查就绪，确保跨进程/线程 DB open 就绪
+            prep_cmd = [axiom_bin, "pool", "status", skel_file, "--db", db_file]
+            subprocess.run(prep_cmd, capture_output=True, text=True, timeout=15)
+
+            barrier.wait()  # 同步屏障：确保两个 Worker 在 DB 就绪后同时发起 CAS 提交碰撞
+
+            cmd = [axiom_bin, "pool", "submit", skel_file, "--db", db_file, "--hole", hole, "--expr", expr, "--json"]
             p = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             results[worker_id] = {
                 "returncode": p.returncode,
@@ -563,21 +568,49 @@ fn task_b(y: Int) -> Int requires { y >= 0 } ensures { result >= y } { ?hole_b }
             final_root = db_state_final.get("root_ref")
 
         commit_chain_len = len(final_commits)
-        # 只要最终 commit 链长为 2 且双 worker 成功，证明后提交成功的 Worker 必定经历了 StaleRoot 冲突并自愈 Fast-Forward 重基成功
-        stale_root_detected = (commit_chain_len == 2 and success_count == 2)
+
+        # 直接从 Worker 实际发射的结构化 CAS 事件流中客观统计指标，杜绝结果反推
+        stale_roots_observed = 0
+        rebases_succeeded = 0
+        parsed_events = {}
+
+        for wid, r in results.items():
+            stdout = r.get("stdout", "")
+            w_events = []
+            try:
+                data = json.loads(stdout)
+                events = data.get("cas_events", [])
+                for ev in events:
+                    w_events.append(ev)
+                    if isinstance(ev, dict):
+                        if "StaleRootDetected" in ev:
+                            stale_roots_observed += 1
+                        if "RebaseSucceeded" in ev:
+                            rebases_succeeded += 1
+            except Exception:
+                if "[CAS_EVENT:STALE_ROOT_DETECTED]" in stdout:
+                    cnt = stdout.count("[CAS_EVENT:STALE_ROOT_DETECTED]")
+                    stale_roots_observed += cnt
+                    w_events.append({"StaleRootDetected": cnt})
+                if "[CAS_EVENT:REBASE_SUCCEEDED]" in stdout:
+                    cnt = stdout.count("[CAS_EVENT:REBASE_SUCCEEDED]")
+                    rebases_succeeded += cnt
+                    w_events.append({"RebaseSucceeded": cnt})
+            parsed_events[wid] = w_events
 
         return {
             "race_workers": 2,
             "success_submissions": success_count,
             "concurrency_elapsed_sec": elapsed,
-            "stale_root_conflicts_observed": 1 if stale_root_detected else 0,
-            "fast_forward_retries_succeeded": 1 if stale_root_detected else 0,
+            "stale_root_conflicts_observed": stale_roots_observed,
+            "fast_forward_retries_succeeded": rebases_succeeded,
             "final_commit_chain_length": commit_chain_len,
             "initial_root": initial_root,
             "final_root": final_root,
             "is_mock": is_mock,
             "git_commit_sha": get_git_commit_sha(),
             "git_tree_hash": get_git_tree_hash(),
+            "cas_events_by_worker": parsed_events,
             "worker_a": results.get("worker_a", {}),
             "worker_b": results.get("worker_b", {}),
         }

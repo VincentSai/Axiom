@@ -79,7 +79,10 @@ fn contracted_add(x: Int) -> Int
     if stdout.contains("[PROVED]") {
         assert!(output.status.success());
     } else {
-        assert!(!output.status.success(), "Strict mode must fail when Z3 solver is unavailable");
+        assert!(
+            !output.status.success(),
+            "Strict mode must fail when Z3 solver is unavailable"
+        );
         assert!(stdout.contains("[SAMPLED_FAIL]"));
     }
 
@@ -123,4 +126,3 @@ fn contracted_string_fn(s: String) -> Int
 
     let _ = std::fs::remove_dir_all(temp_dir);
 }
-

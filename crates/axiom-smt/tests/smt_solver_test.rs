@@ -16,7 +16,10 @@ fn verifies_safe_division_with_precondition() {
     .expect("safe_div should parse");
 
     let result = verify_function(&module.functions[0]);
-    assert!(matches!(result, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
+    assert!(matches!(
+        result,
+        SmtResult::Proved { .. } | SmtResult::Sampled { .. }
+    ));
 }
 
 #[test]
@@ -103,7 +106,10 @@ fn verifies_logical_operators_and_let_bindings() {
     .expect("function should parse");
 
     let res = verify_function(&module.functions[0]);
-    assert!(matches!(res, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
+    assert!(matches!(
+        res,
+        SmtResult::Proved { .. } | SmtResult::Sampled { .. }
+    ));
 }
 
 #[test]
@@ -120,8 +126,8 @@ fn generates_valid_smtlib2_query_script() {
     )
     .expect("safe_sub should parse");
 
-    let smt2 = axiom_smt::generate_smtlib2(&module.functions[0])
-        .expect("should generate SMT-LIB2 query");
+    let smt2 =
+        axiom_smt::generate_smtlib2(&module.functions[0]).expect("should generate SMT-LIB2 query");
 
     assert!(smt2.contains("(set-logic ALL)"));
     assert!(smt2.contains("(declare-const balance Int)"));

@@ -1,4 +1,4 @@
-﻿//! Integration with external Z3 / SMT-LIB2 solvers.
+//! Integration with external Z3 / SMT-LIB2 solvers.
 
 use std::collections::HashMap;
 use std::io::Write;
@@ -36,9 +36,14 @@ pub fn find_z3_executable() -> Option<PathBuf> {
     }
 
     // Common fallback directories on Windows / Unix
-    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
+    let home = std::env::var("USERPROFILE")
+        .or_else(|_| std::env::var("HOME"))
+        .unwrap_or_default();
     let candidates = [
-        PathBuf::from(&home).join(".axiom").join("bin").join("z3.exe"),
+        PathBuf::from(&home)
+            .join(".axiom")
+            .join("bin")
+            .join("z3.exe"),
         PathBuf::from(&home).join(".axiom").join("bin").join("z3"),
         PathBuf::from("C:\\Program Files\\z3\\bin\\z3.exe"),
         PathBuf::from("/usr/bin/z3"),
@@ -55,11 +60,36 @@ pub fn find_z3_executable() -> Option<PathBuf> {
     None
 }
 
-/// Executes a verification query using the Z3 solver via standard input.
+/// Retrieves the dynamically detected version string of Z3 executable.
+pub fn get_z3_version(z3_path: &Path) -> String {
+    if let Ok(output) = Command::new(z3_path).arg("--version").output() {
+        let s = String::from_utf8_lossy(&output.stdout);
+        if let Some(pos) = s.find("version ") {
+            let rest = &s[pos + 8..];
+            let ver = rest.split_whitespace().next().unwrap_or("").trim();
+            if !ver.is_empty() {
+                return ver.to_string();
+            }
+        }
+    }
+    "unknown".to_string()
+}
+
+/// Executes a verification query using the Z3 solver via standard input with a 10s timeout.
 pub fn run_z3_query(z3_path: &Path, smt2_query: &str) -> Result<Z3Result, String> {
+    run_z3_query_with_timeout(z3_path, smt2_query, 10000)
+}
+
+/// Executes a verification query using the Z3 solver with configurable hard timeout.
+pub fn run_z3_query_with_timeout(
+    z3_path: &Path,
+    smt2_query: &str,
+    timeout_ms: u32,
+) -> Result<Z3Result, String> {
     let mut child = Command::new(z3_path)
         .arg("-in")
         .arg("-smt2")
+        .arg(format!("-t:{}", timeout_ms))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -153,7 +183,9 @@ fn extract_numeric_value(text: &str) -> Option<f64> {
             let sub = &text[start + 3..].trim_end_matches(')').trim();
             let div_parts: Vec<&str> = sub.split_whitespace().collect();
             if div_parts.len() == 2 {
-                if let (Ok(num), Ok(den)) = (div_parts[0].parse::<f64>(), div_parts[1].parse::<f64>()) {
+                if let (Ok(num), Ok(den)) =
+                    (div_parts[0].parse::<f64>(), div_parts[1].parse::<f64>())
+                {
                     if den != 0.0 {
                         return Some(num / den);
                     }

@@ -77,7 +77,10 @@ fn valid_contract_returns_a_verified_report() {
     );
 
     assert_eq!(reports.len(), 1);
-    assert!(matches!(reports[0].status, DiagnosticStatus::Proved | DiagnosticStatus::Sampled));
+    assert!(matches!(
+        reports[0].status,
+        DiagnosticStatus::Proved | DiagnosticStatus::Sampled
+    ));
     assert_eq!(reports[0].function_name.as_deref(), Some("identity"));
     assert!(reports[0].counter_example.is_none());
 }
@@ -123,7 +126,9 @@ fn binary_op_type_mismatch_returns_type_error() {
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0].status, DiagnosticStatus::TypeError);
     assert_eq!(reports[0].function_name.as_deref(), Some("bad_addition"));
-    assert!(reports[0].diagnosis.contains("cannot apply arithmetic operator"));
+    assert!(reports[0]
+        .diagnosis
+        .contains("cannot apply arithmetic operator"));
 }
 
 #[test]
@@ -142,7 +147,9 @@ fn match_arms_type_mismatch_returns_type_error() {
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0].status, DiagnosticStatus::TypeError);
     assert_eq!(reports[0].function_name.as_deref(), Some("bad_match"));
-    assert!(reports[0].diagnosis.contains("match arms return incompatible types"));
+    assert!(reports[0]
+        .diagnosis
+        .contains("match arms return incompatible types"));
 }
 
 #[test]
@@ -161,9 +168,9 @@ fn invalid_contract(x: Int) -> Int
 
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0].status, DiagnosticStatus::TypeError);
-    assert_eq!(reports[0].function_name.as_deref(), Some("invalid_contract"));
+    assert_eq!(
+        reports[0].function_name.as_deref(),
+        Some("invalid_contract")
+    );
     assert!(reports[0].diagnosis.contains("must evaluate to Bool"));
 }
-
-
-

@@ -15,10 +15,7 @@ pub enum EffectError {
         source: String,
     },
     /// A function attempts an unauthorized external host call (e.g. std::fs).
-    DisallowedExternalCall {
-        function: String,
-        target: String,
-    },
+    DisallowedExternalCall { function: String, target: String },
 }
 
 impl fmt::Display for EffectError {
@@ -255,7 +252,10 @@ fn collect_raw_calls(source: &str, calls: &mut Vec<Vec<String>>) {
                     if offset < bytes.len() && is_ident_start(bytes[offset]) {
                         continue;
                     }
-                } else if offset + 1 < bytes.len() && bytes[offset] == b':' && bytes[offset + 1] == b':' {
+                } else if offset + 1 < bytes.len()
+                    && bytes[offset] == b':'
+                    && bytes[offset + 1] == b':'
+                {
                     offset += 2;
                     skip_ascii_whitespace(bytes, &mut offset);
                     if offset < bytes.len() && is_ident_start(bytes[offset]) {

@@ -96,7 +96,8 @@ fn transpiles_effects_to_traits_and_handlers() {
     assert!(rust.contains("pub trait Input {\n    fn get_movement_axis(&mut self) -> Vector2;\n}"));
 
     // Check function signature with injected handlers
-    assert!(rust.contains("pub fn tick(dt: f64, render: &mut impl Render, input: &mut impl Input) -> ()"));
+    assert!(rust
+        .contains("pub fn tick(dt: f64, render: &mut impl Render, input: &mut impl Input) -> ()"));
 
     // Check effect method call conversions
     assert!(rust.contains("let dir = input.get_movement_axis();"));
@@ -141,4 +142,3 @@ fn transpiles_nested_effect_calls_and_list_types() {
     // Call propagation: log_item automatically passed `log`
     assert!(rust.contains("log_item(Item { id: 1 }, log)"));
 }
-

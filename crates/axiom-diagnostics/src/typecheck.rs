@@ -3,8 +3,7 @@
 use std::collections::HashMap;
 
 use axiom_ast::{
-    BinaryOperator, Expr, FunctionDecl, Literal, Module, Pattern, Type, TypeDef,
-    UnaryOperator,
+    BinaryOperator, Expr, FunctionDecl, Literal, Module, Pattern, Type, TypeDef, UnaryOperator,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -101,11 +100,7 @@ pub fn check_function_types_with_ctx(
             Err(err_msg) => {
                 return Err(TypeError {
                     function_name: func.name.clone(),
-                    message: format!(
-                        "type error in `requires` clause #{}: {}",
-                        i + 1,
-                        err_msg
-                    ),
+                    message: format!("type error in `requires` clause #{}: {}", i + 1, err_msg),
                 });
             }
         }
@@ -131,11 +126,7 @@ pub fn check_function_types_with_ctx(
             Err(err_msg) => {
                 return Err(TypeError {
                     function_name: func.name.clone(),
-                    message: format!(
-                        "type error in `ensures` clause #{}: {}",
-                        i + 1,
-                        err_msg
-                    ),
+                    message: format!("type error in `ensures` clause #{}: {}", i + 1, err_msg),
                 });
             }
         }
@@ -311,9 +302,7 @@ fn infer_expr_type(
                         Ok(l)
                     }
                 }
-                BinaryOperator::Subtract
-                | BinaryOperator::Multiply
-                | BinaryOperator::Divide => {
+                BinaryOperator::Subtract | BinaryOperator::Multiply | BinaryOperator::Divide => {
                     if !is_numeric(&l) || !is_numeric(&r) {
                         return Err(format!(
                             "cannot apply arithmetic operator to types `{:?}` and `{:?}`",
@@ -374,7 +363,9 @@ fn infer_expr_type(
                 bind_pattern_types(&arm.pattern, &target_ty, &mut arm_env, ctx)?;
                 let arm_ty = infer_expr_type(&arm.body, &mut arm_env, ctx)?;
                 if let Some(ref prev_ty) = first_ty {
-                    if !is_type_compatible(prev_ty, &arm_ty) && !is_type_compatible(&arm_ty, prev_ty) {
+                    if !is_type_compatible(prev_ty, &arm_ty)
+                        && !is_type_compatible(&arm_ty, prev_ty)
+                    {
                         return Err(format!(
                             "match arms return incompatible types `{:?}` and `{:?}`",
                             prev_ty, arm_ty
@@ -417,9 +408,13 @@ fn infer_expr_type(
                 infer_expr_type(expr, env, ctx)?;
             }
             if !matches!(base_ty, Type::Custom(_)) {
-                let update_field_names: Vec<&str> = updates.iter().map(|(f, _)| f.as_str()).collect();
+                let update_field_names: Vec<&str> =
+                    updates.iter().map(|(f, _)| f.as_str()).collect();
                 for (rec_name, rec_fields) in &ctx.records {
-                    if update_field_names.iter().all(|f| rec_fields.contains_key(*f)) {
+                    if update_field_names
+                        .iter()
+                        .all(|f| rec_fields.contains_key(*f))
+                    {
                         base_ty = Type::Custom(rec_name.clone());
                         break;
                     }

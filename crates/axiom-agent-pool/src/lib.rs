@@ -5,14 +5,47 @@ use std::fmt;
 
 use axiom_ast::{Expr, Module};
 use axiom_db::{
-    compute_envelope_hash, compute_expr_hash, compute_function_hash,
-    AstDatabase, Candidate, CasError, CommitRecord, NodeHash, ProofLevel, TaskEnvelope,
+    compute_envelope_hash, compute_expr_hash, compute_function_hash, AstDatabase, Candidate,
+    CasError, CommitRecord, NodeHash, ProofLevel, TaskEnvelope,
 };
 use axiom_hole_extractor::extract_holes;
 pub use axiom_hole_extractor::HoleTask;
 use axiom_parser::{parse_expr, parse_module, ParseError};
 use axiom_smt::verify_function_in_module;
 pub use axiom_smt::SmtResult;
+use serde::{Deserialize, Serialize};
+
+/// Detailed outcome of submitting a hole solution, including SMT verification and CAS events.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SubmitOutcome {
+    pub smt_result: SmtResult,
+    pub cas_events: Vec<CasEvent>,
+    pub upgraded_to_verified: bool,
+}
+
+/// Structured CAS event emitted during candidate submission and concurrent resolution.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum CasEvent {
+    StaleRootDetected {
+        expected: Option<NodeHash>,
+        current: Option<NodeHash>,
+    },
+    RebaseSucceeded {
+        rebased_root: NodeHash,
+        attempts: usize,
+    },
+}
+
+/// Lifecycle status of a hole task in the pool.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HoleStatus {
+    /// No solution accepted yet.
+    Unresolved,
+    /// Has draft/sampled solution in provisional module; open for upgrade.
+    Provisional,
+    /// Mathematically verified with SMT proof, permanently committed to CAS database.
+    Verified,
+}
 
 /// Verification policy for accepting hole candidate solutions into the pool.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -42,63 +75,104 @@ impl AgentTaskPool {
     /// Create a task pool from a parsed skeleton module with an in-memory database.
     pub fn new(skeleton_module: Module) -> Self {
         let db = AstDatabase::in_memory();
-        Self::open_with_database(skeleton_module, db).expect("in-memory database pool initialization cannot fail")
+        Self::open_with_database(skeleton_module, db)
+            .expect("in-memory database pool initialization cannot fail")
     }
 
     /// Open or initialize a task pool backed by a shared AST database instance.
-    pub fn open_with_database(skeleton_module: Module, mut db: AstDatabase) -> Result<Self, PoolError> {
+    ///
+    /// Single Source of Truth (SSOT):
+    /// - If the database already contains a `root_ref`, the authoritative module is loaded
+    ///   directly from CAS storage, completely replacing the passed skeleton text.
+    /// - Hole evidence ledger is rehydrated from stored commits and receipts.
+    /// - Pending holes are derived dynamically by extracting unresolved holes from the authoritative AST.
+    pub fn open_with_database(
+        skeleton_module: Module,
+        mut db: AstDatabase,
+    ) -> Result<Self, PoolError> {
         let mut seen_holes = HashSet::new();
         let tasks = extract_holes(&skeleton_module)
             .into_iter()
             .filter(|task| seen_holes.insert(task.hole_id.clone()))
             .collect::<Vec<_>>();
-        let pending_holes = tasks.iter().map(|task| task.hole_id.clone()).collect();
 
-        let base_root = if let Some(root) = db.current_root() {
-            root
+        // 1. 确定权威基线模块与 Root
+        let (base_root, authoritative_module) = if let Some(root) = db.current_root() {
+            let loaded_mod = db
+                .get_module(&root)
+                .map_err(|e| PoolError::CasFailure(e.to_string()))?
+                .unwrap_or_else(|| skeleton_module.clone());
+            (root, loaded_mod)
         } else {
             let mod_rec = db
                 .insert_module(&skeleton_module)
                 .map_err(|e| PoolError::CasFailure(e.to_string()))?;
-            db.set_root(mod_rec.module_hash.clone())
+            db.initialize_root(mod_rec.module_hash.clone())
                 .map_err(|e| PoolError::CasFailure(e.to_string()))?;
-            mod_rec.module_hash
+            (mod_rec.module_hash, skeleton_module.clone())
         };
 
+        // 2. 从权威模块动态派生当前真正剩余的 pending_holes
+        let remaining_tasks = extract_holes(&authoritative_module);
+        let pending_holes: HashSet<String> =
+            remaining_tasks.into_iter().map(|t| t.hole_id).collect();
+
+        // 3. 从持久化数据库的 commits 与 receipts 反向水合证据账本
+        let mut hole_evidence = HashMap::new();
+        let mut commits = Vec::new();
+        for commit in db.commits().values() {
+            commits.push(commit.clone());
+            if let Ok(Some(receipt)) = db.get_receipt(commit.receipt_hash()) {
+                if let Ok(Some(env)) = db.get_envelope(commit.envelope_hash()) {
+                    hole_evidence.insert(env.target_hole_id.clone(), receipt.proof_level);
+                }
+            }
+        }
+
+        // 4. 构造任务信封与静态提取真实依赖闭包
         let mut envelopes = HashMap::new();
         for task in &tasks {
-            let func_hash = skeleton_module
+            let func_opt = authoritative_module
                 .functions
                 .iter()
-                .find(|f| f.name == task.target_function)
-                .map(compute_function_hash)
-                .unwrap_or_default();
+                .find(|f| f.name == task.target_function);
+            let func_hash = func_opt.map(compute_function_hash).unwrap_or_default();
+            let dep_hashes = if let Some(f) = func_opt {
+                extract_function_dependencies(f, &authoritative_module)
+            } else {
+                Vec::new()
+            };
+
             let env = TaskEnvelope {
                 base_root_hash: Some(base_root.clone()),
                 target_hole_id: task.hole_id.clone(),
                 target_function: task.target_function.clone(),
                 contract_hash: func_hash,
-                dependency_hashes: Vec::new(),
+                dependency_hashes: dep_hashes,
             };
             envelopes.insert(task.hole_id.clone(), env);
         }
 
         Ok(Self {
-            verified_module: skeleton_module.clone(),
-            provisional_module: skeleton_module,
+            verified_module: authoritative_module.clone(),
+            provisional_module: authoritative_module,
             tasks,
             pending_holes,
-            hole_evidence: HashMap::new(),
+            hole_evidence,
             policy: PoolVerificationPolicy::default(),
             db,
             envelopes,
-            commits: Vec::new(),
+            commits,
         })
     }
 
     /// Open or initialize a task pool backed by a persistent file database and skeleton source file.
-    pub fn open_persisted(skeleton_path: &std::path::Path, db_path: &std::path::Path) -> Result<Self, PoolError> {
-        let source = std::fs::read_to_string(skeleton_path).map_err(|e| PoolError::CasFailure(e.to_string()))?;
+    pub fn open_persisted(
+        skeleton_path: &std::path::Path,
+        db_path: &std::path::Path,
+    ) -> Result<Self, PoolError> {
+        let source = std::fs::read_to_string(skeleton_path)
+            .map_err(|e| PoolError::CasFailure(e.to_string()))?;
         let skeleton_module = parse_module(&source)?;
         let db = AstDatabase::open(db_path).map_err(|e| PoolError::CasFailure(e.to_string()))?;
         Self::open_with_database(skeleton_module, db)
@@ -187,6 +261,18 @@ impl AgentTaskPool {
             .collect()
     }
 
+    /// Returns the lifecycle status of a specific hole task in the pool.
+    pub fn hole_status(&self, hole_id: &str) -> Option<HoleStatus> {
+        if !self.tasks.iter().any(|task| task.hole_id == hole_id) {
+            return None;
+        }
+        match self.hole_evidence.get(hole_id) {
+            Some(ProofLevel::Proved) => Some(HoleStatus::Verified),
+            Some(ProofLevel::Sampled) => Some(HoleStatus::Provisional),
+            _ => Some(HoleStatus::Unresolved),
+        }
+    }
+
     /// Parse, verify, and conditionally commit a candidate hole implementation via CAS.
     pub fn submit_solution(
         &mut self,
@@ -196,17 +282,19 @@ impl AgentTaskPool {
         self.submit_solution_with_agent(hole_id, solution_source, "axiom-worker")
     }
 
-    /// Parse, verify, and conditionally commit a candidate hole implementation with an explicit agent ID.
-    pub fn submit_solution_with_agent(
+    /// Parse, verify, and commit a candidate with detailed outcome including CAS events and upgrade flag.
+    pub fn submit_solution_with_outcome(
         &mut self,
         hole_id: &str,
         solution_source: &str,
         agent_id: &str,
-    ) -> Result<SmtResult, PoolError> {
-        if !self.tasks.iter().any(|task| task.hole_id == hole_id) {
-            return Err(PoolError::UnknownHole(hole_id.to_owned()));
-        }
-        if !self.pending_holes.contains(hole_id) {
+    ) -> Result<SubmitOutcome, PoolError> {
+        let current_status = self
+            .hole_status(hole_id)
+            .ok_or_else(|| PoolError::UnknownHole(hole_id.to_owned()))?;
+
+        // 仅拦截已被正式证明（Verified）的洞；处于 Provisional 的草稿解允许继续提交升级为正式证明！
+        if current_status == HoleStatus::Verified {
             return Err(PoolError::AlreadyResolved(hole_id.to_owned()));
         }
 
@@ -225,15 +313,23 @@ impl AgentTaskPool {
         }
 
         let cand_expr_hash = compute_expr_hash(&solution);
-        let contract_hash = compute_function_hash(&candidate_module.functions[affected_functions[0]]);
+        let base_func = &candidate_module.functions[affected_functions[0]];
+        let contract_hash = compute_function_hash(base_func);
+        let dep_hashes = extract_function_dependencies(base_func, &candidate_module);
         let current_root = self.db.current_root();
-        let envelope = self.envelopes.get(hole_id).cloned().unwrap_or_else(|| TaskEnvelope {
-            base_root_hash: current_root.clone(),
-            target_hole_id: hole_id.to_owned(),
-            target_function: candidate_module.functions[affected_functions[0]].name.clone(),
-            contract_hash,
-            dependency_hashes: Vec::new(),
-        });
+        let envelope = self
+            .envelopes
+            .get(hole_id)
+            .cloned()
+            .unwrap_or_else(|| TaskEnvelope {
+                base_root_hash: current_root.clone(),
+                target_hole_id: hole_id.to_owned(),
+                target_function: candidate_module.functions[affected_functions[0]]
+                    .name
+                    .clone(),
+                contract_hash,
+                dependency_hashes: dep_hashes,
+            });
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -251,36 +347,59 @@ impl AgentTaskPool {
         // 1. 预先单点验证，支持向 Worker 报告反例以进行自愈
         let precheck_result = verify_candidate_precheck(&candidate_module, &affected_functions);
         match &precheck_result {
-            SmtResult::CounterExample(_) | SmtResult::VacuousContract { .. } | SmtResult::Unknown(_) => {
-                return Ok(precheck_result);
+            SmtResult::CounterExample(_)
+            | SmtResult::VacuousContract { .. }
+            | SmtResult::Unknown(_) => {
+                return Ok(SubmitOutcome {
+                    smt_result: precheck_result,
+                    cas_events: Vec::new(),
+                    upgraded_to_verified: false,
+                });
             }
             SmtResult::Skipped(_) => {
                 let func = &candidate_module.functions[affected_functions[0]];
-                if func.ensures.is_empty() {
-                    if self.policy == PoolVerificationPolicy::Permissive {
-                        self.provisional_module = candidate_module;
-                        self.pending_holes.remove(hole_id);
-                        self.hole_evidence.insert(hole_id.to_string(), ProofLevel::Sampled);
-                        return Ok(precheck_result);
-                    }
-                    return Ok(precheck_result);
+                if func.ensures.is_empty() && self.policy == PoolVerificationPolicy::Permissive {
+                    self.provisional_module = candidate_module;
+                    self.pending_holes.remove(hole_id);
+                    self.hole_evidence
+                        .insert(hole_id.to_string(), ProofLevel::Sampled);
+                    return Ok(SubmitOutcome {
+                        smt_result: precheck_result,
+                        cas_events: Vec::new(),
+                        upgraded_to_verified: false,
+                    });
                 }
+                return Ok(SubmitOutcome {
+                    smt_result: precheck_result,
+                    cas_events: Vec::new(),
+                    upgraded_to_verified: false,
+                });
             }
             SmtResult::Sampled { .. } => {
                 if self.policy == PoolVerificationPolicy::Permissive {
-                    // Permissive 模式：允许作为草稿更新 provisional_module，但不推进 verified_module
+                    // Permissive 模式：作为草稿更新 provisional_module，不推进 verified_module
                     self.provisional_module = candidate_module;
                     self.pending_holes.remove(hole_id);
-                    self.hole_evidence.insert(hole_id.to_string(), ProofLevel::Sampled);
-                    return Ok(precheck_result);
+                    self.hole_evidence
+                        .insert(hole_id.to_string(), ProofLevel::Sampled);
+                    return Ok(SubmitOutcome {
+                        smt_result: precheck_result,
+                        cas_events: Vec::new(),
+                        upgraded_to_verified: false,
+                    });
                 } else {
-                    return Ok(precheck_result);
+                    return Ok(SubmitOutcome {
+                        smt_result: precheck_result,
+                        cas_events: Vec::new(),
+                        upgraded_to_verified: false,
+                    });
                 }
             }
             SmtResult::Proved { .. } => {}
         }
 
-        // 2. 核心提交：直接交由数据库内核验证并铸造收据！
+        // 2. 核心两阶段提交：直接交由数据库内核验证并铸造收据！
+        let mut cas_events = Vec::new();
         let expected_root = envelope.base_root_hash.clone();
         match self.db.try_commit_candidate(
             &expected_root,
@@ -293,19 +412,25 @@ impl AgentTaskPool {
                 self.verified_module = candidate_module.clone();
                 self.provisional_module = candidate_module;
                 self.pending_holes.remove(hole_id);
-                self.hole_evidence.insert(hole_id.to_string(), ProofLevel::Proved);
+                self.hole_evidence
+                    .insert(hole_id.to_string(), ProofLevel::Proved);
                 let latest_root = self.db.current_root();
                 for env in self.envelopes.values_mut() {
                     env.base_root_hash = latest_root.clone();
                 }
-                Ok(precheck_result)
+                Ok(SubmitOutcome {
+                    smt_result: precheck_result,
+                    cas_events,
+                    upgraded_to_verified: true,
+                })
             }
-            Err(CasError::StaleRoot { current, .. }) => {
-                if !self.pending_holes.contains(hole_id) {
-                    return Err(PoolError::AlreadyResolved(hole_id.to_owned()));
-                }
+            Err(CasError::StaleRoot { current, expected }) => {
+                cas_events.push(CasEvent::StaleRootDetected {
+                    expected,
+                    current: current.clone(),
+                });
 
-                // 核心决议 3：从数据库 CAS 物理加载最新真实 AST 实施 Fast-Forward 重基！
+                // 从数据库 CAS 物理加载最新真实 AST 实施 Fast-Forward 重基！
                 let latest_root = current.clone().ok_or_else(|| {
                     PoolError::CasFailure("stale root returned None current root".to_string())
                 })?;
@@ -319,7 +444,6 @@ impl AgentTaskPool {
                         ))
                     })?;
 
-                // 关键：在被填洞替换前获取基线目标函数的契约哈希
                 let base_func = rebased_module
                     .functions
                     .iter()
@@ -327,6 +451,7 @@ impl AgentTaskPool {
                     .cloned()
                     .ok_or_else(|| PoolError::MissingHole(hole_id.to_owned()))?;
                 let rebased_func_hash = compute_function_hash(&base_func);
+                let rebased_deps = extract_function_dependencies(&base_func, &rebased_module);
 
                 let mut rebased_affected = Vec::new();
                 for (idx, function) in rebased_module.functions.iter_mut().enumerate() {
@@ -343,7 +468,7 @@ impl AgentTaskPool {
                     target_hole_id: hole_id.to_owned(),
                     target_function: envelope.target_function.clone(),
                     contract_hash: rebased_func_hash,
-                    dependency_hashes: Vec::new(),
+                    dependency_hashes: rebased_deps,
                 };
                 let rebased_candidate = Candidate {
                     envelope_hash: compute_envelope_hash(&rebased_envelope),
@@ -353,35 +478,59 @@ impl AgentTaskPool {
                     timestamp: candidate.timestamp + 1,
                 };
 
-                let recheck_result =
-                    verify_candidate_precheck(&rebased_module, &rebased_affected);
+                let recheck_result = verify_candidate_precheck(&rebased_module, &rebased_affected);
                 if !recheck_result.is_proved() {
-                    return Ok(recheck_result);
+                    return Ok(SubmitOutcome {
+                        smt_result: recheck_result,
+                        cas_events,
+                        upgraded_to_verified: false,
+                    });
                 }
 
                 let commit_record = self
                     .db
                     .try_commit_candidate(
-                        &Some(latest_root),
+                        &Some(latest_root.clone()),
                         rebased_envelope,
                         rebased_candidate,
                         Some(&rebased_module),
                     )
                     .map_err(|e| PoolError::CasFailure(e.to_string()))?;
 
+                cas_events.push(CasEvent::RebaseSucceeded {
+                    rebased_root: latest_root,
+                    attempts: 1,
+                });
+
                 self.commits.push(commit_record);
                 self.verified_module = rebased_module.clone();
                 self.provisional_module = rebased_module;
                 self.pending_holes.remove(hole_id);
-                self.hole_evidence.insert(hole_id.to_string(), ProofLevel::Proved);
+                self.hole_evidence
+                    .insert(hole_id.to_string(), ProofLevel::Proved);
                 let current_root = self.db.current_root();
                 for env in self.envelopes.values_mut() {
                     env.base_root_hash = current_root.clone();
                 }
-                Ok(recheck_result)
+                Ok(SubmitOutcome {
+                    smt_result: recheck_result,
+                    cas_events,
+                    upgraded_to_verified: true,
+                })
             }
             Err(other) => Err(PoolError::CasFailure(other.to_string())),
         }
+    }
+
+    /// Parse, verify, and conditionally commit a candidate hole implementation with an explicit agent ID.
+    pub fn submit_solution_with_agent(
+        &mut self,
+        hole_id: &str,
+        solution_source: &str,
+        agent_id: &str,
+    ) -> Result<SmtResult, PoolError> {
+        let outcome = self.submit_solution_with_outcome(hole_id, solution_source, agent_id)?;
+        Ok(outcome.smt_result)
     }
 
     /// Return whether every dispatched hole has an accepted implementation.
@@ -410,7 +559,9 @@ impl AgentTaskPool {
             }
         }
         if ast_contains_any_hole(&self.verified_module) {
-            return Err(PoolError::Incomplete(vec!["unresolved_ast_hole".to_string()]));
+            return Err(PoolError::Incomplete(vec![
+                "unresolved_ast_hole".to_string()
+            ]));
         }
         Ok(self.verified_module.clone())
     }
@@ -423,10 +574,7 @@ impl AgentTaskPool {
 }
 
 /// 预检给定模块中被填洞替换影响的所有函数的 SMT 证明结果
-pub fn verify_candidate_precheck(
-    module: &Module,
-    affected_functions: &[usize],
-) -> SmtResult {
+pub fn verify_candidate_precheck(module: &Module, affected_functions: &[usize]) -> SmtResult {
     let mut final_result = SmtResult::Sampled { points_checked: 0 };
     for &function_index in affected_functions {
         let func = &module.functions[function_index];
@@ -462,10 +610,7 @@ pub enum PoolError {
     AlreadyResolved(String),
     MissingHole(String),
     Incomplete(Vec<String>),
-    InsufficientEvidence {
-        hole_id: String,
-        level: ProofLevel,
-    },
+    InsufficientEvidence { hole_id: String, level: ProofLevel },
     CasFailure(String),
 }
 
@@ -585,19 +730,126 @@ fn ast_contains_any_hole_in_expr(expr: &Expr) -> bool {
             ast_contains_any_hole_in_expr(callee) || args.iter().any(ast_contains_any_hole_in_expr)
         }
         Expr::FieldAccess { target, .. } => ast_contains_any_hole_in_expr(target),
-        Expr::RecordInit { fields, .. } => fields.iter().any(|(_, v)| ast_contains_any_hole_in_expr(v)),
+        Expr::RecordInit { fields, .. } => {
+            fields.iter().any(|(_, v)| ast_contains_any_hole_in_expr(v))
+        }
         Expr::RecordUpdate { base, updates } => {
             ast_contains_any_hole_in_expr(base)
-                || updates.iter().any(|(_, v)| ast_contains_any_hole_in_expr(v))
+                || updates
+                    .iter()
+                    .any(|(_, v)| ast_contains_any_hole_in_expr(v))
         }
         Expr::Match { target, arms } => {
             ast_contains_any_hole_in_expr(target)
-                || arms.iter().any(|arm| ast_contains_any_hole_in_expr(&arm.body))
+                || arms
+                    .iter()
+                    .any(|arm| ast_contains_any_hole_in_expr(&arm.body))
         }
         Expr::Literal(_) | Expr::Ident(_) | Expr::Raw(_) => false,
     }
 }
 
 pub fn ast_contains_any_hole(module: &Module) -> bool {
-    module.functions.iter().any(|f| ast_contains_any_hole_in_expr(&f.body))
+    module
+        .functions
+        .iter()
+        .any(|f| ast_contains_any_hole_in_expr(&f.body))
+}
+
+fn extract_function_dependencies(func: &axiom_ast::FunctionDecl, module: &Module) -> Vec<NodeHash> {
+    let mut deps = Vec::new();
+    let mut symbols = HashSet::new();
+
+    for param in &func.params {
+        if let axiom_ast::Type::Custom(ref name) = param.ty {
+            symbols.insert(name.clone());
+        }
+    }
+    if let axiom_ast::Type::Custom(ref name) = func.return_type {
+        symbols.insert(name.clone());
+    }
+
+    fn collect_expr_symbols(expr: &Expr, syms: &mut HashSet<String>) {
+        match expr {
+            Expr::Ident(name) => {
+                syms.insert(name.clone());
+            }
+            Expr::Call { callee, args } => {
+                collect_expr_symbols(callee, syms);
+                for a in args {
+                    collect_expr_symbols(a, syms);
+                }
+            }
+            Expr::BinaryOp { left, right, .. } => {
+                collect_expr_symbols(left, syms);
+                collect_expr_symbols(right, syms);
+            }
+            Expr::UnaryOp { operand, .. } => collect_expr_symbols(operand, syms),
+            Expr::Let { name: _, value } => collect_expr_symbols(value, syms),
+            Expr::Block { statements, tail } => {
+                for s in statements {
+                    collect_expr_symbols(s, syms);
+                }
+                if let Some(t) = tail {
+                    collect_expr_symbols(t, syms);
+                }
+            }
+            Expr::FieldAccess { target, .. } => collect_expr_symbols(target, syms),
+            Expr::RecordInit { ty_name, fields } => {
+                if let Some(name) = ty_name {
+                    syms.insert(name.clone());
+                }
+                for (_, val) in fields {
+                    collect_expr_symbols(val, syms);
+                }
+            }
+            Expr::RecordUpdate { base, updates } => {
+                collect_expr_symbols(base, syms);
+                for (_, val) in updates {
+                    collect_expr_symbols(val, syms);
+                }
+            }
+            Expr::Match { target, arms } => {
+                collect_expr_symbols(target, syms);
+                for arm in arms {
+                    collect_expr_symbols(&arm.body, syms);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    for req in &func.requires {
+        collect_expr_symbols(req, &mut symbols);
+    }
+    for ens in &func.ensures {
+        collect_expr_symbols(ens, &mut symbols);
+    }
+    collect_expr_symbols(&func.body, &mut symbols);
+
+    for ty in &module.types {
+        let ty_name = match ty {
+            axiom_ast::TypeDef::Record { name, .. } => name,
+            axiom_ast::TypeDef::Enum { name, .. } => name,
+        };
+        if symbols.contains(ty_name) {
+            deps.push(axiom_db::compute_type_hash(ty));
+        }
+    }
+
+    for other_func in &module.functions {
+        if other_func.name != func.name && symbols.contains(&other_func.name) {
+            deps.push(compute_function_hash(other_func));
+        }
+    }
+
+    for effect_name in &func.effects {
+        if let Some(eff) = module.effects.iter().find(|e| &e.name == effect_name) {
+            deps.push(axiom_db::compute_effect_hash(eff));
+        }
+    }
+
+    deps.sort();
+    deps.dedup();
+    deps
 }

@@ -20,7 +20,10 @@ impl<'a> SmtContext<'a> {
             if let TypeDef::Record { name, fields } = ty_def {
                 records.insert(
                     name.clone(),
-                    fields.iter().map(|f| (f.name.clone(), f.ty.clone())).collect(),
+                    fields
+                        .iter()
+                        .map(|f| (f.name.clone(), f.ty.clone()))
+                        .collect(),
                 );
             }
         }
@@ -77,7 +80,13 @@ pub fn generate_smtlib2_with_module(
 
     // 2. Declare result variable (or flattened result record fields)
     let mut flat_results = Vec::new();
-    flatten_type_to_smt("result", &func.return_type, &ctx.records, &mut flat_results, 0)?;
+    flatten_type_to_smt(
+        "result",
+        &func.return_type,
+        &ctx.records,
+        &mut flat_results,
+        0,
+    )?;
     for (name, smt_ty) in &flat_results {
         smt.push_str(&format!("(declare-const {} {})\n", name, smt_ty));
     }
@@ -183,7 +192,10 @@ fn flatten_type_to_smt(
                 Err(format!("unsupported custom type `{}` in SMT export", name))
             }
         }
-        _ => Err(format!("unsupported parameter type `{:?}` in SMT export", ty)),
+        _ => Err(format!(
+            "unsupported parameter type `{:?}` in SMT export",
+            ty
+        )),
     }
 }
 
@@ -241,7 +253,9 @@ fn inline_calls(expr: &Expr, ctx: &SmtContext, depth: usize) -> Result<Expr, Str
             if let Expr::Ident(ref fn_name) = **callee {
                 if let Some(target_func) = ctx.functions.get(fn_name) {
                     if !target_func.effects.is_empty() {
-                        return Err(format!("cannot verify function calling effectful `{fn_name}`"));
+                        return Err(format!(
+                            "cannot verify function calling effectful `{fn_name}`"
+                        ));
                     }
                     let inlined_args: Vec<Expr> = args
                         .iter()
@@ -430,7 +444,9 @@ fn substitute_expr(expr: &Expr, subs: &HashMap<String, Expr>) -> Expr {
                     new_stmts.push(substitute_expr(stmt, &curr_subs));
                 }
             }
-            let new_tail = tail.as_ref().map(|t| Box::new(substitute_expr(t, &curr_subs)));
+            let new_tail = tail
+                .as_ref()
+                .map(|t| Box::new(substitute_expr(t, &curr_subs)));
             Expr::Block {
                 statements: new_stmts,
                 tail: new_tail,
@@ -691,4 +707,3 @@ pub fn generate_precondition_check_smtlib2(
 
     Ok(smt)
 }
-

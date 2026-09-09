@@ -71,14 +71,22 @@ pub fn transpile_to_rust(module: &Module) -> Result<String, TranspileError> {
         .collect();
 
     for function in &module.functions {
-        output.push_str(&transpile_function(function, module, &func_effects, &enum_names)?);
+        output.push_str(&transpile_function(
+            function,
+            module,
+            &func_effects,
+            &enum_names,
+        )?);
         output.push('\n');
     }
     Ok(output)
 }
 
 fn is_scalar_type(ty: &Type) -> bool {
-    matches!(ty, Type::Int | Type::Float | Type::Decimal | Type::Bool | Type::Unit)
+    matches!(
+        ty,
+        Type::Int | Type::Float | Type::Decimal | Type::Bool | Type::Unit
+    )
 }
 
 fn transpile_type_definition(definition: &TypeDef) -> String {
@@ -95,12 +103,12 @@ fn transpile_type_definition(definition: &TypeDef) -> String {
                 .map(|field| format!("    pub {}: {},", field.name, rust_type(&field.ty)))
                 .collect::<Vec<_>>()
                 .join("\n");
-            format!(
-                "{derives}\npub struct {name} {{\n{fields}\n}}\n"
-            )
+            format!("{derives}\npub struct {name} {{\n{fields}\n}}\n")
         }
         TypeDef::Enum { name, variants } => {
-            let all_scalar = variants.iter().all(|v| v.fields.iter().all(|f| is_scalar_type(&f.ty)));
+            let all_scalar = variants
+                .iter()
+                .all(|v| v.fields.iter().all(|f| is_scalar_type(&f.ty)));
             let derives = if all_scalar {
                 "#[derive(Debug, Clone, Copy, PartialEq)]"
             } else {
@@ -123,9 +131,7 @@ fn transpile_type_definition(definition: &TypeDef) -> String {
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
-            format!(
-                "{derives}\npub enum {name} {{\n{variants}\n}}\n"
-            )
+            format!("{derives}\npub enum {name} {{\n{variants}\n}}\n")
         }
     }
 }
@@ -146,7 +152,12 @@ fn transpile_effect_definition(effect: &EffectDecl) -> String {
         } else {
             format!(" -> {}", rust_type(&op.return_type))
         };
-        ops.push(format!("    fn {}({}){};", op.name, params.join(", "), ret_str));
+        ops.push(format!(
+            "    fn {}({}){};",
+            op.name,
+            params.join(", "),
+            ret_str
+        ));
     }
     format!("pub trait {} {{\n{}\n}}\n", effect.name, ops.join("\n"))
 }
@@ -215,10 +226,14 @@ fn transpile_function(
         if function.requires.is_empty() {
             body_code.push_str(&format!("    {body_expr}\n"));
         } else {
-            body_code.push_str(&format!("    let result = {{\n        {body_expr}\n    }};\n    result\n"));
+            body_code.push_str(&format!(
+                "    let result = {{\n        {body_expr}\n    }};\n    result\n"
+            ));
         }
     } else {
-        body_code.push_str(&format!("    let result = {{\n        {body_expr}\n    }};\n"));
+        body_code.push_str(&format!(
+            "    let result = {{\n        {body_expr}\n    }};\n"
+        ));
         for ens in &function.ensures {
             let ens_str = transpile_expr(ens, &ctx)?;
             body_code.push_str(&format!(
@@ -408,11 +423,12 @@ fn transpile_expr(expr: &Expr, ctx: &TranspileContext) -> Result<String, Transpi
                 .join(", ");
 
             // Try to infer record type name from base if it's a known identifier in module or by fields
-            let ty_name = find_record_type_for_expr(base, updates, ctx.module).ok_or_else(|| {
-                TranspileError::UnsupportedExpression(format!(
-                    "cannot infer record type for record update on `{base_str}`"
-                ))
-            })?;
+            let ty_name =
+                find_record_type_for_expr(base, updates, ctx.module).ok_or_else(|| {
+                    TranspileError::UnsupportedExpression(format!(
+                        "cannot infer record type for record update on `{base_str}`"
+                    ))
+                })?;
             if updates.is_empty() {
                 Ok(format!("{ty_name} {{ ..{base_str} }}"))
             } else {
@@ -427,7 +443,10 @@ fn transpile_expr(expr: &Expr, ctx: &TranspileContext) -> Result<String, Transpi
                 let body_str = transpile_expr(&arm.body, ctx)?;
                 arms_rendered.push(format!("        {pat_str} => {body_str},"));
             }
-            Ok(format!("match {target_str} {{\n{}\n    }}", arms_rendered.join("\n")))
+            Ok(format!(
+                "match {target_str} {{\n{}\n    }}",
+                arms_rendered.join("\n")
+            ))
         }
         Expr::Raw(s) => Ok(s.clone()),
     }
@@ -457,7 +476,10 @@ fn find_record_type_for_expr(
     let mut candidate_records = Vec::new();
     for ty_def in &module.types {
         if let TypeDef::Record { name, fields } = ty_def {
-            if update_keys.iter().all(|k| fields.iter().any(|f| &f.name == k)) {
+            if update_keys
+                .iter()
+                .all(|k| fields.iter().any(|f| &f.name == k))
+            {
                 candidate_records.push(name.clone());
             }
         }
@@ -529,7 +551,11 @@ fn transpile_pattern(pattern: &Pattern) -> String {
             if fields.is_empty() {
                 prefix
             } else {
-                let fields_str = fields.iter().map(transpile_pattern).collect::<Vec<_>>().join(", ");
+                let fields_str = fields
+                    .iter()
+                    .map(transpile_pattern)
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 format!("{prefix}({fields_str})")
             }
         }
