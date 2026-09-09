@@ -15,6 +15,28 @@ use axiom_smt::verify_function_in_module;
 pub use axiom_smt::SmtResult;
 use serde::{Deserialize, Serialize};
 
+/// Detailed status tag of submitting a hole solution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SubmitStatus {
+    Accepted,
+    Provisional,
+    Rejected,
+    Unknown,
+    Skipped,
+}
+
+impl fmt::Display for SubmitStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Accepted => write!(f, "ACCEPTED"),
+            Self::Provisional => write!(f, "PROVISIONAL"),
+            Self::Rejected => write!(f, "REJECTED"),
+            Self::Unknown => write!(f, "UNKNOWN"),
+            Self::Skipped => write!(f, "SKIPPED"),
+        }
+    }
+}
+
 /// Detailed outcome of submitting a hole solution, including SMT verification and CAS events.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SubmitOutcome {
@@ -27,7 +49,7 @@ pub struct SubmitOutcome {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SubmitOutcomeDto {
     pub hole: String,
-    pub status: String,
+    pub status: SubmitStatus,
     pub proved: bool,
     pub upgraded_to_verified: bool,
     pub solver: Option<String>,
@@ -47,7 +69,7 @@ impl SubmitOutcome {
                     version,
                     obligations_checked,
                 } => (
-                    "ACCEPTED".to_string(),
+                    SubmitStatus::Accepted,
                     true,
                     Some(solver.clone()),
                     Some(version.clone()),
@@ -56,7 +78,7 @@ impl SubmitOutcome {
                     None,
                 ),
                 SmtResult::CounterExample(ce) => (
-                    "REJECTED".to_string(),
+                    SubmitStatus::Rejected,
                     false,
                     None,
                     None,
@@ -65,7 +87,7 @@ impl SubmitOutcome {
                     Some("SMT counterexample found violating contract".to_string()),
                 ),
                 SmtResult::Sampled { points_checked } => (
-                    "PROVISIONAL".to_string(),
+                    SubmitStatus::Provisional,
                     false,
                     None,
                     None,
@@ -74,7 +96,7 @@ impl SubmitOutcome {
                     Some("candidate sampled without strict proof".to_string()),
                 ),
                 SmtResult::VacuousContract { reason } => (
-                    "REJECTED".to_string(),
+                    SubmitStatus::Rejected,
                     false,
                     None,
                     None,
@@ -83,7 +105,7 @@ impl SubmitOutcome {
                     Some(format!("vacuous contract: {reason}")),
                 ),
                 SmtResult::Unknown(reason) => (
-                    "UNKNOWN".to_string(),
+                    SubmitStatus::Unknown,
                     false,
                     None,
                     None,
@@ -92,7 +114,7 @@ impl SubmitOutcome {
                     Some(format!("solver unknown: {reason}")),
                 ),
                 SmtResult::Skipped(reason) => (
-                    "SKIPPED".to_string(),
+                    SubmitStatus::Skipped,
                     false,
                     None,
                     None,
@@ -340,6 +362,11 @@ impl AgentTaskPool {
         Ok(Self::new(parse_module(source)?))
     }
 
+    /// Return all hole tasks originally defined in the skeleton module.
+    pub fn all_tasks(&self) -> &[HoleTask] {
+        &self.tasks
+    }
+
     /// Return the tasks that still need verified implementations, in source order.
     pub fn dispatch_tasks(&self) -> Vec<HoleTask> {
         self.tasks
@@ -369,6 +396,22 @@ impl AgentTaskPool {
         }
     }
 
+    fn apply_provisional_draft(&mut self, hole_id: &str, solution: Expr) {
+        self.provisional_drafts
+            .insert(hole_id.to_string(), solution);
+        // 注意：Provisional 状态的草稿解不移出 pending_holes，仍需升级为正式 Verified！
+        self.hole_evidence
+            .insert(hole_id.to_string(), ProofLevel::Sampled);
+
+        let mut next_provisional = self.verified_module.clone();
+        for (draft_id, draft_expr) in &self.provisional_drafts {
+            for func in &mut next_provisional.functions {
+                replace_hole(&mut func.body, draft_id, draft_expr);
+            }
+        }
+        self.provisional_module = next_provisional;
+    }
+
     /// Submits a provisional draft solution without requiring SMT formal proof.
     /// Marks the hole as Provisional in the ledger, allowing early assembly previews
     /// while remaining open for upgrade to Verified.
@@ -386,6 +429,10 @@ impl AgentTaskPool {
         }
 
         let solution = parse_expr(solution_source)?;
+        if axiom_ast::expr_contains_hole(&solution) {
+            return Err(PoolError::CandidateContainsHole(hole_id.to_owned()));
+        }
+
         let mut found = false;
         for func in &mut self.verified_module.clone().functions {
             if replace_hole(&mut func.body, hole_id, &solution) {
@@ -397,19 +444,7 @@ impl AgentTaskPool {
             return Err(PoolError::MissingHole(hole_id.to_owned()));
         }
 
-        self.provisional_drafts
-            .insert(hole_id.to_string(), solution);
-        self.pending_holes.remove(hole_id);
-        self.hole_evidence
-            .insert(hole_id.to_string(), ProofLevel::Sampled);
-
-        let mut next_provisional = self.verified_module.clone();
-        for (draft_id, draft_expr) in &self.provisional_drafts {
-            for func in &mut next_provisional.functions {
-                replace_hole(&mut func.body, draft_id, draft_expr);
-            }
-        }
-        self.provisional_module = next_provisional;
+        self.apply_provisional_draft(hole_id, solution);
         Ok(())
     }
 
@@ -467,6 +502,10 @@ impl AgentTaskPool {
         }
 
         let solution = parse_expr(solution_source)?;
+        if axiom_ast::expr_contains_hole(&solution) {
+            return Err(PoolError::CandidateContainsHole(hole_id.to_owned()));
+        }
+
         // 关键修复：打洞候选始终基于权威 verified_module 构建，使未证明的洞（即使处于 Provisional）保持为 Expr::Hole，
         // 绝不会因为之前存入草稿而发生 replace_hole 找不到洞的 MissingHole 错误！
         let mut candidate_module = self.verified_module.clone();
@@ -529,18 +568,7 @@ impl AgentTaskPool {
             SmtResult::Skipped(_) => {
                 let func = &candidate_module.functions[affected_functions[0]];
                 if func.ensures.is_empty() && self.policy == PoolVerificationPolicy::Permissive {
-                    self.provisional_drafts
-                        .insert(hole_id.to_string(), solution);
-                    self.pending_holes.remove(hole_id);
-                    self.hole_evidence
-                        .insert(hole_id.to_string(), ProofLevel::Sampled);
-                    let mut next_provisional = self.verified_module.clone();
-                    for (draft_id, draft_expr) in &self.provisional_drafts {
-                        for func in &mut next_provisional.functions {
-                            replace_hole(&mut func.body, draft_id, draft_expr);
-                        }
-                    }
-                    self.provisional_module = next_provisional;
+                    self.apply_provisional_draft(hole_id, solution);
                     return Ok(SubmitOutcome {
                         smt_result: precheck_result,
                         cas_events: Vec::new(),
@@ -555,18 +583,7 @@ impl AgentTaskPool {
             }
             SmtResult::Sampled { points_checked: _ } => {
                 if self.policy == PoolVerificationPolicy::Permissive {
-                    self.provisional_drafts
-                        .insert(hole_id.to_string(), solution);
-                    self.pending_holes.remove(hole_id);
-                    self.hole_evidence
-                        .insert(hole_id.to_string(), ProofLevel::Sampled);
-                    let mut next_provisional = self.verified_module.clone();
-                    for (draft_id, draft_expr) in &self.provisional_drafts {
-                        for func in &mut next_provisional.functions {
-                            replace_hole(&mut func.body, draft_id, draft_expr);
-                        }
-                    }
-                    self.provisional_module = next_provisional;
+                    self.apply_provisional_draft(hole_id, solution);
                     return Ok(SubmitOutcome {
                         smt_result: precheck_result,
                         cas_events: Vec::new(),
@@ -700,7 +717,7 @@ impl AgentTaskPool {
         Ok(outcome.smt_result)
     }
 
-    /// Return whether every dispatched hole has an accepted implementation.
+    /// Return whether every dispatched hole has been mathematically verified with formal SMT proof.
     pub fn is_complete(&self) -> bool {
         self.pending_holes.is_empty()
     }
@@ -708,14 +725,21 @@ impl AgentTaskPool {
     /// Assemble a clone of the verified, hole-free module.
     ///
     /// 严禁妥协强门禁：
-    /// 1. 所有已分发的洞必须已被解决；
-    /// 2. 深入 AST 扫描，若有残留的 Expr::Hole，拒绝导出；
-    /// 3. 证据账本强门禁：所有已分发洞 100% 具备 ProofLevel::Proved 证据；
+    /// 1. 所有已分发的洞必须已被解决（非 Unresolved）；
+    /// 2. 证据账本强门禁：所有已分发洞 100% 具备 ProofLevel::Proved 证据；
     ///    若有任何洞仅为 Sampled 或 Unverified，坚决拒绝，返回 PoolError::InsufficientEvidence！
+    /// 3. 深入 AST 扫描，若有残留的 Expr::Hole，拒绝导出。
     pub fn assemble_verified_module(&self) -> Result<Module, PoolError> {
-        if !self.is_complete() {
-            return Err(PoolError::Incomplete(self.pending_hole_ids()));
+        let unresolved_holes: Vec<String> = self
+            .tasks
+            .iter()
+            .filter(|t| self.hole_status(&t.hole_id) == Some(HoleStatus::Unresolved))
+            .map(|t| t.hole_id.clone())
+            .collect();
+        if !unresolved_holes.is_empty() {
+            return Err(PoolError::Incomplete(unresolved_holes));
         }
+
         for task in &self.tasks {
             let evidence = self.hole_evidence.get(&task.hole_id);
             if evidence != Some(&ProofLevel::Proved) {
@@ -776,6 +800,7 @@ pub enum PoolError {
     UnknownHole(String),
     AlreadyResolved(String),
     MissingHole(String),
+    CandidateContainsHole(String),
     Incomplete(Vec<String>),
     InsufficientEvidence { hole_id: String, level: ProofLevel },
     CasFailure(String),
@@ -795,6 +820,10 @@ impl fmt::Display for PoolError {
             Self::MissingHole(hole_id) => write!(
                 formatter,
                 "pending hole `{hole_id}` is missing from the working module"
+            ),
+            Self::CandidateContainsHole(hole_id) => write!(
+                formatter,
+                "candidate solution for `{hole_id}` contains an unresolved hole, candidates must be closed expressions"
             ),
             Self::Incomplete(hole_ids) => write!(
                 formatter,
@@ -817,6 +846,7 @@ impl std::error::Error for PoolError {
             Self::UnknownHole(_)
             | Self::AlreadyResolved(_)
             | Self::MissingHole(_)
+            | Self::CandidateContainsHole(_)
             | Self::Incomplete(_)
             | Self::InsufficientEvidence { .. }
             | Self::CasFailure(_) => None,
@@ -832,13 +862,15 @@ impl From<ParseError> for PoolError {
 
 fn replace_hole(expression: &mut Expr, hole_id: &str, solution: &Expr) -> bool {
     let mut replaced = false;
-    axiom_ast::visit_expr_mut(expression, &mut |expr| {
+    axiom_ast::visit_expr_mut_control(expression, &mut |expr| {
         if let Expr::Hole(current_id) = expr {
             if current_id == hole_id {
                 *expr = solution.clone();
                 replaced = true;
+                return axiom_ast::VisitControl::SkipChildren;
             }
         }
+        axiom_ast::VisitControl::Continue
     });
     replaced
 }

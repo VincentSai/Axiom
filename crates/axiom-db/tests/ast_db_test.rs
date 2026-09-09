@@ -223,7 +223,7 @@ fn cas_commits_valid_candidate_and_kernel_mints_receipt() {
         .expect("receipt must exist");
     assert_eq!(minted_receipt.candidate_hash, cand_hash);
     assert_eq!(minted_receipt.proof_level, ProofLevel::Proved);
-    assert_eq!(minted_receipt.obligations_checked, 1);
+    assert_eq!(minted_receipt.obligations_checked, 3);
     let expected_obligation_hash = compute_proof_obligation_hash(&updated_mod.functions[0]);
     assert_eq!(
         minted_receipt.proof_obligation_hash,
@@ -591,7 +591,7 @@ fn two_phase_cas_offline_verification_and_short_lock_commit() {
         .verify_candidate_offline(&root, &envelope, &candidate, None)
         .expect("offline verification should succeed");
 
-    assert_eq!(certified.obligations_checked(), 1);
+    assert_eq!(certified.obligations_checked(), 3);
 
     // 2. 微秒级短锁原子提交
     let commit = db

@@ -6,6 +6,11 @@ use axiom_ast::{
     BinaryOperator, Expr, FunctionDecl, Literal, Module, Pattern, Type, TypeDef, UnaryOperator,
 };
 
+/// Minimum boundary of signed 64-bit physical machine word integer.
+pub const I64_MIN: i64 = -9223372036854775808;
+/// Maximum boundary of signed 64-bit physical machine word integer.
+pub const I64_MAX: i64 = 9223372036854775807;
+
 /// Context containing module records and function definitions.
 #[derive(Debug, Clone, Default)]
 pub struct SmtContext<'a> {
@@ -41,11 +46,25 @@ pub fn generate_smtlib2(func: &FunctionDecl) -> Result<String, String> {
     generate_smtlib2_with_module(func, None)
 }
 
+/// Translates an Axiom function and returns query script with obligations count.
+pub fn generate_smtlib2_and_obligations(func: &FunctionDecl) -> Result<(String, usize), String> {
+    generate_smtlib2_with_module_and_obligations(func, None)
+}
+
 /// Translates an Axiom function with full module context into SMT-LIB2 format.
 pub fn generate_smtlib2_with_module(
     func: &FunctionDecl,
     module: Option<&Module>,
 ) -> Result<String, String> {
+    generate_smtlib2_with_module_and_obligations(func, module).map(|(query, _)| query)
+}
+
+/// Translates an Axiom function with full module context into SMT-LIB2 format,
+/// and returns the total count of proof obligations checked (ensures + safety).
+pub fn generate_smtlib2_with_module_and_obligations(
+    func: &FunctionDecl,
+    module: Option<&Module>,
+) -> Result<(String, usize), String> {
     if !func.effects.is_empty() {
         return Err(format!("function `{}` has side effects", func.name));
     }
@@ -154,6 +173,18 @@ pub fn generate_smtlib2_with_module(
         }
     }
 
+    // Collect arithmetic safety obligations from intermediate subexpressions in the inlined body
+    let mut subexpr_obligations = Vec::new();
+    let expanded_body = expand_lets_for_safety(&inlined_body, &HashMap::new());
+    collect_arithmetic_safety_obligations(&expanded_body, &var_types, &mut subexpr_obligations)?;
+    for safe_ob in subexpr_obligations {
+        if !obligations.contains(&safe_ob) {
+            obligations.push(safe_ob);
+        }
+    }
+
+    let obligations_count = obligations.len();
+
     if obligations.len() == 1 {
         smt.push_str(&format!("(assert (not {}))\n\n", obligations[0]));
     } else {
@@ -169,7 +200,7 @@ pub fn generate_smtlib2_with_module(
     // 6. Check satisfiability and retrieve model on counterexample
     smt.push_str("(check-sat)\n(get-model)\n");
 
-    Ok(smt)
+    Ok((smt, obligations_count))
 }
 
 fn flatten_type_to_smt(
@@ -720,4 +751,192 @@ pub fn generate_precondition_check_smtlib2(
     smt.push_str("\n(check-sat)\n");
 
     Ok(smt)
+}
+
+fn expand_lets_for_safety(expr: &Expr, subs: &HashMap<String, Expr>) -> Expr {
+    match expr {
+        Expr::Ident(name) => {
+            if let Some(sub) = subs.get(name) {
+                sub.clone()
+            } else {
+                Expr::Ident(name.clone())
+            }
+        }
+        Expr::Let { name, value } => {
+            let expanded_val = expand_lets_for_safety(value, subs);
+            let mut inner_subs = subs.clone();
+            inner_subs.insert(name.clone(), expanded_val.clone());
+            expanded_val
+        }
+        Expr::Block { statements, tail } => {
+            let mut curr_subs = subs.clone();
+            for stmt in statements {
+                if let Expr::Let { name, value } = stmt {
+                    let expanded_val = expand_lets_for_safety(value, &curr_subs);
+                    curr_subs.insert(name.clone(), expanded_val);
+                }
+            }
+            if let Some(t) = tail {
+                expand_lets_for_safety(t, &curr_subs)
+            } else {
+                Expr::Literal(Literal::Int(0))
+            }
+        }
+        Expr::BinaryOp { left, op, right } => Expr::BinaryOp {
+            left: Box::new(expand_lets_for_safety(left, subs)),
+            op: op.clone(),
+            right: Box::new(expand_lets_for_safety(right, subs)),
+        },
+        Expr::UnaryOp { op, operand } => Expr::UnaryOp {
+            op: op.clone(),
+            operand: Box::new(expand_lets_for_safety(operand, subs)),
+        },
+        Expr::Match { target, arms } => Expr::Match {
+            target: Box::new(expand_lets_for_safety(target, subs)),
+            arms: arms
+                .iter()
+                .map(|arm| {
+                    let mut arm_subs = subs.clone();
+                    if let Pattern::Ident(ref id) = arm.pattern {
+                        arm_subs.remove(id);
+                    }
+                    axiom_ast::MatchArm {
+                        pattern: arm.pattern.clone(),
+                        body: expand_lets_for_safety(&arm.body, &arm_subs),
+                    }
+                })
+                .collect(),
+        },
+        Expr::Call { callee, args } => Expr::Call {
+            callee: Box::new(expand_lets_for_safety(callee, subs)),
+            args: args
+                .iter()
+                .map(|a| expand_lets_for_safety(a, subs))
+                .collect(),
+        },
+        Expr::FieldAccess { target, field } => Expr::FieldAccess {
+            target: Box::new(expand_lets_for_safety(target, subs)),
+            field: field.clone(),
+        },
+        Expr::RecordInit { ty_name, fields } => Expr::RecordInit {
+            ty_name: ty_name.clone(),
+            fields: fields
+                .iter()
+                .map(|(k, v)| (k.clone(), expand_lets_for_safety(v, subs)))
+                .collect(),
+        },
+        Expr::RecordUpdate { base, updates } => Expr::RecordUpdate {
+            base: Box::new(expand_lets_for_safety(base, subs)),
+            updates: updates
+                .iter()
+                .map(|(k, v)| (k.clone(), expand_lets_for_safety(v, subs)))
+                .collect(),
+        },
+        _ => expr.clone(),
+    }
+}
+
+fn collect_arithmetic_safety_obligations(
+    expr: &Expr,
+    var_types: &HashMap<String, &'static str>,
+    obligations: &mut Vec<String>,
+) -> Result<(), String> {
+    match expr {
+        Expr::BinaryOp { left, op, right } => {
+            collect_arithmetic_safety_obligations(left, var_types, obligations)?;
+            collect_arithmetic_safety_obligations(right, var_types, obligations)?;
+
+            let l_smt = expr_to_smt(left, var_types)?;
+            let r_smt = expr_to_smt(right, var_types)?;
+
+            let is_real = l_smt.contains('.')
+                || r_smt.contains('.')
+                || var_types.get(&l_smt).copied() == Some("Real")
+                || var_types.get(&r_smt).copied() == Some("Real");
+
+            if !is_real {
+                match op {
+                    BinaryOperator::Add => {
+                        let op_smt = format!("(+ {} {})", l_smt, r_smt);
+                        obligations.push(format!(
+                            "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
+                            op_smt, op_smt
+                        ));
+                    }
+                    BinaryOperator::Subtract => {
+                        let op_smt = format!("(- {} {})", l_smt, r_smt);
+                        obligations.push(format!(
+                            "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
+                            op_smt, op_smt
+                        ));
+                    }
+                    BinaryOperator::Multiply => {
+                        let op_smt = format!("(* {} {})", l_smt, r_smt);
+                        obligations.push(format!(
+                            "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
+                            op_smt, op_smt
+                        ));
+                    }
+                    BinaryOperator::Divide => {
+                        obligations.push(format!("(not (= {} 0))", r_smt));
+                        obligations.push(format!(
+                            "(not (and (= {} (- 9223372036854775808)) (= {} (- 1))))",
+                            l_smt, r_smt
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Expr::UnaryOp { op, operand } => {
+            collect_arithmetic_safety_obligations(operand, var_types, obligations)?;
+            if *op == UnaryOperator::Negate {
+                let inner_smt = expr_to_smt(operand, var_types)?;
+                let is_real =
+                    inner_smt.contains('.') || var_types.get(&inner_smt).copied() == Some("Real");
+                if !is_real {
+                    obligations.push(format!("(not (= {} (- 9223372036854775808)))", inner_smt));
+                }
+            }
+        }
+        Expr::Let { value, .. } => {
+            collect_arithmetic_safety_obligations(value, var_types, obligations)?;
+        }
+        Expr::Block { statements, tail } => {
+            for stmt in statements {
+                collect_arithmetic_safety_obligations(stmt, var_types, obligations)?;
+            }
+            if let Some(t) = tail {
+                collect_arithmetic_safety_obligations(t, var_types, obligations)?;
+            }
+        }
+        Expr::Call { callee, args } => {
+            collect_arithmetic_safety_obligations(callee, var_types, obligations)?;
+            for arg in args {
+                collect_arithmetic_safety_obligations(arg, var_types, obligations)?;
+            }
+        }
+        Expr::FieldAccess { target, .. } => {
+            collect_arithmetic_safety_obligations(target, var_types, obligations)?;
+        }
+        Expr::RecordInit { fields, .. } => {
+            for (_, val) in fields {
+                collect_arithmetic_safety_obligations(val, var_types, obligations)?;
+            }
+        }
+        Expr::RecordUpdate { base, updates } => {
+            collect_arithmetic_safety_obligations(base, var_types, obligations)?;
+            for (_, val) in updates {
+                collect_arithmetic_safety_obligations(val, var_types, obligations)?;
+            }
+        }
+        Expr::Match { target, arms } => {
+            collect_arithmetic_safety_obligations(target, var_types, obligations)?;
+            for arm in arms {
+                collect_arithmetic_safety_obligations(&arm.body, var_types, obligations)?;
+            }
+        }
+        Expr::Literal(_) | Expr::Ident(_) | Expr::Hole(_) | Expr::Raw(_) => {}
+    }
+    Ok(())
 }

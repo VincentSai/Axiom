@@ -60,19 +60,55 @@ pub fn find_z3_executable() -> Option<PathBuf> {
     None
 }
 
-/// Retrieves the dynamically detected version string of Z3 executable.
+/// Retrieves the dynamically detected version string of Z3 executable with hard timeout watchdog.
 pub fn get_z3_version(z3_path: &Path) -> String {
-    if let Ok(output) = Command::new(z3_path).arg("--version").output() {
-        let s = String::from_utf8_lossy(&output.stdout);
-        if let Some(pos) = s.find("version ") {
-            let rest = &s[pos + 8..];
-            let ver = rest.split_whitespace().next().unwrap_or("").trim();
-            if !ver.is_empty() {
-                return ver.to_string();
+    let mut child = match Command::new(z3_path)
+        .arg("--version")
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(_) => return "unknown".to_string(),
+    };
+
+    let start = std::time::Instant::now();
+    let timeout = std::time::Duration::from_millis(3000);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if status.success() {
+                    if let Some(mut out) = child.stdout.take() {
+                        use std::io::Read;
+                        let mut buf = Vec::new();
+                        let _ = out.read_to_end(&mut buf);
+                        let s = String::from_utf8_lossy(&buf);
+                        if let Some(pos) = s.find("version ") {
+                            let rest = &s[pos + 8..];
+                            let ver = rest.split_whitespace().next().unwrap_or("").trim();
+                            if !ver.is_empty() {
+                                return ver.to_string();
+                            }
+                        }
+                    }
+                }
+                return "unknown".to_string();
+            }
+            Ok(None) => {
+                if start.elapsed() >= timeout {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return "unknown".to_string();
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return "unknown".to_string();
             }
         }
     }
-    "unknown".to_string()
 }
 
 /// Executes a verification query using the Z3 solver via standard input with a 10s timeout.

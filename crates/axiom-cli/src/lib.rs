@@ -992,10 +992,10 @@ fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
                 PoolVerificationPolicy::Permissive
             };
             let pool = create_task_pool(&file, db.as_deref(), policy)?;
-            let tasks = pool.dispatch_tasks();
+            let all_tasks = pool.all_tasks();
             let pending = pool.pending_hole_ids();
             if json {
-                let task_dtos: Vec<serde_json::Value> = tasks
+                let task_dtos: Vec<serde_json::Value> = all_tasks
                     .iter()
                     .map(|task| {
                         let status = pool
@@ -1019,7 +1019,7 @@ fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
                     "file": file.display().to_string(),
                     "db": db.as_ref().map(|p| p.display().to_string()),
                     "policy": format!("{:?}", pool.policy()),
-                    "total_tasks": tasks.len(),
+                    "total_tasks": all_tasks.len(),
                     "pending_holes": pending.len(),
                     "tasks": task_dtos,
                 });
@@ -1033,9 +1033,9 @@ fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
                     println!("Database: {}", db_path.display());
                 }
                 println!("Policy: {:?}", pool.policy());
-                println!("Total Dispatched Tasks: {}", tasks.len());
+                println!("Total Tasks: {}", all_tasks.len());
                 println!("Pending Holes: {}", pending.len());
-                for task in &tasks {
+                for task in all_tasks {
                     let status = pool
                         .hole_status(&task.hole_id)
                         .unwrap_or(axiom_agent_pool::HoleStatus::Unresolved);
@@ -1184,8 +1184,8 @@ fn render_submit_outcome(
             }
         }
 
-        match dto.status.as_str() {
-            "ACCEPTED" => {
+        match dto.status {
+            axiom_agent_pool::SubmitStatus::Accepted => {
                 let solver = dto.solver.as_deref().unwrap_or("Z3");
                 let version = dto.solver_version.as_deref().unwrap_or("unknown");
                 let obligations = dto.obligations_checked.unwrap_or(0);
@@ -1197,7 +1197,7 @@ fn render_submit_outcome(
                     println!("  [UPGRADED] Successfully upgraded hole status from provisional draft to verified.");
                 }
             }
-            "PROVISIONAL" => {
+            axiom_agent_pool::SubmitStatus::Provisional => {
                 let points = dto.obligations_checked.unwrap_or(0);
                 if strict {
                     println!(
@@ -1210,7 +1210,7 @@ fn render_submit_outcome(
                     );
                 }
             }
-            "REJECTED" => {
+            axiom_agent_pool::SubmitStatus::Rejected => {
                 if let Some(ce) = &dto.counter_example {
                     println!("[REJECTED] SMT counter-example found");
                     println!("Counter-example inputs: {ce}");
@@ -1221,28 +1221,25 @@ fn render_submit_outcome(
                     );
                 }
             }
-            "UNKNOWN" => {
+            axiom_agent_pool::SubmitStatus::Unknown => {
                 println!(
                     "[REJECTED] SMT solver returned unknown: {}",
                     dto.reason.as_deref().unwrap_or("unknown")
                 );
             }
-            "SKIPPED" => {
+            axiom_agent_pool::SubmitStatus::Skipped => {
                 println!(
                     "[REJECTED] Verification skipped: {}",
                     dto.reason.as_deref().unwrap_or("skipped")
                 );
             }
-            other => {
-                println!("[REJECTED] Verification outcome: {other}");
-            }
         }
     }
 
-    match dto.status.as_str() {
-        "ACCEPTED" => Ok(()),
-        "PROVISIONAL" if !strict => Ok(()),
-        "PROVISIONAL" => Err(CliError::HoleVerificationRejected(
+    match dto.status {
+        axiom_agent_pool::SubmitStatus::Accepted => Ok(()),
+        axiom_agent_pool::SubmitStatus::Provisional if !strict => Ok(()),
+        axiom_agent_pool::SubmitStatus::Provisional => Err(CliError::HoleVerificationRejected(
             dto.reason
                 .clone()
                 .unwrap_or_else(|| "strict formal proof required".to_string()),

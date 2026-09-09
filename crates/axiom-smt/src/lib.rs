@@ -12,7 +12,8 @@ use std::collections::HashMap;
 
 use axiom_ast::{FunctionDecl, Module};
 pub use smtlib2::{
-    generate_precondition_check_smtlib2, generate_smtlib2, generate_smtlib2_with_module,
+    generate_precondition_check_smtlib2, generate_smtlib2, generate_smtlib2_and_obligations,
+    generate_smtlib2_with_module, generate_smtlib2_with_module_and_obligations,
 };
 pub use z3_solver::{find_z3_executable, get_z3_version, run_z3_query, Z3Result};
 
@@ -126,7 +127,9 @@ pub fn verify_function(func: &FunctionDecl) -> SmtResult {
 /// Verifies a function using full module context for record flattening and pure function calls.
 pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtResult {
     if let Some(z3_path) = find_z3_executable() {
-        if let Ok(smt2_query) = generate_smtlib2_with_module(func, Some(module)) {
+        if let Ok((smt2_query, num_obligations)) =
+            generate_smtlib2_with_module_and_obligations(func, Some(module))
+        {
             // P0: Precondition Satisfiability Check (Vacuity Prevention)
             if let Err(vacuity_err) =
                 check_precondition_vacuity_fail_closed(&z3_path, func, Some(module))
@@ -139,7 +142,7 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
                     return SmtResult::Proved {
                         solver: "Microsoft Z3 (SMT-LIB2)".into(),
                         version: get_z3_version(&z3_path),
-                        obligations_checked: func.ensures.len(),
+                        obligations_checked: num_obligations,
                     }
                 }
                 Ok(Z3Result::Sat(ce)) => return SmtResult::CounterExample(ce),
@@ -166,13 +169,13 @@ pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String>
         return Ok(vacuity_err);
     }
 
-    let smt2_query = generate_smtlib2(func)?;
+    let (smt2_query, num_obligations) = generate_smtlib2_and_obligations(func)?;
 
     match run_z3_query(&z3_path, &smt2_query)? {
         Z3Result::Unsat => Ok(SmtResult::Proved {
             solver: "Microsoft Z3 (SMT-LIB2)".into(),
             version: get_z3_version(&z3_path),
-            obligations_checked: func.ensures.len(),
+            obligations_checked: num_obligations,
         }),
         Z3Result::Sat(ce) => Ok(SmtResult::CounterExample(ce)),
         Z3Result::Unknown(r) => Ok(SmtResult::Unknown(r)),

@@ -5,16 +5,16 @@
     "engine": "codex",
     "mode": "concurrent_multi_agent",
     "is_mock": true,
-    "git_commit": "0eed81c1a99b382be623c49ab462df75de707dc2",
-    "git_tree_hash": "41e49ad21971fd66b99d7b9b545e1e41ad86ab41",
+    "git_commit": "516d62d9041b04f5cbcae90c14571316bab9c499",
+    "git_tree_hash": "0130d08e9bb929b403e40d4719ae88840c029f01",
     "z3_version": "Z3 version 4.13.0 - 64 bit",
     "platform": "win32",
     "python_version": "3.14.2",
-    "timestamp": "2026-09-09 15:17:13"
+    "timestamp": "2026-09-09 16:14:03"
   },
   "summary": {
     "rust_group": {
-      "wall_clock_sec": 1.72,
+      "wall_clock_sec": 1.67,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -24,7 +24,7 @@
       "unit_test_passed": true
     },
     "axiom_group": {
-      "wall_clock_sec": 2.26,
+      "wall_clock_sec": 2.74,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -32,14 +32,14 @@
       "resolver_tax_billed_tokens": 0,
       "total_billed_tokens": 75070,
       "formal_proved": true,
-      "speedup_vs_rust": 0.76
+      "speedup_vs_rust": 0.61
     }
   },
   "detailed_runs": {
     "group2_rust": {
       "status": "success",
-      "wall_clock_sec": 1.72,
-      "worker_concurrency_sec": 0.15,
+      "wall_clock_sec": 1.67,
+      "worker_concurrency_sec": 0.27,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -139,10 +139,10 @@
     },
     "group3_axiom": {
       "status": "success",
-      "wall_clock_sec": 2.26,
+      "wall_clock_sec": 2.74,
       "worker_concurrency_sec": 0.0,
-      "combinator_latency_ms": 1189.32,
-      "smt_verify_sec": 0.56,
+      "combinator_latency_ms": 1470.68,
+      "smt_verify_sec": 0.71,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -181,10 +181,10 @@
           "hole_id": null,
           "violated_clause": null,
           "counter_example": null,
-          "diagnosis": "Function `calc_stacked_counts` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 4.",
+          "diagnosis": "Function `calc_stacked_counts` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 6.",
           "suggested_action": "No action required.",
           "has_contracts": true,
-          "obligations_checked": 4,
+          "obligations_checked": 6,
           "solver_version": "4.13.0"
         },
         {
@@ -193,10 +193,10 @@
           "hole_id": null,
           "violated_clause": null,
           "counter_example": null,
-          "diagnosis": "Function `calculate_purchase_cost` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 4.",
+          "diagnosis": "Function `calculate_purchase_cost` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 10.",
           "suggested_action": "No action required.",
           "has_contracts": true,
-          "obligations_checked": 4,
+          "obligations_checked": 10,
           "solver_version": "4.13.0"
         },
         {
@@ -217,10 +217,10 @@
           "hole_id": null,
           "violated_clause": null,
           "counter_example": null,
-          "diagnosis": "Function `calc_sell_refund` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 4.",
+          "diagnosis": "Function `calc_sell_refund` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 8.",
           "suggested_action": "No action required.",
           "has_contracts": true,
-          "obligations_checked": 4,
+          "obligations_checked": 8,
           "solver_version": "4.13.0"
         }
       ],
@@ -228,27 +228,27 @@
       "cas_concurrency_benchmark": {
         "race_workers": 2,
         "success_submissions": 2,
-        "concurrency_elapsed_sec": 0.431,
+        "concurrency_elapsed_sec": 0.47,
         "stale_root_conflicts_observed": 1,
         "fast_forward_retries_succeeded": 1,
         "final_commit_chain_length": 2,
         "initial_root": "#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed",
         "final_root": "#mod_8892410a4f9ec42e4507b5b4546f24373ed41f8430d7c1d8d71d0a8090dc4b56",
         "is_mock": true,
-        "git_commit_sha": "0eed81c1a99b382be623c49ab462df75de707dc2",
-        "git_tree_hash": "41e49ad21971fd66b99d7b9b545e1e41ad86ab41",
+        "git_commit_sha": "516d62d9041b04f5cbcae90c14571316bab9c499",
+        "git_tree_hash": "0130d08e9bb929b403e40d4719ae88840c029f01",
         "cas_events_by_worker": {
-          "worker_b": [],
-          "worker_a": [
+          "worker_a": [],
+          "worker_b": [
             {
               "StaleRootDetected": {
                 "expected": "#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed",
-                "current": "#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f"
+                "current": "#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d"
               }
             },
             {
               "RebaseSucceeded": {
-                "rebased_root": "#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f",
+                "rebased_root": "#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d",
                 "attempts": 1
               }
             }
@@ -256,12 +256,12 @@
         },
         "worker_a": {
           "returncode": 0,
-          "stdout": "{\n  \"hole\": \"hole_a\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": true,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 1,\n  \"cas_events\": [\n    {\n      \"StaleRootDetected\": {\n        \"expected\": \"#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed\",\n        \"current\": \"#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f\"\n      }\n    },\n    {\n      \"RebaseSucceeded\": {\n        \"rebased_root\": \"#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f\",\n        \"attempts\": 1\n      }\n    }\n  ],\n  \"counter_example\": null,\n  \"reason\": null\n}",
+          "stdout": "{\n  \"hole\": \"hole_a\",\n  \"status\": \"Accepted\",\n  \"proved\": true,\n  \"upgraded_to_verified\": true,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [],\n  \"counter_example\": null,\n  \"reason\": null\n}",
           "stderr": ""
         },
         "worker_b": {
           "returncode": 0,
-          "stdout": "{\n  \"hole\": \"hole_b\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": true,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 1,\n  \"cas_events\": [],\n  \"counter_example\": null,\n  \"reason\": null\n}",
+          "stdout": "{\n  \"hole\": \"hole_b\",\n  \"status\": \"Accepted\",\n  \"proved\": true,\n  \"upgraded_to_verified\": true,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [\n    {\n      \"StaleRootDetected\": {\n        \"expected\": \"#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed\",\n        \"current\": \"#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d\"\n      }\n    },\n    {\n      \"RebaseSucceeded\": {\n        \"rebased_root\": \"#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d\",\n        \"attempts\": 1\n      }\n    }\n  ],\n  \"counter_example\": null,\n  \"reason\": null\n}",
           "stderr": ""
         }
       },

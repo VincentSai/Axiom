@@ -841,10 +841,20 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
             status_obj = json.loads(status_p.stdout.strip())
             for t_item in status_obj.get("tasks", []):
                 h_id = t_item.get("hole_id")
-                if h_id:
-                    envelopes_by_hole[h_id] = t_item.get("envelope")
+                env = t_item.get("envelope")
+                if h_id and env:
+                    envelopes_by_hole[h_id] = env
         except json.JSONDecodeError as exc:
             raise RuntimeError(f"Fail-Closed: 无法解析 pool status 输出为 JSON: {status_p.stdout}") from exc
+
+    # Fail-Closed 强校验：启动 Worker 前，强制断言预期 5 个 hole 均存在合法完整的 TaskEnvelope
+    for task in tasks:
+        expected_hole = f"{task['function_name']}_hole"
+        env = envelopes_by_hole.get(expected_hole)
+        if not env:
+            raise RuntimeError(f"Fail-Closed: 缺少洞 `{expected_hole}` 的权威 TaskEnvelope 信封数据")
+        if not env.get("contract_hash") or not env.get("target_hole_id"):
+            raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 的 TaskEnvelope Schema 不完整: {env}")
 
     # 2. 并发派发 5 个 Worker 填洞 (纯表达式)
     print(f"⏳ 派发 {len(tasks)} 个并发 Worker (各负责一个纯代数表达式打洞任务)...")

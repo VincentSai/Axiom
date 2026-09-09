@@ -528,7 +528,80 @@ fn multiple_holes_in_same_function_can_be_submitted_sequentially_without_contrac
         SmtResult::Skipped(_) | SmtResult::Sampled { .. }
     ));
 
-    assert!(pool.is_complete());
+    assert!(
+        !pool.is_complete(),
+        "unverified provisional holes must not make pool complete"
+    );
+    assert_eq!(
+        pool.hole_status("hole_a"),
+        Some(axiom_agent_pool::HoleStatus::Provisional)
+    );
+    assert_eq!(
+        pool.hole_status("hole_b"),
+        Some(axiom_agent_pool::HoleStatus::Provisional)
+    );
     let draft = pool.assemble_provisional_module();
     assert!(!axiom_agent_pool::ast_contains_any_hole(&draft));
+}
+
+#[test]
+fn rejects_candidate_containing_unresolved_hole() {
+    const HOLE_SKELETON: &str = r#"
+        fn compute(x: Int) -> Int
+            requires { x >= 0, x < 1000000 }
+            ensures { result > x }
+        {
+            ?target_hole
+        }
+    "#;
+
+    let mut pool = AgentTaskPool::from_source(HOLE_SKELETON).unwrap();
+
+    // 1. 提交包含自引用或任意 hole 的候选表达式，应立即被拒绝
+    let err_submit = pool.submit_solution("target_hole", "?nested_hole + 1");
+    match err_submit {
+        Err(PoolError::CandidateContainsHole(h)) => assert_eq!(h, "target_hole"),
+        other => panic!("expected CandidateContainsHole, got {:?}", other),
+    }
+
+    // 2. 提交包含 hole 的草稿解，也应被拒绝
+    let err_draft = pool.submit_draft_solution("target_hole", "?target_hole");
+    match err_draft {
+        Err(PoolError::CandidateContainsHole(h)) => assert_eq!(h, "target_hole"),
+        other => panic!("expected CandidateContainsHole, got {:?}", other),
+    }
+}
+
+#[test]
+fn provisional_draft_stays_in_dispatch_tasks_until_verified() {
+    use axiom_agent_pool::HoleStatus;
+
+    const SKELETON: &str = r#"
+        fn inc(x: Int) -> Int
+            requires { x >= 0, x < 1000000 }
+            ensures { result > x }
+        {
+            ?inc_hole
+        }
+    "#;
+
+    let mut pool = AgentTaskPool::from_source(SKELETON).unwrap();
+
+    assert_eq!(pool.dispatch_tasks().len(), 1);
+    assert_eq!(pool.hole_status("inc_hole"), Some(HoleStatus::Unresolved));
+
+    // 1. 提交草稿后，洞变为 Provisional，但依然留在 dispatch_tasks 中，便于调度升级
+    pool.submit_draft_solution("inc_hole", "x + 2").unwrap();
+    assert_eq!(pool.hole_status("inc_hole"), Some(HoleStatus::Provisional));
+    assert_eq!(pool.dispatch_tasks().len(), 1);
+    assert!(!pool.is_complete());
+
+    // 2. 提交正式证明后，洞变为 Verified，彻底移出 dispatch_tasks
+    let outcome = pool
+        .submit_solution_with_outcome("inc_hole", "x + 1", "verifier_agent")
+        .unwrap();
+    assert!(outcome.smt_result.is_proved());
+    assert_eq!(pool.hole_status("inc_hole"), Some(HoleStatus::Verified));
+    assert_eq!(pool.dispatch_tasks().len(), 0);
+    assert!(pool.is_complete());
 }

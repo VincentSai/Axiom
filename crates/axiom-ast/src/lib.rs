@@ -222,54 +222,110 @@ pub fn visit_expr<F: FnMut(&Expr)>(expr: &Expr, f: &mut F) {
     }
 }
 
-/// Recursively traverses and mutates an expression tree.
-pub fn visit_expr_mut<F: FnMut(&mut Expr)>(expr: &mut Expr, f: &mut F) {
-    f(expr);
+/// Control flow for expression AST visitors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VisitControl {
+    /// Continue recursion into child expressions.
+    Continue,
+    /// Skip visiting the child expressions of the current node.
+    SkipChildren,
+    /// Stop the traversal entirely.
+    Break,
+}
+
+/// Recursively traverses and mutates an expression tree with explicit control flow.
+pub fn visit_expr_mut_control<F: FnMut(&mut Expr) -> VisitControl>(
+    expr: &mut Expr,
+    f: &mut F,
+) -> VisitControl {
+    match f(expr) {
+        VisitControl::Break => return VisitControl::Break,
+        VisitControl::SkipChildren => return VisitControl::Continue,
+        VisitControl::Continue => {}
+    }
+
     match expr {
-        Expr::Literal(_) | Expr::Ident(_) | Expr::Hole(_) | Expr::Raw(_) => {}
+        Expr::Literal(_) | Expr::Ident(_) | Expr::Hole(_) | Expr::Raw(_) => VisitControl::Continue,
         Expr::BinaryOp { left, right, .. } => {
-            visit_expr_mut(left, f);
-            visit_expr_mut(right, f);
+            if visit_expr_mut_control(left, f) == VisitControl::Break {
+                return VisitControl::Break;
+            }
+            visit_expr_mut_control(right, f)
         }
-        Expr::UnaryOp { operand, .. } => {
-            visit_expr_mut(operand, f);
-        }
-        Expr::Let { value, .. } => {
-            visit_expr_mut(value, f);
-        }
+        Expr::UnaryOp { operand, .. } => visit_expr_mut_control(operand, f),
+        Expr::Let { value, .. } => visit_expr_mut_control(value, f),
         Expr::Block { statements, tail } => {
             for stmt in statements {
-                visit_expr_mut(stmt, f);
+                if visit_expr_mut_control(stmt, f) == VisitControl::Break {
+                    return VisitControl::Break;
+                }
             }
             if let Some(tail_expr) = tail {
-                visit_expr_mut(tail_expr, f);
+                visit_expr_mut_control(tail_expr, f)
+            } else {
+                VisitControl::Continue
             }
         }
         Expr::Call { callee, args } => {
-            visit_expr_mut(callee, f);
-            for arg in args {
-                visit_expr_mut(arg, f);
+            if visit_expr_mut_control(callee, f) == VisitControl::Break {
+                return VisitControl::Break;
             }
+            for arg in args {
+                if visit_expr_mut_control(arg, f) == VisitControl::Break {
+                    return VisitControl::Break;
+                }
+            }
+            VisitControl::Continue
         }
-        Expr::FieldAccess { target, .. } => {
-            visit_expr_mut(target, f);
-        }
+        Expr::FieldAccess { target, .. } => visit_expr_mut_control(target, f),
         Expr::RecordInit { fields, .. } => {
             for (_, val) in fields {
-                visit_expr_mut(val, f);
+                if visit_expr_mut_control(val, f) == VisitControl::Break {
+                    return VisitControl::Break;
+                }
             }
+            VisitControl::Continue
         }
         Expr::RecordUpdate { base, updates } => {
-            visit_expr_mut(base, f);
-            for (_, val) in updates {
-                visit_expr_mut(val, f);
+            if visit_expr_mut_control(base, f) == VisitControl::Break {
+                return VisitControl::Break;
             }
+            for (_, val) in updates {
+                if visit_expr_mut_control(val, f) == VisitControl::Break {
+                    return VisitControl::Break;
+                }
+            }
+            VisitControl::Continue
         }
         Expr::Match { target, arms } => {
-            visit_expr_mut(target, f);
-            for arm in arms {
-                visit_expr_mut(&mut arm.body, f);
+            if visit_expr_mut_control(target, f) == VisitControl::Break {
+                return VisitControl::Break;
             }
+            for arm in arms {
+                if visit_expr_mut_control(&mut arm.body, f) == VisitControl::Break {
+                    return VisitControl::Break;
+                }
+            }
+            VisitControl::Continue
         }
     }
+}
+
+/// Recursively traverses and mutates an expression tree.
+pub fn visit_expr_mut<F: FnMut(&mut Expr)>(expr: &mut Expr, mut f: F) {
+    visit_expr_mut_control(expr, &mut |e| {
+        f(e);
+        VisitControl::Continue
+    });
+}
+
+/// Checks whether an expression contains any hole (`?hole_id`).
+pub fn expr_contains_hole(expr: &Expr) -> bool {
+    let mut contains = false;
+    visit_expr(expr, &mut |e| {
+        if matches!(e, Expr::Hole(_)) {
+            contains = true;
+        }
+    });
+    contains
 }
