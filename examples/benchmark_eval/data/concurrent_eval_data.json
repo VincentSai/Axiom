@@ -6,31 +6,32 @@
     "mode": "concurrent_multi_agent",
     "eval_mode": "mock",
     "is_mock": true,
-    "git_commit": "8e3628cdb668e9811f8e7c4258bef67f9340925c",
-    "git_tree_hash": "63f3ee046fe9036f51994999799cb964037e4e6d",
+    "git_commit": "a15bd839ed14323e27199e5466d587ef19c06f12",
+    "git_tree_hash": "74dcf379de94f265248a51ca601a5f114babd668",
     "git_status": {
       "is_dirty": true,
-      "dirty_files_count": 9,
+      "dirty_files_count": 10,
       "dirty_files": [
         "M crates/axiom-agent-pool/src/lib.rs",
         "M crates/axiom-agent-pool/tests/concurrent_pool_test.rs",
         "M crates/axiom-db/src/lib.rs",
         "M crates/axiom-db/tests/ast_db_test.rs",
-        "M crates/axiom-smt/src/internal_solver.rs",
+        "M crates/axiom-diagnostics/src/typecheck.rs",
         "M crates/axiom-smt/src/smtlib2.rs",
         "M crates/axiom-smt/src/z3_solver.rs",
         "M crates/axiom-smt/tests/smt_solver_test.rs",
-        "M examples/benchmark_eval/concurrent_runner.py"
+        "M examples/benchmark_eval/concurrent_runner.py",
+        "M examples/game_survivor/native/src/lib.rs"
       ]
     },
     "z3_version": "Z3 version 4.13.0 - 64 bit",
     "platform": "win32",
     "python_version": "3.14.2",
-    "timestamp": "2026-09-09 18:35:08"
+    "timestamp": "2026-09-09 19:05:00"
   },
   "summary": {
     "rust_group": {
-      "wall_clock_sec": 1.71,
+      "wall_clock_sec": 2.73,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -40,7 +41,7 @@
       "unit_test_passed": true
     },
     "axiom_group": {
-      "wall_clock_sec": 2.76,
+      "wall_clock_sec": 3.06,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -48,15 +49,15 @@
       "resolver_tax_billed_tokens": 0,
       "total_billed_tokens": 75070,
       "formal_proved": true,
-      "speedup_vs_rust": 0.62
+      "speedup_vs_rust": 0.89
     }
   },
   "detailed_runs": {
     "group2_rust": {
       "status": "success",
       "total_tasks": 5,
-      "wall_clock_sec": 1.71,
-      "worker_concurrency_sec": 0.17,
+      "wall_clock_sec": 2.73,
+      "worker_concurrency_sec": 0.24,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -70,21 +71,22 @@
       },
       "unit_test_passed": true,
       "unit_test_message": "All subsystem unit tests passed",
-      "git_commit_sha": "8e3628cdb668e9811f8e7c4258bef67f9340925c",
-      "git_tree_hash": "63f3ee046fe9036f51994999799cb964037e4e6d",
+      "git_commit_sha": "a15bd839ed14323e27199e5466d587ef19c06f12",
+      "git_tree_hash": "74dcf379de94f265248a51ca601a5f114babd668",
       "git_status": {
         "is_dirty": true,
-        "dirty_files_count": 9,
+        "dirty_files_count": 10,
         "dirty_files": [
           "M crates/axiom-agent-pool/src/lib.rs",
           "M crates/axiom-agent-pool/tests/concurrent_pool_test.rs",
           "M crates/axiom-db/src/lib.rs",
           "M crates/axiom-db/tests/ast_db_test.rs",
-          "M crates/axiom-smt/src/internal_solver.rs",
+          "M crates/axiom-diagnostics/src/typecheck.rs",
           "M crates/axiom-smt/src/smtlib2.rs",
           "M crates/axiom-smt/src/z3_solver.rs",
           "M crates/axiom-smt/tests/smt_solver_test.rs",
-          "M examples/benchmark_eval/concurrent_runner.py"
+          "M examples/benchmark_eval/concurrent_runner.py",
+          "M examples/game_survivor/native/src/lib.rs"
         ]
       },
       "resolver_details": [],
@@ -174,10 +176,10 @@
     "group3_axiom": {
       "status": "success",
       "total_tasks": 5,
-      "wall_clock_sec": 2.76,
+      "wall_clock_sec": 3.06,
       "worker_concurrency_sec": 0.0,
-      "combinator_latency_ms": 1510.41,
-      "smt_verify_sec": 0.72,
+      "combinator_latency_ms": 1565.47,
+      "smt_verify_sec": 0.89,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -196,21 +198,22 @@
         "tokens_to_proved": 1070
       },
       "formal_proved": true,
-      "git_commit_sha": "8e3628cdb668e9811f8e7c4258bef67f9340925c",
-      "git_tree_hash": "63f3ee046fe9036f51994999799cb964037e4e6d",
+      "git_commit_sha": "a15bd839ed14323e27199e5466d587ef19c06f12",
+      "git_tree_hash": "74dcf379de94f265248a51ca601a5f114babd668",
       "git_status": {
         "is_dirty": true,
-        "dirty_files_count": 9,
+        "dirty_files_count": 10,
         "dirty_files": [
           "M crates/axiom-agent-pool/src/lib.rs",
           "M crates/axiom-agent-pool/tests/concurrent_pool_test.rs",
           "M crates/axiom-db/src/lib.rs",
           "M crates/axiom-db/tests/ast_db_test.rs",
-          "M crates/axiom-smt/src/internal_solver.rs",
+          "M crates/axiom-diagnostics/src/typecheck.rs",
           "M crates/axiom-smt/src/smtlib2.rs",
           "M crates/axiom-smt/src/z3_solver.rs",
           "M crates/axiom-smt/tests/smt_solver_test.rs",
-          "M examples/benchmark_eval/concurrent_runner.py"
+          "M examples/benchmark_eval/concurrent_runner.py",
+          "M examples/game_survivor/native/src/lib.rs"
         ]
       },
       "smt_message": "All 5 functions formally proved by Z3",
@@ -280,7 +283,7 @@
       "cas_concurrency_benchmark": {
         "race_workers": 2,
         "success_submissions": 2,
-        "concurrency_elapsed_sec": 0.467,
+        "concurrency_elapsed_sec": 0.503,
         "stale_root_conflicts_observed": 1,
         "fast_forward_retries_succeeded": 1,
         "final_commit_chain_length": 2,
@@ -288,8 +291,8 @@
         "final_root": "#mod_8892410a4f9ec42e4507b5b4546f24373ed41f8430d7c1d8d71d0a8090dc4b56",
         "eval_mode": "mock",
         "is_mock": true,
-        "git_commit_sha": "8e3628cdb668e9811f8e7c4258bef67f9340925c",
-        "git_tree_hash": "63f3ee046fe9036f51994999799cb964037e4e6d",
+        "git_commit_sha": "a15bd839ed14323e27199e5466d587ef19c06f12",
+        "git_tree_hash": "74dcf379de94f265248a51ca601a5f114babd668",
         "cas_events_by_worker": {
           "worker_a": [],
           "worker_b": [

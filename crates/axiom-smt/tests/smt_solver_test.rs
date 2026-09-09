@@ -186,7 +186,7 @@ fn parses_z3_sat_model_with_real_numbers() {
     match res {
         axiom_smt::Z3Result::Sat(model) => {
             let x = model.get("x").expect("x should be present in model");
-            assert!((*x - 1.4142135623).abs() < 1e-6);
+            assert!((*x - std::f64::consts::SQRT_2).abs() < 1e-6);
         }
         other => panic!("expected Sat, got {:?}", other),
     }
@@ -458,6 +458,14 @@ fn negative_modulo_preserves_sign_and_rejects_euclidean() {
     )
     .expect("function should parse");
 
+    let (trunc_query, trunc_ob) = axiom_smt::generate_smtlib2_with_module_and_obligations(
+        &trunc_mod_module.functions[0],
+        Some(&trunc_mod_module),
+    )
+    .expect("trunc mod query generation must succeed");
+    assert!(trunc_ob >= 1);
+    assert!(trunc_query.contains("check-sat"));
+
     let trunc_res = verify_function(&trunc_mod_module.functions[0]);
     if axiom_smt::find_z3_executable().is_some() {
         assert!(
@@ -465,6 +473,8 @@ fn negative_modulo_preserves_sign_and_rejects_euclidean() {
             "Negative integer modulo must retain dividend sign (-1)! Got: {:?}",
             trunc_res
         );
+    } else {
+        assert!(matches!(trunc_res, SmtResult::Sampled { .. }));
     }
 
     // 2. 验证欧几里得非负余数 (-5 mod 2 == 1) 被严格拒绝
@@ -479,6 +489,14 @@ fn negative_modulo_preserves_sign_and_rejects_euclidean() {
     )
     .expect("function should parse");
 
+    let (euclid_query, euclid_ob) = axiom_smt::generate_smtlib2_with_module_and_obligations(
+        &euclidean_mod_module.functions[0],
+        Some(&euclidean_mod_module),
+    )
+    .expect("euclid query generation must succeed");
+    assert!(euclid_ob >= 1);
+    assert!(euclid_query.contains("check-sat"));
+
     let euclidean_res = verify_function(&euclidean_mod_module.functions[0]);
     if axiom_smt::find_z3_executable().is_some() {
         assert!(
@@ -486,6 +504,11 @@ fn negative_modulo_preserves_sign_and_rejects_euclidean() {
             "Euclidean non-negative remainder (1) must be rejected with CounterExample! Got: {:?}",
             euclidean_res
         );
+    } else {
+        assert!(matches!(
+            euclidean_res,
+            SmtResult::CounterExample(_) | SmtResult::Sampled { .. }
+        ));
     }
 }
 
@@ -507,6 +530,14 @@ fn match_wildcard_detects_dead_branch_division_by_zero_when_first_arm_is_false()
     )
     .expect("function should parse");
 
+    let (query, obligations) = axiom_smt::generate_smtlib2_with_module_and_obligations(
+        &module.functions[0],
+        Some(&module),
+    )
+    .expect("match_zero_div query generation must succeed");
+    assert!(obligations >= 2);
+    assert!(query.contains("not (= d 0)"));
+
     let res = verify_function(&module.functions[0]);
     if axiom_smt::find_z3_executable().is_some() {
         assert!(
@@ -514,6 +545,11 @@ fn match_wildcard_detects_dead_branch_division_by_zero_when_first_arm_is_false()
             "Match wildcard with false first arm must detect division by zero at d == 0! Got: {:?}",
             res
         );
+    } else {
+        assert!(matches!(
+            res,
+            SmtResult::CounterExample(_) | SmtResult::Sampled { .. }
+        ));
     }
 }
 
@@ -531,6 +567,14 @@ fn detects_division_overflow_on_i64_min_divided_by_negative_one() {
     )
     .expect("function should parse");
 
+    let (query, obligations) = axiom_smt::generate_smtlib2_with_module_and_obligations(
+        &module.functions[0],
+        Some(&module),
+    )
+    .expect("div_overflow query generation must succeed");
+    assert!(obligations >= 2);
+    assert!(query.contains("9223372036854775808"));
+
     let res = verify_function(&module.functions[0]);
     if axiom_smt::find_z3_executable().is_some() {
         assert!(
@@ -538,5 +582,96 @@ fn detects_division_overflow_on_i64_min_divided_by_negative_one() {
             "x / y must be rejected due to i64::MIN / -1 overflow! Got: {:?}",
             res
         );
+    } else {
+        assert!(matches!(
+            res,
+            SmtResult::CounterExample(_) | SmtResult::Sampled { .. }
+        ));
+    }
+}
+
+#[test]
+fn match_first_match_semantics_with_wildcard_precedence() {
+    // [Spec 1, P0] match b { _ => 0, true => 1 }
+    // 必须遵从首匹配语义，首臂 _ => 0 胜出；若被错误编码为 (ite b 1 0)，则在 requires { b } 下会被误证为 1。
+    let module = parse_module(
+        r#"
+        fn test_first_match(b: Bool) -> Int
+            requires { b }
+            ensures { result == 1 }
+        {
+            match b {
+                _ => 0,
+                true => 1
+            }
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let (smt_query, obligations) = axiom_smt::generate_smtlib2_with_module_and_obligations(
+        &module.functions[0],
+        Some(&module),
+    )
+    .expect("SMT generation should succeed");
+    // SMT 编码中首臂即为 0，绝不能生成 (ite b 1 0)
+    assert!(!smt_query.contains("(ite b 1 0)"));
+    // 包含 1 个 ensures 与 1 个 64位整型返回值范围安全义务
+    assert_eq!(obligations, 2);
+
+    let res = verify_function(&module.functions[0]);
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(res, SmtResult::CounterExample(_)),
+            "First match arm _ => 0 must win, so result == 1 must be refuted! Got: {:?}",
+            res
+        );
+    } else {
+        assert!(matches!(
+            res,
+            SmtResult::Sampled { .. } | SmtResult::CounterExample(_)
+        ));
+    }
+}
+
+#[test]
+fn match_dead_arm_safety_obligations_pruned() {
+    // [Spec 1, P0] match x { _ => 0, 1 => 100 / 0 }
+    // 后臂 1 => 100 / 0 为死代码，不能因为死分支中的除零导致整个函数被误拒！
+    let module = parse_module(
+        r#"
+        fn test_dead_arm_pruning(x: Int) -> Int
+            ensures { result == 0 }
+        {
+            match x {
+                _ => 0,
+                1 => 100 / 0
+            }
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let (smt_query, obligations) = axiom_smt::generate_smtlib2_with_module_and_obligations(
+        &module.functions[0],
+        Some(&module),
+    )
+    .expect("SMT generation should succeed");
+    // 收集到的义务只有 1 个 ensures 与 1 个 64位整型返回值范围安全义务，死分支内的 100 / 0 除零义务被剪枝（没有额外义务）
+    assert_eq!(obligations, 2);
+    assert!(!smt_query.contains("(not (= 0 0))"));
+
+    let res = verify_function(&module.functions[0]);
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(res, SmtResult::Proved { .. }),
+            "Function must be proved because dead branch division by zero is pruned! Got: {:?}",
+            res
+        );
+    } else {
+        assert!(matches!(
+            res,
+            SmtResult::Sampled { .. } | SmtResult::Proved { .. }
+        ));
     }
 }

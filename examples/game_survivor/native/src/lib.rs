@@ -400,26 +400,26 @@ impl SurvivorRuntime {
                 y: self.entities[i].y,
             };
 
-            if generated_core::check_collision(current_monster_pos, 0.5, player_pos, 0.5) {
-                if self.player_invincible_timer <= 0.0 {
-                    let core_player = generated_core::Player {
-                        pos: player_pos,
-                        hp: self.entities[0].hp,
-                        max_hp: self.entities[0].max_hp,
-                        exp: self.entities[0].exp,
-                        level: self.entities[0].level,
-                        speed: 5.5,
-                    };
-                    let damaged_player = generated_core::apply_damage_to_player(core_player, 10);
-                    let dealt = self.entities[0].hp - damaged_player.hp;
-                    self.entities[0].hp = damaged_player.hp;
-                    self.player_invincible_timer = 0.6; // 0.6s i-frame
-                    self.push_event(VisualEventKind::Hit, 1, 0, dealt);
+            if generated_core::check_collision(current_monster_pos, 0.5, player_pos, 0.5)
+                && self.player_invincible_timer <= 0.0
+            {
+                let core_player = generated_core::Player {
+                    pos: player_pos,
+                    hp: self.entities[0].hp,
+                    max_hp: self.entities[0].max_hp,
+                    exp: self.entities[0].exp,
+                    level: self.entities[0].level,
+                    speed: 5.5,
+                };
+                let damaged_player = generated_core::apply_damage_to_player(core_player, 10);
+                let dealt = self.entities[0].hp - damaged_player.hp;
+                self.entities[0].hp = damaged_player.hp;
+                self.player_invincible_timer = 0.6; // 0.6s i-frame
+                self.push_event(VisualEventKind::Hit, 1, 0, dealt);
 
-                    if generated_core::is_game_over(damaged_player) {
-                        self.is_game_over = true;
-                        self.push_event(VisualEventKind::GameOver, 1, 0, 0);
-                    }
+                if generated_core::is_game_over(damaged_player) {
+                    self.is_game_over = true;
+                    self.push_event(VisualEventKind::GameOver, 1, 0, 0);
                 }
             }
         }
@@ -493,7 +493,7 @@ impl SurvivorRuntime {
         let id = self.next_entity_id;
         self.next_entity_id += 1;
 
-        let angle = (self.revision as f64 * 0.7) % 6.28;
+        let angle = (self.revision as f64 * 0.7) % std::f64::consts::TAU;
         let radius = 8.0 + (self.revision % 4) as f64;
         let px = self.entities[0].x + angle.cos() * radius;
         let py = self.entities[0].y + angle.sin() * radius;
@@ -577,6 +577,11 @@ pub extern "C" fn axiom_init() -> *mut c_void {
     Box::into_raw(Box::new(SurvivorRuntime::new())).cast()
 }
 
+/// Advances the game survivor simulation by one frame tick.
+///
+/// # Safety
+///
+/// `instance` must be a valid pointer obtained from `axiom_init`, and `input` must be null or a valid pointer to a `PlayerInput` struct.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_tick(
     instance: *mut c_void,
@@ -590,6 +595,11 @@ pub unsafe extern "C" fn axiom_tick(
     runtime.tick(input, delta_time);
 }
 
+/// Returns a pointer to the current entity snapshot batch.
+///
+/// # Safety
+///
+/// `instance` must be a valid pointer obtained from `axiom_init`.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_get_snapshot_ptr(instance: *mut c_void) -> *const SnapshotBatch {
     instance
@@ -598,6 +608,11 @@ pub unsafe extern "C" fn axiom_get_snapshot_ptr(instance: *mut c_void) -> *const
         .map_or(ptr::null(), SurvivorRuntime::snapshot_ptr)
 }
 
+/// Returns a pointer to the current visual event batch.
+///
+/// # Safety
+///
+/// `instance` must be a valid pointer obtained from `axiom_init`.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_get_events_ptr(instance: *mut c_void) -> *const VisualEventBatch {
     instance
@@ -606,6 +621,11 @@ pub unsafe extern "C" fn axiom_get_events_ptr(instance: *mut c_void) -> *const V
         .map_or(ptr::null(), SurvivorRuntime::events_ptr)
 }
 
+/// Destroys a survivor runtime instance and frees its memory.
+///
+/// # Safety
+///
+/// `instance` must be a valid pointer obtained from `axiom_init` or null, and must not be used after this call.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_destroy(instance: *mut c_void) {
     if instance.is_null() {
@@ -615,6 +635,11 @@ pub unsafe extern "C" fn axiom_destroy(instance: *mut c_void) {
     LIVE_INSTANCES.fetch_sub(1, Ordering::Relaxed);
 }
 
+/// Resets the survivor runtime simulation to the initial state.
+///
+/// # Safety
+///
+/// `instance` must be a valid pointer obtained from `axiom_init`.
 #[no_mangle]
 pub unsafe extern "C" fn axiom_reset(instance: *mut c_void) {
     if let Some(runtime) = instance.cast::<SurvivorRuntime>().as_mut() {

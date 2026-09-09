@@ -218,7 +218,7 @@ fn cas_commits_valid_candidate_and_kernel_mints_receipt() {
 
     // 2. 验证收据是由内核亲自铸造，包含真实的证明义务绑定
     let minted_receipt = db
-        .get_receipt(&commit.receipt_hash())
+        .get_receipt(commit.receipt_hash())
         .unwrap()
         .expect("receipt must exist");
     assert_eq!(minted_receipt.candidate_hash, cand_hash);
@@ -711,6 +711,8 @@ fn persisted_database_persists_and_restores_draft_records() {
             agent_id: "worker_1".into(),
             code: "a + b".into(),
             timestamp: 1700000000,
+            base_root: None,
+            revision: 1,
         };
         db.insert_draft(draft.clone())
             .expect("insert draft should succeed");
@@ -734,12 +736,56 @@ fn persisted_database_persists_and_restores_draft_records() {
             .expect("remove draft should succeed");
         assert!(removed.is_some());
         assert!(db.drafts().is_empty());
+
+        // 测试 insert_draft_cas 乐观并发控制
+        let draft_v1 = DraftRecord {
+            hole_id: "hole_cas".into(),
+            agent_id: "agent_a".into(),
+            code: "10".into(),
+            timestamp: 100,
+            base_root: None,
+            revision: 0,
+        };
+        let committed_v1 = db
+            .insert_draft_cas(draft_v1, Some(0))
+            .expect("initial cas draft should succeed");
+        assert_eq!(committed_v1.revision, 1);
+
+        // 使用过期的 expected_revision 尝试提交应被 CAS 拦截
+        let draft_stale = DraftRecord {
+            hole_id: "hole_cas".into(),
+            agent_id: "agent_b".into(),
+            code: "20".into(),
+            timestamp: 101,
+            base_root: None,
+            revision: 0,
+        };
+        let cas_err = db.insert_draft_cas(draft_stale, Some(0));
+        assert!(matches!(
+            cas_err,
+            Err(axiom_db::CasError::StaleDraftRevision { .. })
+        ));
+
+        // 使用正确的 revision 提交应成功递增
+        let draft_v2 = DraftRecord {
+            hole_id: "hole_cas".into(),
+            agent_id: "agent_b".into(),
+            code: "20".into(),
+            timestamp: 102,
+            base_root: None,
+            revision: 0,
+        };
+        let committed_v2 = db
+            .insert_draft_cas(draft_v2, Some(1))
+            .expect("subsequent cas draft should succeed");
+        assert_eq!(committed_v2.revision, 2);
     }
 
     // Verify disk state after removal
     {
         let db = AstDatabase::open(&db_path).expect("third open should succeed");
-        assert!(db.drafts().is_empty());
+        assert_eq!(db.drafts().len(), 1);
+        assert_eq!(db.get_draft("hole_cas").unwrap().revision, 2);
     }
 
     let _ = std::fs::remove_file(&db_path);

@@ -82,11 +82,12 @@ def get_git_status() -> dict:
             "dirty_files_count": len(dirty_files),
             "dirty_files": dirty_files[:20],
         }
-    except Exception:
+    except Exception as e:
         return {
-            "is_dirty": False,
-            "dirty_files_count": 0,
+            "is_dirty": "unknown",
+            "dirty_files_count": -1,
             "dirty_files": [],
+            "error": str(e),
         }
 
 

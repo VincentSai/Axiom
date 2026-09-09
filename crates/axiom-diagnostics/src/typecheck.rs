@@ -236,9 +236,9 @@ fn infer_expr_type(
                     Expr::Ident(name) => {
                         let name_str = name.as_str();
                         if name_str == "Ok" || name_str == "Err" {
-                            matches!(&l, Type::Custom(s) if s.starts_with("Result")) || true
+                            matches!(&l, Type::Custom(s) if s.starts_with("Result"))
                         } else if name_str == "Some" || name_str == "None" {
-                            matches!(&l, Type::Custom(s) if s.starts_with("Option")) || true
+                            matches!(&l, Type::Custom(s) if s.starts_with("Option"))
                         } else if let Type::Custom(enum_name) = &l {
                             if let Some(variants) = ctx.enums.get(enum_name) {
                                 variants.contains_key(name_str)
@@ -646,13 +646,13 @@ fn bind_pattern_types(
                 }
                 return Ok(());
             }
-            let enum_key = enum_name.as_ref().unwrap_or_else(|| {
-                if let Type::Custom(n) = target_ty {
+            let enum_key = enum_name
+                .as_ref()
+                .unwrap_or(if let Type::Custom(n) = target_ty {
                     n
                 } else {
                     variant_name
-                }
-            });
+                });
             if let Some(variants) = ctx.enums.get(enum_key) {
                 if let Some(field_tys) = variants.get(variant_name) {
                     if fields.len() != field_tys.len() {

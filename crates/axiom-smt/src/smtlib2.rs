@@ -587,10 +587,9 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
             let r = expr_to_smt(right, var_types)?;
             match op {
                 BinaryOperator::Divide => {
-                    let is_real = l.contains('.')
-                        || r.contains('.')
-                        || var_types.get(&l).copied() == Some("Real")
-                        || var_types.get(&r).copied() == Some("Real");
+                    let empty_subs = HashMap::new();
+                    let is_real = infer_expr_type(left, var_types, &empty_subs) == "Real"
+                        || infer_expr_type(right, var_types, &empty_subs) == "Real";
                     if is_real {
                         Ok(format!("(/ {} {})", l, r))
                     } else {
@@ -644,37 +643,109 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
             Ok(s)
         }
         Expr::Match { target, arms } => {
-            if arms.len() == 2 {
-                let cond_str = expr_to_smt(target, var_types)?;
-                let mut true_body = None;
-                let mut false_body = None;
-                for arm in arms {
-                    match &arm.pattern {
-                        Pattern::Literal(Literal::Bool(b)) => {
-                            let arm_smt = expr_to_smt(&arm.body, var_types)?;
-                            if *b {
-                                true_body = Some(arm_smt);
-                            } else {
-                                false_body = Some(arm_smt);
-                            }
-                        }
-                        Pattern::Wildcard | Pattern::Ident(_) => {
-                            let arm_smt = expr_to_smt(&arm.body, var_types)?;
-                            if true_body.is_none() {
-                                true_body = Some(arm_smt.clone());
-                            }
-                            if false_body.is_none() {
-                                false_body = Some(arm_smt);
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-                if let (Some(tb), Some(fb)) = (true_body, false_body) {
-                    return Ok(format!("(ite {} {} {})", cond_str, tb, fb));
+            if arms.is_empty() {
+                return Err("empty match expression in SMT translation".into());
+            }
+
+            // 1. 按照物理执行顺序收集可达臂，遇到首个 catch-all (Wildcard 或 Ident) 立即截断后续不可达死分支
+            let mut reachable_arms = Vec::new();
+            for arm in arms {
+                reachable_arms.push(arm);
+                if matches!(arm.pattern, Pattern::Wildcard | Pattern::Ident(_)) {
+                    break;
                 }
             }
-            Err("complex match pattern translation requires full ADT solver encoding".into())
+
+            // 2. 若首臂即为不可反驳 catch-all，直接翻译该臂 body
+            if reachable_arms.len() == 1
+                && matches!(
+                    reachable_arms[0].pattern,
+                    Pattern::Wildcard | Pattern::Ident(_)
+                )
+            {
+                return expr_to_smt(&reachable_arms[0].body, var_types);
+            }
+
+            let cond_str = expr_to_smt(target, var_types)?;
+
+            // 3. 辅助模式条件匹配生成器
+            let pattern_cond = |pat: &Pattern| -> Result<Option<String>, String> {
+                match pat {
+                    Pattern::Literal(Literal::Bool(true)) => Ok(Some(cond_str.clone())),
+                    Pattern::Literal(Literal::Bool(false)) => {
+                        Ok(Some(format!("(not {})", cond_str)))
+                    }
+                    Pattern::Literal(Literal::Int(n)) => {
+                        let n_smt = if *n == I64_MIN {
+                            "(- 9223372036854775808)".to_string()
+                        } else if *n < 0 {
+                            format!("(- {})", n.abs())
+                        } else {
+                            n.to_string()
+                        };
+                        Ok(Some(format!("(= {} {})", cond_str, n_smt)))
+                    }
+                    Pattern::Literal(Literal::Float(f)) => {
+                        if f.is_finite() {
+                            let f_smt = if *f < 0.0 {
+                                format!("(- {})", format_float(f.abs()))
+                            } else {
+                                format_float(*f)
+                            };
+                            Ok(Some(format!("(= {} {})", cond_str, f_smt)))
+                        } else {
+                            Err("unsupported non-finite float literal pattern".into())
+                        }
+                    }
+                    Pattern::Wildcard | Pattern::Ident(_) => Ok(None),
+                    _ => Err(
+                        "complex match pattern translation requires full ADT solver encoding"
+                            .into(),
+                    ),
+                }
+            };
+
+            // 4. 情形 A：最后一条可达臂为 catch-all (通配符或标识符)
+            let last_idx = reachable_arms.len() - 1;
+            if matches!(
+                reachable_arms[last_idx].pattern,
+                Pattern::Wildcard | Pattern::Ident(_)
+            ) {
+                let mut current_else = expr_to_smt(&reachable_arms[last_idx].body, var_types)?;
+                for arm in reachable_arms[..last_idx].iter().rev() {
+                    let pat_cond = pattern_cond(&arm.pattern)?.ok_or_else(|| {
+                        "unexpected catch-all before last reachable arm".to_string()
+                    })?;
+                    let body_smt = expr_to_smt(&arm.body, var_types)?;
+                    current_else = format!("(ite {} {} {})", pat_cond, body_smt, current_else);
+                }
+                return Ok(current_else);
+            }
+
+            // 5. 情形 B：布尔完备匹配 (true 与 false 双臂)
+            if reachable_arms.len() == 2 {
+                match (&reachable_arms[0].pattern, &reachable_arms[1].pattern) {
+                    (
+                        Pattern::Literal(Literal::Bool(true)),
+                        Pattern::Literal(Literal::Bool(false)),
+                    ) => {
+                        let true_body = expr_to_smt(&reachable_arms[0].body, var_types)?;
+                        let false_body = expr_to_smt(&reachable_arms[1].body, var_types)?;
+                        return Ok(format!("(ite {} {} {})", cond_str, true_body, false_body));
+                    }
+                    (
+                        Pattern::Literal(Literal::Bool(false)),
+                        Pattern::Literal(Literal::Bool(true)),
+                    ) => {
+                        let false_body = expr_to_smt(&reachable_arms[0].body, var_types)?;
+                        let true_body = expr_to_smt(&reachable_arms[1].body, var_types)?;
+                        return Ok(format!("(ite {} {} {})", cond_str, true_body, false_body));
+                    }
+                    _ => {}
+                }
+            }
+
+            Err("complex match pattern translation requires full ADT solver encoding or catch-all default".into())
         }
         _ => Err("unsupported expression in SMT translation".into()),
     }
@@ -1193,6 +1264,8 @@ fn collect_safety_obligations_recursive(
                         arm_paths.push(mc);
                     }
 
+                    let is_catch_all = matches!(arm.pattern, Pattern::Wildcard | Pattern::Ident(_));
+
                     // 递归分析当前臂 body
                     collect_safety_obligations_recursive(
                         &arm.body,
@@ -1201,6 +1274,11 @@ fn collect_safety_obligations_recursive(
                         &arm_paths,
                         obligations,
                     )?;
+
+                    // [Spec 1, P0] 遇到首个 catch-all 分支，后续所有分支在物理上均为不可达死代码，立即终止分析
+                    if is_catch_all {
+                        break;
+                    }
 
                     // 将当前臂的否定条件累积到后续分支的路径前提中
                     if let Some(nc) = neg_cond_opt {
@@ -1213,6 +1291,7 @@ fn collect_safety_obligations_recursive(
                     if let Pattern::Ident(ref id) = arm.pattern {
                         arm_subs.remove(id);
                     }
+                    let is_catch_all = matches!(arm.pattern, Pattern::Wildcard | Pattern::Ident(_));
                     collect_safety_obligations_recursive(
                         &arm.body,
                         var_types,
@@ -1220,6 +1299,9 @@ fn collect_safety_obligations_recursive(
                         path_conditions,
                         obligations,
                     )?;
+                    if is_catch_all {
+                        break;
+                    }
                 }
             }
         }

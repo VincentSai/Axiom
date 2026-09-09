@@ -200,8 +200,40 @@ pub fn run_z3_query_with_timeout(
     let policy = TimeoutPolicy::from_millis(timeout_ms);
     let status_res = policy.wait_child_with_watchdog(&mut child);
 
+    // [Spec 6 & Standards 2] 读写线程退出全局超时控制与 stdin 写入错误/panic 检查
+    let join_grace = std::time::Duration::from_millis(1500);
+    let deadline = std::time::Instant::now() + join_grace;
+
+    while !stdout_join.is_finished() || !stderr_join.is_finished() {
+        if std::time::Instant::now() > deadline {
+            return Err("timed out waiting for z3 stdout/stderr reader threads to exit".into());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+
+    if let Some(ref stdin_handle) = stdin_join {
+        while !stdin_handle.is_finished() {
+            if std::time::Instant::now() > deadline {
+                return Err("timed out waiting for z3 stdin writer thread to exit".into());
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
     if let Some(stdin_handle) = stdin_join {
-        let _ = stdin_handle.join();
+        match stdin_handle.join() {
+            Ok(Ok(())) => {}
+            Ok(Err(io_err)) => {
+                if status_res.is_ok() {
+                    return Err(format!("failed to write query to z3 stdin: {}", io_err));
+                }
+            }
+            Err(_) => {
+                if status_res.is_ok() {
+                    return Err("z3 stdin writer thread panicked".into());
+                }
+            }
+        }
     }
 
     let stdout_bytes = stdout_join

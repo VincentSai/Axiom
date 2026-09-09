@@ -792,9 +792,53 @@ fn profile_invalidation_and_reverify_unproved_holes_closed_loop() {
         // 4. 调用 reverify_unproved_holes 自动重新定理证明，闭环晋升为 Verified
         let rev_results = pool.reverify_unproved_holes().unwrap();
         assert_eq!(rev_results.len(), 1);
-        assert!(rev_results[0].1.is_proved());
+        assert!(rev_results[0].smt_result.is_proved());
+        assert!(rev_results[0].committed);
+        assert!(rev_results[0].new_receipt_hash.is_some());
         assert_eq!(pool.hole_status("add_hole"), Some(HoleStatus::Verified));
         assert!(!pool.pending_hole_ids().contains(&"add_hole".to_string()));
+    }
+
+    let _ = std::fs::remove_file(&skel_path);
+    let _ = std::fs::remove_file(&db_path);
+}
+
+#[test]
+fn reopen_pool_hydrates_commits_in_causal_order_preventing_hash_order_inversion() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let skel_path = std::env::temp_dir().join(format!("axiom_causal_skel_{nonce}.ax"));
+    let db_path = std::env::temp_dir().join(format!("axiom_causal_db_{nonce}.json"));
+
+    let skel = r#"
+    fn compute(x: Int) -> Int
+        requires { x >= 0, x < 1000 }
+        ensures { result > 0 }
+    {
+        ?calc_hole
+    }
+    "#;
+    std::fs::write(&skel_path, skel).unwrap();
+
+    {
+        let mut pool = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        pool.submit_solution("calc_hole", "x + 1").unwrap();
+        assert_eq!(
+            pool.hole_status("calc_hole"),
+            Some(axiom_agent_pool::HoleStatus::Verified)
+        );
+    }
+
+    // 重启池，验证因果拓扑正序水合后证据账本完备
+    {
+        let pool = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        assert_eq!(
+            pool.hole_status("calc_hole"),
+            Some(axiom_agent_pool::HoleStatus::Verified)
+        );
+        assert!(pool.is_complete());
     }
 
     let _ = std::fs::remove_file(&skel_path);

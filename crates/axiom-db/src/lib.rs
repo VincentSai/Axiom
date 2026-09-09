@@ -248,12 +248,16 @@ pub fn compute_receipt_hash(rcpt: &VerificationReceipt) -> NodeHash {
 }
 
 /// Non-authoritative draft implementation for a hole under provisional trial.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct DraftRecord {
     pub hole_id: String,
     pub agent_id: String,
     pub code: String,
     pub timestamp: u64,
+    #[serde(default)]
+    pub base_root: Option<NodeHash>,
+    #[serde(default)]
+    pub revision: u64,
 }
 
 /// The immutable data payload of a commit, excluding the commit's self-identifying hash.
@@ -407,6 +411,11 @@ pub enum CasError {
     UnverifiedCandidate(String),
     VacuousContract(String),
     VerificationRejected(String),
+    StaleDraftRevision {
+        hole_id: String,
+        current: u64,
+        expected: u64,
+    },
     Db(DbError),
 }
 
@@ -434,6 +443,14 @@ impl fmt::Display for CasError {
             Self::VerificationRejected(msg) => {
                 write!(f, "CAS rejected: formal theorem verification failed: {msg}")
             }
+            Self::StaleDraftRevision {
+                hole_id,
+                current,
+                expected,
+            } => write!(
+                f,
+                "CAS rejected: stale draft revision for hole `{hole_id}` (expected {expected}, current is {current})"
+            ),
             Self::Db(err) => write!(f, "database error during CAS: {err}"),
         }
     }
@@ -531,6 +548,35 @@ pub struct DatabaseState {
 pub struct AstDatabase {
     path: Option<PathBuf>,
     state: DatabaseState,
+}
+
+/// Deterministically derives a new module from `base_module` by substituting `envelope.target_hole_id`
+/// with `parsed_candidate` inside `envelope.target_function`.
+pub fn derive_candidate_module(
+    base_module: &Module,
+    envelope: &TaskEnvelope,
+    parsed_candidate: &Expr,
+) -> Result<Module, CasError> {
+    let mut derived_module = base_module.clone();
+    let mut replaced = false;
+    for func in &mut derived_module.functions {
+        if func.name == envelope.target_function
+            && (replace_hole_in_expr(&mut func.body, &envelope.target_hole_id, parsed_candidate)
+                || func.body == *parsed_candidate)
+        {
+            replaced = true;
+            break;
+        }
+    }
+
+    if !replaced {
+        return Err(CasError::InvalidEnvelope(format!(
+            "target hole `{}` not found in target function `{}`",
+            envelope.target_hole_id, envelope.target_function
+        )));
+    }
+
+    Ok(derived_module)
 }
 
 impl AstDatabase {
@@ -759,25 +805,7 @@ impl AstDatabase {
             )));
         }
 
-        let mut derived_module = base_module.clone();
-        let mut replaced = false;
-        for func in &mut derived_module.functions {
-            if func.name == envelope.target_function {
-                if replace_hole_in_expr(&mut func.body, &envelope.target_hole_id, &parsed_expr) {
-                    replaced = true;
-                } else if func.body == parsed_expr {
-                    // [Spec 4] 函数实现已处于当前候选表达式（用于规则升级后的重新定理证明与换发收据）
-                    replaced = true;
-                }
-            }
-        }
-
-        if !replaced {
-            return Err(CasError::InvalidEnvelope(format!(
-                "target hole `{}` not found in target function `{}`",
-                envelope.target_hole_id, envelope.target_function
-            )));
-        }
+        let derived_module = derive_candidate_module(&base_module, envelope, &parsed_expr)?;
 
         // 5. 防篡改断言：比对调用方模块与内核推导模块
         if let Some(caller_mod) = caller_module {
@@ -911,26 +939,10 @@ impl AstDatabase {
             axiom_parser::parse_expr(&candidate.expression_source).map_err(|e| {
                 CasError::InvalidCandidate(format!("candidate expression parse failure: {}", e))
             })?;
-        let mut expected_derived = base_module.clone();
-        let mut replaced = false;
-        for func in &mut expected_derived.functions {
-            if func.name == envelope.target_function {
-                if replace_hole_in_expr(&mut func.body, &envelope.target_hole_id, &parsed_candidate)
-                {
-                    replaced = true;
-                    break;
-                } else if func.body == parsed_candidate {
-                    replaced = true;
-                    break;
-                }
-            }
-        }
-        if !replaced {
-            return Err(CasError::InvalidCandidate(format!(
-                "target hole `{}` not found in function `{}` during commit verification",
-                envelope.target_hole_id, envelope.target_function
-            )));
-        }
+        let expected_derived = derive_candidate_module(base_module, &envelope, &parsed_candidate)
+            .map_err(|e| {
+            CasError::InvalidCandidate(format!("commit derivation failure: {}", e))
+        })?;
         let expected_derived_hash = compute_module_hash(&expected_derived);
         let actual_derived_hash = compute_module_hash(&certified.derived_module);
         if expected_derived_hash != actual_derived_hash {
@@ -970,6 +982,9 @@ impl AstDatabase {
             .commits
             .insert(final_commit.commit_hash.clone(), final_commit.clone());
         next_state.root_ref = Some(new_root);
+
+        // [Spec 4] 锁内原子化删除已晋升为正式提交的草稿，杜绝幽灵草稿与并发竞态
+        next_state.drafts.remove(&envelope.target_hole_id);
 
         self.persist(&next_state)?;
         self.state = next_state;
@@ -1060,11 +1075,65 @@ impl AstDatabase {
         self.state.drafts.get(hole_id)
     }
 
+    /// Inserts or updates a provisional draft with CAS validation on expected revision and base root.
+    pub fn insert_draft_cas(
+        &mut self,
+        mut draft: DraftRecord,
+        expected_revision: Option<u64>,
+    ) -> Result<DraftRecord, CasError> {
+        let _guard = self.lock_and_sync()?;
+        let mut next_state = self.state.clone();
+
+        if let Some(existing) = next_state.drafts.get(&draft.hole_id) {
+            if let Some(exp_rev) = expected_revision {
+                if existing.revision != exp_rev {
+                    return Err(CasError::StaleDraftRevision {
+                        hole_id: draft.hole_id,
+                        current: existing.revision,
+                        expected: exp_rev,
+                    });
+                }
+            }
+            draft.revision = existing.revision + 1;
+        } else {
+            if let Some(exp_rev) = expected_revision {
+                if exp_rev != 0 {
+                    return Err(CasError::StaleDraftRevision {
+                        hole_id: draft.hole_id,
+                        current: 0,
+                        expected: exp_rev,
+                    });
+                }
+            }
+            draft.revision = 1;
+        }
+
+        if draft.base_root.is_none() {
+            draft.base_root = self.state.root_ref.clone();
+        }
+
+        next_state
+            .drafts
+            .insert(draft.hole_id.clone(), draft.clone());
+        self.persist(&next_state)?;
+        self.state = next_state;
+        Ok(draft)
+    }
+
     /// Inserts or updates a provisional draft for a hole and persists state.
     pub fn insert_draft(&mut self, draft: DraftRecord) -> Result<(), DbError> {
         let _guard = self.lock_and_sync()?;
         let mut next_state = self.state.clone();
-        next_state.drafts.insert(draft.hole_id.clone(), draft);
+        let mut d = draft;
+        if let Some(existing) = next_state.drafts.get(&d.hole_id) {
+            d.revision = existing.revision + 1;
+        } else if d.revision == 0 {
+            d.revision = 1;
+        }
+        if d.base_root.is_none() {
+            d.base_root = self.state.root_ref.clone();
+        }
+        next_state.drafts.insert(d.hole_id.clone(), d);
         self.persist(&next_state)?;
         self.state = next_state;
         Ok(())
@@ -1175,6 +1244,7 @@ impl FileLockGuard {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .share_mode(0)
             .open(path)
     }
@@ -1186,6 +1256,7 @@ impl FileLockGuard {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(path)?;
         let ret = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
         if ret != 0 {
