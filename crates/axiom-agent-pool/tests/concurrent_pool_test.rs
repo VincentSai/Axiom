@@ -7,14 +7,14 @@ use axiom_transpiler::transpile_to_rust;
 
 const TWO_HOLE_SKELETON: &str = r#"
     fn increment(value: Int) -> Int
-        requires { value >= 0 }
+        requires { value >= 0, value < 1000000 }
         ensures { result > value }
     {
         ?increment_impl
     }
 
     fn double(value: Int) -> Int
-        requires { value >= 0 }
+        requires { value >= 0, value < 1000000 }
         ensures { result >= value }
     {
         ?double_impl
@@ -351,14 +351,14 @@ fn persisted_pool_resumes_across_process_exits_seamlessly() {
 
     const MULTI_STEP_SKELETON: &str = r#"
         fn step_one(x: Int) -> Int
-            requires { x >= 0 }
+            requires { x >= 0, x < 1000000 }
             ensures { result > x }
         {
             ?step1_hole
         }
 
         fn step_two(y: Int) -> Int
-            requires { y >= 0 }
+            requires { y >= 0, y < 1000000 }
             ensures { result >= y }
         {
             ?step2_hole
@@ -442,10 +442,9 @@ fn persisted_pool_resumes_across_process_exits_seamlessly() {
 fn provisional_draft_can_be_upgraded_to_verified_status() {
     use axiom_agent_pool::HoleStatus;
 
-    // 骨架包含带合约函数
     const UPGRADE_SKELETON: &str = r#"
         fn safe_inc(x: Int) -> Int
-            requires { x >= 0 }
+            requires { x >= 0, x < 1000000 }
             ensures { result > x }
         {
             ?safe_inc_hole
@@ -461,18 +460,33 @@ fn provisional_draft_can_be_upgraded_to_verified_status() {
         Some(HoleStatus::Unresolved)
     );
 
-    // 1. 提交一个形式化证明成功的解，直接升级为 Verified
+    // 1. 先提交一个草稿解，真正制造 Provisional 状态
+    pool.submit_draft_solution("safe_inc_hole", "x + 5")
+        .expect("draft submission should succeed");
+    assert_eq!(
+        pool.hole_status("safe_inc_hole"),
+        Some(HoleStatus::Provisional),
+        "hole must transition from Unresolved to Provisional"
+    );
+    // 草稿模块已可用，但权威已验证模块仍不可发布
+    assert!(!axiom_agent_pool::ast_contains_any_hole(
+        pool.provisional_module()
+    ));
+    assert!(pool.assemble_verified_module().is_err());
+
+    // 2. 提交形式化严格证明解，草稿成功无缝升级为 Verified
     let outcome = pool
         .submit_solution_with_outcome("safe_inc_hole", "x + 10", "expert_agent")
-        .unwrap();
+        .expect("upgrading submission should succeed without MissingHole error");
     assert!(outcome.smt_result.is_proved());
     assert!(outcome.upgraded_to_verified);
     assert_eq!(
         pool.hole_status("safe_inc_hole"),
-        Some(HoleStatus::Verified)
+        Some(HoleStatus::Verified),
+        "hole must transition from Provisional to Verified"
     );
 
-    // 2. 已是 Verified 后，再次提交将被安全拒绝 (AlreadyResolved)
+    // 3. 已是 Verified 后，再次提交将被安全拒绝 (AlreadyResolved)
     let re_submit = pool.submit_solution("safe_inc_hole", "x + 20");
     match re_submit {
         Err(PoolError::AlreadyResolved(h)) => assert_eq!(h, "safe_inc_hole"),
@@ -482,4 +496,39 @@ fn provisional_draft_can_be_upgraded_to_verified_status() {
     // 最终成功交付正式模块
     let final_mod = pool.assemble_verified_module().unwrap();
     assert!(!axiom_agent_pool::ast_contains_any_hole(&final_mod));
+}
+
+#[test]
+fn multiple_holes_in_same_function_can_be_submitted_sequentially_without_contract_hash_drift() {
+    const MULTI_SKELETON: &str = r#"
+        fn add_pair(a: Int, b: Int) -> Int {
+            ?hole_a + ?hole_b
+        }
+    "#;
+
+    let mut pool = AgentTaskPool::from_source(MULTI_SKELETON)
+        .unwrap()
+        .with_policy(PoolVerificationPolicy::Permissive);
+
+    // 1. 提交第一个洞 hole_a
+    let res_a = pool
+        .submit_solution("hole_a", "a")
+        .expect("submitting first hole in function should succeed");
+    assert!(matches!(
+        res_a,
+        SmtResult::Skipped(_) | SmtResult::Sampled { .. }
+    ));
+
+    // 2. 提交同一函数中的第二个洞 hole_b：因为使用规范级 compute_contract_hash，契约哈希绝不漂移，绝不报 InvalidEnvelope
+    let res_b = pool
+        .submit_solution("hole_b", "b")
+        .expect("submitting second hole in same function must not fail with InvalidEnvelope");
+    assert!(matches!(
+        res_b,
+        SmtResult::Skipped(_) | SmtResult::Sampled { .. }
+    ));
+
+    assert!(pool.is_complete());
+    let draft = pool.assemble_provisional_module();
+    assert!(!axiom_agent_pool::ast_contains_any_hole(&draft));
 }

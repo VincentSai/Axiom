@@ -92,9 +92,9 @@ pub fn generate_smtlib2_with_module(
     }
     smt.push('\n');
 
-    // 2.5 Physical representation bounds: 64-bit signed integer range to align with Rust backend
-    smt.push_str("; Physical representation bounds: 64-bit signed integer range\n");
-    for (name, smt_ty) in flat_params.iter().chain(flat_results.iter()) {
+    // 2.5 Physical representation bounds: 64-bit signed integer range for inputs
+    smt.push_str("; Physical representation bounds: 64-bit signed integer range for inputs\n");
+    for (name, smt_ty) in &flat_params {
         if *smt_ty == "Int" {
             smt.push_str(&format!(
                 "(assert (and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807)))\n",
@@ -134,22 +134,36 @@ pub fn generate_smtlib2_with_module(
         bind_record_body_to_results(&inlined_body, &var_types, &mut smt)?;
     }
 
-    // 5. Assert negation of postconditions (Ensures)
-    smt.push_str("; Goal: Find any counterexample violating Ensures clauses\n");
-    if func.ensures.len() == 1 {
-        let inlined_ens = inline_calls(&func.ensures[0], &ctx, 0)?;
+    // 5. Assert negation of postconditions (Ensures) and 64-bit safety range obligations
+    smt.push_str(
+        "; Goal: Find any counterexample violating Ensures clauses or 64-bit range safety\n",
+    );
+    let mut obligations = Vec::new();
+    for ens in &func.ensures {
+        let inlined_ens = inline_calls(ens, &ctx, 0)?;
         let ens_expr = expr_to_smt(&inlined_ens, &var_types)?;
-        smt.push_str(&format!("(assert (not {}))\n\n", ens_expr));
-    } else {
-        let mut all_ens = String::from("(and");
-        for ens in &func.ensures {
-            let inlined_ens = inline_calls(ens, &ctx, 0)?;
-            let ens_expr = expr_to_smt(&inlined_ens, &var_types)?;
-            all_ens.push(' ');
-            all_ens.push_str(&ens_expr);
+        obligations.push(ens_expr);
+    }
+    // Safety range obligation: result Ints must not overflow 64-bit signed integer limits
+    for (name, smt_ty) in &flat_results {
+        if *smt_ty == "Int" {
+            obligations.push(format!(
+                "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
+                name, name
+            ));
         }
-        all_ens.push(')');
-        smt.push_str(&format!("(assert (not {}))\n\n", all_ens));
+    }
+
+    if obligations.len() == 1 {
+        smt.push_str(&format!("(assert (not {}))\n\n", obligations[0]));
+    } else {
+        let mut all_obs = String::from("(and");
+        for ob in &obligations {
+            all_obs.push(' ');
+            all_obs.push_str(ob);
+        }
+        all_obs.push(')');
+        smt.push_str(&format!("(assert (not {}))\n\n", all_obs));
     }
 
     // 6. Check satisfiability and retrieve model on counterexample

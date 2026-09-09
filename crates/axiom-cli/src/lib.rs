@@ -170,6 +170,10 @@ pub enum PoolAction {
         /// Strict verification policy: require formal SMT proof for contracted functions.
         #[arg(long)]
         strict: bool,
+
+        /// Output status and task envelopes as structured JSON.
+        #[arg(long)]
+        json: bool,
     },
 
     /// Submit a candidate expression solution for a specific hole and verify with SMT.
@@ -552,7 +556,7 @@ fn init() -> State {{
 }}
 
 fn calculate_next_count(current: Int) -> Int
-    requires {{ current >= 0 }}
+    requires {{ current >= 0, current < 1000000 }}
     ensures {{ result > current }}
 {{
     current + 1
@@ -976,7 +980,12 @@ fn create_task_pool(
 
 fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
     match action {
-        PoolAction::Status { file, db, strict } => {
+        PoolAction::Status {
+            file,
+            db,
+            strict,
+            json,
+        } => {
             let policy = if strict {
                 PoolVerificationPolicy::StrictProved
             } else {
@@ -985,31 +994,66 @@ fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
             let pool = create_task_pool(&file, db.as_deref(), policy)?;
             let tasks = pool.dispatch_tasks();
             let pending = pool.pending_hole_ids();
-            println!("Axiom Task Pool: {}", file.display());
-            if let Some(db_path) = db {
-                println!("Database: {}", db_path.display());
-            }
-            println!("Policy: {:?}", pool.policy());
-            println!("Total Dispatched Tasks: {}", tasks.len());
-            println!("Pending Holes: {}", pending.len());
-            for task in &tasks {
-                let status = pool
-                    .hole_status(&task.hole_id)
-                    .unwrap_or(axiom_agent_pool::HoleStatus::Unresolved);
-                let status_str = match status {
-                    axiom_agent_pool::HoleStatus::Verified => "[VERIFIED]",
-                    axiom_agent_pool::HoleStatus::Provisional => "[PROVISIONAL]",
-                    axiom_agent_pool::HoleStatus::Unresolved => "[UNRESOLVED]",
-                };
-                let eff_str = if task.allowed_effects.is_empty() {
-                    "pure".to_string()
-                } else {
-                    format!("effects: [{}]", task.allowed_effects.join(", "))
-                };
+            if json {
+                let task_dtos: Vec<serde_json::Value> = tasks
+                    .iter()
+                    .map(|task| {
+                        let status = pool
+                            .hole_status(&task.hole_id)
+                            .unwrap_or(axiom_agent_pool::HoleStatus::Unresolved);
+                        let env = pool.envelope_for_hole(&task.hole_id);
+                        serde_json::json!({
+                            "hole_id": task.hole_id,
+                            "target_function": task.target_function,
+                            "status": match status {
+                                axiom_agent_pool::HoleStatus::Verified => "VERIFIED",
+                                axiom_agent_pool::HoleStatus::Provisional => "PROVISIONAL",
+                                axiom_agent_pool::HoleStatus::Unresolved => "UNRESOLVED",
+                            },
+                            "allowed_effects": task.allowed_effects,
+                            "envelope": env,
+                        })
+                    })
+                    .collect();
+                let status_dto = serde_json::json!({
+                    "file": file.display().to_string(),
+                    "db": db.as_ref().map(|p| p.display().to_string()),
+                    "policy": format!("{:?}", pool.policy()),
+                    "total_tasks": tasks.len(),
+                    "pending_holes": pending.len(),
+                    "tasks": task_dtos,
+                });
                 println!(
-                    "  {} ?{} in function `{}` ({})",
-                    status_str, task.hole_id, task.target_function, eff_str
+                    "{}",
+                    serde_json::to_string_pretty(&status_dto).map_err(CliError::Serialize)?
                 );
+            } else {
+                println!("Axiom Task Pool: {}", file.display());
+                if let Some(db_path) = db {
+                    println!("Database: {}", db_path.display());
+                }
+                println!("Policy: {:?}", pool.policy());
+                println!("Total Dispatched Tasks: {}", tasks.len());
+                println!("Pending Holes: {}", pending.len());
+                for task in &tasks {
+                    let status = pool
+                        .hole_status(&task.hole_id)
+                        .unwrap_or(axiom_agent_pool::HoleStatus::Unresolved);
+                    let status_str = match status {
+                        axiom_agent_pool::HoleStatus::Verified => "[VERIFIED]",
+                        axiom_agent_pool::HoleStatus::Provisional => "[PROVISIONAL]",
+                        axiom_agent_pool::HoleStatus::Unresolved => "[UNRESOLVED]",
+                    };
+                    let eff_str = if task.allowed_effects.is_empty() {
+                        "pure".to_string()
+                    } else {
+                        format!("effects: [{}]", task.allowed_effects.join(", "))
+                    };
+                    println!(
+                        "  {} ?{} in function `{}` ({})",
+                        status_str, task.hole_id, task.target_function, eff_str
+                    );
+                }
             }
             Ok(())
         }
@@ -1048,166 +1092,8 @@ fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
                 .submit_solution_with_outcome(&hole, &solution_expr, "axiom-worker")
                 .map_err(CliError::Pool)?;
 
-            if !json {
-                for ev in &outcome.cas_events {
-                    match ev {
-                        axiom_agent_pool::CasEvent::StaleRootDetected { expected, current } => {
-                            println!(
-                                "[CAS_EVENT:STALE_ROOT_DETECTED] expected: {:?}, current: {:?}",
-                                expected, current
-                            );
-                        }
-                        axiom_agent_pool::CasEvent::RebaseSucceeded {
-                            rebased_root,
-                            attempts,
-                        } => {
-                            println!(
-                                "[CAS_EVENT:REBASE_SUCCEEDED] rebased to root: {} (attempts: {})",
-                                rebased_root, attempts
-                            );
-                        }
-                    }
-                }
-            }
-
-            match &outcome.smt_result {
-                SmtResult::Proved {
-                    solver,
-                    version,
-                    obligations_checked,
-                } => {
-                    if json {
-                        let obj = serde_json::json!({
-                            "hole": hole,
-                            "status": "ACCEPTED",
-                            "proved": true,
-                            "cas_events": outcome.cas_events,
-                            "solver": solver,
-                            "solver_version": version,
-                            "obligations_checked": obligations_checked,
-                        });
-                        println!("{}", serde_json::to_string_pretty(&obj).unwrap());
-                    } else {
-                        println!(
-                            "[ACCEPTED] Hole `?{hole}` formally verified with SMT proof ({solver} v{version}, obligations: {obligations_checked})."
-                        );
-                    }
-                    Ok(())
-                }
-                SmtResult::VacuousContract { reason } => {
-                    if json {
-                        let obj = serde_json::json!({
-                            "hole": hole,
-                            "status": "REJECTED",
-                            "proved": false,
-                            "cas_events": outcome.cas_events,
-                            "reason": format!("vacuous contract: {reason}"),
-                        });
-                        println!("{}", serde_json::to_string_pretty(&obj).unwrap());
-                    } else {
-                        println!(
-                            "[REJECTED] SMT vacuous contract error (unsatisfiable preconditions)"
-                        );
-                        println!("Vacuity diagnosis: {reason}");
-                    }
-                    Err(CliError::HoleVerificationRejected(format!(
-                        "vacuous contract: {reason}"
-                    )))
-                }
-                SmtResult::Sampled { points_checked } => {
-                    if strict {
-                        if json {
-                            let obj = serde_json::json!({
-                                "hole": hole,
-                                "status": "REJECTED",
-                                "proved": false,
-                                "cas_events": outcome.cas_events,
-                                "reason": format!("sampled {points_checked} points without formal proof"),
-                            });
-                            println!("{}", serde_json::to_string_pretty(&obj).unwrap());
-                        } else {
-                            println!(
-                                "[REJECTED] Verification sampled {} points but strict formal proof is required.",
-                                points_checked
-                            );
-                        }
-                        Err(CliError::HoleVerificationRejected(format!(
-                            "sampled {} points without formal proof",
-                            points_checked
-                        )))
-                    } else {
-                        if json {
-                            let obj = serde_json::json!({
-                                "hole": hole,
-                                "status": "ACCEPTED",
-                                "proved": false,
-                                "cas_events": outcome.cas_events,
-                                "points_checked": points_checked,
-                            });
-                            println!("{}", serde_json::to_string_pretty(&obj).unwrap());
-                        } else {
-                            println!(
-                                "[ACCEPTED] Hole `?{hole}` verified via sampling ({} points checked).",
-                                points_checked
-                            );
-                        }
-                        Ok(())
-                    }
-                }
-                SmtResult::CounterExample(inputs) => {
-                    if json {
-                        let obj = serde_json::json!({
-                            "hole": hole,
-                            "status": "REJECTED",
-                            "proved": false,
-                            "cas_events": outcome.cas_events,
-                            "counter_example": inputs,
-                        });
-                        println!("{}", serde_json::to_string_pretty(&obj).unwrap());
-                    } else {
-                        println!("[REJECTED] SMT counter-example found");
-                        println!("Counter-example inputs: {:?}", inputs);
-                    }
-                    Err(CliError::HoleVerificationRejected(format!(
-                        "counter-example found with inputs: {:?}",
-                        inputs
-                    )))
-                }
-                SmtResult::Unknown(reason) => {
-                    if json {
-                        let obj = serde_json::json!({
-                            "hole": hole,
-                            "status": "REJECTED",
-                            "proved": false,
-                            "cas_events": outcome.cas_events,
-                            "reason": format!("solver unknown: {reason}"),
-                        });
-                        println!("{}", serde_json::to_string_pretty(&obj).unwrap());
-                    } else {
-                        println!("[REJECTED] SMT solver returned unknown: {reason}");
-                    }
-                    Err(CliError::HoleVerificationRejected(format!(
-                        "solver unknown: {reason}"
-                    )))
-                }
-                SmtResult::Skipped(reason) => {
-                    if json {
-                        let obj = serde_json::json!({
-                            "hole": hole,
-                            "status": "REJECTED",
-                            "proved": false,
-                            "cas_events": outcome.cas_events,
-                            "reason": format!("verification skipped: {reason}"),
-                        });
-                        println!("{}", serde_json::to_string_pretty(&obj).unwrap());
-                    } else {
-                        println!("[REJECTED] Verification skipped: {reason}");
-                    }
-                    Err(CliError::HoleVerificationRejected(format!(
-                        "verification skipped: {reason}"
-                    )))
-                }
-            }
+            let dto = outcome.to_dto(&hole);
+            render_submit_outcome(&dto, json, strict)
         }
         PoolAction::Assemble {
             file,
@@ -1266,5 +1152,105 @@ fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
             }
             Ok(())
         }
+    }
+}
+
+fn render_submit_outcome(
+    dto: &axiom_agent_pool::SubmitOutcomeDto,
+    json: bool,
+    strict: bool,
+) -> Result<(), CliError> {
+    if json {
+        let json_str = serde_json::to_string_pretty(dto).map_err(CliError::Serialize)?;
+        println!("{json_str}");
+    } else {
+        for ev in &dto.cas_events {
+            match ev {
+                axiom_agent_pool::CasEvent::StaleRootDetected { expected, current } => {
+                    println!(
+                        "[CAS_EVENT:STALE_ROOT_DETECTED] expected: {:?}, current: {:?}",
+                        expected, current
+                    );
+                }
+                axiom_agent_pool::CasEvent::RebaseSucceeded {
+                    rebased_root,
+                    attempts,
+                } => {
+                    println!(
+                        "[CAS_EVENT:REBASE_SUCCEEDED] rebased to root: {} (attempts: {})",
+                        rebased_root, attempts
+                    );
+                }
+            }
+        }
+
+        match dto.status.as_str() {
+            "ACCEPTED" => {
+                let solver = dto.solver.as_deref().unwrap_or("Z3");
+                let version = dto.solver_version.as_deref().unwrap_or("unknown");
+                let obligations = dto.obligations_checked.unwrap_or(0);
+                println!(
+                    "[ACCEPTED] Hole `?{}` formally verified with SMT proof ({solver} v{version}, obligations: {obligations}).",
+                    dto.hole
+                );
+                if dto.upgraded_to_verified {
+                    println!("  [UPGRADED] Successfully upgraded hole status from provisional draft to verified.");
+                }
+            }
+            "PROVISIONAL" => {
+                let points = dto.obligations_checked.unwrap_or(0);
+                if strict {
+                    println!(
+                        "[REJECTED] Verification sampled {points} points but strict formal proof is required."
+                    );
+                } else {
+                    println!(
+                        "[ACCEPTED] Hole `?{}` verified via sampling ({points} points checked).",
+                        dto.hole
+                    );
+                }
+            }
+            "REJECTED" => {
+                if let Some(ce) = &dto.counter_example {
+                    println!("[REJECTED] SMT counter-example found");
+                    println!("Counter-example inputs: {ce}");
+                } else {
+                    println!(
+                        "[REJECTED] SMT verification failed: {}",
+                        dto.reason.as_deref().unwrap_or("contract violated")
+                    );
+                }
+            }
+            "UNKNOWN" => {
+                println!(
+                    "[REJECTED] SMT solver returned unknown: {}",
+                    dto.reason.as_deref().unwrap_or("unknown")
+                );
+            }
+            "SKIPPED" => {
+                println!(
+                    "[REJECTED] Verification skipped: {}",
+                    dto.reason.as_deref().unwrap_or("skipped")
+                );
+            }
+            other => {
+                println!("[REJECTED] Verification outcome: {other}");
+            }
+        }
+    }
+
+    match dto.status.as_str() {
+        "ACCEPTED" => Ok(()),
+        "PROVISIONAL" if !strict => Ok(()),
+        "PROVISIONAL" => Err(CliError::HoleVerificationRejected(
+            dto.reason
+                .clone()
+                .unwrap_or_else(|| "strict formal proof required".to_string()),
+        )),
+        _ => Err(CliError::HoleVerificationRejected(
+            dto.reason
+                .clone()
+                .unwrap_or_else(|| "verification rejected".to_string()),
+        )),
     }
 }

@@ -86,6 +86,8 @@ pub fn run_z3_query_with_timeout(
     smt2_query: &str,
     timeout_ms: u32,
 ) -> Result<Z3Result, String> {
+    use std::io::Read;
+
     let mut child = Command::new(z3_path)
         .arg("-in")
         .arg("-smt2")
@@ -102,14 +104,62 @@ pub fn run_z3_query_with_timeout(
             .map_err(|e| format!("failed to write query to z3 stdin: {}", e))?;
     }
 
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("failed to wait for z3: {}", e))?;
+    let mut stdout_handle = child.stdout.take().ok_or("failed to take stdout")?;
+    let mut stderr_handle = child.stderr.take().ok_or("failed to take stderr")?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout_join = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stdout_handle.read_to_end(&mut buf);
+        buf
+    });
+    let stderr_join = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stderr_handle.read_to_end(&mut buf);
+        buf
+    });
 
-    if !stderr.is_empty() && !output.status.success() {
+    let start = std::time::Instant::now();
+    let timeout = std::time::Duration::from_millis(timeout_ms as u64);
+    let mut is_timeout = false;
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(_status)) => break,
+            Ok(None) => {
+                if start.elapsed() >= timeout {
+                    is_timeout = true;
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            Err(e) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("error polling z3 child process: {}", e));
+            }
+        }
+    }
+
+    let stdout_bytes = stdout_join
+        .join()
+        .map_err(|_| "stdout reader thread panicked")?;
+    let stderr_bytes = stderr_join
+        .join()
+        .map_err(|_| "stderr reader thread panicked")?;
+
+    if is_timeout {
+        return Err(format!(
+            "Z3 solver process hard-killed: execution time exceeded timeout threshold of {}ms",
+            timeout_ms
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&stdout_bytes);
+    let stderr = String::from_utf8_lossy(&stderr_bytes);
+
+    if !stderr.is_empty() && stderr.contains("error") {
         return Err(format!("z3 error: {}", stderr.trim()));
     }
 

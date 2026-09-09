@@ -40,6 +40,7 @@ type Point = {
 fn increment(x: Int) -> Int
     requires {
         x >= 0,
+        x < 1000000,
     }
     ensures {
         result > x,

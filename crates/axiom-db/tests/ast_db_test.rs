@@ -1,7 +1,7 @@
 use axiom_ast::{EffectDecl, EffectOp, Expr, FunctionDecl, FunctionParam, Module, Type, TypeDef};
 use axiom_db::{
-    compute_effect_hash, compute_function_hash, compute_module_hash, compute_type_hash,
-    AstDatabase, NodeHash,
+    compute_contract_hash, compute_effect_hash, compute_function_hash, compute_module_hash,
+    compute_type_hash, AstDatabase, NodeHash,
 };
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -151,7 +151,7 @@ fn sample_verifiable_skeleton() -> Module {
     axiom_parser::parse_module(
         r#"
         fn increment(x: Int) -> Int
-            requires { x >= 0 }
+            requires { x >= 0, x < 1000000 }
             ensures { result > x }
         {
             ?inc_impl
@@ -177,7 +177,7 @@ fn cas_commits_valid_candidate_and_kernel_mints_receipt() {
         base_root_hash: Some(initial_root.clone()),
         target_hole_id: "inc_impl".into(),
         target_function: "increment".into(),
-        contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
+        contract_hash: axiom_db::compute_contract_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let env_hash = compute_envelope_hash(&envelope);
@@ -248,7 +248,7 @@ fn cas_detects_and_rejects_forged_module() {
         base_root_hash: Some(initial_root.clone()),
         target_hole_id: "inc_impl".into(),
         target_function: "increment".into(),
-        contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
+        contract_hash: axiom_db::compute_contract_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let env_hash = compute_envelope_hash(&envelope);
@@ -296,7 +296,7 @@ fn cas_stale_root_preserves_candidates_without_silent_overwrite() {
         base_root_hash: Some(stale_root.clone()),
         target_hole_id: "inc_impl".into(),
         target_function: "increment".into(),
-        contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
+        contract_hash: axiom_db::compute_contract_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let adv_cand = Candidate {
@@ -315,7 +315,7 @@ fn cas_stale_root_preserves_candidates_without_silent_overwrite() {
         base_root_hash: Some(stale_root.clone()),
         target_hole_id: "inc_impl".into(),
         target_function: "increment".into(),
-        contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
+        contract_hash: axiom_db::compute_contract_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let env_hash = compute_envelope_hash(&envelope);
@@ -368,7 +368,7 @@ fn kernel_verification_rejects_counterexample_candidate() {
         base_root_hash: Some(root.clone()),
         target_hole_id: "inc_impl".into(),
         target_function: "increment".into(),
-        contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
+        contract_hash: axiom_db::compute_contract_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let env_hash = compute_envelope_hash(&envelope);
@@ -418,7 +418,7 @@ fn cross_instance_cas_file_locking_and_stale_root_detection() {
         base_root_hash: Some(initial_root.clone()),
         target_hole_id: "inc_impl".into(),
         target_function: "increment".into(),
-        contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
+        contract_hash: axiom_db::compute_contract_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let candidate1 = Candidate {
@@ -448,7 +448,7 @@ fn cross_instance_cas_file_locking_and_stale_root_detection() {
         base_root_hash: Some(initial_root.clone()),
         target_hole_id: "inc_impl".into(),
         target_function: "increment".into(),
-        contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
+        contract_hash: axiom_db::compute_contract_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let candidate2 = Candidate {
@@ -568,7 +568,7 @@ fn two_phase_cas_offline_verification_and_short_lock_commit() {
 
     let root = db.current_root();
     let func = &initial_mod.functions[0];
-    let contract_hash = compute_function_hash(func);
+    let contract_hash = compute_contract_hash(func);
 
     let envelope = axiom_db::TaskEnvelope {
         base_root_hash: root.clone(),
@@ -591,7 +591,7 @@ fn two_phase_cas_offline_verification_and_short_lock_commit() {
         .verify_candidate_offline(&root, &envelope, &candidate, None)
         .expect("offline verification should succeed");
 
-    assert_eq!(certified.obligations_checked, 1);
+    assert_eq!(certified.obligations_checked(), 1);
 
     // 2. 微秒级短锁原子提交
     let commit = db
@@ -601,6 +601,53 @@ fn two_phase_cas_offline_verification_and_short_lock_commit() {
     assert_eq!(commit.parent_root, root);
     assert_ne!(Some(commit.new_root.clone()), root);
     assert_eq!(db.current_root(), Some(commit.new_root.clone()));
+
+    let _ = std::fs::remove_file(&db_path);
+}
+
+#[test]
+fn two_phase_cas_rejects_mismatched_base_root() {
+    let db_path = temporary_database_path("two_phase_mismatch_test");
+    let mut db = AstDatabase::open(&db_path).unwrap();
+    let initial_mod = sample_verifiable_skeleton();
+    let mod_rec = db.insert_module(&initial_mod).unwrap();
+    db.initialize_root(mod_rec.module_hash.clone()).unwrap();
+
+    let root = db.current_root();
+    let func = &initial_mod.functions[0];
+    let contract_hash = compute_contract_hash(func);
+
+    let envelope = axiom_db::TaskEnvelope {
+        base_root_hash: root.clone(),
+        target_hole_id: "inc_impl".into(),
+        target_function: "increment".into(),
+        contract_hash,
+        dependency_hashes: vec![],
+    };
+
+    let candidate = axiom_db::Candidate {
+        envelope_hash: axiom_db::compute_envelope_hash(&envelope),
+        expression_source: "x + 1".into(),
+        expression_hash: axiom_db::compute_expr_hash(&axiom_parser::parse_expr("x + 1").unwrap()),
+        author_agent_id: "agent_mismatch".into(),
+        timestamp: 123456,
+    };
+
+    let certified = db
+        .verify_candidate_offline(&root, &envelope, &candidate, None)
+        .expect("offline verification should succeed");
+
+    // 试图将基于 root 的证书提交给一个伪造的/过期的 root
+    let fake_root = Some(
+        "#mod_0000000000000000000000000000000000000000000000000000000000000001"
+            .parse::<NodeHash>()
+            .unwrap(),
+    );
+    let err = db.try_commit_verified(&fake_root, envelope, candidate, certified);
+    assert!(
+        err.is_err(),
+        "commit with mismatched base_root_hash must be rejected!"
+    );
 
     let _ = std::fs::remove_file(&db_path);
 }

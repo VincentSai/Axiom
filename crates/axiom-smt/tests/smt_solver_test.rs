@@ -135,7 +135,7 @@ fn generates_valid_smtlib2_query_script() {
     assert!(smt2.contains("(declare-const result Int)"));
     assert!(smt2.contains("(assert (>= balance 0))"));
     assert!(smt2.contains("(assert (= result (- balance amount)))"));
-    assert!(smt2.contains("(assert (not (and (>= result 0) (= result (- balance amount)))))"));
+    assert!(smt2.contains("(assert (not (and (>= result 0) (= result (- balance amount)) (and (>= result (- 9223372036854775808)) (<= result 9223372036854775807)))))"));
     assert!(smt2.contains("(check-sat)"));
     assert!(smt2.contains("(get-model)"));
 }
@@ -217,5 +217,30 @@ fn detects_and_rejects_vacuous_contract_with_unsatisfiable_preconditions() {
             }
             other => panic!("expected VacuousContract, got: {:?}", other),
         }
+    }
+}
+
+#[test]
+fn detects_and_rejects_integer_overflow_beyond_i64_bounds() {
+    let module = parse_module(
+        r#"
+        fn potential_overflow(x: Int) -> Int
+            requires { x >= 0 }
+            ensures { result > x }
+        {
+            x + 1
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let res = verify_function(&module.functions[0]);
+
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(res, SmtResult::CounterExample(_)),
+            "Z3 SMT must find counterexample when x + 1 can exceed i64::MAX! Got: {:?}",
+            res
+        );
     }
 }

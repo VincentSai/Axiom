@@ -99,6 +99,29 @@ pub fn compute_function_hash(func: &FunctionDecl) -> NodeHash {
     compute_hash("fn", func)
 }
 
+/// Computes the content identifier of a function's specification contract (signature, effects, requires, ensures).
+/// This purposefully excludes the function body implementation, allowing independent hole-filling.
+pub fn compute_contract_hash(func: &FunctionDecl) -> NodeHash {
+    #[derive(Serialize)]
+    struct ContractPayload<'a> {
+        name: &'a str,
+        params: &'a [FunctionParam],
+        return_type: &'a Type,
+        effects: &'a [String],
+        requires: &'a [Expr],
+        ensures: &'a [Expr],
+    }
+    let payload = ContractPayload {
+        name: &func.name,
+        params: &func.params,
+        return_type: &func.return_type,
+        effects: &func.effects,
+        requires: &func.requires,
+        ensures: &func.ensures,
+    };
+    compute_hash("contract", &payload)
+}
+
 /// Computes the content identifier of an effect declaration.
 pub fn compute_effect_hash(eff: &EffectDecl) -> NodeHash {
     compute_hash("effect", eff)
@@ -412,16 +435,45 @@ impl From<serde_json::Error> for CasError {
 }
 
 /// Kernel-minted cryptographic verification certificate computed offline without database locks.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// This certificate is sealed: it cannot be constructed from outside axiom-db or deserialized arbitrarily.
+#[derive(Debug, Clone, PartialEq)]
 pub struct CertifiedVerification {
-    pub base_root_hash: Option<NodeHash>,
-    pub envelope_hash: NodeHash,
-    pub candidate_hash: NodeHash,
-    pub proof_obligation_hash: NodeHash,
-    pub derived_module: Module,
-    pub solver: String,
-    pub solver_version: String,
-    pub obligations_checked: usize,
+    pub(crate) base_root_hash: Option<NodeHash>,
+    pub(crate) envelope_hash: NodeHash,
+    pub(crate) candidate_hash: NodeHash,
+    pub(crate) proof_obligation_hash: NodeHash,
+    pub(crate) derived_module: Module,
+    pub(crate) solver: String,
+    pub(crate) solver_version: String,
+    pub(crate) obligations_checked: usize,
+    pub(crate) _sealed: (),
+}
+
+impl CertifiedVerification {
+    pub fn base_root_hash(&self) -> Option<&NodeHash> {
+        self.base_root_hash.as_ref()
+    }
+    pub fn envelope_hash(&self) -> &NodeHash {
+        &self.envelope_hash
+    }
+    pub fn candidate_hash(&self) -> &NodeHash {
+        &self.candidate_hash
+    }
+    pub fn proof_obligation_hash(&self) -> &NodeHash {
+        &self.proof_obligation_hash
+    }
+    pub fn derived_module(&self) -> &Module {
+        &self.derived_module
+    }
+    pub fn solver(&self) -> &str {
+        &self.solver
+    }
+    pub fn solver_version(&self) -> &str {
+        &self.solver_version
+    }
+    pub fn obligations_checked(&self) -> usize {
+        self.obligations_checked
+    }
 }
 
 /// Internal storage state of the AST database, accessible within transactions.
@@ -595,15 +647,6 @@ impl AstDatabase {
         })
     }
 
-    /// Records a verification receipt for audit and compliance under lock.
-    pub fn record_receipt(&mut self, receipt: VerificationReceipt) -> Result<NodeHash, DbError> {
-        self.locked_transaction(|state| {
-            let hash = compute_receipt_hash(&receipt);
-            state.receipts.insert(hash.clone(), receipt);
-            Ok(hash)
-        })
-    }
-
     /// Performs offline Z3 formal verification of a candidate against the expected base module
     /// without acquiring database file locks.
     ///
@@ -681,7 +724,7 @@ impl AstDatabase {
                 ))
             })?;
 
-        let actual_contract_hash = compute_function_hash(target_func);
+        let actual_contract_hash = compute_contract_hash(target_func);
         if envelope.contract_hash != actual_contract_hash {
             return Err(CasError::InvalidEnvelope(format!(
                 "envelope contract hash `{}` does not match base function contract hash `{}`",
@@ -772,13 +815,15 @@ impl AstDatabase {
             solver,
             solver_version,
             obligations_checked,
+            _sealed: (),
         })
     }
 
-    /// Atomic CAS commit of a verified candidate using a short-lived exclusive OS lock.
+    /// Two-phase commit Phase 2: Atomically applies a certified verification candidate to the CAS database.
     ///
-    /// The lock is held ONLY for the microsecond duration of checking the root and persisting
-    /// the new state to disk. Mathematical theorem proving is NOT performed under lock.
+    /// The lock is held ONLY for the microsecond duration of checking the root, verifying the derived
+    /// module hash matches deterministic AST transformation, and persisting the new state to disk.
+    /// Mathematical theorem proving is NOT performed under lock.
     pub fn try_commit_verified(
         &mut self,
         expected_root: &Option<NodeHash>,
@@ -792,6 +837,12 @@ impl AstDatabase {
         if certified.envelope_hash != env_hash || certified.candidate_hash != cand_hash {
             return Err(CasError::InvalidCandidate(
                 "certified verification does not match envelope or candidate".to_string(),
+            ));
+        }
+
+        if &certified.base_root_hash != expected_root {
+            return Err(CasError::InvalidCandidate(
+                "certified verification base_root_hash does not match expected_root".to_string(),
             ));
         }
 
@@ -816,6 +867,43 @@ impl AstDatabase {
                 current: self.state.root_ref.clone(),
                 expected: expected_root.clone(),
             });
+        }
+
+        // 2.5 锁内极速验证 derived_module 确由 base_module 与 candidate 表达式确定性推导生成（纳秒级操作，防止模块伪造）
+        let base_module = match expected_root {
+            Some(root_hash) => self.state.modules.get(root_hash).ok_or_else(|| {
+                CasError::InvalidEnvelope(format!("expected root module {} not found", root_hash))
+            })?,
+            None => &Module::default(),
+        };
+
+        let parsed_candidate =
+            axiom_parser::parse_expr(&candidate.expression_source).map_err(|e| {
+                CasError::InvalidCandidate(format!("candidate expression parse failure: {}", e))
+            })?;
+        let mut expected_derived = base_module.clone();
+        let mut replaced = false;
+        for func in &mut expected_derived.functions {
+            if func.name == envelope.target_function {
+                if replace_hole_in_expr(&mut func.body, &envelope.target_hole_id, &parsed_candidate)
+                {
+                    replaced = true;
+                    break;
+                }
+            }
+        }
+        if !replaced {
+            return Err(CasError::InvalidCandidate(format!(
+                "target hole `{}` not found in function `{}` during commit verification",
+                envelope.target_hole_id, envelope.target_function
+            )));
+        }
+        let expected_derived_hash = compute_module_hash(&expected_derived);
+        let actual_derived_hash = compute_module_hash(&certified.derived_module);
+        if expected_derived_hash != actual_derived_hash {
+            return Err(CasError::ForgedModule(format!(
+                "certified module hash `{actual_derived_hash}` does not match kernel deterministic derivation `{expected_derived_hash}`"
+            )));
         }
 
         // 3. 内核铸造防伪证明收据
@@ -974,6 +1062,7 @@ impl AstDatabase {
 /// RAII cross-process exclusive OS file lock guard.
 #[derive(Debug)]
 pub struct FileLockGuard {
+    #[allow(dead_code)]
     lock_path: PathBuf,
     file: Option<fs::File>,
 }
@@ -1072,9 +1161,10 @@ impl FileLockGuard {
 
 impl Drop for FileLockGuard {
     fn drop(&mut self) {
-        // Drop the file handle first to release OS kernel lock (Windows handle / Unix flock)
+        // Drop the file handle to release OS kernel lock (Windows share_mode / Unix flock).
+        // The lock file is permanently retained to preserve the single inode and prevent
+        // double-locking race conditions between unlink and concurrent re-creation.
         self.file.take();
-        let _ = fs::remove_file(&self.lock_path);
     }
 }
 
@@ -1108,19 +1198,31 @@ fn atomic_replace_file(from: &Path, to: &Path) -> Result<(), DbError> {
         return Ok(());
     }
 
-    let ret = unsafe {
-        MoveFileExW(
-            from_wide.as_ptr(),
-            to_wide.as_ptr(),
-            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-        )
-    };
-    if ret == 0 {
+    let mut last_err = None;
+    for _ in 0..10 {
+        let ret = unsafe {
+            MoveFileExW(
+                from_wide.as_ptr(),
+                to_wide.as_ptr(),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+            )
+        };
+        if ret != 0 {
+            return Ok(());
+        }
         let err = std::io::Error::last_os_error();
+        if err.raw_os_error() == Some(5) || err.raw_os_error() == Some(32) {
+            std::thread::sleep(std::time::Duration::from_millis(15));
+            last_err = Some(err);
+            continue;
+        }
         let _ = fs::remove_file(from);
         return Err(DbError::Io(err));
     }
-    Ok(())
+    let _ = fs::remove_file(from);
+    Err(DbError::Io(
+        last_err.unwrap_or_else(std::io::Error::last_os_error),
+    ))
 }
 
 #[cfg(not(windows))]

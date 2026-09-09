@@ -144,7 +144,7 @@ fn twenty_hole_skeleton() -> String {
             source,
             r#"
 fn worker_{index:02}(value: Int) -> Int
-    requires {{ value >= 0 }}
+    requires {{ value >= 0, value < 1000000 }}
     ensures {{ result > value }}
 {{
     ?hole_{index:02}

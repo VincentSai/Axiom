@@ -384,7 +384,7 @@ AXIOM_SYSTEM_CAPSULE = """- Return ONLY a single pure expression (no semicolons 
 - Canonical Example: `match a >= b { true => a - b, false => b - a }`"""
 
 
-def build_axiom_context_capsule(task: dict) -> ContextCapsule:
+def build_axiom_context_capsule(task: dict, envelope: dict = None) -> ContextCapsule:
     fname = task["function_name"]
     hole_id = f"{fname}_hole"
     params = ", ".join([f"{p['name']}: {p['type']}" for p in task["inputs"]])
@@ -401,12 +401,23 @@ def build_axiom_context_capsule(task: dict) -> ContextCapsule:
 {{
     ?{hole_id}
 }}"""
-    dependency_text = "// Referenced types: Int (i64), Bool (boolean)"
+    dep_lines = []
+    types_used = sorted(set([p["type"] for p in task.get("inputs", [])] + [task.get("output", "Int")]))
+    dep_lines.append(f"// Primitive & Domain Types: {', '.join(types_used)}")
+    if envelope:
+        c_hash = envelope.get("contract_hash")
+        if c_hash:
+            dep_lines.append(f"// TaskEnvelope Contract Hash: {c_hash}")
+        deps = envelope.get("dependency_hashes")
+        if deps:
+            for dep in deps:
+                dep_lines.append(f"// TaskEnvelope Dependency Hash: {dep}")
+    dependency_text = "\n".join(dep_lines)
     return ContextCapsule(AXIOM_SYSTEM_CAPSULE, skeleton, dependency_text)
 
 
-def build_axiom_worker_prompt(task: dict) -> str:
-    capsule = build_axiom_context_capsule(task)
+def build_axiom_worker_prompt(task: dict, envelope: dict = None) -> str:
+    capsule = build_axiom_context_capsule(task, envelope)
     return capsule.render_prompt()
 
 
@@ -511,8 +522,8 @@ def benchmark_cas_concurrency_and_stale_root(axiom_bin: str, is_mock: bool = Fal
     import threading
     t_start = time.time()
 
-    skel = """fn task_a(x: Int) -> Int requires { x >= 0 } ensures { result > x } { ?hole_a }
-fn task_b(y: Int) -> Int requires { y >= 0 } ensures { result >= y } { ?hole_b }
+    skel = """fn task_a(x: Int) -> Int requires { x >= 0, x < 1000000 } ensures { result > x } { ?hole_a }
+fn task_b(y: Int) -> Int requires { y >= 0, y < 1000000 } ensures { result >= y } { ?hole_b }
 """
     with tempfile.TemporaryDirectory() as tmpdir:
         skel_file = os.path.join(tmpdir, "race_skel.ax")
@@ -576,26 +587,27 @@ fn task_b(y: Int) -> Int requires { y >= 0 } ensures { result >= y } { ?hole_b }
 
         for wid, r in results.items():
             stdout = r.get("stdout", "")
-            w_events = []
+            if not stdout:
+                raise RuntimeError(
+                    f"Fail-Closed: Worker {wid} returned empty output. "
+                    f"returncode={r.get('returncode')}, stderr={r.get('stderr')}"
+                )
             try:
                 data = json.loads(stdout)
-                events = data.get("cas_events", [])
-                for ev in events:
-                    w_events.append(ev)
-                    if isinstance(ev, dict):
-                        if "StaleRootDetected" in ev:
-                            stale_roots_observed += 1
-                        if "RebaseSucceeded" in ev:
-                            rebases_succeeded += 1
-            except Exception:
-                if "[CAS_EVENT:STALE_ROOT_DETECTED]" in stdout:
-                    cnt = stdout.count("[CAS_EVENT:STALE_ROOT_DETECTED]")
-                    stale_roots_observed += cnt
-                    w_events.append({"StaleRootDetected": cnt})
-                if "[CAS_EVENT:REBASE_SUCCEEDED]" in stdout:
-                    cnt = stdout.count("[CAS_EVENT:REBASE_SUCCEEDED]")
-                    rebases_succeeded += cnt
-                    w_events.append({"RebaseSucceeded": cnt})
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(
+                    f"Fail-Closed: Worker {wid} CLI output is not valid JSON:\nSTDOUT:\n{stdout}\nSTDERR:\n{r.get('stderr')}"
+                ) from exc
+
+            w_events = []
+            events = data.get("cas_events", [])
+            for ev in events:
+                w_events.append(ev)
+                if isinstance(ev, dict):
+                    if "StaleRootDetected" in ev:
+                        stale_roots_observed += 1
+                    if "RebaseSucceeded" in ev:
+                        rebases_succeeded += 1
             parsed_events[wid] = w_events
 
         return {
@@ -815,6 +827,25 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
     # 1. 架构师初始 5 洞骨架
     initial_skeleton = build_axiom_initial_skeleton(tasks)
 
+    # 1.1 从权威骨架中提取真实 TaskEnvelope 契约与依赖元数据 (Fail-Closed)
+    envelopes_by_hole = {}
+    with tempfile.TemporaryDirectory() as tmp_meta_dir:
+        skel_meta_path = os.path.join(tmp_meta_dir, "skel.ax")
+        with open(skel_meta_path, "w", encoding="utf-8") as f:
+            f.write(initial_skeleton)
+        status_cmd = [axiom_bin, "pool", "status", skel_meta_path, "--json"]
+        status_p = subprocess.run(status_cmd, capture_output=True, text=True, timeout=20)
+        if status_p.returncode != 0:
+            raise RuntimeError(f"Fail-Closed: 获取 pool status 失败: {status_p.stderr}")
+        try:
+            status_obj = json.loads(status_p.stdout.strip())
+            for t_item in status_obj.get("tasks", []):
+                h_id = t_item.get("hole_id")
+                if h_id:
+                    envelopes_by_hole[h_id] = t_item.get("envelope")
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Fail-Closed: 无法解析 pool status 输出为 JSON: {status_p.stdout}") from exc
+
     # 2. 并发派发 5 个 Worker 填洞 (纯表达式)
     print(f"⏳ 派发 {len(tasks)} 个并发 Worker (各负责一个纯代数表达式打洞任务)...")
     worker_start = time.time()
@@ -822,7 +853,9 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
     def do_worker(task):
         tid = task["id"]
         fname = task["function_name"]
-        capsule = build_axiom_context_capsule(task)
+        hole_id = f"{fname}_hole"
+        envelope = envelopes_by_hole.get(hole_id)
+        capsule = build_axiom_context_capsule(task, envelope)
         prompt = capsule.render_prompt()
         if args.mock:
             res = mock_generate_worker(task, group=3)

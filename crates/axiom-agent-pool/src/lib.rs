@@ -5,8 +5,8 @@ use std::fmt;
 
 use axiom_ast::{Expr, Module};
 use axiom_db::{
-    compute_envelope_hash, compute_expr_hash, compute_function_hash, AstDatabase, Candidate,
-    CasError, CommitRecord, NodeHash, ProofLevel, TaskEnvelope,
+    compute_contract_hash, compute_envelope_hash, compute_expr_hash, compute_function_hash,
+    AstDatabase, Candidate, CasError, CommitRecord, NodeHash, ProofLevel, TaskEnvelope,
 };
 use axiom_hole_extractor::extract_holes;
 pub use axiom_hole_extractor::HoleTask;
@@ -21,6 +21,100 @@ pub struct SubmitOutcome {
     pub smt_result: SmtResult,
     pub cas_events: Vec<CasEvent>,
     pub upgraded_to_verified: bool,
+}
+
+/// Serializable Data Transfer Object for SubmitOutcome, decoupling clients/CLI from internal domain types.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SubmitOutcomeDto {
+    pub hole: String,
+    pub status: String,
+    pub proved: bool,
+    pub upgraded_to_verified: bool,
+    pub solver: Option<String>,
+    pub solver_version: Option<String>,
+    pub obligations_checked: Option<usize>,
+    pub cas_events: Vec<CasEvent>,
+    pub counter_example: Option<String>,
+    pub reason: Option<String>,
+}
+
+impl SubmitOutcome {
+    pub fn to_dto(&self, hole_id: &str) -> SubmitOutcomeDto {
+        let (status, proved, solver, version, obligations_checked, counter_example, reason) =
+            match &self.smt_result {
+                SmtResult::Proved {
+                    solver,
+                    version,
+                    obligations_checked,
+                } => (
+                    "ACCEPTED".to_string(),
+                    true,
+                    Some(solver.clone()),
+                    Some(version.clone()),
+                    Some(*obligations_checked),
+                    None,
+                    None,
+                ),
+                SmtResult::CounterExample(ce) => (
+                    "REJECTED".to_string(),
+                    false,
+                    None,
+                    None,
+                    None,
+                    Some(format!("{ce:?}")),
+                    Some("SMT counterexample found violating contract".to_string()),
+                ),
+                SmtResult::Sampled { points_checked } => (
+                    "PROVISIONAL".to_string(),
+                    false,
+                    None,
+                    None,
+                    Some(*points_checked),
+                    None,
+                    Some("candidate sampled without strict proof".to_string()),
+                ),
+                SmtResult::VacuousContract { reason } => (
+                    "REJECTED".to_string(),
+                    false,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(format!("vacuous contract: {reason}")),
+                ),
+                SmtResult::Unknown(reason) => (
+                    "UNKNOWN".to_string(),
+                    false,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(format!("solver unknown: {reason}")),
+                ),
+                SmtResult::Skipped(reason) => (
+                    "SKIPPED".to_string(),
+                    false,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(format!("verification skipped: {reason}")),
+                ),
+            };
+
+        SubmitOutcomeDto {
+            hole: hole_id.to_string(),
+            status,
+            proved,
+            upgraded_to_verified: self.upgraded_to_verified,
+            solver,
+            solver_version: version,
+            obligations_checked,
+            cas_events: self.cas_events.clone(),
+            counter_example,
+            reason,
+        }
+    }
 }
 
 /// Structured CAS event emitted during candidate submission and concurrent resolution.
@@ -62,6 +156,7 @@ pub enum PoolVerificationPolicy {
 pub struct AgentTaskPool {
     verified_module: Module,
     provisional_module: Module,
+    provisional_drafts: HashMap<String, Expr>,
     tasks: Vec<HoleTask>,
     pending_holes: HashSet<String>,
     hole_evidence: HashMap<String, ProofLevel>,
@@ -129,14 +224,14 @@ impl AgentTaskPool {
             }
         }
 
-        // 4. 构造任务信封与静态提取真实依赖闭包
+        // 4. 构造任务信封与静态提取真实依赖闭包（使用规范级 compute_contract_hash）
         let mut envelopes = HashMap::new();
         for task in &tasks {
             let func_opt = authoritative_module
                 .functions
                 .iter()
                 .find(|f| f.name == task.target_function);
-            let func_hash = func_opt.map(compute_function_hash).unwrap_or_default();
+            let contract_hash = func_opt.map(compute_contract_hash).unwrap_or_default();
             let dep_hashes = if let Some(f) = func_opt {
                 extract_function_dependencies(f, &authoritative_module)
             } else {
@@ -147,7 +242,7 @@ impl AgentTaskPool {
                 base_root_hash: Some(base_root.clone()),
                 target_hole_id: task.hole_id.clone(),
                 target_function: task.target_function.clone(),
-                contract_hash: func_hash,
+                contract_hash,
                 dependency_hashes: dep_hashes,
             };
             envelopes.insert(task.hole_id.clone(), env);
@@ -156,10 +251,11 @@ impl AgentTaskPool {
         Ok(Self {
             verified_module: authoritative_module.clone(),
             provisional_module: authoritative_module,
+            provisional_drafts: HashMap::new(),
             tasks,
             pending_holes,
             hole_evidence,
-            policy: PoolVerificationPolicy::default(),
+            policy: PoolVerificationPolicy::StrictProved,
             db,
             envelopes,
             commits,
@@ -273,6 +369,50 @@ impl AgentTaskPool {
         }
     }
 
+    /// Submits a provisional draft solution without requiring SMT formal proof.
+    /// Marks the hole as Provisional in the ledger, allowing early assembly previews
+    /// while remaining open for upgrade to Verified.
+    pub fn submit_draft_solution(
+        &mut self,
+        hole_id: &str,
+        solution_source: &str,
+    ) -> Result<(), PoolError> {
+        let current_status = self
+            .hole_status(hole_id)
+            .ok_or_else(|| PoolError::UnknownHole(hole_id.to_owned()))?;
+
+        if current_status == HoleStatus::Verified {
+            return Err(PoolError::AlreadyResolved(hole_id.to_owned()));
+        }
+
+        let solution = parse_expr(solution_source)?;
+        let mut found = false;
+        for func in &mut self.verified_module.clone().functions {
+            if replace_hole(&mut func.body, hole_id, &solution) {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return Err(PoolError::MissingHole(hole_id.to_owned()));
+        }
+
+        self.provisional_drafts
+            .insert(hole_id.to_string(), solution);
+        self.pending_holes.remove(hole_id);
+        self.hole_evidence
+            .insert(hole_id.to_string(), ProofLevel::Sampled);
+
+        let mut next_provisional = self.verified_module.clone();
+        for (draft_id, draft_expr) in &self.provisional_drafts {
+            for func in &mut next_provisional.functions {
+                replace_hole(&mut func.body, draft_id, draft_expr);
+            }
+        }
+        self.provisional_module = next_provisional;
+        Ok(())
+    }
+
     /// Parse, verify, and conditionally commit a candidate hole implementation via CAS.
     pub fn submit_solution(
         &mut self,
@@ -282,7 +422,35 @@ impl AgentTaskPool {
         self.submit_solution_with_agent(hole_id, solution_source, "axiom-worker")
     }
 
-    /// Parse, verify, and commit a candidate with detailed outcome including CAS events and upgrade flag.
+    fn apply_verified_commit(
+        &mut self,
+        commit_record: CommitRecord,
+        committed_module: Module,
+        hole_id: &str,
+    ) {
+        self.commits.push(commit_record);
+        self.verified_module = committed_module;
+        self.pending_holes.remove(hole_id);
+        self.provisional_drafts.remove(hole_id);
+        self.hole_evidence
+            .insert(hole_id.to_string(), ProofLevel::Proved);
+
+        // 刷新 provisional_module：基于最新 verified_module，叠加剩余所有草稿
+        let mut next_provisional = self.verified_module.clone();
+        for (draft_id, draft_expr) in &self.provisional_drafts {
+            for func in &mut next_provisional.functions {
+                replace_hole(&mut func.body, draft_id, draft_expr);
+            }
+        }
+        self.provisional_module = next_provisional;
+
+        let latest_root = self.db.current_root();
+        for env in self.envelopes.values_mut() {
+            env.base_root_hash = latest_root.clone();
+        }
+    }
+
+    /// Submit a candidate solution with full outcome reporting (precheck SMT result, CAS events, and status upgrade).
     pub fn submit_solution_with_outcome(
         &mut self,
         hole_id: &str,
@@ -299,7 +467,9 @@ impl AgentTaskPool {
         }
 
         let solution = parse_expr(solution_source)?;
-        let mut candidate_module = self.provisional_module.clone();
+        // 关键修复：打洞候选始终基于权威 verified_module 构建，使未证明的洞（即使处于 Provisional）保持为 Expr::Hole，
+        // 绝不会因为之前存入草稿而发生 replace_hole 找不到洞的 MissingHole 错误！
+        let mut candidate_module = self.verified_module.clone();
         let mut affected_functions = Vec::new();
 
         for (index, function) in candidate_module.functions.iter_mut().enumerate() {
@@ -314,7 +484,7 @@ impl AgentTaskPool {
 
         let cand_expr_hash = compute_expr_hash(&solution);
         let base_func = &candidate_module.functions[affected_functions[0]];
-        let contract_hash = compute_function_hash(base_func);
+        let contract_hash = compute_contract_hash(base_func);
         let dep_hashes = extract_function_dependencies(base_func, &candidate_module);
         let current_root = self.db.current_root();
         let envelope = self
@@ -359,10 +529,18 @@ impl AgentTaskPool {
             SmtResult::Skipped(_) => {
                 let func = &candidate_module.functions[affected_functions[0]];
                 if func.ensures.is_empty() && self.policy == PoolVerificationPolicy::Permissive {
-                    self.provisional_module = candidate_module;
+                    self.provisional_drafts
+                        .insert(hole_id.to_string(), solution);
                     self.pending_holes.remove(hole_id);
                     self.hole_evidence
                         .insert(hole_id.to_string(), ProofLevel::Sampled);
+                    let mut next_provisional = self.verified_module.clone();
+                    for (draft_id, draft_expr) in &self.provisional_drafts {
+                        for func in &mut next_provisional.functions {
+                            replace_hole(&mut func.body, draft_id, draft_expr);
+                        }
+                    }
+                    self.provisional_module = next_provisional;
                     return Ok(SubmitOutcome {
                         smt_result: precheck_result,
                         cas_events: Vec::new(),
@@ -375,13 +553,20 @@ impl AgentTaskPool {
                     upgraded_to_verified: false,
                 });
             }
-            SmtResult::Sampled { .. } => {
+            SmtResult::Sampled { points_checked: _ } => {
                 if self.policy == PoolVerificationPolicy::Permissive {
-                    // Permissive 模式：作为草稿更新 provisional_module，不推进 verified_module
-                    self.provisional_module = candidate_module;
+                    self.provisional_drafts
+                        .insert(hole_id.to_string(), solution);
                     self.pending_holes.remove(hole_id);
                     self.hole_evidence
                         .insert(hole_id.to_string(), ProofLevel::Sampled);
+                    let mut next_provisional = self.verified_module.clone();
+                    for (draft_id, draft_expr) in &self.provisional_drafts {
+                        for func in &mut next_provisional.functions {
+                            replace_hole(&mut func.body, draft_id, draft_expr);
+                        }
+                    }
+                    self.provisional_module = next_provisional;
                     return Ok(SubmitOutcome {
                         smt_result: precheck_result,
                         cas_events: Vec::new(),
@@ -408,16 +593,7 @@ impl AgentTaskPool {
             Some(&candidate_module),
         ) {
             Ok(commit_record) => {
-                self.commits.push(commit_record);
-                self.verified_module = candidate_module.clone();
-                self.provisional_module = candidate_module;
-                self.pending_holes.remove(hole_id);
-                self.hole_evidence
-                    .insert(hole_id.to_string(), ProofLevel::Proved);
-                let latest_root = self.db.current_root();
-                for env in self.envelopes.values_mut() {
-                    env.base_root_hash = latest_root.clone();
-                }
+                self.apply_verified_commit(commit_record, candidate_module, hole_id);
                 Ok(SubmitOutcome {
                     smt_result: precheck_result,
                     cas_events,
@@ -450,7 +626,7 @@ impl AgentTaskPool {
                     .find(|f| f.name == envelope.target_function)
                     .cloned()
                     .ok_or_else(|| PoolError::MissingHole(hole_id.to_owned()))?;
-                let rebased_func_hash = compute_function_hash(&base_func);
+                let rebased_func_hash = compute_contract_hash(&base_func);
                 let rebased_deps = extract_function_dependencies(&base_func, &rebased_module);
 
                 let mut rebased_affected = Vec::new();
@@ -502,16 +678,7 @@ impl AgentTaskPool {
                     attempts: 1,
                 });
 
-                self.commits.push(commit_record);
-                self.verified_module = rebased_module.clone();
-                self.provisional_module = rebased_module;
-                self.pending_holes.remove(hole_id);
-                self.hole_evidence
-                    .insert(hole_id.to_string(), ProofLevel::Proved);
-                let current_root = self.db.current_root();
-                for env in self.envelopes.values_mut() {
-                    env.base_root_hash = current_root.clone();
-                }
+                self.apply_verified_commit(commit_record, rebased_module, hole_id);
                 Ok(SubmitOutcome {
                     smt_result: recheck_result,
                     cas_events,
@@ -664,89 +831,26 @@ impl From<ParseError> for PoolError {
 }
 
 fn replace_hole(expression: &mut Expr, hole_id: &str, solution: &Expr) -> bool {
-    match expression {
-        Expr::Hole(current_hole_id) if current_hole_id == hole_id => {
-            *expression = solution.clone();
-            true
+    let mut replaced = false;
+    axiom_ast::visit_expr_mut(expression, &mut |expr| {
+        if let Expr::Hole(current_id) = expr {
+            if current_id == hole_id {
+                *expr = solution.clone();
+                replaced = true;
+            }
         }
-        Expr::BinaryOp { left, right, .. } => {
-            replace_hole(left, hole_id, solution) | replace_hole(right, hole_id, solution)
-        }
-        Expr::UnaryOp { operand, .. } | Expr::Let { value: operand, .. } => {
-            replace_hole(operand, hole_id, solution)
-        }
-        Expr::Block { statements, tail } => {
-            let statements_changed = statements.iter_mut().fold(false, |changed, statement| {
-                replace_hole(statement, hole_id, solution) | changed
-            });
-            let tail_changed = tail
-                .as_mut()
-                .is_some_and(|tail| replace_hole(tail, hole_id, solution));
-            statements_changed | tail_changed
-        }
-        Expr::Call { callee, args } => {
-            let callee_changed = replace_hole(callee, hole_id, solution);
-            let args_changed = args.iter_mut().fold(false, |changed, argument| {
-                replace_hole(argument, hole_id, solution) | changed
-            });
-            callee_changed | args_changed
-        }
-        Expr::FieldAccess { target, .. } => replace_hole(target, hole_id, solution),
-        Expr::RecordInit { fields, .. } => fields.iter_mut().fold(false, |changed, (_, value)| {
-            replace_hole(value, hole_id, solution) | changed
-        }),
-        Expr::RecordUpdate { base, updates } => {
-            let base_changed = replace_hole(base, hole_id, solution);
-            let updates_changed = updates.iter_mut().fold(false, |changed, (_, value)| {
-                replace_hole(value, hole_id, solution) | changed
-            });
-            base_changed | updates_changed
-        }
-        Expr::Match { target, arms } => {
-            let target_changed = replace_hole(target, hole_id, solution);
-            let arms_changed = arms.iter_mut().fold(false, |changed, arm| {
-                replace_hole(&mut arm.body, hole_id, solution) | changed
-            });
-            target_changed | arms_changed
-        }
-        Expr::Literal(_) | Expr::Ident(_) | Expr::Hole(_) | Expr::Raw(_) => false,
-    }
+    });
+    replaced
 }
 
-fn ast_contains_any_hole_in_expr(expr: &Expr) -> bool {
-    match expr {
-        Expr::Hole(_) => true,
-        Expr::BinaryOp { left, right, .. } => {
-            ast_contains_any_hole_in_expr(left) || ast_contains_any_hole_in_expr(right)
+fn ast_contains_any_hole_in_expr(expression: &Expr) -> bool {
+    let mut has_hole = false;
+    axiom_ast::visit_expr(expression, &mut |expr| {
+        if matches!(expr, Expr::Hole(_)) {
+            has_hole = true;
         }
-        Expr::UnaryOp { operand, .. } | Expr::Let { value: operand, .. } => {
-            ast_contains_any_hole_in_expr(operand)
-        }
-        Expr::Block { statements, tail } => {
-            statements.iter().any(ast_contains_any_hole_in_expr)
-                || tail.as_deref().map_or(false, ast_contains_any_hole_in_expr)
-        }
-        Expr::Call { callee, args } => {
-            ast_contains_any_hole_in_expr(callee) || args.iter().any(ast_contains_any_hole_in_expr)
-        }
-        Expr::FieldAccess { target, .. } => ast_contains_any_hole_in_expr(target),
-        Expr::RecordInit { fields, .. } => {
-            fields.iter().any(|(_, v)| ast_contains_any_hole_in_expr(v))
-        }
-        Expr::RecordUpdate { base, updates } => {
-            ast_contains_any_hole_in_expr(base)
-                || updates
-                    .iter()
-                    .any(|(_, v)| ast_contains_any_hole_in_expr(v))
-        }
-        Expr::Match { target, arms } => {
-            ast_contains_any_hole_in_expr(target)
-                || arms
-                    .iter()
-                    .any(|arm| ast_contains_any_hole_in_expr(&arm.body))
-        }
-        Expr::Literal(_) | Expr::Ident(_) | Expr::Raw(_) => false,
-    }
+    });
+    has_hole
 }
 
 pub fn ast_contains_any_hole(module: &Module) -> bool {
@@ -769,55 +873,20 @@ fn extract_function_dependencies(func: &axiom_ast::FunctionDecl, module: &Module
         symbols.insert(name.clone());
     }
 
-    fn collect_expr_symbols(expr: &Expr, syms: &mut HashSet<String>) {
-        match expr {
+    let collect_expr_symbols = |expr: &Expr, syms: &mut HashSet<String>| {
+        axiom_ast::visit_expr(expr, &mut |e| match e {
             Expr::Ident(name) => {
                 syms.insert(name.clone());
             }
-            Expr::Call { callee, args } => {
-                collect_expr_symbols(callee, syms);
-                for a in args {
-                    collect_expr_symbols(a, syms);
-                }
-            }
-            Expr::BinaryOp { left, right, .. } => {
-                collect_expr_symbols(left, syms);
-                collect_expr_symbols(right, syms);
-            }
-            Expr::UnaryOp { operand, .. } => collect_expr_symbols(operand, syms),
-            Expr::Let { name: _, value } => collect_expr_symbols(value, syms),
-            Expr::Block { statements, tail } => {
-                for s in statements {
-                    collect_expr_symbols(s, syms);
-                }
-                if let Some(t) = tail {
-                    collect_expr_symbols(t, syms);
-                }
-            }
-            Expr::FieldAccess { target, .. } => collect_expr_symbols(target, syms),
-            Expr::RecordInit { ty_name, fields } => {
-                if let Some(name) = ty_name {
-                    syms.insert(name.clone());
-                }
-                for (_, val) in fields {
-                    collect_expr_symbols(val, syms);
-                }
-            }
-            Expr::RecordUpdate { base, updates } => {
-                collect_expr_symbols(base, syms);
-                for (_, val) in updates {
-                    collect_expr_symbols(val, syms);
-                }
-            }
-            Expr::Match { target, arms } => {
-                collect_expr_symbols(target, syms);
-                for arm in arms {
-                    collect_expr_symbols(&arm.body, syms);
-                }
+            Expr::RecordInit {
+                ty_name: Some(name),
+                ..
+            } => {
+                syms.insert(name.clone());
             }
             _ => {}
-        }
-    }
+        });
+    };
 
     for req in &func.requires {
         collect_expr_symbols(req, &mut symbols);

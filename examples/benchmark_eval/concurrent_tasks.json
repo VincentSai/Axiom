@@ -109,8 +109,11 @@
       "contracts": {
         "requires": [
           "count1 >= 0",
+          "count1 <= 1000000",
           "count2 >= 0",
-          "max_stack > 0"
+          "count2 <= 1000000",
+          "max_stack > 0",
+          "max_stack <= 1000000"
         ],
         "ensures": [
           "result >= 0",
@@ -178,7 +181,9 @@
       "contracts": {
         "requires": [
           "unit_price >= 0",
+          "unit_price <= 100000000",
           "quantity >= 0",
+          "quantity <= 100000",
           "discount_pct >= 0",
           "discount_pct <= 100"
         ],
@@ -323,7 +328,9 @@
       "contracts": {
         "requires": [
           "cost >= 0",
+          "cost <= 100000000",
           "durability_max > 0",
+          "durability_max <= 100000",
           "durability_cur >= 0",
           "durability_cur <= durability_max"
         ],

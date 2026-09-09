@@ -169,3 +169,107 @@ pub struct Module {
     pub functions: Vec<FunctionDecl>,
     pub effects: Vec<EffectDecl>,
 }
+
+/// Recursively traverses an expression tree, invoking the callback for each sub-expression.
+pub fn visit_expr<F: FnMut(&Expr)>(expr: &Expr, f: &mut F) {
+    f(expr);
+    match expr {
+        Expr::Literal(_) | Expr::Ident(_) | Expr::Hole(_) | Expr::Raw(_) => {}
+        Expr::BinaryOp { left, right, .. } => {
+            visit_expr(left, f);
+            visit_expr(right, f);
+        }
+        Expr::UnaryOp { operand, .. } => {
+            visit_expr(operand, f);
+        }
+        Expr::Let { value, .. } => {
+            visit_expr(value, f);
+        }
+        Expr::Block { statements, tail } => {
+            for stmt in statements {
+                visit_expr(stmt, f);
+            }
+            if let Some(tail_expr) = tail {
+                visit_expr(tail_expr, f);
+            }
+        }
+        Expr::Call { callee, args } => {
+            visit_expr(callee, f);
+            for arg in args {
+                visit_expr(arg, f);
+            }
+        }
+        Expr::FieldAccess { target, .. } => {
+            visit_expr(target, f);
+        }
+        Expr::RecordInit { fields, .. } => {
+            for (_, val) in fields {
+                visit_expr(val, f);
+            }
+        }
+        Expr::RecordUpdate { base, updates } => {
+            visit_expr(base, f);
+            for (_, val) in updates {
+                visit_expr(val, f);
+            }
+        }
+        Expr::Match { target, arms } => {
+            visit_expr(target, f);
+            for arm in arms {
+                visit_expr(&arm.body, f);
+            }
+        }
+    }
+}
+
+/// Recursively traverses and mutates an expression tree.
+pub fn visit_expr_mut<F: FnMut(&mut Expr)>(expr: &mut Expr, f: &mut F) {
+    f(expr);
+    match expr {
+        Expr::Literal(_) | Expr::Ident(_) | Expr::Hole(_) | Expr::Raw(_) => {}
+        Expr::BinaryOp { left, right, .. } => {
+            visit_expr_mut(left, f);
+            visit_expr_mut(right, f);
+        }
+        Expr::UnaryOp { operand, .. } => {
+            visit_expr_mut(operand, f);
+        }
+        Expr::Let { value, .. } => {
+            visit_expr_mut(value, f);
+        }
+        Expr::Block { statements, tail } => {
+            for stmt in statements {
+                visit_expr_mut(stmt, f);
+            }
+            if let Some(tail_expr) = tail {
+                visit_expr_mut(tail_expr, f);
+            }
+        }
+        Expr::Call { callee, args } => {
+            visit_expr_mut(callee, f);
+            for arg in args {
+                visit_expr_mut(arg, f);
+            }
+        }
+        Expr::FieldAccess { target, .. } => {
+            visit_expr_mut(target, f);
+        }
+        Expr::RecordInit { fields, .. } => {
+            for (_, val) in fields {
+                visit_expr_mut(val, f);
+            }
+        }
+        Expr::RecordUpdate { base, updates } => {
+            visit_expr_mut(base, f);
+            for (_, val) in updates {
+                visit_expr_mut(val, f);
+            }
+        }
+        Expr::Match { target, arms } => {
+            visit_expr_mut(target, f);
+            for arm in arms {
+                visit_expr_mut(&mut arm.body, f);
+            }
+        }
+    }
+}

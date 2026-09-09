@@ -55,7 +55,7 @@ fn test_strict_mode_rejects_unproved_contract() {
         &ax_file,
         r#"
 fn contracted_add(x: Int) -> Int
-    requires { x >= 0 }
+    requires { x >= 0, x < 1000000 }
     ensures { result > x }
 {
     x + 1

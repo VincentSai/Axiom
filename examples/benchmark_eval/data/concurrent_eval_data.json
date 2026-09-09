@@ -5,16 +5,16 @@
     "engine": "codex",
     "mode": "concurrent_multi_agent",
     "is_mock": true,
-    "git_commit": "41983bace0ee19f291227a659323d9d21cda8fa7",
-    "git_tree_hash": "0f93596a6f632c3705ce591cb68dec084c23d37a",
+    "git_commit": "0eed81c1a99b382be623c49ab462df75de707dc2",
+    "git_tree_hash": "41e49ad21971fd66b99d7b9b545e1e41ad86ab41",
     "z3_version": "Z3 version 4.13.0 - 64 bit",
     "platform": "win32",
     "python_version": "3.14.2",
-    "timestamp": "2026-09-09 14:06:20"
+    "timestamp": "2026-09-09 15:17:13"
   },
   "summary": {
     "rust_group": {
-      "wall_clock_sec": 1.59,
+      "wall_clock_sec": 1.72,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -24,7 +24,7 @@
       "unit_test_passed": true
     },
     "axiom_group": {
-      "wall_clock_sec": 1.51,
+      "wall_clock_sec": 2.26,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -32,14 +32,14 @@
       "resolver_tax_billed_tokens": 0,
       "total_billed_tokens": 75070,
       "formal_proved": true,
-      "speedup_vs_rust": 1.05
+      "speedup_vs_rust": 0.76
     }
   },
   "detailed_runs": {
     "group2_rust": {
       "status": "success",
-      "wall_clock_sec": 1.59,
-      "worker_concurrency_sec": 0.14,
+      "wall_clock_sec": 1.72,
+      "worker_concurrency_sec": 0.15,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -139,10 +139,10 @@
     },
     "group3_axiom": {
       "status": "success",
-      "wall_clock_sec": 1.51,
+      "wall_clock_sec": 2.26,
       "worker_concurrency_sec": 0.0,
-      "combinator_latency_ms": 774.13,
-      "smt_verify_sec": 0.38,
+      "combinator_latency_ms": 1189.32,
+      "smt_verify_sec": 0.56,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -155,8 +155,8 @@
         "total_raw_billed": 75070,
         "capsule_breakdown": {
           "system_tokens": 470,
-          "contract_tokens": 511,
-          "dependency_tokens": 70
+          "contract_tokens": 570,
+          "dependency_tokens": 265
         },
         "tokens_to_proved": 1070
       },
@@ -224,44 +224,44 @@
           "solver_version": "4.13.0"
         }
       ],
-      "assembled_source": "fn can_stack_items(item_id1: Int, count1: Int, max_stack1: Int, item_id2: Int, count2: Int) -> Bool\n    requires {\n        count1 >= 0,\n        count2 >= 0,\n        max_stack1 > 0,\n    }\n    ensures {\n        result == (item_id1 == item_id2 && count1 < max_stack1),\n    }\n{\n    item_id1 == item_id2 && count1 < max_stack1\n}\n\nfn calc_stacked_counts(count1: Int, count2: Int, max_stack: Int) -> Int\n    requires {\n        count1 >= 0,\n        count2 >= 0,\n        max_stack > 0,\n    }\n    ensures {\n        result >= 0,\n        result <= max_stack,\n        count1 + count2 > max_stack => result == max_stack,\n        count1 + count2 <= max_stack => result == count1 + count2,\n    }\n{\n    match count1 + count2 > max_stack { true => max_stack, false => count1 + count2 }\n}\n\nfn calculate_purchase_cost(unit_price: Int, quantity: Int, discount_pct: Int) -> Int\n    requires {\n        unit_price >= 0,\n        quantity >= 0,\n        discount_pct >= 0,\n        discount_pct <= 100,\n    }\n    ensures {\n        result >= 0,\n        result <= unit_price * quantity,\n        discount_pct == 0 => result == unit_price * quantity,\n        discount_pct == 100 => result == 0,\n    }\n{\n    unit_price * quantity * (100 - discount_pct) / 100\n}\n\nfn validate_trade_balance(buyer_gold: Int, total_cost: Int, free_slots: Int, needed_slots: Int) -> Bool\n    requires {\n        buyer_gold >= 0,\n        total_cost >= 0,\n        free_slots >= 0,\n        needed_slots >= 0,\n    }\n    ensures {\n        result == (buyer_gold >= total_cost && free_slots >= needed_slots),\n    }\n{\n    buyer_gold >= total_cost && free_slots >= needed_slots\n}\n\nfn calc_sell_refund(cost: Int, durability_cur: Int, durability_max: Int) -> Int\n    requires {\n        cost >= 0,\n        durability_max > 0,\n        durability_cur >= 0,\n        durability_cur <= durability_max,\n    }\n    ensures {\n        result >= 0,\n        result <= cost,\n        durability_cur == durability_max => result == cost,\n        durability_cur == 0 => result == 0,\n    }\n{\n    cost * durability_cur / durability_max\n}",
+      "assembled_source": "fn can_stack_items(item_id1: Int, count1: Int, max_stack1: Int, item_id2: Int, count2: Int) -> Bool\n    requires {\n        count1 >= 0,\n        count2 >= 0,\n        max_stack1 > 0,\n    }\n    ensures {\n        result == (item_id1 == item_id2 && count1 < max_stack1),\n    }\n{\n    item_id1 == item_id2 && count1 < max_stack1\n}\n\nfn calc_stacked_counts(count1: Int, count2: Int, max_stack: Int) -> Int\n    requires {\n        count1 >= 0,\n        count1 <= 1000000,\n        count2 >= 0,\n        count2 <= 1000000,\n        max_stack > 0,\n        max_stack <= 1000000,\n    }\n    ensures {\n        result >= 0,\n        result <= max_stack,\n        count1 + count2 > max_stack => result == max_stack,\n        count1 + count2 <= max_stack => result == count1 + count2,\n    }\n{\n    match count1 + count2 > max_stack { true => max_stack, false => count1 + count2 }\n}\n\nfn calculate_purchase_cost(unit_price: Int, quantity: Int, discount_pct: Int) -> Int\n    requires {\n        unit_price >= 0,\n        unit_price <= 100000000,\n        quantity >= 0,\n        quantity <= 100000,\n        discount_pct >= 0,\n        discount_pct <= 100,\n    }\n    ensures {\n        result >= 0,\n        result <= unit_price * quantity,\n        discount_pct == 0 => result == unit_price * quantity,\n        discount_pct == 100 => result == 0,\n    }\n{\n    unit_price * quantity * (100 - discount_pct) / 100\n}\n\nfn validate_trade_balance(buyer_gold: Int, total_cost: Int, free_slots: Int, needed_slots: Int) -> Bool\n    requires {\n        buyer_gold >= 0,\n        total_cost >= 0,\n        free_slots >= 0,\n        needed_slots >= 0,\n    }\n    ensures {\n        result == (buyer_gold >= total_cost && free_slots >= needed_slots),\n    }\n{\n    buyer_gold >= total_cost && free_slots >= needed_slots\n}\n\nfn calc_sell_refund(cost: Int, durability_cur: Int, durability_max: Int) -> Int\n    requires {\n        cost >= 0,\n        cost <= 100000000,\n        durability_max > 0,\n        durability_max <= 100000,\n        durability_cur >= 0,\n        durability_cur <= durability_max,\n    }\n    ensures {\n        result >= 0,\n        result <= cost,\n        durability_cur == durability_max => result == cost,\n        durability_cur == 0 => result == 0,\n    }\n{\n    cost * durability_cur / durability_max\n}",
       "cas_concurrency_benchmark": {
         "race_workers": 2,
         "success_submissions": 2,
-        "concurrency_elapsed_sec": 0.291,
+        "concurrency_elapsed_sec": 0.431,
         "stale_root_conflicts_observed": 1,
         "fast_forward_retries_succeeded": 1,
         "final_commit_chain_length": 2,
-        "initial_root": "#mod_8f44aeb1f28767a06f08996f4fcfe4486c460247d5774f0e270db7e50bb77dc7",
-        "final_root": "#mod_613e187ea693b2e490f73c7239853578555fffbac894da6faef0bb7d8be61d96",
+        "initial_root": "#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed",
+        "final_root": "#mod_8892410a4f9ec42e4507b5b4546f24373ed41f8430d7c1d8d71d0a8090dc4b56",
         "is_mock": true,
-        "git_commit_sha": "41983bace0ee19f291227a659323d9d21cda8fa7",
-        "git_tree_hash": "0f93596a6f632c3705ce591cb68dec084c23d37a",
+        "git_commit_sha": "0eed81c1a99b382be623c49ab462df75de707dc2",
+        "git_tree_hash": "41e49ad21971fd66b99d7b9b545e1e41ad86ab41",
         "cas_events_by_worker": {
-          "worker_a": [],
-          "worker_b": [
+          "worker_b": [],
+          "worker_a": [
             {
               "StaleRootDetected": {
-                "current": "#mod_1523a09cf517acd3449f46b166a12bfcbfc9b0c7c3ec78c91f3da263adb195b1",
-                "expected": "#mod_8f44aeb1f28767a06f08996f4fcfe4486c460247d5774f0e270db7e50bb77dc7"
+                "expected": "#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed",
+                "current": "#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f"
               }
             },
             {
               "RebaseSucceeded": {
-                "attempts": 1,
-                "rebased_root": "#mod_1523a09cf517acd3449f46b166a12bfcbfc9b0c7c3ec78c91f3da263adb195b1"
+                "rebased_root": "#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f",
+                "attempts": 1
               }
             }
           ]
         },
         "worker_a": {
           "returncode": 0,
-          "stdout": "{\n  \"cas_events\": [],\n  \"hole\": \"hole_a\",\n  \"obligations_checked\": 1,\n  \"proved\": true,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"status\": \"ACCEPTED\"\n}",
+          "stdout": "{\n  \"hole\": \"hole_a\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": true,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 1,\n  \"cas_events\": [\n    {\n      \"StaleRootDetected\": {\n        \"expected\": \"#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed\",\n        \"current\": \"#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f\"\n      }\n    },\n    {\n      \"RebaseSucceeded\": {\n        \"rebased_root\": \"#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f\",\n        \"attempts\": 1\n      }\n    }\n  ],\n  \"counter_example\": null,\n  \"reason\": null\n}",
           "stderr": ""
         },
         "worker_b": {
           "returncode": 0,
-          "stdout": "{\n  \"cas_events\": [\n    {\n      \"StaleRootDetected\": {\n        \"current\": \"#mod_1523a09cf517acd3449f46b166a12bfcbfc9b0c7c3ec78c91f3da263adb195b1\",\n        \"expected\": \"#mod_8f44aeb1f28767a06f08996f4fcfe4486c460247d5774f0e270db7e50bb77dc7\"\n      }\n    },\n    {\n      \"RebaseSucceeded\": {\n        \"attempts\": 1,\n        \"rebased_root\": \"#mod_1523a09cf517acd3449f46b166a12bfcbfc9b0c7c3ec78c91f3da263adb195b1\"\n      }\n    }\n  ],\n  \"hole\": \"hole_b\",\n  \"obligations_checked\": 1,\n  \"proved\": true,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"status\": \"ACCEPTED\"\n}",
+          "stdout": "{\n  \"hole\": \"hole_b\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": true,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 1,\n  \"cas_events\": [],\n  \"counter_example\": null,\n  \"reason\": null\n}",
           "stderr": ""
         }
       },
@@ -284,8 +284,8 @@
           "capsule": {
             "system_tokens": 94,
             "contract_tokens": 96,
-            "dependency_tokens": 14,
-            "total_tokens": 204
+            "dependency_tokens": 59,
+            "total_tokens": 249
           }
         },
         {
@@ -305,9 +305,9 @@
           },
           "capsule": {
             "system_tokens": 94,
-            "contract_tokens": 110,
-            "dependency_tokens": 14,
-            "total_tokens": 218
+            "contract_tokens": 137,
+            "dependency_tokens": 49,
+            "total_tokens": 280
           }
         },
         {
@@ -327,9 +327,9 @@
           },
           "capsule": {
             "system_tokens": 94,
-            "contract_tokens": 108,
-            "dependency_tokens": 14,
-            "total_tokens": 216
+            "contract_tokens": 124,
+            "dependency_tokens": 49,
+            "total_tokens": 267
           }
         },
         {
@@ -350,8 +350,8 @@
           "capsule": {
             "system_tokens": 94,
             "contract_tokens": 93,
-            "dependency_tokens": 14,
-            "total_tokens": 201
+            "dependency_tokens": 57,
+            "total_tokens": 244
           }
         },
         {
@@ -371,9 +371,9 @@
           },
           "capsule": {
             "system_tokens": 94,
-            "contract_tokens": 104,
-            "dependency_tokens": 14,
-            "total_tokens": 212
+            "contract_tokens": 120,
+            "dependency_tokens": 51,
+            "total_tokens": 265
           }
         }
       ]
