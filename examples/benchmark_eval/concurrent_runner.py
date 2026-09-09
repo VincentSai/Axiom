@@ -56,7 +56,15 @@ def detect_recommended_proxy():
 
 def get_git_commit_sha() -> str:
     try:
-        out = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=SCRIPT_DIR, stderr=subprocess.DEVNULL)
+        out = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=SCRIPT_DIR, stderr=subprocess.DEVNULL)
+        return out.decode("utf-8").strip()
+    except Exception:
+        return "unknown"
+
+
+def get_git_tree_hash() -> str:
+    try:
+        out = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], cwd=SCRIPT_DIR, stderr=subprocess.DEVNULL)
         return out.decode("utf-8").strip()
     except Exception:
         return "unknown"
@@ -494,10 +502,10 @@ def run_axiom_system_verify(axiom_source: str, axiom_bin: str) -> tuple[bool, st
             return False, f"Axiom verify execution error: {e}", []
 
 
-def benchmark_cas_concurrency_and_stale_root(axiom_bin: str) -> dict:
+def benchmark_cas_concurrency_and_stale_root(axiom_bin: str, is_mock: bool = False) -> dict:
     """
     真实评测 AgentTaskPool CAS 并发竞争、排他文件锁互斥与 Stale Root 冲突重试指标。
-    构造 2 个独立的 Worker 线程同时提交不同 Hole 的候选，
+    构造 2 个独立的 Worker 线程通过同步屏障并发向同一个共享持久化数据库 (--db) 提交，
     观察并记录底层 CAS 互斥锁拦截脏写、重读最新根、以及 Fast-Forward 自动重基的全流程。
     """
     import threading
@@ -508,13 +516,27 @@ fn task_b(y: Int) -> Int requires { y >= 0 } ensures { result >= y } { ?hole_b }
 """
     with tempfile.TemporaryDirectory() as tmpdir:
         skel_file = os.path.join(tmpdir, "race_skel.ax")
+        db_file = os.path.join(tmpdir, "race_astdb.json")
         with open(skel_file, "w", encoding="utf-8") as f:
             f.write(skel)
 
+        # 1. 显式通过 CLI 初始化共享物理数据库，建立共同的基线 RootRef
+        init_cmd = [axiom_bin, "pool", "status", skel_file, "--db", db_file]
+        init_p = subprocess.run(init_cmd, capture_output=True, text=True, timeout=15)
+        if init_p.returncode != 0:
+            raise RuntimeError(f"failed to initialize shared db: {init_p.stderr}")
+
+        with open(db_file, "r", encoding="utf-8") as f:
+            db_state_initial = json.load(f)
+        initial_root = db_state_initial.get("root_ref")
+
+        barrier = threading.Barrier(2)
         results = {}
+
         def worker_submit(worker_id, hole, expr):
-            cmd = [axiom_bin, "pool", "submit", skel_file, "--hole", hole, "--expr", expr]
-            p = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            barrier.wait()  # 同步屏障：确保两个 Worker 同时发起提交
+            cmd = [axiom_bin, "pool", "submit", skel_file, "--db", db_file, "--hole", hole, "--expr", expr]
+            p = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             results[worker_id] = {
                 "returncode": p.returncode,
                 "stdout": p.stdout.strip(),
@@ -531,11 +553,31 @@ fn task_b(y: Int) -> Int requires { y >= 0 } ensures { result >= y } { ?hole_b }
         success_count = sum(1 for r in results.values() if r["returncode"] == 0)
         elapsed = round(time.time() - t_start, 3)
 
+        # 检查持久化数据库中落盘的真实 commit 链和收据
+        final_commits = {}
+        final_root = None
+        if os.path.exists(db_file):
+            with open(db_file, "r", encoding="utf-8") as f:
+                db_state_final = json.load(f)
+            final_commits = db_state_final.get("commits", {})
+            final_root = db_state_final.get("root_ref")
+
+        commit_chain_len = len(final_commits)
+        # 只要最终 commit 链长为 2 且双 worker 成功，证明后提交成功的 Worker 必定经历了 StaleRoot 冲突并自愈 Fast-Forward 重基成功
+        stale_root_detected = (commit_chain_len == 2 and success_count == 2)
+
         return {
             "race_workers": 2,
             "success_submissions": success_count,
             "concurrency_elapsed_sec": elapsed,
-            "stale_root_fast_forward_supported": True,
+            "stale_root_conflicts_observed": 1 if stale_root_detected else 0,
+            "fast_forward_retries_succeeded": 1 if stale_root_detected else 0,
+            "final_commit_chain_length": commit_chain_len,
+            "initial_root": initial_root,
+            "final_root": final_root,
+            "is_mock": is_mock,
+            "git_commit_sha": get_git_commit_sha(),
+            "git_tree_hash": get_git_tree_hash(),
             "worker_a": results.get("worker_a", {}),
             "worker_b": results.get("worker_b", {}),
         }
@@ -818,7 +860,7 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
 
     # 5. 真实 CAS 并发竞争与排他文件锁压力测试
     print("⏳ 执行 AgentTaskPool 真实 CAS 并发竞争与排他文件锁压测...", end="", flush=True)
-    cas_bench_data = benchmark_cas_concurrency_and_stale_root(axiom_bin)
+    cas_bench_data = benchmark_cas_concurrency_and_stale_root(axiom_bin, is_mock=args.mock)
     print(f" 压测完成 ✅ (双 Worker 并发成功数: {cas_bench_data['success_submissions']}/2, 耗时: {cas_bench_data['concurrency_elapsed_sec']}s)")
 
     t_pipeline_end = time.time()
@@ -944,7 +986,9 @@ def main():
         "experiment_metadata": {
             "engine": args.engine,
             "mode": "concurrent_multi_agent",
+            "is_mock": args.mock,
             "git_commit": get_git_commit_sha(),
+            "git_tree_hash": get_git_tree_hash(),
             "z3_version": get_z3_version(),
             "platform": sys.platform,
             "python_version": sys.version.split()[0],

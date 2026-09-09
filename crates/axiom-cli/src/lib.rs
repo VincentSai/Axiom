@@ -163,6 +163,10 @@ pub enum PoolAction {
     Status {
         file: PathBuf,
 
+        /// Optional path to shared AST database file.
+        #[arg(long)]
+        db: Option<PathBuf>,
+
         /// Strict verification policy: require formal SMT proof for contracted functions.
         #[arg(long)]
         strict: bool,
@@ -180,6 +184,10 @@ pub enum PoolAction {
         #[arg(long)]
         expr: String,
 
+        /// Optional path to shared AST database file.
+        #[arg(long)]
+        db: Option<PathBuf>,
+
         /// Strict verification policy: require formal SMT proof.
         #[arg(long)]
         strict: bool,
@@ -192,6 +200,10 @@ pub enum PoolAction {
         /// Optional solutions JSON mapping hole_id -> expression string.
         #[arg(long)]
         solutions: Option<PathBuf>,
+
+        /// Optional path to shared AST database file.
+        #[arg(long)]
+        db: Option<PathBuf>,
 
         /// Write assembled module to a file instead of stdout.
         #[arg(short, long)]
@@ -936,21 +948,35 @@ impl Drop for TemporaryBuildDirectory {
     }
 }
 
+fn create_task_pool(
+    file: &Path,
+    db: Option<&Path>,
+    policy: PoolVerificationPolicy,
+) -> Result<AgentTaskPool, CliError> {
+    let pool = if let Some(db_path) = db {
+        AgentTaskPool::open_persisted(file, db_path).map_err(CliError::Pool)?
+    } else {
+        let source = read_source(file)?;
+        AgentTaskPool::from_source(&source).map_err(CliError::Pool)?
+    };
+    Ok(pool.with_policy(policy))
+}
+
 fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
     match action {
-        PoolAction::Status { file, strict } => {
-            let source = read_source(&file)?;
+        PoolAction::Status { file, db, strict } => {
             let policy = if strict {
                 PoolVerificationPolicy::StrictProved
             } else {
                 PoolVerificationPolicy::Permissive
             };
-            let pool = AgentTaskPool::from_source(&source)
-                .map_err(CliError::Pool)?
-                .with_policy(policy);
+            let pool = create_task_pool(&file, db.as_deref(), policy)?;
             let tasks = pool.dispatch_tasks();
             let pending = pool.pending_hole_ids();
             println!("Axiom Task Pool: {}", file.display());
+            if let Some(db_path) = db {
+                println!("Database: {}", db_path.display());
+            }
             println!("Policy: {:?}", pool.policy());
             println!("Total Dispatched Tasks: {}", tasks.len());
             println!("Pending Holes: {}", pending.len());
@@ -976,9 +1002,9 @@ fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
             file,
             hole,
             expr,
+            db,
             strict,
         } => {
-            let source = read_source(&file)?;
             let solution_expr = if Path::new(&expr).exists() {
                 fs::read_to_string(&expr)
                     .map_err(|source| CliError::ReadSource {
@@ -995,9 +1021,7 @@ fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
             } else {
                 PoolVerificationPolicy::Permissive
             };
-            let mut pool = AgentTaskPool::from_source(&source)
-                .map_err(CliError::Pool)?
-                .with_policy(policy);
+            let mut pool = create_task_pool(&file, db.as_deref(), policy)?;
             println!(
                 "Submitting candidate solution for hole `?{hole}` in `{}`...",
                 file.display()
@@ -1063,17 +1087,15 @@ fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
             file,
             solutions,
             output,
+            db,
             strict,
         } => {
-            let source = read_source(&file)?;
             let policy = if strict {
                 PoolVerificationPolicy::StrictProved
             } else {
                 PoolVerificationPolicy::Permissive
             };
-            let mut pool = AgentTaskPool::from_source(&source)
-                .map_err(CliError::Pool)?
-                .with_policy(policy);
+            let mut pool = create_task_pool(&file, db.as_deref(), policy)?;
             if let Some(solutions_path) = solutions {
                 let sol_content = fs::read_to_string(&solutions_path).map_err(|source| {
                     CliError::ReadSource {

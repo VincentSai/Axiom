@@ -147,34 +147,42 @@ fn persisted_database_can_reconstruct_the_original_module() {
     std::fs::remove_file(path).expect("temporary database should be removable");
 }
 
-fn sample_skeleton_module() -> Module {
-    let mut module = sample_module();
-    module.functions[0].body = Expr::Hole("balance_impl".into());
-    module
+fn sample_verifiable_skeleton() -> Module {
+    axiom_parser::parse_module(
+        r#"
+        fn increment(x: Int) -> Int
+            requires { x >= 0 }
+            ensures { result > x }
+        {
+            ?inc_impl
+        }
+    "#,
+    )
+    .expect("sample verifiable skeleton must parse")
 }
 
 #[test]
-fn cas_commits_valid_candidate_and_mints_self_verifying_commit_record() {
+fn cas_commits_valid_candidate_and_kernel_mints_receipt() {
     use axiom_db::{
-        compute_candidate_hash, compute_envelope_hash, compute_expr_hash, Candidate, ProofLevel,
-        TaskEnvelope, VerificationReceipt,
+        compute_candidate_hash, compute_envelope_hash, compute_expr_hash,
+        compute_proof_obligation_hash, Candidate, ProofLevel, TaskEnvelope,
     };
 
     let mut db = AstDatabase::in_memory();
-    let initial_mod = sample_skeleton_module();
+    let initial_mod = sample_verifiable_skeleton();
     let _mod_rec = db.insert_module(&initial_mod).unwrap();
     let initial_root = db.current_root().unwrap();
 
     let envelope = TaskEnvelope {
         base_root_hash: Some(initial_root.clone()),
-        target_hole_id: "balance_impl".into(),
-        target_function: "balance".into(),
+        target_hole_id: "inc_impl".into(),
+        target_function: "increment".into(),
         contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let env_hash = compute_envelope_hash(&envelope);
 
-    let expr_src = "account.balance + 10";
+    let expr_src = "x + 1";
     let parsed_expr = axiom_parser::parse_expr(expr_src).unwrap();
     let expr_hash = compute_expr_hash(&parsed_expr);
 
@@ -187,38 +195,33 @@ fn cas_commits_valid_candidate_and_mints_self_verifying_commit_record() {
     };
     let cand_hash = compute_candidate_hash(&candidate);
 
-    let receipt = VerificationReceipt {
-        candidate_hash: cand_hash.clone(),
-        proof_level: ProofLevel::Proved,
-        solver: "Z3".into(),
-        solver_version: "4.13.0".into(),
-        obligations_checked: 2,
-        proof_obligation_hash: cand_hash.clone(),
-        verified_at: 1700000001,
-    };
-
     let mut updated_mod = initial_mod.clone();
-    axiom_db::replace_hole_in_expr(&mut updated_mod.functions[0].body, "balance_impl", &parsed_expr);
+    axiom_db::replace_hole_in_expr(&mut updated_mod.functions[0].body, "inc_impl", &parsed_expr);
 
-    // 1. CAS 成功提交
+    // 1. CAS 提交：由内核独立进行 SMT 验证并亲自铸造收据！
     let commit = db
         .try_commit_candidate(
             &Some(initial_root.clone()),
             envelope.clone(),
             candidate.clone(),
-            receipt.clone(),
-            &updated_mod,
+            Some(&updated_mod),
         )
-        .expect("CAS should succeed");
+        .expect("CAS with formally verified candidate should succeed");
 
     assert_eq!(commit.parent_root(), Some(&initial_root));
     assert_ne!(commit.new_root(), commit.parent_root().unwrap());
     assert_eq!(db.current_root().unwrap(), *commit.new_root());
     assert_eq!(db.get_candidate(&cand_hash).unwrap(), Some(candidate.clone()));
-    assert_eq!(db.get_receipt(&commit.receipt_hash()).unwrap(), Some(receipt));
-    assert_eq!(db.get_commit(&commit.commit_hash).unwrap(), Some(commit.clone()));
 
-    // 2. 密码学自校验断言：CommitRecord 哈希必须能重新计算自验证
+    // 2. 验证收据是由内核亲自铸造，包含真实的证明义务绑定
+    let minted_receipt = db.get_receipt(&commit.receipt_hash()).unwrap().expect("receipt must exist");
+    assert_eq!(minted_receipt.candidate_hash, cand_hash);
+    assert_eq!(minted_receipt.proof_level, ProofLevel::Proved);
+    assert_eq!(minted_receipt.obligations_checked, 1);
+    let expected_obligation_hash = compute_proof_obligation_hash(&updated_mod.functions[0]);
+    assert_eq!(minted_receipt.proof_obligation_hash, expected_obligation_hash);
+
+    // 3. 密码学自校验断言：CommitRecord 哈希自验证
     assert!(commit.verify_self_hash());
     assert_eq!(axiom_db::compute_commit_hash(&commit), commit.commit_hash);
 }
@@ -226,25 +229,24 @@ fn cas_commits_valid_candidate_and_mints_self_verifying_commit_record() {
 #[test]
 fn cas_detects_and_rejects_forged_module() {
     use axiom_db::{
-        compute_candidate_hash, compute_envelope_hash, compute_expr_hash, Candidate, CasError,
-        ProofLevel, TaskEnvelope, VerificationReceipt,
+        compute_envelope_hash, compute_expr_hash, Candidate, CasError, TaskEnvelope,
     };
 
     let mut db = AstDatabase::in_memory();
-    let initial_mod = sample_skeleton_module();
+    let initial_mod = sample_verifiable_skeleton();
     db.insert_module(&initial_mod).unwrap();
     let initial_root = db.current_root().unwrap();
 
     let envelope = TaskEnvelope {
         base_root_hash: Some(initial_root.clone()),
-        target_hole_id: "balance_impl".into(),
-        target_function: "balance".into(),
+        target_hole_id: "inc_impl".into(),
+        target_function: "increment".into(),
         contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let env_hash = compute_envelope_hash(&envelope);
 
-    let expr_src = "account.balance + 10";
+    let expr_src = "x + 1";
     let parsed_expr = axiom_parser::parse_expr(expr_src).unwrap();
 
     let candidate = Candidate {
@@ -254,29 +256,17 @@ fn cas_detects_and_rejects_forged_module() {
         author_agent_id: "malicious_agent".into(),
         timestamp: 1700000000,
     };
-    let cand_hash = compute_candidate_hash(&candidate);
-
-    let receipt = VerificationReceipt {
-        candidate_hash: cand_hash,
-        proof_level: ProofLevel::Proved,
-        solver: "Z3".into(),
-        solver_version: "4.13.0".into(),
-        obligations_checked: 2,
-        proof_obligation_hash: NodeHash::default(),
-        verified_at: 1700000001,
-    };
 
     // 恶意调用者夹带私货：在 module 中篡改了函数名称或逻辑
     let mut forged_mod = initial_mod.clone();
-    axiom_db::replace_hole_in_expr(&mut forged_mod.functions[0].body, "balance_impl", &parsed_expr);
+    axiom_db::replace_hole_in_expr(&mut forged_mod.functions[0].body, "inc_impl", &parsed_expr);
     forged_mod.functions[0].name = "unauthorized_name_change".into();
 
     let res = db.try_commit_candidate(
         &Some(initial_root),
         envelope,
         candidate,
-        receipt,
-        &forged_mod,
+        Some(&forged_mod),
     );
 
     match res {
@@ -291,11 +281,11 @@ fn cas_detects_and_rejects_forged_module() {
 fn cas_stale_root_preserves_candidates_without_silent_overwrite() {
     use axiom_db::{
         compute_candidate_hash, compute_envelope_hash, compute_expr_hash, Candidate, CasError,
-        ProofLevel, TaskEnvelope, VerificationReceipt,
+        TaskEnvelope,
     };
 
     let mut db = AstDatabase::in_memory();
-    let initial_mod = sample_skeleton_module();
+    let initial_mod = sample_verifiable_skeleton();
     let mod_rec = db.insert_module(&initial_mod).unwrap();
     let stale_root = mod_rec.module_hash;
 
@@ -309,14 +299,14 @@ fn cas_stale_root_preserves_candidates_without_silent_overwrite() {
 
     let envelope = TaskEnvelope {
         base_root_hash: Some(stale_root.clone()),
-        target_hole_id: "balance_impl".into(),
-        target_function: "balance".into(),
+        target_hole_id: "inc_impl".into(),
+        target_function: "increment".into(),
         contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let env_hash = compute_envelope_hash(&envelope);
 
-    let expr_src = "account.balance + 20";
+    let expr_src = "x + 2";
     let parsed_expr = axiom_parser::parse_expr(expr_src).unwrap();
 
     let candidate = Candidate {
@@ -328,23 +318,12 @@ fn cas_stale_root_preserves_candidates_without_silent_overwrite() {
     };
     let cand_hash = compute_candidate_hash(&candidate);
 
-    let receipt = VerificationReceipt {
-        candidate_hash: cand_hash.clone(),
-        proof_level: ProofLevel::Proved,
-        solver: "Z3".into(),
-        solver_version: "4.13.0".into(),
-        obligations_checked: 1,
-        proof_obligation_hash: cand_hash.clone(),
-        verified_at: 1700000051,
-    };
-
     // 试图在过期的 stale_root 上提交 -> 必须返回 StaleRoot 错误
     let res = db.try_commit_candidate(
         &Some(stale_root.clone()),
         envelope,
         candidate.clone(),
-        receipt,
-        &initial_mod,
+        Some(&initial_mod),
     );
 
     match res {
@@ -360,79 +339,56 @@ fn cas_stale_root_preserves_candidates_without_silent_overwrite() {
 }
 
 #[test]
-fn evidence_gate_rejects_sampled_proof_from_release() {
-    use axiom_db::{
-        compute_candidate_hash, compute_envelope_hash, compute_expr_hash, Candidate, CasError,
-        ProofLevel, TaskEnvelope, VerificationReceipt,
-    };
+fn kernel_verification_rejects_counterexample_candidate() {
+    use axiom_db::{compute_envelope_hash, compute_expr_hash, Candidate, CasError, TaskEnvelope};
 
     let mut db = AstDatabase::in_memory();
-    let initial_mod = sample_skeleton_module();
+    let initial_mod = sample_verifiable_skeleton();
     db.insert_module(&initial_mod).unwrap();
     let root = db.current_root().unwrap();
 
     let envelope = TaskEnvelope {
         base_root_hash: Some(root.clone()),
-        target_hole_id: "balance_impl".into(),
-        target_function: "balance".into(),
+        target_hole_id: "inc_impl".into(),
+        target_function: "increment".into(),
         contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let env_hash = compute_envelope_hash(&envelope);
 
-    let expr_src = "account.balance + 10";
+    // 错误候选解：x - 1 违反 ensures { result > x }
+    let expr_src = "x - 1";
     let parsed_expr = axiom_parser::parse_expr(expr_src).unwrap();
 
     let candidate = Candidate {
         envelope_hash: env_hash,
         expression_source: expr_src.into(),
         expression_hash: compute_expr_hash(&parsed_expr),
-        author_agent_id: "heuristic_worker".into(),
+        author_agent_id: "buggy_worker".into(),
         timestamp: 1700000100,
     };
-    let cand_hash = compute_candidate_hash(&candidate);
 
-    let receipt = VerificationReceipt {
-        candidate_hash: cand_hash,
-        proof_level: ProofLevel::Sampled,
-        solver: "InternalSymbolic".into(),
-        solver_version: "0.1.0".into(),
-        obligations_checked: 10,
-        proof_obligation_hash: NodeHash::default(),
-        verified_at: 1700000101,
-    };
-
-    let mut derived_mod = initial_mod.clone();
-    axiom_db::replace_hole_in_expr(&mut derived_mod.functions[0].body, "balance_impl", &parsed_expr);
-
-    let res = db.try_commit_candidate(
-        &Some(root),
-        envelope,
-        candidate,
-        receipt,
-        &derived_mod,
-    );
+    let res = db.try_commit_candidate(&Some(root), envelope, candidate, None);
 
     match res {
-        Err(CasError::UnverifiedCandidate(msg)) => {
-            assert!(msg.contains("Sampled"));
+        Err(CasError::VerificationRejected(msg)) => {
+            assert!(msg.contains("counterexample") || msg.contains("increment"));
         }
-        other => panic!("expected UnverifiedCandidate error for Sampled proof, got: {:?}", other),
+        other => panic!("expected VerificationRejected error, got: {:?}", other),
     }
 }
 
 #[test]
 fn cross_instance_cas_file_locking_and_stale_root_detection() {
     use axiom_db::{
-        compute_candidate_hash, compute_envelope_hash, compute_expr_hash, Candidate, CasError,
-        ProofLevel, TaskEnvelope, VerificationReceipt,
+        compute_envelope_hash, compute_expr_hash, Candidate, CasError, TaskEnvelope,
     };
 
     let db_path = temporary_database_path("cross_instance_test");
 
     // 实例 1 初始化物理文件数据库
     let mut db1 = AstDatabase::open(&db_path).unwrap();
-    let initial_mod = sample_skeleton_module();
+    let initial_mod = sample_verifiable_skeleton();
     let mod_rec = db1.insert_module(&initial_mod).unwrap();
     let initial_root = mod_rec.module_hash;
 
@@ -441,13 +397,13 @@ fn cross_instance_cas_file_locking_and_stale_root_detection() {
     assert_eq!(db2.current_root(), Some(initial_root.clone()));
 
     // 实例 1 提交一个候选推进 Root
-    let expr1_src = "account.balance + 10";
+    let expr1_src = "x + 1";
     let parsed_expr1 = axiom_parser::parse_expr(expr1_src).unwrap();
     let envelope1 = TaskEnvelope {
         base_root_hash: Some(initial_root.clone()),
-        target_hole_id: "balance_impl".into(),
-        target_function: "balance".into(),
-        contract_hash: NodeHash::default(),
+        target_hole_id: "inc_impl".into(),
+        target_function: "increment".into(),
+        contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let candidate1 = Candidate {
@@ -457,31 +413,22 @@ fn cross_instance_cas_file_locking_and_stale_root_detection() {
         author_agent_id: "worker_1".into(),
         timestamp: 100,
     };
-    let receipt1 = VerificationReceipt {
-        candidate_hash: compute_candidate_hash(&candidate1),
-        proof_level: ProofLevel::Proved,
-        solver: "Z3".into(),
-        solver_version: "4.13.0".into(),
-        obligations_checked: 1,
-        proof_obligation_hash: NodeHash::default(),
-        verified_at: 100,
-    };
     let mut mod1 = initial_mod.clone();
-    axiom_db::replace_hole_in_expr(&mut mod1.functions[0].body, "balance_impl", &parsed_expr1);
+    axiom_db::replace_hole_in_expr(&mut mod1.functions[0].body, "inc_impl", &parsed_expr1);
 
     let commit1 = db1
-        .try_commit_candidate(&Some(initial_root.clone()), envelope1, candidate1, receipt1, &mod1)
+        .try_commit_candidate(&Some(initial_root.clone()), envelope1, candidate1, Some(&mod1))
         .expect("db1 commit should succeed");
     let new_root1 = commit1.new_root().clone();
 
     // 实例 2 持有旧的 initial_root 试图提交 -> 跨进程排他锁与磁盘重读检测到 StaleRoot！
-    let expr2_src = "account.balance + 20";
+    let expr2_src = "x + 2";
     let parsed_expr2 = axiom_parser::parse_expr(expr2_src).unwrap();
     let envelope2 = TaskEnvelope {
         base_root_hash: Some(initial_root.clone()),
-        target_hole_id: "balance_impl".into(),
-        target_function: "balance".into(),
-        contract_hash: NodeHash::default(),
+        target_hole_id: "inc_impl".into(),
+        target_function: "increment".into(),
+        contract_hash: axiom_db::compute_function_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
     let candidate2 = Candidate {
@@ -491,19 +438,10 @@ fn cross_instance_cas_file_locking_and_stale_root_detection() {
         author_agent_id: "worker_2".into(),
         timestamp: 101,
     };
-    let receipt2 = VerificationReceipt {
-        candidate_hash: compute_candidate_hash(&candidate2),
-        proof_level: ProofLevel::Proved,
-        solver: "Z3".into(),
-        solver_version: "4.13.0".into(),
-        obligations_checked: 1,
-        proof_obligation_hash: NodeHash::default(),
-        verified_at: 101,
-    };
     let mut mod2 = initial_mod.clone();
-    axiom_db::replace_hole_in_expr(&mut mod2.functions[0].body, "balance_impl", &parsed_expr2);
+    axiom_db::replace_hole_in_expr(&mut mod2.functions[0].body, "inc_impl", &parsed_expr2);
 
-    let res2 = db2.try_commit_candidate(&Some(initial_root.clone()), envelope2, candidate2, receipt2, &mod2);
+    let res2 = db2.try_commit_candidate(&Some(initial_root.clone()), envelope2, candidate2, Some(&mod2));
     match res2 {
         Err(CasError::StaleRoot { current, expected }) => {
             assert_eq!(current, Some(new_root1));
@@ -513,5 +451,86 @@ fn cross_instance_cas_file_locking_and_stale_root_detection() {
     }
 
     let _ = std::fs::remove_file(&db_path);
+}
+
+#[test]
+fn os_file_lock_guard_provides_mutual_exclusion() {
+    use axiom_db::FileLockGuard;
+
+    let db_path = temporary_database_path("lock_exclusion_test");
+
+    // 持有排他锁
+    let guard1 = FileLockGuard::acquire(&db_path).expect("first lock acquire should succeed");
+
+    // 第二个锁应该在超时后失败或者被阻塞
+    let start = std::time::Instant::now();
+    // 在子线程尝试获取锁
+    let handle = std::thread::spawn({
+        let path = db_path.clone();
+        move || FileLockGuard::acquire(&path)
+    });
+
+    // 释放 guard1
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    drop(guard1);
+
+    // guard1 释放后，子线程应该能成功获取到锁
+    let guard2_res = handle.join().expect("thread join failed");
+    assert!(guard2_res.is_ok(), "second acquire after drop should succeed");
+    assert!(start.elapsed() >= std::time::Duration::from_millis(50));
+
+    let _ = std::fs::remove_file(&db_path);
+}
+
+#[test]
+fn locked_transaction_serializes_concurrent_writes() {
+    use std::sync::Arc;
+    use axiom_db::TaskEnvelope;
+
+    let db_path = temporary_database_path("concurrent_tx_test");
+    let mut db = AstDatabase::open(&db_path).unwrap();
+    let initial_mod = sample_verifiable_skeleton();
+    db.insert_module(&initial_mod).unwrap();
+
+    let db_path = Arc::new(db_path);
+    let mut handles = Vec::new();
+
+    for i in 0..5 {
+        let path = Arc::clone(&db_path);
+        handles.push(std::thread::spawn(move || {
+            let mut local_db = AstDatabase::open(&path).expect("open must succeed");
+            local_db.locked_transaction::<(), axiom_db::DbError>(|state| {
+                let dummy_env = TaskEnvelope {
+                    base_root_hash: None,
+                    target_hole_id: format!("hole_{i}"),
+                    target_function: "dummy".into(),
+                    contract_hash: NodeHash::default(),
+                    dependency_hashes: vec![],
+                };
+                let hash = axiom_db::compute_envelope_hash(&dummy_env);
+                state.envelopes.insert(hash, dummy_env);
+                Ok(())
+            })
+        }));
+    }
+
+    for h in handles {
+        h.join().unwrap().expect("transaction should succeed");
+    }
+
+    let final_db = AstDatabase::open(&db_path).unwrap();
+    for i in 0..5 {
+        let dummy_env = TaskEnvelope {
+            base_root_hash: None,
+            target_hole_id: format!("hole_{i}"),
+            target_function: "dummy".into(),
+            contract_hash: NodeHash::default(),
+            dependency_hashes: vec![],
+        };
+        let hash = axiom_db::compute_envelope_hash(&dummy_env);
+        assert!(final_db.get_envelope(&hash).unwrap().is_some());
+    }
+
+    let _ = std::fs::remove_file(&*db_path);
 }
 

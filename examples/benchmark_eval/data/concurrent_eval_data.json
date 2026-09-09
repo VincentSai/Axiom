@@ -4,15 +4,17 @@
   "experiment_metadata": {
     "engine": "codex",
     "mode": "concurrent_multi_agent",
-    "git_commit": "096f284",
+    "is_mock": true,
+    "git_commit": "7dcdb0ba254aed924cc4b7561be980d25d502885",
+    "git_tree_hash": "aa8bb48339730a2b8b3f4aac4169389ade098fb7",
     "z3_version": "Z3 version 4.13.0 - 64 bit",
     "platform": "win32",
     "python_version": "3.14.2",
-    "timestamp": "2026-09-09 11:41:41"
+    "timestamp": "2026-09-09 12:42:56"
   },
   "summary": {
     "rust_group": {
-      "wall_clock_sec": 1.8,
+      "wall_clock_sec": 1.68,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -22,7 +24,7 @@
       "unit_test_passed": true
     },
     "axiom_group": {
-      "wall_clock_sec": 0.89,
+      "wall_clock_sec": 1.51,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -30,14 +32,14 @@
       "resolver_tax_billed_tokens": 0,
       "total_billed_tokens": 75070,
       "formal_proved": true,
-      "speedup_vs_rust": 2.02
+      "speedup_vs_rust": 1.11
     }
   },
   "detailed_runs": {
     "group2_rust": {
       "status": "success",
-      "wall_clock_sec": 1.8,
-      "worker_concurrency_sec": 0.23,
+      "wall_clock_sec": 1.68,
+      "worker_concurrency_sec": 0.15,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -137,10 +139,10 @@
     },
     "group3_axiom": {
       "status": "success",
-      "wall_clock_sec": 0.89,
+      "wall_clock_sec": 1.51,
       "worker_concurrency_sec": 0.0,
-      "combinator_latency_ms": 408.56,
-      "smt_verify_sec": 0.39,
+      "combinator_latency_ms": 783.69,
+      "smt_verify_sec": 0.37,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -226,16 +228,23 @@
       "cas_concurrency_benchmark": {
         "race_workers": 2,
         "success_submissions": 2,
-        "concurrency_elapsed_sec": 0.081,
-        "stale_root_fast_forward_supported": true,
+        "concurrency_elapsed_sec": 0.29,
+        "stale_root_conflicts_observed": 1,
+        "fast_forward_retries_succeeded": 1,
+        "final_commit_chain_length": 2,
+        "initial_root": "#mod_8f44aeb1f28767a06f08996f4fcfe4486c460247d5774f0e270db7e50bb77dc7",
+        "final_root": "#mod_613e187ea693b2e490f73c7239853578555fffbac894da6faef0bb7d8be61d96",
+        "is_mock": true,
+        "git_commit_sha": "7dcdb0ba254aed924cc4b7561be980d25d502885",
+        "git_tree_hash": "aa8bb48339730a2b8b3f4aac4169389ade098fb7",
         "worker_a": {
           "returncode": 0,
-          "stdout": "Submitting candidate solution for hole `?hole_a` in `C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\tmp2yi_7ffi\\race_skel.ax`...\n[ACCEPTED] Hole `?hole_a` formally verified with SMT proof (Microsoft Z3 (SMT-LIB2) v4.13.0, obligations: 1).",
+          "stdout": "Submitting candidate solution for hole `?hole_a` in `C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\tmp1cq0c2cy\\race_skel.ax`...\n[ACCEPTED] Hole `?hole_a` formally verified with SMT proof (Microsoft Z3 (SMT-LIB2) v4.13.0, obligations: 1).",
           "stderr": ""
         },
         "worker_b": {
           "returncode": 0,
-          "stdout": "Submitting candidate solution for hole `?hole_b` in `C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\tmp2yi_7ffi\\race_skel.ax`...\n[ACCEPTED] Hole `?hole_b` formally verified with SMT proof (Microsoft Z3 (SMT-LIB2) v4.13.0, obligations: 1).",
+          "stdout": "Submitting candidate solution for hole `?hole_b` in `C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\tmp1cq0c2cy\\race_skel.ax`...\n[ACCEPTED] Hole `?hole_b` formally verified with SMT proof (Microsoft Z3 (SMT-LIB2) v4.13.0, obligations: 1).",
           "stderr": ""
         }
       },

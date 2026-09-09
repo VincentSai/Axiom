@@ -232,3 +232,88 @@ fn fast_forward_reverification_mints_clean_receipt_and_commits_successfully() {
     assert!(!matches!(verified_mod.functions[1].body, Expr::Hole(_)));
 }
 
+#[test]
+fn real_cross_instance_stale_root_fast_forward_rebasing() {
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let skeleton_path = std::env::temp_dir().join(format!("axiom-test-skel-{nonce}.ax"));
+    let db_path = std::env::temp_dir().join(format!("axiom-test-db-{nonce}.json"));
+
+    std::fs::write(&skeleton_path, TWO_HOLE_SKELETON).unwrap();
+
+    // 实例 1 打开共享数据库与骨架
+    let mut pool1 = AgentTaskPool::open_persisted(&skeleton_path, &db_path).unwrap();
+    let initial_root = pool1.current_root().unwrap();
+
+    // 实例 2 同时打开同一个共享数据库与骨架
+    let mut pool2 = AgentTaskPool::open_persisted(&skeleton_path, &db_path).unwrap();
+    assert_eq!(pool2.current_root(), Some(initial_root.clone()));
+
+    // 实例 1 解决 increment_impl 并推进 Root 落盘
+    let res1 = pool1
+        .submit_solution_with_agent("increment_impl", "value + 1", "worker_1")
+        .expect("worker 1 submit should succeed");
+    assert!(res1.is_proved());
+    let root_after_pool1 = pool1.current_root().unwrap();
+    assert_ne!(root_after_pool1, initial_root);
+
+    // 实例 2 仍然持有旧的 initial_root 信封，尝试提交 double_impl
+    // 此时由于底层文件数据库中 root 已经变为 root_after_pool1，CAS 检测出 StaleRoot，
+    // pool2 自动触发 Fast-Forward 重基：从数据库中物理加载 root_after_pool1 的真实 AST
+    // （该 AST 中已经包含了 pool1 填入的 increment_impl 实现！），在其上填入 double_impl 并重验成功！
+    let res2 = pool2
+        .submit_solution_with_agent("double_impl", "value * 2", "worker_2")
+        .expect("worker 2 submit with fast-forward rebasing should succeed");
+    assert!(res2.is_proved());
+    let final_root = pool2.current_root().unwrap();
+    assert_ne!(final_root, root_after_pool1);
+
+    // 实例 3 从磁盘重新打开，验证两项提交均成功合并入库！
+    let pool3 = AgentTaskPool::open_persisted(&skeleton_path, &db_path).unwrap();
+    let final_mod = pool3.database().get_module(&final_root).unwrap().unwrap();
+    assert!(!axiom_agent_pool::ast_contains_any_hole(&final_mod));
+
+    let _ = std::fs::remove_file(&skeleton_path);
+    let _ = std::fs::remove_file(&db_path);
+}
+
+#[test]
+fn permissive_sampled_solution_rejected_by_assemble_verified_module() {
+    use axiom_db::ProofLevel;
+
+    // 骨架包含一个没有 ensures 的纯函数（在当前引擎下无法获得 Proved，只能返回 Skipped 或 Sampled）
+    const HEURISTIC_SKELETON: &str = r#"
+        fn compute(value: Int) -> Int {
+            ?compute_impl
+        }
+    "#;
+
+    let mut pool = AgentTaskPool::from_source(HEURISTIC_SKELETON)
+        .expect("skeleton parses")
+        .with_policy(PoolVerificationPolicy::Permissive);
+
+    // 在 Permissive 模式下提交解
+    let res = pool
+        .submit_solution("compute_impl", "value + 42")
+        .expect("permissive mode accepts candidate");
+
+    // 证实证据级别不是 Proved（例如 Sampled 或 Skipped）
+    assert!(!res.is_proved());
+
+    // 草稿可以正常导出
+    let provisional = pool.assemble_provisional_module();
+    assert_eq!(provisional.functions.len(), 1);
+
+    // 严格门禁：assemble_verified_module 必须拒绝，绝不放行至生产！
+    let verified_err = pool.assemble_verified_module();
+    match verified_err {
+        Err(PoolError::InsufficientEvidence { hole_id, level }) => {
+            assert_eq!(hole_id, "compute_impl");
+            assert_ne!(level, ProofLevel::Proved);
+        }
+        other => panic!("expected InsufficientEvidence error, got: {:?}", other),
+    }
+}
+

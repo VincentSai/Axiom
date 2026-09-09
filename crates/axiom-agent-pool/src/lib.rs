@@ -5,9 +5,8 @@ use std::fmt;
 
 use axiom_ast::{Expr, Module};
 use axiom_db::{
-    compute_candidate_hash, compute_envelope_hash, compute_expr_hash, compute_function_hash,
+    compute_envelope_hash, compute_expr_hash, compute_function_hash,
     AstDatabase, Candidate, CasError, CommitRecord, NodeHash, ProofLevel, TaskEnvelope,
-    VerificationReceipt,
 };
 use axiom_hole_extractor::extract_holes;
 pub use axiom_hole_extractor::HoleTask;
@@ -28,9 +27,11 @@ pub enum PoolVerificationPolicy {
 /// A pool of hole tasks backed by a module whose accepted solutions are SMT-verified and committed via CAS.
 #[derive(Debug, Clone)]
 pub struct AgentTaskPool {
-    module: Module,
+    verified_module: Module,
+    provisional_module: Module,
     tasks: Vec<HoleTask>,
     pending_holes: HashSet<String>,
+    hole_evidence: HashMap<String, ProofLevel>,
     policy: PoolVerificationPolicy,
     db: AstDatabase,
     envelopes: HashMap<String, TaskEnvelope>,
@@ -38,8 +39,14 @@ pub struct AgentTaskPool {
 }
 
 impl AgentTaskPool {
-    /// Create a task pool from a parsed skeleton module.
+    /// Create a task pool from a parsed skeleton module with an in-memory database.
     pub fn new(skeleton_module: Module) -> Self {
+        let db = AstDatabase::in_memory();
+        Self::open_with_database(skeleton_module, db).expect("in-memory database pool initialization cannot fail")
+    }
+
+    /// Open or initialize a task pool backed by a shared AST database instance.
+    pub fn open_with_database(skeleton_module: Module, mut db: AstDatabase) -> Result<Self, PoolError> {
         let mut seen_holes = HashSet::new();
         let tasks = extract_holes(&skeleton_module)
             .into_iter()
@@ -47,12 +54,16 @@ impl AgentTaskPool {
             .collect::<Vec<_>>();
         let pending_holes = tasks.iter().map(|task| task.hole_id.clone()).collect();
 
-        let mut db = AstDatabase::in_memory();
-        let mod_rec = db
-            .insert_module(&skeleton_module)
-            .expect("in-memory database module insert cannot fail");
-        db.set_root(mod_rec.module_hash.clone())
-            .expect("in-memory database set_root cannot fail");
+        let base_root = if let Some(root) = db.current_root() {
+            root
+        } else {
+            let mod_rec = db
+                .insert_module(&skeleton_module)
+                .map_err(|e| PoolError::CasFailure(e.to_string()))?;
+            db.set_root(mod_rec.module_hash.clone())
+                .map_err(|e| PoolError::CasFailure(e.to_string()))?;
+            mod_rec.module_hash
+        };
 
         let mut envelopes = HashMap::new();
         for task in &tasks {
@@ -63,7 +74,7 @@ impl AgentTaskPool {
                 .map(compute_function_hash)
                 .unwrap_or_default();
             let env = TaskEnvelope {
-                base_root_hash: Some(mod_rec.module_hash.clone()),
+                base_root_hash: Some(base_root.clone()),
                 target_hole_id: task.hole_id.clone(),
                 target_function: task.target_function.clone(),
                 contract_hash: func_hash,
@@ -72,20 +83,55 @@ impl AgentTaskPool {
             envelopes.insert(task.hole_id.clone(), env);
         }
 
-        Self {
-            module: skeleton_module,
+        Ok(Self {
+            verified_module: skeleton_module.clone(),
+            provisional_module: skeleton_module,
             tasks,
             pending_holes,
+            hole_evidence: HashMap::new(),
             policy: PoolVerificationPolicy::default(),
             db,
             envelopes,
             commits: Vec::new(),
-        }
+        })
+    }
+
+    /// Open or initialize a task pool backed by a persistent file database and skeleton source file.
+    pub fn open_persisted(skeleton_path: &std::path::Path, db_path: &std::path::Path) -> Result<Self, PoolError> {
+        let source = std::fs::read_to_string(skeleton_path).map_err(|e| PoolError::CasFailure(e.to_string()))?;
+        let skeleton_module = parse_module(&source)?;
+        let db = AstDatabase::open(db_path).map_err(|e| PoolError::CasFailure(e.to_string()))?;
+        Self::open_with_database(skeleton_module, db)
     }
 
     /// Access the underlying immutable AST database.
     pub fn database(&self) -> &AstDatabase {
         &self.db
+    }
+
+    /// Access the underlying mutable AST database.
+    pub fn database_mut(&mut self) -> &mut AstDatabase {
+        &mut self.db
+    }
+
+    /// Access the verified module baseline.
+    pub fn verified_module(&self) -> &Module {
+        &self.verified_module
+    }
+
+    /// Access the provisional module (including draft / sampled solutions).
+    pub fn provisional_module(&self) -> &Module {
+        &self.provisional_module
+    }
+
+    /// Access the primary module (alias for verified_module).
+    pub fn module(&self) -> &Module {
+        &self.verified_module
+    }
+
+    /// Access the explicit hole evidence ledger.
+    pub fn hole_evidence(&self) -> &HashMap<String, ProofLevel> {
+        &self.hole_evidence
     }
 
     /// Get current root module hash reference.
@@ -165,7 +211,7 @@ impl AgentTaskPool {
         }
 
         let solution = parse_expr(solution_source)?;
-        let mut candidate_module = self.module.clone();
+        let mut candidate_module = self.provisional_module.clone();
         let mut affected_functions = Vec::new();
 
         for (index, function) in candidate_module.functions.iter_mut().enumerate() {
@@ -180,58 +226,108 @@ impl AgentTaskPool {
 
         let cand_expr_hash = compute_expr_hash(&solution);
         let contract_hash = compute_function_hash(&candidate_module.functions[affected_functions[0]]);
+        let current_root = self.db.current_root();
         let envelope = self.envelopes.get(hole_id).cloned().unwrap_or_else(|| TaskEnvelope {
-            base_root_hash: self.db.current_root(),
+            base_root_hash: current_root.clone(),
             target_hole_id: hole_id.to_owned(),
             target_function: candidate_module.functions[affected_functions[0]].name.clone(),
             contract_hash,
             dependency_hashes: Vec::new(),
         });
 
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
         let candidate = Candidate {
             envelope_hash: compute_envelope_hash(&envelope),
             expression_source: solution_source.to_string(),
             expression_hash: cand_expr_hash.clone(),
             author_agent_id: agent_id.to_string(),
-            timestamp: 0,
+            timestamp: now,
         };
 
-        // 1. 首次验证通过单点函数执行
-        let (final_result, receipt) = match verify_candidate_and_mint_receipt(
-            &candidate_module,
-            &affected_functions,
-            &candidate,
-            self.policy,
-        ) {
-            Ok(pair) => pair,
-            Err(failure_result) => return Ok(failure_result),
-        };
+        // 1. 预先单点验证，支持向 Worker 报告反例以进行自愈
+        let precheck_result = verify_candidate_precheck(&candidate_module, &affected_functions);
+        match &precheck_result {
+            SmtResult::CounterExample(_) | SmtResult::VacuousContract { .. } | SmtResult::Unknown(_) => {
+                return Ok(precheck_result);
+            }
+            SmtResult::Skipped(_) => {
+                let func = &candidate_module.functions[affected_functions[0]];
+                if func.ensures.is_empty() {
+                    if self.policy == PoolVerificationPolicy::Permissive {
+                        self.provisional_module = candidate_module;
+                        self.pending_holes.remove(hole_id);
+                        self.hole_evidence.insert(hole_id.to_string(), ProofLevel::Sampled);
+                        return Ok(precheck_result);
+                    }
+                    return Ok(precheck_result);
+                }
+            }
+            SmtResult::Sampled { .. } => {
+                if self.policy == PoolVerificationPolicy::Permissive {
+                    // Permissive 模式：允许作为草稿更新 provisional_module，但不推进 verified_module
+                    self.provisional_module = candidate_module;
+                    self.pending_holes.remove(hole_id);
+                    self.hole_evidence.insert(hole_id.to_string(), ProofLevel::Sampled);
+                    return Ok(precheck_result);
+                } else {
+                    return Ok(precheck_result);
+                }
+            }
+            SmtResult::Proved { .. } => {}
+        }
 
+        // 2. 核心提交：直接交由数据库内核验证并铸造收据！
         let expected_root = envelope.base_root_hash.clone();
         match self.db.try_commit_candidate(
             &expected_root,
             envelope.clone(),
             candidate.clone(),
-            receipt.clone(),
-            &candidate_module,
+            Some(&candidate_module),
         ) {
             Ok(commit_record) => {
                 self.commits.push(commit_record);
-                self.module = candidate_module;
+                self.verified_module = candidate_module.clone();
+                self.provisional_module = candidate_module;
                 self.pending_holes.remove(hole_id);
+                self.hole_evidence.insert(hole_id.to_string(), ProofLevel::Proved);
                 let latest_root = self.db.current_root();
                 for env in self.envelopes.values_mut() {
                     env.base_root_hash = latest_root.clone();
                 }
-                Ok(final_result)
+                Ok(precheck_result)
             }
             Err(CasError::StaleRoot { current, .. }) => {
-                // Stale Root 冲突处理：并发冲突检测成功
                 if !self.pending_holes.contains(hole_id) {
                     return Err(PoolError::AlreadyResolved(hole_id.to_owned()));
                 }
 
-                let mut rebased_module = self.module.clone();
+                // 核心决议 3：从数据库 CAS 物理加载最新真实 AST 实施 Fast-Forward 重基！
+                let latest_root = current.clone().ok_or_else(|| {
+                    PoolError::CasFailure("stale root returned None current root".to_string())
+                })?;
+                let mut rebased_module = self
+                    .db
+                    .get_module(&latest_root)
+                    .map_err(|e| PoolError::CasFailure(e.to_string()))?
+                    .ok_or_else(|| {
+                        PoolError::CasFailure(format!(
+                            "latest module for root `{latest_root}` not found in database"
+                        ))
+                    })?;
+
+                // 关键：在被填洞替换前获取基线目标函数的契约哈希
+                let base_func = rebased_module
+                    .functions
+                    .iter()
+                    .find(|f| f.name == envelope.target_function)
+                    .cloned()
+                    .ok_or_else(|| PoolError::MissingHole(hole_id.to_owned()))?;
+                let rebased_func_hash = compute_function_hash(&base_func);
+
                 let mut rebased_affected = Vec::new();
                 for (idx, function) in rebased_module.functions.iter_mut().enumerate() {
                     if replace_hole(&mut function.body, hole_id, &solution) {
@@ -242,11 +338,10 @@ impl AgentTaskPool {
                     return Err(PoolError::MissingHole(hole_id.to_owned()));
                 }
 
-                let rebased_func_hash = compute_function_hash(&rebased_module.functions[rebased_affected[0]]);
                 let rebased_envelope = TaskEnvelope {
-                    base_root_hash: current.clone(),
+                    base_root_hash: Some(latest_root.clone()),
                     target_hole_id: hole_id.to_owned(),
-                    target_function: rebased_module.functions[rebased_affected[0]].name.clone(),
+                    target_function: envelope.target_function.clone(),
                     contract_hash: rebased_func_hash,
                     dependency_hashes: Vec::new(),
                 };
@@ -258,46 +353,32 @@ impl AgentTaskPool {
                     timestamp: candidate.timestamp + 1,
                 };
 
-                // 2. 关键：Fast-Forward 重验 100% 走同一个纯函数，铸造全新收据，严禁继承旧收据！
-                let (recheck_result, rebased_receipt) = match verify_candidate_and_mint_receipt(
-                    &rebased_module,
-                    &rebased_affected,
-                    &rebased_candidate,
-                    self.policy,
-                ) {
-                    Ok(pair) => pair,
-                    Err(failure_result) => return Ok(failure_result),
-                };
+                let recheck_result =
+                    verify_candidate_precheck(&rebased_module, &rebased_affected);
+                if !recheck_result.is_proved() {
+                    return Ok(recheck_result);
+                }
 
                 let commit_record = self
                     .db
                     .try_commit_candidate(
-                        &current,
+                        &Some(latest_root),
                         rebased_envelope,
                         rebased_candidate,
-                        rebased_receipt,
-                        &rebased_module,
+                        Some(&rebased_module),
                     )
                     .map_err(|e| PoolError::CasFailure(e.to_string()))?;
 
                 self.commits.push(commit_record);
-                self.module = rebased_module;
+                self.verified_module = rebased_module.clone();
+                self.provisional_module = rebased_module;
                 self.pending_holes.remove(hole_id);
-                let latest_root = self.db.current_root();
+                self.hole_evidence.insert(hole_id.to_string(), ProofLevel::Proved);
+                let current_root = self.db.current_root();
                 for env in self.envelopes.values_mut() {
-                    env.base_root_hash = latest_root.clone();
+                    env.base_root_hash = current_root.clone();
                 }
                 Ok(recheck_result)
-            }
-            Err(CasError::UnverifiedCandidate(_)) => {
-                if self.policy == PoolVerificationPolicy::Permissive {
-                    let _ = self.db.record_receipt(receipt);
-                    self.module = candidate_module;
-                    self.pending_holes.remove(hole_id);
-                    Ok(final_result)
-                } else {
-                    Ok(final_result)
-                }
             }
             Err(other) => Err(PoolError::CasFailure(other.to_string())),
         }
@@ -310,38 +391,43 @@ impl AgentTaskPool {
 
     /// Assemble a clone of the verified, hole-free module.
     ///
-    /// 严禁妥协：
+    /// 严禁妥协强门禁：
     /// 1. 所有已分发的洞必须已被解决；
     /// 2. 深入 AST 扫描，若有残留的 Expr::Hole，拒绝导出；
+    /// 3. 证据账本强门禁：所有已分发洞 100% 具备 ProofLevel::Proved 证据；
+    ///    若有任何洞仅为 Sampled 或 Unverified，坚决拒绝，返回 PoolError::InsufficientEvidence！
     pub fn assemble_verified_module(&self) -> Result<Module, PoolError> {
         if !self.is_complete() {
             return Err(PoolError::Incomplete(self.pending_hole_ids()));
         }
-        if ast_contains_any_hole(&self.module) {
+        for task in &self.tasks {
+            let evidence = self.hole_evidence.get(&task.hole_id);
+            if evidence != Some(&ProofLevel::Proved) {
+                return Err(PoolError::InsufficientEvidence {
+                    hole_id: task.hole_id.clone(),
+                    level: evidence.copied().unwrap_or(ProofLevel::Unverified),
+                });
+            }
+        }
+        if ast_contains_any_hole(&self.verified_module) {
             return Err(PoolError::Incomplete(vec!["unresolved_ast_hole".to_string()]));
         }
-        Ok(self.module.clone())
+        Ok(self.verified_module.clone())
     }
 
     /// Assemble a provisional module draft (for inspection, review, or debugging).
     /// May contain unresolved holes or provisional implementations.
     pub fn assemble_provisional_module(&self) -> Module {
-        self.module.clone()
+        self.provisional_module.clone()
     }
 }
 
-/// 单点验证与收据铸造纯函数：
-/// 对给定模块中被填洞替换影响的所有函数执行 SMT 定理证明，
-/// 严格保证无论首次提交还是并发冲突后的 Fast-Forward 重验，100% 走完全一致的逻辑，
-/// 杜绝分支逻辑漂移，坚决禁止继承旧收据字段。
-pub fn verify_candidate_and_mint_receipt(
+/// 预检给定模块中被填洞替换影响的所有函数的 SMT 证明结果
+pub fn verify_candidate_precheck(
     module: &Module,
     affected_functions: &[usize],
-    candidate: &Candidate,
-    policy: PoolVerificationPolicy,
-) -> Result<(SmtResult, VerificationReceipt), SmtResult> {
+) -> SmtResult {
     let mut final_result = SmtResult::Sampled { points_checked: 0 };
-
     for &function_index in affected_functions {
         let func = &module.functions[function_index];
         let result = verify_function_in_module(func, module);
@@ -349,18 +435,15 @@ pub fn verify_candidate_and_mint_receipt(
             SmtResult::CounterExample { .. }
             | SmtResult::VacuousContract { .. }
             | SmtResult::Unknown(_) => {
-                return Err(result);
+                return result;
             }
             SmtResult::Skipped(_) => {
                 if !func.ensures.is_empty() {
-                    return Err(result);
+                    return result;
                 }
                 final_result = result;
             }
             SmtResult::Sampled { .. } => {
-                if policy == PoolVerificationPolicy::StrictProved && !func.ensures.is_empty() {
-                    return Err(result);
-                }
                 final_result = result;
             }
             SmtResult::Proved { .. } => {
@@ -368,40 +451,7 @@ pub fn verify_candidate_and_mint_receipt(
             }
         }
     }
-
-    let cand_hash = compute_candidate_hash(candidate);
-
-    let (proof_level, solver, solver_version, obligations_checked) = match &final_result {
-        SmtResult::Proved {
-            solver,
-            version,
-            obligations_checked,
-        } => (
-            ProofLevel::Proved,
-            solver.clone(),
-            version.clone(),
-            *obligations_checked,
-        ),
-        SmtResult::Sampled { points_checked } => (
-            ProofLevel::Sampled,
-            "discrete-grid-evaluator".to_string(),
-            "0.1.0".to_string(),
-            *points_checked,
-        ),
-        _ => (ProofLevel::Unverified, "none".to_string(), "0".to_string(), 0),
-    };
-
-    let receipt = VerificationReceipt {
-        candidate_hash: cand_hash.clone(),
-        proof_level,
-        solver,
-        solver_version,
-        obligations_checked,
-        proof_obligation_hash: cand_hash,
-        verified_at: candidate.timestamp,
-    };
-
-    Ok((final_result, receipt))
+    final_result
 }
 
 /// Errors that prevent a worker submission or final module assembly.
@@ -412,6 +462,10 @@ pub enum PoolError {
     AlreadyResolved(String),
     MissingHole(String),
     Incomplete(Vec<String>),
+    InsufficientEvidence {
+        hole_id: String,
+        level: ProofLevel,
+    },
     CasFailure(String),
 }
 
@@ -435,6 +489,10 @@ impl fmt::Display for PoolError {
                 "module still has pending holes: {}",
                 hole_ids.join(", ")
             ),
+            Self::InsufficientEvidence { hole_id, level } => write!(
+                formatter,
+                "hole `{hole_id}` does not meet formal verification bar: evidence level is `{level:?}`, required `Proved`"
+            ),
             Self::CasFailure(msg) => write!(formatter, "CAS commit failed: {msg}"),
         }
     }
@@ -448,6 +506,7 @@ impl std::error::Error for PoolError {
             | Self::AlreadyResolved(_)
             | Self::MissingHole(_)
             | Self::Incomplete(_)
+            | Self::InsufficientEvidence { .. }
             | Self::CasFailure(_) => None,
         }
     }

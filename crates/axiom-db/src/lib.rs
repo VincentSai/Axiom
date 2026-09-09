@@ -1,6 +1,6 @@
 //! Content-addressed storage and Verifiable Change Protocol for Axiom abstract syntax trees.
 
-use axiom_ast::{EffectDecl, Expr, FunctionDecl, Module, TypeDef};
+use axiom_ast::{EffectDecl, Expr, FunctionDecl, FunctionParam, Module, Type, TypeDef};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -50,7 +50,7 @@ impl FromStr for NodeHash {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         let valid_prefix = [
-            "#type_", "#fn_", "#effect_", "#mod_", "#env_", "#cand_", "#rcpt_", "#commit_", "#null_",
+            "#type_", "#fn_", "#effect_", "#mod_", "#env_", "#cand_", "#rcpt_", "#commit_", "#obl_", "#null_",
         ]
         .iter()
         .find(|prefix| value.starts_with(**prefix));
@@ -111,6 +111,26 @@ pub fn compute_module_hash(module: &Module) -> NodeHash {
 /// Computes the content identifier of an expression.
 pub fn compute_expr_hash(expr: &Expr) -> NodeHash {
     compute_hash("expr", expr)
+}
+
+/// Computes the content identifier for formal proof obligations of a function.
+pub fn compute_proof_obligation_hash(func: &FunctionDecl) -> NodeHash {
+    #[derive(Serialize)]
+    struct ObligationPayload<'a> {
+        target_function: &'a str,
+        params: &'a [FunctionParam],
+        return_type: &'a Type,
+        requires: &'a [Expr],
+        ensures: &'a [Expr],
+    }
+    let payload = ObligationPayload {
+        target_function: &func.name,
+        params: &func.params,
+        return_type: &func.return_type,
+        requires: &func.requires,
+        ensures: &func.ensures,
+    };
+    compute_hash("obl", &payload)
 }
 
 /// Content-addressed task envelope defining the scope and formal baseline of a hole task.
@@ -336,6 +356,8 @@ pub enum CasError {
     InvalidEnvelope(String),
     ForgedModule(String),
     UnverifiedCandidate(String),
+    VacuousContract(String),
+    VerificationRejected(String),
     Db(DbError),
 }
 
@@ -352,6 +374,8 @@ impl fmt::Display for CasError {
             Self::InvalidEnvelope(msg) => write!(f, "CAS rejected: invalid task envelope: {msg}"),
             Self::ForgedModule(msg) => write!(f, "CAS rejected: forged module mismatch: {msg}"),
             Self::UnverifiedCandidate(msg) => write!(f, "CAS rejected: candidate does not meet proof bar: {msg}"),
+            Self::VacuousContract(msg) => write!(f, "CAS rejected: vacuous contract with unsatisfiable preconditions: {msg}"),
+            Self::VerificationRejected(msg) => write!(f, "CAS rejected: formal theorem verification failed: {msg}"),
             Self::Db(err) => write!(f, "database error during CAS: {err}"),
         }
     }
@@ -377,26 +401,27 @@ impl From<serde_json::Error> for CasError {
     }
 }
 
+/// Internal storage state of the AST database, accessible within transactions.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-struct DatabaseState {
+pub struct DatabaseState {
     #[serde(default)]
-    root_ref: Option<NodeHash>,
+    pub root_ref: Option<NodeHash>,
     #[serde(default)]
-    types: BTreeMap<NodeHash, TypeDef>,
+    pub types: BTreeMap<NodeHash, TypeDef>,
     #[serde(default)]
-    functions: BTreeMap<NodeHash, FunctionDecl>,
+    pub functions: BTreeMap<NodeHash, FunctionDecl>,
     #[serde(default)]
-    effects: BTreeMap<NodeHash, EffectDecl>,
+    pub effects: BTreeMap<NodeHash, EffectDecl>,
     #[serde(default)]
-    modules: BTreeMap<NodeHash, Module>,
+    pub modules: BTreeMap<NodeHash, Module>,
     #[serde(default)]
-    envelopes: BTreeMap<NodeHash, TaskEnvelope>,
+    pub envelopes: BTreeMap<NodeHash, TaskEnvelope>,
     #[serde(default)]
-    candidates: BTreeMap<NodeHash, Candidate>,
+    pub candidates: BTreeMap<NodeHash, Candidate>,
     #[serde(default)]
-    receipts: BTreeMap<NodeHash, VerificationReceipt>,
+    pub receipts: BTreeMap<NodeHash, VerificationReceipt>,
     #[serde(default)]
-    commits: BTreeMap<NodeHash, CommitRecord>,
+    pub commits: BTreeMap<NodeHash, CommitRecord>,
 }
 
 /// A content-addressed AST database backed by a JSON file or memory.
@@ -439,16 +464,40 @@ impl AstDatabase {
         self.state.root_ref.clone()
     }
 
-    /// Sets the root module hash reference directly.
-    pub fn set_root(&mut self, root: NodeHash) -> Result<(), DbError> {
-        let mut next_state = self.state.clone();
-        next_state.root_ref = Some(root);
-        self.persist(&next_state)?;
-        self.state = next_state;
-        Ok(())
+    fn lock_and_sync(&mut self) -> Result<Option<FileLockGuard>, DbError> {
+        let lock = self.path.as_ref().map(|p| FileLockGuard::acquire(p)).transpose()?;
+        if let Some(path) = &self.path {
+            if path.exists() {
+                let bytes = fs::read(path)?;
+                let disk_state: DatabaseState = serde_json::from_slice(&bytes)?;
+                self.state = disk_state;
+            }
+        }
+        Ok(lock)
     }
 
-    fn insert_module_to_state(&self, state: &mut DatabaseState, module: &Module) -> ModuleRecord {
+    /// Executes a state-mutating transaction with an exclusive OS file lock and read-latest consistency.
+    pub fn locked_transaction<T, E>(&mut self, action: impl FnOnce(&mut DatabaseState) -> Result<T, E>) -> Result<T, E>
+    where
+        E: From<DbError>,
+    {
+        let _lock = self.lock_and_sync()?;
+        let mut next_state = self.state.clone();
+        let result = action(&mut next_state)?;
+        self.persist(&next_state).map_err(E::from)?;
+        self.state = next_state;
+        Ok(result)
+    }
+
+    /// Sets the root module hash reference directly under lock.
+    pub fn set_root(&mut self, root: NodeHash) -> Result<(), DbError> {
+        self.locked_transaction(|state| {
+            state.root_ref = Some(root);
+            Ok(())
+        })
+    }
+
+    fn insert_module_to_state(state: &mut DatabaseState, module: &Module) -> ModuleRecord {
         let type_hashes = module.types.iter().map(compute_type_hash).collect::<Vec<_>>();
         let function_hashes = module.functions.iter().map(compute_function_hash).collect::<Vec<_>>();
         let effect_hashes = module.effects.iter().map(compute_effect_hash).collect::<Vec<_>>();
@@ -473,85 +522,70 @@ impl AstDatabase {
         }
     }
 
-    /// Inserts a module and every type, function, and effect it owns.
+    /// Inserts a module and every type, function, and effect it owns under lock.
     pub fn insert_module(&mut self, module: &Module) -> Result<ModuleRecord, DbError> {
-        let mut next_state = self.state.clone();
-        let record = self.insert_module_to_state(&mut next_state, module);
-        if next_state.root_ref.is_none() {
-            next_state.root_ref = Some(record.module_hash.clone());
-        }
-        self.persist(&next_state)?;
-        self.state = next_state;
-        Ok(record)
+        self.locked_transaction(|state| {
+            let record = Self::insert_module_to_state(state, module);
+            if state.root_ref.is_none() {
+                state.root_ref = Some(record.module_hash.clone());
+            }
+            Ok(record)
+        })
     }
 
-    /// Records a task envelope into the database.
+    /// Records a task envelope into the database under lock.
     pub fn record_envelope(&mut self, envelope: TaskEnvelope) -> Result<NodeHash, DbError> {
-        let hash = compute_envelope_hash(&envelope);
-        let mut next_state = self.state.clone();
-        next_state.envelopes.insert(hash.clone(), envelope);
-        self.persist(&next_state)?;
-        self.state = next_state;
-        Ok(hash)
+        self.locked_transaction(|state| {
+            let hash = compute_envelope_hash(&envelope);
+            state.envelopes.insert(hash.clone(), envelope);
+            Ok(hash)
+        })
     }
 
-    /// Records a candidate implementation without committing it to the root ref.
+    /// Records a candidate implementation without committing it to the root ref under lock.
     pub fn record_candidate(&mut self, candidate: Candidate) -> Result<NodeHash, DbError> {
-        let hash = compute_candidate_hash(&candidate);
-        let mut next_state = self.state.clone();
-        next_state.candidates.insert(hash.clone(), candidate);
-        self.persist(&next_state)?;
-        self.state = next_state;
-        Ok(hash)
+        self.locked_transaction(|state| {
+            let hash = compute_candidate_hash(&candidate);
+            state.candidates.insert(hash.clone(), candidate);
+            Ok(hash)
+        })
     }
 
-    /// Records a verification receipt for audit and compliance.
+    /// Records a verification receipt for audit and compliance under lock.
     pub fn record_receipt(&mut self, receipt: VerificationReceipt) -> Result<NodeHash, DbError> {
-        let hash = compute_receipt_hash(&receipt);
-        let mut next_state = self.state.clone();
-        next_state.receipts.insert(hash.clone(), receipt);
-        self.persist(&next_state)?;
-        self.state = next_state;
-        Ok(hash)
+        self.locked_transaction(|state| {
+            let hash = compute_receipt_hash(&receipt);
+            state.receipts.insert(hash.clone(), receipt);
+            Ok(hash)
+        })
     }
 
     /// Attempts an atomic CAS (Compare-And-Swap) commit of a verified candidate.
     ///
     /// The database kernel independently parses and replaces the candidate expression into
     /// the base module identified by `expected_root`, deriving `derived_new_module`.
-    /// If `new_module` is provided, it is strictly compared against `derived_new_module`
-    /// to detect and reject forged or tampered modules.
+    /// It verifies that:
+    /// - `envelope.base_root_hash == expected_root`
+    /// - `envelope.target_function` exists in the base module with matching `contract_hash`
+    /// - all `envelope.dependency_hashes` exist in the database
+    /// - `candidate.envelope_hash` and `candidate.expression_hash` match their contents
+    /// - if `caller_module` is provided, its hash strictly matches `derived_new_module`
     ///
-    /// Preserves all envelopes, candidates, and receipts regardless of CAS success or failure.
+    /// The kernel directly verifies the candidate using SMT (`axiom_smt::verify_function_in_module`).
+    /// If formally proved, the kernel mints the `VerificationReceipt` and commits the new root.
+    ///
+    /// Preserves all envelopes and candidates regardless of CAS success or failure.
     pub fn try_commit_candidate(
         &mut self,
         expected_root: &Option<NodeHash>,
         envelope: TaskEnvelope,
         candidate: Candidate,
-        receipt: VerificationReceipt,
-        new_module: &Module,
+        caller_module: Option<&Module>,
     ) -> Result<CommitRecord, CasError> {
-        // 1. 获取跨进程排他锁 (若为文件型数据库)
-        let _lock = self.path.as_ref().map(|p| FileLockGuard::acquire(p)).transpose()?;
+        // 1. 获取跨进程排他锁并同步最新磁盘状态
+        let _lock = self.lock_and_sync()?;
 
-        // 2. 强一致性重读：从磁盘重新加载最新状态，确保多进程实例视图一致
-        if let Some(path) = &self.path {
-            if path.exists() {
-                let bytes = fs::read(path)?;
-                let disk_state: DatabaseState = serde_json::from_slice(&bytes)?;
-                self.state = disk_state;
-            }
-        }
-
-        // 3. 证据链密码学哈希全链路自验
-        let cand_hash = compute_candidate_hash(&candidate);
-        if receipt.candidate_hash != cand_hash {
-            return Err(CasError::InvalidReceipt(format!(
-                "receipt candidate hash `{}` does not match computed `{}`",
-                receipt.candidate_hash, cand_hash
-            )));
-        }
-
+        // 2. 候选内容哈希自验
         let env_hash = compute_envelope_hash(&envelope);
         if candidate.envelope_hash != env_hash {
             return Err(CasError::InvalidCandidate(format!(
@@ -570,22 +604,39 @@ impl AstDatabase {
             )));
         }
 
-        // 4. 证据门禁拦截：Sampled / Unknown / Unverified 绝对不可推进正式 Root
-        if matches!(receipt.proof_level, ProofLevel::Sampled | ProofLevel::Unknown | ProofLevel::Unverified) {
-            return Err(CasError::UnverifiedCandidate(format!(
-                "candidate proof level `{:?}` cannot be committed to root ref",
-                receipt.proof_level
-            )));
-        }
-
-        let rcpt_hash = compute_receipt_hash(&receipt);
+        let cand_hash = compute_candidate_hash(&candidate);
 
         let mut next_state = self.state.clone();
         next_state.envelopes.insert(env_hash.clone(), envelope.clone());
         next_state.candidates.insert(cand_hash.clone(), candidate.clone());
-        next_state.receipts.insert(rcpt_hash.clone(), receipt);
 
-        // 5. 比较当前 root 是否与 expected_root 匹配
+        // 3. 信封基线根校验
+        if &envelope.base_root_hash != expected_root {
+            let _ = self.persist(&next_state);
+            self.state = next_state;
+            return Err(CasError::InvalidEnvelope(format!(
+                "envelope base root `{:?}` does not match expected root `{:?}`",
+                envelope.base_root_hash, expected_root
+            )));
+        }
+
+        // 4. 信封依赖完整性校验
+        for dep in &envelope.dependency_hashes {
+            if !self.state.functions.contains_key(dep)
+                && !self.state.types.contains_key(dep)
+                && !self.state.effects.contains_key(dep)
+                && !self.state.modules.contains_key(dep)
+            {
+                let _ = self.persist(&next_state);
+                self.state = next_state;
+                return Err(CasError::InvalidEnvelope(format!(
+                    "envelope dependency `{}` not found in database",
+                    dep
+                )));
+            }
+        }
+
+        // 5. 比较当前 root 是否与 expected_root 匹配 (CAS 门禁)
         if &self.state.root_ref != expected_root {
             let _ = self.persist(&next_state);
             self.state = next_state;
@@ -595,7 +646,7 @@ impl AstDatabase {
             });
         }
 
-        // 6. 内核 AST 独立自推导：根据 expected_root 取出基线模块，在内核中执行原子替换
+        // 6. 内核 AST 独立自推导与基线契约比对
         let base_module = match expected_root {
             Some(root) => self.state.modules.get(root).cloned().ok_or_else(|| {
                 CasError::Db(DbError::Io(std::io::Error::new(
@@ -606,31 +657,128 @@ impl AstDatabase {
             None => Module::default(),
         };
 
-        let mut derived_module = base_module;
+        let target_func = base_module
+            .functions
+            .iter()
+            .find(|f| f.name == envelope.target_function)
+            .ok_or_else(|| {
+                CasError::InvalidEnvelope(format!(
+                    "target function `{}` not found in base module",
+                    envelope.target_function
+                ))
+            })?;
+
+        let actual_contract_hash = compute_function_hash(target_func);
+        if envelope.contract_hash != actual_contract_hash {
+            return Err(CasError::InvalidEnvelope(format!(
+                "envelope contract hash `{}` does not match base function contract hash `{}`",
+                envelope.contract_hash, actual_contract_hash
+            )));
+        }
+
+        let mut derived_module = base_module.clone();
         let mut replaced = false;
         for func in &mut derived_module.functions {
-            if replace_hole_in_expr(&mut func.body, &envelope.target_hole_id, &parsed_expr) {
-                replaced = true;
+            if func.name == envelope.target_function {
+                if replace_hole_in_expr(&mut func.body, &envelope.target_hole_id, &parsed_expr) {
+                    replaced = true;
+                }
             }
         }
 
         if !replaced {
             return Err(CasError::InvalidEnvelope(format!(
-                "target hole `{}` not found in base module functions",
-                envelope.target_hole_id
+                "target hole `{}` not found in target function `{}`",
+                envelope.target_hole_id, envelope.target_function
             )));
         }
 
-        // 7. 防伪造与篡改断言：比对调用方提供的模块与内核推导模块的哈希
-        let derived_hash = compute_module_hash(&derived_module);
-        let provided_hash = compute_module_hash(new_module);
-        if derived_hash != provided_hash {
-            return Err(CasError::ForgedModule(format!(
-                "provided module hash `{provided_hash}` does not match kernel-derived module `{derived_hash}`"
-            )));
+        // 7. 防篡改断言：比对调用方模块与内核推导模块
+        if let Some(caller_mod) = caller_module {
+            let derived_hash = compute_module_hash(&derived_module);
+            let caller_hash = compute_module_hash(caller_mod);
+            if derived_hash != caller_hash {
+                return Err(CasError::ForgedModule(format!(
+                    "caller module hash `{caller_hash}` does not match kernel-derived module `{derived_hash}`"
+                )));
+            }
         }
 
-        let mod_record = self.insert_module_to_state(&mut next_state, &derived_module);
+        // 8. 内核直接调用 SMT 定理证明
+        let affected_func = derived_module
+            .functions
+            .iter()
+            .find(|f| f.name == envelope.target_function)
+            .expect("target function exists in derived module");
+
+        let smt_result = axiom_smt::verify_function_in_module(affected_func, &derived_module);
+
+        let (solver, version, obligations_checked) = match smt_result {
+            axiom_smt::SmtResult::Proved {
+                solver,
+                version,
+                obligations_checked,
+            } => (solver, version, obligations_checked),
+            axiom_smt::SmtResult::VacuousContract { reason } => {
+                let _ = self.persist(&next_state);
+                self.state = next_state;
+                return Err(CasError::VacuousContract(reason));
+            }
+            axiom_smt::SmtResult::CounterExample(ce) => {
+                let _ = self.persist(&next_state);
+                self.state = next_state;
+                return Err(CasError::VerificationRejected(format!(
+                    "SMT counterexample found for `{}`: {:?}",
+                    envelope.target_function, ce
+                )));
+            }
+            axiom_smt::SmtResult::Sampled { .. } => {
+                let _ = self.persist(&next_state);
+                self.state = next_state;
+                return Err(CasError::UnverifiedCandidate(format!(
+                    "candidate for `{}` was only heuristically sampled, not mathematically proved",
+                    envelope.target_function
+                )));
+            }
+            axiom_smt::SmtResult::Unknown(reason) => {
+                let _ = self.persist(&next_state);
+                self.state = next_state;
+                return Err(CasError::UnverifiedCandidate(format!(
+                    "SMT solver returned unknown for `{}`: {reason}",
+                    envelope.target_function
+                )));
+            }
+            axiom_smt::SmtResult::Skipped(reason) => {
+                let _ = self.persist(&next_state);
+                self.state = next_state;
+                return Err(CasError::UnverifiedCandidate(format!(
+                    "verification skipped for `{}`: {reason}",
+                    envelope.target_function
+                )));
+            }
+        };
+
+        // 9. 内核亲自铸造防伪证明收据 (Mint Kernel Verification Receipt)
+        let proof_obligation_hash = compute_proof_obligation_hash(affected_func);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let receipt = VerificationReceipt {
+            candidate_hash: cand_hash.clone(),
+            proof_level: ProofLevel::Proved,
+            solver,
+            solver_version: version,
+            obligations_checked,
+            proof_obligation_hash,
+            verified_at: now,
+        };
+        let rcpt_hash = compute_receipt_hash(&receipt);
+        next_state.receipts.insert(rcpt_hash.clone(), receipt);
+
+        // 10. 录入新模块与生成 CommitRecord
+        let mod_record = Self::insert_module_to_state(&mut next_state, &derived_module);
         let new_root = mod_record.module_hash;
 
         let payload = CommitPayload {
@@ -734,14 +882,15 @@ impl AstDatabase {
     }
 }
 
-/// RAII cross-process exclusive file lock guard.
+/// RAII cross-process exclusive OS file lock guard.
 #[derive(Debug)]
 pub struct FileLockGuard {
     lock_path: PathBuf,
+    file: Option<fs::File>,
 }
 
 impl FileLockGuard {
-    /// Attempts to acquire an exclusive lock on the target file with timeout and auto-recovery.
+    /// Attempts to acquire an OS-level exclusive handle lock on the target lock file with timeout.
     pub fn acquire(target_path: &Path) -> Result<Self, DbError> {
         let lock_path = target_path.with_extension("lock");
         let start = std::time::Instant::now();
@@ -749,40 +898,63 @@ impl FileLockGuard {
         let mut backoff = std::time::Duration::from_millis(5);
 
         loop {
-            match fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&lock_path)
-            {
-                Ok(_) => return Ok(Self { lock_path }),
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            match Self::try_open_exclusive(&lock_path) {
+                Ok(file) => return Ok(Self { lock_path, file: Some(file) }),
+                Err(e) if Self::is_contended(&e) => {
                     if start.elapsed() > timeout {
-                        if let Ok(metadata) = fs::metadata(&lock_path) {
-                            if let Ok(modified) = metadata.modified() {
-                                if let Ok(age) = modified.elapsed() {
-                                    if age > std::time::Duration::from_secs(10) {
-                                        let _ = fs::remove_file(&lock_path);
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
                         return Err(DbError::Io(std::io::Error::new(
                             std::io::ErrorKind::TimedOut,
-                            format!("timed out waiting for database lock `{}`", lock_path.display()),
+                            format!("timed out waiting for exclusive OS file lock on `{}`", lock_path.display()),
                         )));
                     }
                     std::thread::sleep(backoff);
-                    backoff = (backoff * 2).min(std::time::Duration::from_millis(100));
+                    backoff = (backoff * 2).min(std::time::Duration::from_millis(50));
                 }
                 Err(e) => return Err(DbError::Io(e)),
             }
+        }
+    }
+
+    #[cfg(windows)]
+    fn try_open_exclusive(path: &Path) -> std::io::Result<fs::File> {
+        use std::os::windows::fs::OpenOptionsExt;
+        // share_mode(0): Exclusive access. Other processes attempting to open will fail with sharing violation.
+        fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .share_mode(0)
+            .open(path)
+    }
+
+    #[cfg(not(windows))]
+    fn try_open_exclusive(path: &Path) -> std::io::Result<fs::File> {
+        fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .open(path)
+    }
+
+    fn is_contended(err: &std::io::Error) -> bool {
+        #[cfg(windows)]
+        {
+            // Windows error code 32: ERROR_SHARING_VIOLATION
+            err.raw_os_error() == Some(32)
+                || err.kind() == std::io::ErrorKind::PermissionDenied
+                || err.kind() == std::io::ErrorKind::AlreadyExists
+        }
+        #[cfg(not(windows))]
+        {
+            err.kind() == std::io::ErrorKind::AlreadyExists || err.kind() == std::io::ErrorKind::WouldBlock
         }
     }
 }
 
 impl Drop for FileLockGuard {
     fn drop(&mut self) {
+        // Drop the file handle first to release OS kernel lock
+        self.file.take();
         let _ = fs::remove_file(&self.lock_path);
     }
 }
