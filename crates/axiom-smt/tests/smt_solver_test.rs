@@ -398,3 +398,145 @@ fn modulo_operation_generates_safety_obligations_and_verifies() {
         );
     }
 }
+
+#[test]
+fn negative_division_truncates_towards_zero_and_rejects_euclidean() {
+    // 1. 验证向零截断 (-5 / 2 == -2) 证明成功
+    let trunc_module = parse_module(
+        r#"
+        fn test_trunc_div() -> Int
+            ensures { result == -2 }
+        {
+            (-5) / 2
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let trunc_res = verify_function(&trunc_module.functions[0]);
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(trunc_res, SmtResult::Proved { .. }),
+            "Negative integer division must truncate towards zero (-2)! Got: {:?}",
+            trunc_res
+        );
+    }
+
+    // 2. 验证欧几里得除法 (-5 div 2 == -3) 被严格拒绝
+    let euclidean_module = parse_module(
+        r#"
+        fn test_euclidean_div() -> Int
+            ensures { result == -3 }
+        {
+            (-5) / 2
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let euclidean_res = verify_function(&euclidean_module.functions[0]);
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(euclidean_res, SmtResult::CounterExample(_)),
+            "Euclidean division result (-3) must be rejected with CounterExample! Got: {:?}",
+            euclidean_res
+        );
+    }
+}
+
+#[test]
+fn negative_modulo_preserves_sign_and_rejects_euclidean() {
+    // 1. 验证向零截断取模 (-5 % 2 == -1) 证明成功
+    let trunc_mod_module = parse_module(
+        r#"
+        fn test_trunc_mod() -> Int
+            ensures { result == -1 }
+        {
+            (-5) % 2
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let trunc_res = verify_function(&trunc_mod_module.functions[0]);
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(trunc_res, SmtResult::Proved { .. }),
+            "Negative integer modulo must retain dividend sign (-1)! Got: {:?}",
+            trunc_res
+        );
+    }
+
+    // 2. 验证欧几里得非负余数 (-5 mod 2 == 1) 被严格拒绝
+    let euclidean_mod_module = parse_module(
+        r#"
+        fn test_euclidean_mod() -> Int
+            ensures { result == 1 }
+        {
+            (-5) % 2
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let euclidean_res = verify_function(&euclidean_mod_module.functions[0]);
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(euclidean_res, SmtResult::CounterExample(_)),
+            "Euclidean non-negative remainder (1) must be rejected with CounterExample! Got: {:?}",
+            euclidean_res
+        );
+    }
+}
+
+#[test]
+fn match_wildcard_detects_dead_branch_division_by_zero_when_first_arm_is_false() {
+    // [Spec 2, P0] 当首臂为 false 时，通配符 _ 覆盖 true (d == 0) 路径；
+    // 内部的 100 / d 真实发生物理除零崩溃，必须被 SMT 精准拦截！
+    let module = parse_module(
+        r#"
+        fn match_zero_div(d: Int) -> Int
+            ensures { result >= 0 }
+        {
+            match d == 0 {
+                false => 0,
+                _ => 100 / d
+            }
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let res = verify_function(&module.functions[0]);
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(res, SmtResult::CounterExample(_)),
+            "Match wildcard with false first arm must detect division by zero at d == 0! Got: {:?}",
+            res
+        );
+    }
+}
+
+#[test]
+fn detects_division_overflow_on_i64_min_divided_by_negative_one() {
+    let module = parse_module(
+        r#"
+        fn div_overflow(x: Int, y: Int) -> Int
+            requires { y != 0 }
+            ensures { result != 0 }
+        {
+            x / y
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let res = verify_function(&module.functions[0]);
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(res, SmtResult::CounterExample(_)),
+            "x / y must be rejected due to i64::MIN / -1 overflow! Got: {:?}",
+            res
+        );
+    }
+}

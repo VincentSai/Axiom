@@ -172,11 +172,16 @@ pub fn run_z3_query_with_timeout(
         .spawn()
         .map_err(|e| format!("failed to spawn z3 at {}: {}", z3_path.display(), e))?;
 
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(smt2_query.as_bytes())
-            .map_err(|e| format!("failed to write query to z3 stdin: {}", e))?;
-    }
+    let stdin_join = if let Some(mut stdin) = child.stdin.take() {
+        let query_bytes = smt2_query.as_bytes().to_vec();
+        Some(std::thread::spawn(move || {
+            let res = stdin.write_all(&query_bytes);
+            drop(stdin);
+            res
+        }))
+    } else {
+        None
+    };
 
     let mut stdout_handle = child.stdout.take().ok_or("failed to take stdout")?;
     let mut stderr_handle = child.stderr.take().ok_or("failed to take stderr")?;
@@ -194,6 +199,10 @@ pub fn run_z3_query_with_timeout(
 
     let policy = TimeoutPolicy::from_millis(timeout_ms);
     let status_res = policy.wait_child_with_watchdog(&mut child);
+
+    if let Some(stdin_handle) = stdin_join {
+        let _ = stdin_handle.join();
+    }
 
     let stdout_bytes = stdout_join
         .join()

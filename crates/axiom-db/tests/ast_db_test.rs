@@ -744,3 +744,37 @@ fn persisted_database_persists_and_restores_draft_records() {
 
     let _ = std::fs::remove_file(&db_path);
 }
+
+#[test]
+fn legacy_receipt_without_profile_deserializes_with_fallback_and_invalidates_current_profile() {
+    use axiom_db::{
+        current_verification_profile_hash, legacy_verification_profile_hash, ProofLevel,
+        VerificationReceipt,
+    };
+
+    // 模拟无 verification_profile_hash 字段的历史旧版收据 JSON
+    let legacy_json = r##"{
+        "candidate_hash": "#cand_abc123",
+        "proof_level": "Proved",
+        "solver": "z3",
+        "solver_version": "4.13.0",
+        "obligations_checked": 2,
+        "proof_obligation_hash": "#obl_xyz456",
+        "verified_at": 1700000000
+    }"##;
+
+    let receipt: VerificationReceipt = serde_json::from_str(legacy_json)
+        .expect("legacy receipt JSON should deserialize with default profile");
+
+    assert_eq!(receipt.candidate_hash.as_str(), "#cand_abc123");
+    assert_eq!(receipt.proof_level, ProofLevel::Proved);
+    assert_eq!(
+        receipt.verification_profile_hash,
+        legacy_verification_profile_hash()
+    );
+    assert_ne!(
+        receipt.verification_profile_hash,
+        current_verification_profile_hash(),
+        "Legacy receipt must never match current profile hash and will trigger downgrade!"
+    );
+}

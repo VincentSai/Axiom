@@ -216,11 +216,16 @@ impl fmt::Display for ProofLevel {
 
 /// Current verification profile specification identifying SMT encoding rules,
 /// arithmetic overflow guards, division-by-zero path-condition rules, and solver requirements.
-pub const CURRENT_VERIFICATION_PROFILE: &str = "axiom-smt-v2-int64safe-pathcond-modulo";
+pub const CURRENT_VERIFICATION_PROFILE: &str = "axiom-smt-v3-truncdiv-residualmatch";
 
 /// Returns the cryptographically secure hash of the current verification profile.
 pub fn current_verification_profile_hash() -> NodeHash {
     compute_hash("vprof", &CURRENT_VERIFICATION_PROFILE)
+}
+
+/// Returns a deterministic fallback hash for legacy unversioned receipts.
+pub fn legacy_verification_profile_hash() -> NodeHash {
+    compute_hash("vprof", &"axiom-legacy-unversioned-profile")
 }
 
 /// Cryptographically signed verification receipt for an accepted candidate.
@@ -232,6 +237,7 @@ pub struct VerificationReceipt {
     pub solver_version: String,
     pub obligations_checked: usize,
     pub proof_obligation_hash: NodeHash,
+    #[serde(default = "legacy_verification_profile_hash")]
     pub verification_profile_hash: NodeHash,
     pub verified_at: u64,
 }
@@ -759,6 +765,9 @@ impl AstDatabase {
             if func.name == envelope.target_function {
                 if replace_hole_in_expr(&mut func.body, &envelope.target_hole_id, &parsed_expr) {
                     replaced = true;
+                } else if func.body == parsed_expr {
+                    // [Spec 4] 函数实现已处于当前候选表达式（用于规则升级后的重新定理证明与换发收据）
+                    replaced = true;
                 }
             }
         }
@@ -908,6 +917,9 @@ impl AstDatabase {
             if func.name == envelope.target_function {
                 if replace_hole_in_expr(&mut func.body, &envelope.target_hole_id, &parsed_candidate)
                 {
+                    replaced = true;
+                    break;
+                } else if func.body == parsed_candidate {
                     replaced = true;
                     break;
                 }

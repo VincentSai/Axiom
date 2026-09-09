@@ -681,3 +681,122 @@ fn persisted_pool_restores_provisional_draft_across_processes_and_upgrades() {
     let _ = std::fs::remove_file(&skel_path);
     let _ = std::fs::remove_file(&db_path);
 }
+
+#[test]
+fn permissive_skipped_and_sampled_persist_drafts_to_db() {
+    use axiom_agent_pool::{HoleStatus, PoolVerificationPolicy};
+
+    // 无 ensures 的函数在 Permissive 模式下返回 Skipped，并作为 Provisional 草稿持久化
+    const SKIPPED_SKELETON: &str = r#"
+        fn effect_worker(x: Int) -> Int
+            requires { x >= 0 }
+        {
+            ?worker_hole
+        }
+    "#;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let skel_path = std::env::temp_dir().join(format!("axiom_permissive_skel_{nonce}.ax"));
+    let db_path = std::env::temp_dir().join(format!("axiom_permissive_db_{nonce}.json"));
+
+    std::fs::write(&skel_path, SKIPPED_SKELETON).unwrap();
+
+    // 进程 1：Permissive 模式下提交草稿
+    {
+        let mut pool = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        pool.set_policy(PoolVerificationPolicy::Permissive);
+
+        let outcome = pool
+            .submit_solution_with_outcome("worker_hole", "x + 42", "agent_worker_x")
+            .unwrap();
+        assert!(matches!(
+            outcome.smt_result,
+            axiom_smt::SmtResult::Skipped(_)
+        ));
+        assert_eq!(
+            pool.hole_status("worker_hole"),
+            Some(HoleStatus::Provisional)
+        );
+        assert_eq!(pool.database().drafts().len(), 1);
+    }
+
+    // 进程 2：重启进程打开，草稿必须完好恢复
+    {
+        let pool = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        assert_eq!(
+            pool.hole_status("worker_hole"),
+            Some(HoleStatus::Provisional)
+        );
+        assert_eq!(pool.database().drafts().len(), 1);
+    }
+
+    let _ = std::fs::remove_file(&skel_path);
+    let _ = std::fs::remove_file(&db_path);
+}
+
+#[test]
+fn profile_invalidation_and_reverify_unproved_holes_closed_loop() {
+    use axiom_agent_pool::HoleStatus;
+    use axiom_db::legacy_verification_profile_hash;
+
+    const REVERIFY_SKELETON: &str = r#"
+        fn add_safe(a: Int, b: Int) -> Int
+            requires { a >= 0 && a < 100, b >= 0 && b < 100 }
+            ensures { result == a + b }
+        {
+            ?add_hole
+        }
+    "#;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let skel_path = std::env::temp_dir().join(format!("axiom_reverify_skel_{nonce}.ax"));
+    let db_path = std::env::temp_dir().join(format!("axiom_reverify_db_{nonce}.json"));
+
+    std::fs::write(&skel_path, REVERIFY_SKELETON).unwrap();
+
+    // 1. 提交并通过验证
+    {
+        let mut pool = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        let outcome = pool
+            .submit_solution_with_outcome("add_hole", "a + b", "agent_1")
+            .unwrap();
+        assert!(outcome.smt_result.is_proved());
+        assert_eq!(pool.hole_status("add_hole"), Some(HoleStatus::Verified));
+    }
+
+    // 2. 模拟底层收据来自旧规则（直接将持久化 DB 文件中的 profile hash 篡改为 legacy）
+    {
+        let db_content = std::fs::read_to_string(&db_path).unwrap();
+        let cur_hash = axiom_db::current_verification_profile_hash().to_string();
+        let leg_hash = legacy_verification_profile_hash().to_string();
+        assert!(
+            db_content.contains(&cur_hash),
+            "DB must contain current verification profile hash"
+        );
+        let tampered_content = db_content.replace(&cur_hash, &leg_hash);
+        std::fs::write(&db_path, tampered_content).unwrap();
+    }
+
+    // 3. 重新打开池：断言已填洞被降级为 Unresolved，并且被重新收录进 pending_holes
+    {
+        let mut pool = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        assert_eq!(pool.hole_status("add_hole"), Some(HoleStatus::Unresolved));
+        assert!(pool.pending_hole_ids().contains(&"add_hole".to_string()));
+
+        // 4. 调用 reverify_unproved_holes 自动重新定理证明，闭环晋升为 Verified
+        let rev_results = pool.reverify_unproved_holes().unwrap();
+        assert_eq!(rev_results.len(), 1);
+        assert!(rev_results[0].1.is_proved());
+        assert_eq!(pool.hole_status("add_hole"), Some(HoleStatus::Verified));
+        assert!(!pool.pending_hole_ids().contains(&"add_hole".to_string()));
+    }
+
+    let _ = std::fs::remove_file(&skel_path);
+    let _ = std::fs::remove_file(&db_path);
+}

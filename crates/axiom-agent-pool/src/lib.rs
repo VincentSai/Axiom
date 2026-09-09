@@ -232,7 +232,7 @@ impl AgentTaskPool {
 
         // 2. 从权威模块动态派生当前真正剩余的 pending_holes
         let remaining_tasks = extract_holes(&authoritative_module);
-        let pending_holes: HashSet<String> =
+        let mut pending_holes: HashSet<String> =
             remaining_tasks.into_iter().map(|t| t.hole_id).collect();
 
         // 3. 从持久化数据库的 commits 与 receipts 反向水合证据账本
@@ -250,6 +250,15 @@ impl AgentTaskPool {
                         hole_evidence.insert(env.target_hole_id.clone(), ProofLevel::Unverified);
                     }
                 }
+            }
+        }
+
+        // 3.5 [Spec 4] 校验与收据重验闭环：
+        // 凡是在初始任务 tasks 中定义、但在证据账本中未达到当前 Profile Proved 状态的洞
+        // （例如规则升级后旧收据失效降级为 Unverified），必须强制重新纳入 pending_holes！
+        for task in &tasks {
+            if hole_evidence.get(&task.hole_id) != Some(&ProofLevel::Proved) {
+                pending_holes.insert(task.hole_id.clone());
             }
         }
 
@@ -404,6 +413,84 @@ impl AgentTaskPool {
             .collect()
     }
 
+    /// 重新验证所有未达到当前 Verification Profile 证明标准（即非 Proved 状态）的已填洞。
+    /// 遍历所有处于未证明状态的洞任务，提取当前权威模块中该函数的实现，使用当前规则集执行全量证明：
+    /// - 若证明通过，内核重新铸造带有当前 Profile Hash 的新收据并提交 CAS；
+    /// - 若证明失败，保持未证明状态并返回诊断结果。
+    pub fn reverify_unproved_holes(&mut self) -> Result<Vec<(String, SmtResult)>, PoolError> {
+        let unproved_holes: Vec<String> = self
+            .tasks
+            .iter()
+            .map(|t| t.hole_id.clone())
+            .filter(|h| self.hole_evidence.get(h) != Some(&ProofLevel::Proved))
+            .collect();
+
+        let mut results = Vec::new();
+        for hole_id in unproved_holes {
+            let env = match self.envelopes.get(&hole_id) {
+                Some(e) => e.clone(),
+                None => continue,
+            };
+
+            let func_opt = self
+                .verified_module
+                .functions
+                .iter()
+                .find(|f| f.name == env.target_function)
+                .cloned();
+
+            if let Some(func) = func_opt {
+                if axiom_ast::expr_contains_hole(&func.body) {
+                    continue;
+                }
+
+                let smt_res = axiom_smt::verify_function_in_module(&func, &self.verified_module);
+                if matches!(smt_res, SmtResult::Proved { .. }) {
+                    let prev_source = self
+                        .commits
+                        .iter()
+                        .rev()
+                        .find_map(|c| {
+                            if let Ok(Some(env_rec)) = self.db.get_envelope(c.envelope_hash()) {
+                                if env_rec.target_hole_id == hole_id {
+                                    if let Ok(Some(cand)) =
+                                        self.db.get_candidate(c.candidate_hash())
+                                    {
+                                        return Some(cand.expression_source);
+                                    }
+                                }
+                            }
+                            None
+                        })
+                        .unwrap_or_else(|| "/* re-verified */".to_string());
+
+                    let expr_hash = axiom_db::compute_expr_hash(&func.body);
+                    let candidate = Candidate {
+                        envelope_hash: compute_envelope_hash(&env),
+                        expression_source: prev_source,
+                        expression_hash: expr_hash,
+                        author_agent_id: "axiom-reverifier".into(),
+                        timestamp: std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs(),
+                    };
+                    let current_root = self.db.current_root();
+                    if let Ok(commit) = self.db.try_commit_candidate(
+                        &current_root,
+                        env.clone(),
+                        candidate,
+                        Some(&self.verified_module),
+                    ) {
+                        self.apply_verified_commit(commit, self.verified_module.clone(), &hole_id);
+                    }
+                }
+                results.push((hole_id, smt_res));
+            }
+        }
+        Ok(results)
+    }
+
     /// Returns the lifecycle status of a specific hole task in the pool.
     pub fn hole_status(&self, hole_id: &str) -> Option<HoleStatus> {
         if !self.tasks.iter().any(|task| task.hole_id == hole_id) {
@@ -426,13 +513,34 @@ impl AgentTaskPool {
         self.provisional_module = next_provisional;
     }
 
-    fn apply_provisional_draft(&mut self, hole_id: &str, solution: Expr) {
+    fn persist_and_apply_draft(
+        &mut self,
+        hole_id: &str,
+        solution: Expr,
+        solution_source: &str,
+        agent_id: &str,
+    ) -> Result<(), PoolError> {
+        // [Spec 4] 跨进程原子持久化草稿到底层数据库，若失败则绝不更新内存并向上报错
+        let draft_rec = axiom_db::DraftRecord {
+            hole_id: hole_id.to_string(),
+            agent_id: agent_id.to_string(),
+            code: solution_source.to_string(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+        };
+        self.db.insert_draft(draft_rec).map_err(|e| {
+            PoolError::CasFailure(format!("failed to persist provisional draft: {}", e))
+        })?;
+
         self.provisional_drafts
             .insert(hole_id.to_string(), solution);
         // 注意：Provisional 状态的草稿解不移出 pending_holes，仍需升级为正式 Verified！
         self.hole_evidence
             .insert(hole_id.to_string(), ProofLevel::Sampled);
         self.rebuild_provisional_module();
+        Ok(())
     }
 
     /// Submits a provisional draft solution without requiring SMT formal proof.
@@ -467,21 +575,7 @@ impl AgentTaskPool {
             return Err(PoolError::MissingHole(hole_id.to_owned()));
         }
 
-        self.apply_provisional_draft(hole_id, solution);
-
-        // [Spec 4] 跨进程持久化草稿到底层数据库
-        let draft_rec = axiom_db::DraftRecord {
-            hole_id: hole_id.to_string(),
-            agent_id: "axiom-worker".to_string(),
-            code: solution_source.to_string(),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-        };
-        let _ = self.db.insert_draft(draft_rec);
-
-        Ok(())
+        self.persist_and_apply_draft(hole_id, solution, solution_source, "axiom-worker")
     }
 
     /// Parse, verify, and conditionally commit a candidate hole implementation via CAS.
@@ -603,7 +697,7 @@ impl AgentTaskPool {
             SmtResult::Skipped(_) => {
                 let func = &candidate_module.functions[affected_functions[0]];
                 if func.ensures.is_empty() && self.policy == PoolVerificationPolicy::Permissive {
-                    self.apply_provisional_draft(hole_id, solution);
+                    self.persist_and_apply_draft(hole_id, solution, solution_source, agent_id)?;
                     return Ok(SubmitOutcome {
                         smt_result: precheck_result,
                         cas_events: Vec::new(),
@@ -618,7 +712,7 @@ impl AgentTaskPool {
             }
             SmtResult::Sampled { points_checked: _ } => {
                 if self.policy == PoolVerificationPolicy::Permissive {
-                    self.apply_provisional_draft(hole_id, solution);
+                    self.persist_and_apply_draft(hole_id, solution, solution_source, agent_id)?;
                     return Ok(SubmitOutcome {
                         smt_result: precheck_result,
                         cas_events: Vec::new(),

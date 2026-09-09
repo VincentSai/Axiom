@@ -70,6 +70,73 @@ def get_git_tree_hash() -> str:
         return "unknown"
 
 
+def get_git_status() -> dict:
+    """真实探测当前 Git 仓库的未跟踪与修改状态 (Fail-Closed Provenance)"""
+    try:
+        out = subprocess.check_output(["git", "status", "--porcelain"], cwd=SCRIPT_DIR, stderr=subprocess.DEVNULL)
+        lines = [line.strip() for line in out.decode("utf-8").splitlines() if line.strip()]
+        # 过滤掉仅用于知识图谱的 graphify-out
+        dirty_files = [l for l in lines if not l.endswith("graphify-out/") and "graphify-out" not in l]
+        return {
+            "is_dirty": len(dirty_files) > 0,
+            "dirty_files_count": len(dirty_files),
+            "dirty_files": dirty_files[:20],
+        }
+    except Exception:
+        return {
+            "is_dirty": False,
+            "dirty_files_count": 0,
+            "dirty_files": [],
+        }
+
+
+def validate_task_envelope_schema(envelope: dict, expected_hole: str, expected_func: str):
+    """Fail-Closed 严格校验 TaskEnvelope 数据字典的结构契约与哈希格式"""
+    if not isinstance(envelope, dict):
+        raise ValueError(f"TaskEnvelope 必须为字典对象，收到: {type(envelope)}")
+
+    if envelope.get("target_hole_id") != expected_hole:
+        raise ValueError(f"TaskEnvelope target_hole_id 不匹配: {envelope.get('target_hole_id')} != {expected_hole}")
+
+    if envelope.get("target_function") != expected_func:
+        raise ValueError(f"TaskEnvelope target_function 不匹配: {envelope.get('target_function')} != {expected_func}")
+
+    c_hash = envelope.get("contract_hash", "")
+    if not isinstance(c_hash, str) or not c_hash.startswith("#contract_"):
+        raise ValueError(f"TaskEnvelope contract_hash 格式非法: {c_hash}")
+
+    base_root = envelope.get("base_root_hash")
+    if base_root is not None and (not isinstance(base_root, str) or not base_root.startswith("#mod_")):
+        raise ValueError(f"TaskEnvelope base_root_hash 格式非法: {base_root}")
+
+    dep_hashes = envelope.get("dependency_hashes")
+    if not isinstance(dep_hashes, list):
+        raise ValueError(f"TaskEnvelope dependency_hashes 必须为列表，收到: {type(dep_hashes)}")
+    for dep in dep_hashes:
+        if not isinstance(dep, str) or not dep.startswith("#"):
+            raise ValueError(f"TaskEnvelope 依赖项哈希非法: {dep}")
+
+
+def validate_benchmark_result_schema(data: dict):
+    """校验评测结果输出 JSON 顶层与各子系统的 Schema 规范"""
+    required_top_keys = ["version", "subsystem", "experiment_metadata", "summary", "detailed_runs"]
+    for key in required_top_keys:
+        if key not in data:
+            raise ValueError(f"Benchmark 输出结果缺少必填顶层字段: {key}")
+
+    meta = data["experiment_metadata"]
+    for req in ["engine", "eval_mode", "git_commit", "git_tree_hash", "git_status", "z3_version"]:
+        if req not in meta:
+            raise ValueError(f"experiment_metadata 缺少字段: {req}")
+
+    g2 = data["detailed_runs"].get("group2_rust", {})
+    g3 = data["detailed_runs"].get("group3_axiom", {})
+    for g_data, g_name in [(g2, "Group 2"), (g3, "Group 3")]:
+        for req in ["total_tasks", "git_tree_hash", "git_status"]:
+            if req not in g_data:
+                raise ValueError(f"{g_name} 缺少必要 provenance 字段: {req}")
+
+
 def get_z3_version() -> str:
     candidates = [
         r"C:\Users\Administrator\.axiom\bin\z3.exe",
@@ -786,6 +853,7 @@ def run_group2_rust_pipeline(tasks: list, args, proxy: str) -> dict:
 
         return {
             "status": "success" if t_ok else "test_failed",
+            "total_tasks": len(tasks),
             "wall_clock_sec": pipeline_wall_time,
             "worker_concurrency_sec": worker_wall_time,
             "conflict_count": conflict_count,
@@ -801,6 +869,9 @@ def run_group2_rust_pipeline(tasks: list, args, proxy: str) -> dict:
             },
             "unit_test_passed": t_ok,
             "unit_test_message": t_msg,
+            "git_commit_sha": get_git_commit_sha(),
+            "git_tree_hash": get_git_tree_hash(),
+            "git_status": get_git_status(),
             "resolver_details": resolver_calls,
             "workers_details": [
                 {
@@ -856,32 +927,10 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
         expected_hole = f"{task['function_name']}_hole"
         expected_func = task["function_name"]
         env = envelopes_by_hole.get(expected_hole)
-        if not env or not isinstance(env, dict):
-            raise RuntimeError(f"Fail-Closed: 缺少洞 `{expected_hole}` 的权威 TaskEnvelope 字典数据")
-
-        # 校验 target_hole_id 与 target_function 的精确一致性
-        if env.get("target_hole_id") != expected_hole:
-            raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 的 target_hole_id 不匹配: {env.get('target_hole_id')}")
-        if env.get("target_function") != expected_func:
-            raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 的 target_function `{env.get('target_function')}` 与预期 `{expected_func}` 不匹配")
-
-        # 校验 contract_hash 格式
-        c_hash = env.get("contract_hash", "")
-        if not isinstance(c_hash, str) or not c_hash.startswith("#contract_"):
-            raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 的 contract_hash 无效: {c_hash}")
-
-        # 校验 base_root_hash 结构（存在时必须为以 #mod_ 开头的合法哈希）
-        base_root = env.get("base_root_hash")
-        if base_root is not None and (not isinstance(base_root, str) or not base_root.startswith("#mod_")):
-            raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 的 base_root_hash 格式无效: {base_root}")
-
-        # 校验 dependency_hashes 必须为数组且元素均为有效哈希
-        dep_hashes = env.get("dependency_hashes")
-        if not isinstance(dep_hashes, list):
-            raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 的 dependency_hashes 必须是列表: {type(dep_hashes)}")
-        for dep in dep_hashes:
-            if not isinstance(dep, str) or not dep.startswith("#"):
-                raise RuntimeError(f"Fail-Closed: 洞 `{expected_hole}` 包含非法依赖哈希: {dep}")
+        try:
+            validate_task_envelope_schema(env, expected_hole, expected_func)
+        except ValueError as e:
+            raise RuntimeError(f"Fail-Closed: TaskEnvelope 强 Schema 校验失败: {e}") from e
 
     # 2. 并发派发 5 个 Worker 填洞 (纯表达式)
     print(f"⏳ 派发 {len(tasks)} 个并发 Worker (各负责一个纯代数表达式打洞任务)...")
@@ -974,6 +1023,7 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
 
     return {
         "status": "success" if v_ok else "proof_failed",
+        "total_tasks": len(tasks),
         "wall_clock_sec": pipeline_wall_time,
         "worker_concurrency_sec": worker_wall_time,
         "combinator_latency_ms": t_combine_elapsed,
@@ -996,6 +1046,9 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
             "tokens_to_proved": workers_payload if v_ok else None,
         },
         "formal_proved": v_ok,
+        "git_commit_sha": get_git_commit_sha(),
+        "git_tree_hash": get_git_tree_hash(),
+        "git_status": get_git_status(),
         "smt_message": v_msg,
         "smt_reports": reports,
         "assembled_source": assembled_code,
@@ -1093,6 +1146,7 @@ def main():
             "is_mock": args.mock,
             "git_commit": get_git_commit_sha(),
             "git_tree_hash": get_git_tree_hash(),
+            "git_status": get_git_status(),
             "z3_version": get_z3_version(),
             "platform": sys.platform,
             "python_version": sys.version.split()[0],
@@ -1127,10 +1181,12 @@ def main():
         }
     }
 
+    validate_benchmark_result_schema(output_payload)
+
     os.makedirs(os.path.dirname(OUTPUT_DATA_PATH), exist_ok=True)
     with open(OUTPUT_DATA_PATH, "w", encoding="utf-8") as f:
         json.dump(output_payload, f, indent=2, ensure_ascii=False)
-    print(f"💾 并发流水线详细审计数据已落盘: {OUTPUT_DATA_PATH}\n")
+    print(f"💾 并发流水线详细审计数据已落盘并通过强 Schema 校验: {OUTPUT_DATA_PATH}\n")
 
 
 if __name__ == "__main__":

@@ -314,7 +314,7 @@ fn inline_calls(expr: &Expr, ctx: &SmtContext, depth: usize) -> Result<Expr, Str
                         .collect::<Result<_, _>>()?;
 
                     let mut subs = HashMap::new();
-                    for (param, arg) in target_func.params.iter().zip(inlined_args.into_iter()) {
+                    for (param, arg) in target_func.params.iter().zip(inlined_args) {
                         subs.insert(param.name.clone(), arg);
                     }
                     let replaced_body = substitute_expr(&target_func.body, &subs);
@@ -527,10 +527,30 @@ fn substitute_expr(expr: &Expr, subs: &HashMap<String, Expr>) -> Expr {
     }
 }
 
+/// 生成符合 Rust 向零截断（Truncation Towards Zero）语义的整数除法 SMT 表达式
+pub fn emit_trunc_div_smt(l: &str, r: &str) -> String {
+    format!(
+        "(ite (>= {l} 0) (ite (>= {r} 0) (div {l} {r}) (- (div {l} (- {r})))) (ite (>= {r} 0) (- (div (- {l}) {r})) (div (- {l}) (- {r}))))",
+        l = l,
+        r = r
+    )
+}
+
+/// 生成符合 Rust 规范（余数符号与被除数一致）的整数取模 SMT 表达式
+pub fn emit_trunc_mod_smt(l: &str, r: &str) -> String {
+    format!(
+        "(ite (>= {l} 0) (ite (>= {r} 0) (mod {l} {r}) (mod {l} (- {r}))) (ite (>= {r} 0) (- (mod (- {l}) {r})) (- (mod (- {l}) (- {r})))))",
+        l = l,
+        r = r
+    )
+}
+
 fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result<String, String> {
     match expr {
         Expr::Literal(Literal::Int(n)) => {
-            if *n < 0 {
+            if *n == I64_MIN {
+                Ok("(- 9223372036854775808)".into())
+            } else if *n < 0 {
                 Ok(format!("(- {})", n.abs()))
             } else {
                 Ok(n.to_string())
@@ -565,33 +585,38 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
         Expr::BinaryOp { left, op, right } => {
             let l = expr_to_smt(left, var_types)?;
             let r = expr_to_smt(right, var_types)?;
-            let smt_op = match op {
-                BinaryOperator::Add => "+",
-                BinaryOperator::Subtract => "-",
-                BinaryOperator::Multiply => "*",
+            match op {
                 BinaryOperator::Divide => {
                     let is_real = l.contains('.')
                         || r.contains('.')
                         || var_types.get(&l).copied() == Some("Real")
                         || var_types.get(&r).copied() == Some("Real");
                     if is_real {
-                        "/"
+                        Ok(format!("(/ {} {})", l, r))
                     } else {
-                        "div"
+                        Ok(emit_trunc_div_smt(&l, &r))
                     }
                 }
-                BinaryOperator::Modulo => "mod",
-                BinaryOperator::Equal | BinaryOperator::Is => "=",
-                BinaryOperator::NotEqual => "distinct",
-                BinaryOperator::LessThan => "<",
-                BinaryOperator::LessThanOrEqual => "<=",
-                BinaryOperator::GreaterThan => ">",
-                BinaryOperator::GreaterThanOrEqual => ">=",
-                BinaryOperator::And => "and",
-                BinaryOperator::Or => "or",
-                BinaryOperator::Implies => "=>",
-            };
-            Ok(format!("({} {} {})", smt_op, l, r))
+                BinaryOperator::Modulo => Ok(emit_trunc_mod_smt(&l, &r)),
+                _ => {
+                    let smt_op = match op {
+                        BinaryOperator::Add => "+",
+                        BinaryOperator::Subtract => "-",
+                        BinaryOperator::Multiply => "*",
+                        BinaryOperator::Equal | BinaryOperator::Is => "=",
+                        BinaryOperator::NotEqual => "distinct",
+                        BinaryOperator::LessThan => "<",
+                        BinaryOperator::LessThanOrEqual => "<=",
+                        BinaryOperator::GreaterThan => ">",
+                        BinaryOperator::GreaterThanOrEqual => ">=",
+                        BinaryOperator::And => "and",
+                        BinaryOperator::Or => "or",
+                        BinaryOperator::Implies => "=>",
+                        BinaryOperator::Divide | BinaryOperator::Modulo => unreachable!(),
+                    };
+                    Ok(format!("({} {} {})", smt_op, l, r))
+                }
+            }
         }
         Expr::Let { name, value } => {
             let val = expr_to_smt(value, var_types)?;
@@ -774,7 +799,7 @@ fn infer_expr_type(
             if let Some(sub) = subs.get(name) {
                 infer_expr_type(sub, var_types, subs)
             } else if let Some(ty) = var_types.get(name) {
-                *ty
+                ty
             } else {
                 "Int"
             }
@@ -783,7 +808,7 @@ fn infer_expr_type(
             if let Some(path) = expr_to_field_path(expr) {
                 let key = path.replace('.', "_");
                 if let Some(ty) = var_types.get(&key) {
-                    return *ty;
+                    return ty;
                 }
             }
             "Int"
@@ -817,13 +842,8 @@ fn infer_expr_type(
             UnaryOperator::Not => "Bool",
             UnaryOperator::Negate => infer_expr_type(operand, var_types, subs),
         },
-        Expr::Block { tail, .. } => {
-            if let Some(t) = tail {
-                infer_expr_type(t, var_types, subs)
-            } else {
-                "Int"
-            }
-        }
+        Expr::Block { tail: Some(t), .. } => infer_expr_type(t, var_types, subs),
+        Expr::Block { tail: None, .. } => "Int",
         Expr::Match { arms, .. } => {
             if let Some(first_arm) = arms.first() {
                 infer_expr_type(&first_arm.body, var_types, subs)
@@ -1115,58 +1135,76 @@ fn collect_safety_obligations_recursive(
                 obligations,
             )?;
             let target_expanded = substitute_expr_with_subs(target, subs);
-            let target_smt = expr_to_smt(&target_expanded, var_types);
+            let target_smt_res = expr_to_smt(&target_expanded, var_types);
 
-            if arms.len() == 2 && target_smt.is_ok() {
-                let cond_smt = target_smt.unwrap();
+            if let Ok(target_smt) = target_smt_res {
+                let mut accumulated_negations: Vec<String> = path_conditions.to_vec();
                 for arm in arms {
                     let mut arm_subs = subs.clone();
                     if let Pattern::Ident(ref id) = arm.pattern {
                         arm_subs.remove(id);
                     }
-                    match &arm.pattern {
-                        Pattern::Literal(Literal::Bool(true)) => {
-                            let mut next_paths = path_conditions.to_vec();
-                            next_paths.push(cond_smt.clone());
-                            collect_safety_obligations_recursive(
-                                &arm.body,
-                                var_types,
-                                &mut arm_subs,
-                                &next_paths,
-                                obligations,
-                            )?;
+
+                    // 计算当前臂模式的匹配条件与未匹配否定条件
+                    let (match_cond_opt, neg_cond_opt) = match &arm.pattern {
+                        Pattern::Literal(Literal::Bool(true)) => (
+                            Some(target_smt.clone()),
+                            Some(format!("(not {})", target_smt)),
+                        ),
+                        Pattern::Literal(Literal::Bool(false)) => (
+                            Some(format!("(not {})", target_smt)),
+                            Some(target_smt.clone()),
+                        ),
+                        Pattern::Literal(Literal::Int(n)) => {
+                            let n_smt = if *n == I64_MIN {
+                                "(- 9223372036854775808)".to_string()
+                            } else if *n < 0 {
+                                format!("(- {})", n.abs())
+                            } else {
+                                n.to_string()
+                            };
+                            (
+                                Some(format!("(= {} {})", target_smt, n_smt)),
+                                Some(format!("(not (= {} {}))", target_smt, n_smt)),
+                            )
                         }
-                        Pattern::Literal(Literal::Bool(false)) => {
-                            let mut next_paths = path_conditions.to_vec();
-                            next_paths.push(format!("(not {})", cond_smt));
-                            collect_safety_obligations_recursive(
-                                &arm.body,
-                                var_types,
-                                &mut arm_subs,
-                                &next_paths,
-                                obligations,
-                            )?;
+                        Pattern::Literal(Literal::Float(f)) => {
+                            if f.is_finite() {
+                                let f_smt = if *f < 0.0 {
+                                    format!("(- {})", format_float(f.abs()))
+                                } else {
+                                    format_float(*f)
+                                };
+                                (
+                                    Some(format!("(= {} {})", target_smt, f_smt)),
+                                    Some(format!("(not (= {} {}))", target_smt, f_smt)),
+                                )
+                            } else {
+                                (None, None)
+                            }
                         }
-                        Pattern::Wildcard | Pattern::Ident(_) => {
-                            let mut next_paths = path_conditions.to_vec();
-                            next_paths.push(format!("(not {})", cond_smt));
-                            collect_safety_obligations_recursive(
-                                &arm.body,
-                                var_types,
-                                &mut arm_subs,
-                                &next_paths,
-                                obligations,
-                            )?;
-                        }
-                        _ => {
-                            collect_safety_obligations_recursive(
-                                &arm.body,
-                                var_types,
-                                &mut arm_subs,
-                                path_conditions,
-                                obligations,
-                            )?;
-                        }
+                        Pattern::Wildcard | Pattern::Ident(_) => (None, None),
+                        _ => (None, None),
+                    };
+
+                    // 当前臂内部生效路径条件 = 之前所有臂的未匹配条件 + 当前臂的匹配条件
+                    let mut arm_paths = accumulated_negations.clone();
+                    if let Some(mc) = match_cond_opt {
+                        arm_paths.push(mc);
+                    }
+
+                    // 递归分析当前臂 body
+                    collect_safety_obligations_recursive(
+                        &arm.body,
+                        var_types,
+                        &mut arm_subs,
+                        &arm_paths,
+                        obligations,
+                    )?;
+
+                    // 将当前臂的否定条件累积到后续分支的路径前提中
+                    if let Some(nc) = neg_cond_opt {
+                        accumulated_negations.push(nc);
                     }
                 }
             } else {

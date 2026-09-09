@@ -248,13 +248,13 @@ fn populate_env_records(
     for (key, &val) in point {
         let is_int = param_types
             .get(key)
-            .map_or(false, |ty| matches!(ty, Type::Int));
+            .is_some_and(|ty| matches!(ty, Type::Int));
         env.insert(key.clone(), Value::Num { val, is_int });
     }
     for (key, &val) in point {
         let is_int = param_types
             .get(key)
-            .map_or(false, |ty| matches!(ty, Type::Int));
+            .is_some_and(|ty| matches!(ty, Type::Int));
         let parts: Vec<&str> = key.split('.').collect();
         if parts.len() > 1 {
             insert_nested_record(env, &parts, Value::Num { val, is_int });
@@ -599,7 +599,7 @@ fn eval_expr_internal(
             }
 
             let mut sub_env = HashMap::new();
-            for (param, val) in target_func.params.iter().zip(arg_vals.into_iter()) {
+            for (param, val) in target_func.params.iter().zip(arg_vals) {
                 sub_env.insert(param.name.clone(), val.clone());
                 if let Value::Record(ref map) = val {
                     flatten_record_into_env(&param.name, map, &mut sub_env);
