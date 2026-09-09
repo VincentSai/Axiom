@@ -200,38 +200,60 @@ pub fn run_z3_query_with_timeout(
     let policy = TimeoutPolicy::from_millis(timeout_ms);
     let status_res = policy.wait_child_with_watchdog(&mut child);
 
-    // [Spec 6 & Standards 2] 读写线程退出全局超时控制与 stdin 写入错误/panic 检查
+    // [Spec 7 & Standards 2] 读写线程退出全局绝对截止时间控制与资源无泄漏回收
     let join_grace = std::time::Duration::from_millis(1500);
     let deadline = std::time::Instant::now() + join_grace;
 
+    let mut io_timed_out = false;
     while !stdout_join.is_finished() || !stderr_join.is_finished() {
         if std::time::Instant::now() > deadline {
-            return Err("timed out waiting for z3 stdout/stderr reader threads to exit".into());
+            io_timed_out = true;
+            break;
         }
         std::thread::sleep(std::time::Duration::from_millis(5));
     }
 
-    if let Some(ref stdin_handle) = stdin_join {
-        while !stdin_handle.is_finished() {
-            if std::time::Instant::now() > deadline {
-                return Err("timed out waiting for z3 stdin writer thread to exit".into());
+    if !io_timed_out {
+        if let Some(ref stdin_handle) = stdin_join {
+            while !stdin_handle.is_finished() {
+                if std::time::Instant::now() > deadline {
+                    io_timed_out = true;
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(5));
             }
-            std::thread::sleep(std::time::Duration::from_millis(5));
         }
+    }
+
+    // 若读写线程超时或子进程监控报错，立即强杀子进程切断管道，并强制回收线程句柄杜绝泄漏
+    if io_timed_out || status_res.is_err() {
+        let _ = child.kill();
+        let _ = child.wait();
+        if let Some(stdin_handle) = stdin_join {
+            let _ = stdin_handle.join();
+        }
+        let _ = stdout_join.join();
+        let _ = stderr_join.join();
+
+        if io_timed_out {
+            return Err("timed out waiting for z3 reader/writer threads to exit".into());
+        }
+        status_res?;
+        return Err("z3 process exited abnormally".into());
     }
 
     if let Some(stdin_handle) = stdin_join {
         match stdin_handle.join() {
             Ok(Ok(())) => {}
             Ok(Err(io_err)) => {
-                if status_res.is_ok() {
-                    return Err(format!("failed to write query to z3 stdin: {}", io_err));
-                }
+                let _ = stdout_join.join();
+                let _ = stderr_join.join();
+                return Err(format!("failed to write query to z3 stdin: {}", io_err));
             }
             Err(_) => {
-                if status_res.is_ok() {
-                    return Err("z3 stdin writer thread panicked".into());
-                }
+                let _ = stdout_join.join();
+                let _ = stderr_join.join();
+                return Err("z3 stdin writer thread panicked".into());
             }
         }
     }

@@ -656,64 +656,43 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
                 }
             }
 
-            // 2. 若首臂即为不可反驳 catch-all，直接翻译该臂 body
-            if reachable_arms.len() == 1
-                && matches!(
-                    reachable_arms[0].pattern,
-                    Pattern::Wildcard | Pattern::Ident(_)
-                )
-            {
-                return expr_to_smt(&reachable_arms[0].body, var_types);
-            }
-
             let cond_str = expr_to_smt(target, var_types)?;
 
-            // 3. 辅助模式条件匹配生成器
-            let pattern_cond = |pat: &Pattern| -> Result<Option<String>, String> {
-                match pat {
-                    Pattern::Literal(Literal::Bool(true)) => Ok(Some(cond_str.clone())),
-                    Pattern::Literal(Literal::Bool(false)) => {
-                        Ok(Some(format!("(not {})", cond_str)))
-                    }
-                    Pattern::Literal(Literal::Int(n)) => {
-                        let n_smt = if *n == I64_MIN {
-                            "(- 9223372036854775808)".to_string()
-                        } else if *n < 0 {
-                            format!("(- {})", n.abs())
-                        } else {
-                            n.to_string()
-                        };
-                        Ok(Some(format!("(= {} {})", cond_str, n_smt)))
-                    }
-                    Pattern::Literal(Literal::Float(f)) => {
-                        if f.is_finite() {
-                            let f_smt = if *f < 0.0 {
-                                format!("(- {})", format_float(f.abs()))
-                            } else {
-                                format_float(*f)
-                            };
-                            Ok(Some(format!("(= {} {})", cond_str, f_smt)))
-                        } else {
-                            Err("unsupported non-finite float literal pattern".into())
-                        }
-                    }
-                    Pattern::Wildcard | Pattern::Ident(_) => Ok(None),
-                    _ => Err(
-                        "complex match pattern translation requires full ADT solver encoding"
-                            .into(),
-                    ),
+            // 2. 若首臂即为不可反驳 catch-all，直接翻译该臂 body（若是 Ident 则建立词法绑定）
+            if reachable_arms.len() == 1 {
+                if let Pattern::Ident(ref id) = reachable_arms[0].pattern {
+                    let mut arm_var_types = var_types.clone();
+                    let empty_subs = HashMap::new();
+                    let target_ty = infer_expr_type(target, var_types, &empty_subs);
+                    arm_var_types.insert(id.clone(), target_ty);
+                    let body_smt = expr_to_smt(&reachable_arms[0].body, &arm_var_types)?;
+                    return Ok(format!("(let (({} {})) {})", id, cond_str, body_smt));
+                } else if matches!(reachable_arms[0].pattern, Pattern::Wildcard) {
+                    return expr_to_smt(&reachable_arms[0].body, var_types);
                 }
-            };
+            }
 
-            // 4. 情形 A：最后一条可达臂为 catch-all (通配符或标识符)
+            // 3. 情形 A：最后一条可达臂为 catch-all (通配符或标识符)
             let last_idx = reachable_arms.len() - 1;
             if matches!(
                 reachable_arms[last_idx].pattern,
                 Pattern::Wildcard | Pattern::Ident(_)
             ) {
-                let mut current_else = expr_to_smt(&reachable_arms[last_idx].body, var_types)?;
+                let last_arm = &reachable_arms[last_idx];
+                let mut current_else = if let Pattern::Ident(ref id) = last_arm.pattern {
+                    let mut arm_var_types = var_types.clone();
+                    let empty_subs = HashMap::new();
+                    let target_ty = infer_expr_type(target, var_types, &empty_subs);
+                    arm_var_types.insert(id.clone(), target_ty);
+                    let body_smt = expr_to_smt(&last_arm.body, &arm_var_types)?;
+                    format!("(let (({} {})) {})", id, cond_str, body_smt)
+                } else {
+                    expr_to_smt(&last_arm.body, var_types)?
+                };
+
                 for arm in reachable_arms[..last_idx].iter().rev() {
-                    let pat_cond = pattern_cond(&arm.pattern)?.ok_or_else(|| {
+                    let (pat_cond_opt, _) = pattern_condition_smt(&arm.pattern, &cond_str)?;
+                    let pat_cond = pat_cond_opt.ok_or_else(|| {
                         "unexpected catch-all before last reachable arm".to_string()
                     })?;
                     let body_smt = expr_to_smt(&arm.body, var_types)?;
@@ -722,7 +701,7 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
                 return Ok(current_else);
             }
 
-            // 5. 情形 B：布尔完备匹配 (true 与 false 双臂)
+            // 4. 情形 B：布尔完备匹配 (true 与 false 双臂)
             if reachable_arms.len() == 2 {
                 match (&reachable_arms[0].pattern, &reachable_arms[1].pattern) {
                     (
@@ -748,6 +727,53 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
             Err("complex match pattern translation requires full ADT solver encoding or catch-all default".into())
         }
         _ => Err("unsupported expression in SMT translation".into()),
+    }
+}
+
+/// 提取统一的模式匹配 SMT 条件生成器 (match_cond, neg_cond)
+pub fn pattern_condition_smt(
+    pattern: &Pattern,
+    target_smt: &str,
+) -> Result<(Option<String>, Option<String>), String> {
+    match pattern {
+        Pattern::Literal(Literal::Bool(true)) => Ok((
+            Some(target_smt.to_string()),
+            Some(format!("(not {})", target_smt)),
+        )),
+        Pattern::Literal(Literal::Bool(false)) => Ok((
+            Some(format!("(not {})", target_smt)),
+            Some(target_smt.to_string()),
+        )),
+        Pattern::Literal(Literal::Int(n)) => {
+            let n_smt = if *n == I64_MIN {
+                "(- 9223372036854775808)".to_string()
+            } else if *n < 0 {
+                format!("(- {})", n.abs())
+            } else {
+                n.to_string()
+            };
+            Ok((
+                Some(format!("(= {} {})", target_smt, n_smt)),
+                Some(format!("(not (= {} {}))", target_smt, n_smt)),
+            ))
+        }
+        Pattern::Literal(Literal::Float(f)) => {
+            if f.is_finite() {
+                let f_smt = if *f < 0.0 {
+                    format!("(- {})", format_float(f.abs()))
+                } else {
+                    format_float(*f)
+                };
+                Ok((
+                    Some(format!("(= {} {})", target_smt, f_smt)),
+                    Some(format!("(not (= {} {}))", target_smt, f_smt)),
+                ))
+            } else {
+                Err("unsupported non-finite float literal pattern".into())
+            }
+        }
+        Pattern::Wildcard | Pattern::Ident(_) => Ok((None, None)),
+        _ => Err("complex match pattern translation requires full ADT solver encoding".into()),
     }
 }
 
@@ -779,7 +805,11 @@ fn build_block_smt(
 
     if let Expr::Let { name, value } = first {
         let val_smt = expr_to_smt(value, var_types)?;
-        let rest_smt = build_block_smt(rest, tail, var_types)?;
+        let empty_subs = HashMap::new();
+        let val_ty = infer_expr_type(value, var_types, &empty_subs);
+        let mut child_var_types = var_types.clone();
+        child_var_types.insert(name.clone(), val_ty);
+        let rest_smt = build_block_smt(rest, tail, &child_var_types)?;
         Ok(format!("(let (({} {})) {})", name, val_smt, rest_smt))
     } else {
         build_block_smt(rest, tail, var_types)
@@ -913,8 +943,20 @@ fn infer_expr_type(
             UnaryOperator::Not => "Bool",
             UnaryOperator::Negate => infer_expr_type(operand, var_types, subs),
         },
-        Expr::Block { tail: Some(t), .. } => infer_expr_type(t, var_types, subs),
-        Expr::Block { tail: None, .. } => "Int",
+        Expr::Block { statements, tail } => {
+            let mut local_var_types = var_types.clone();
+            for stmt in statements {
+                if let Expr::Let { name, value } = stmt {
+                    let ty = infer_expr_type(value, &local_var_types, subs);
+                    local_var_types.insert(name.clone(), ty);
+                }
+            }
+            if let Some(t) = tail {
+                infer_expr_type(t, &local_var_types, subs)
+            } else {
+                "Int"
+            }
+        }
         Expr::Match { arms, .. } => {
             if let Some(first_arm) = arms.first() {
                 infer_expr_type(&first_arm.body, var_types, subs)
@@ -1213,50 +1255,12 @@ fn collect_safety_obligations_recursive(
                 for arm in arms {
                     let mut arm_subs = subs.clone();
                     if let Pattern::Ident(ref id) = arm.pattern {
-                        arm_subs.remove(id);
+                        arm_subs.insert(id.clone(), target_expanded.clone());
                     }
 
-                    // 计算当前臂模式的匹配条件与未匹配否定条件
-                    let (match_cond_opt, neg_cond_opt) = match &arm.pattern {
-                        Pattern::Literal(Literal::Bool(true)) => (
-                            Some(target_smt.clone()),
-                            Some(format!("(not {})", target_smt)),
-                        ),
-                        Pattern::Literal(Literal::Bool(false)) => (
-                            Some(format!("(not {})", target_smt)),
-                            Some(target_smt.clone()),
-                        ),
-                        Pattern::Literal(Literal::Int(n)) => {
-                            let n_smt = if *n == I64_MIN {
-                                "(- 9223372036854775808)".to_string()
-                            } else if *n < 0 {
-                                format!("(- {})", n.abs())
-                            } else {
-                                n.to_string()
-                            };
-                            (
-                                Some(format!("(= {} {})", target_smt, n_smt)),
-                                Some(format!("(not (= {} {}))", target_smt, n_smt)),
-                            )
-                        }
-                        Pattern::Literal(Literal::Float(f)) => {
-                            if f.is_finite() {
-                                let f_smt = if *f < 0.0 {
-                                    format!("(- {})", format_float(f.abs()))
-                                } else {
-                                    format_float(*f)
-                                };
-                                (
-                                    Some(format!("(= {} {})", target_smt, f_smt)),
-                                    Some(format!("(not (= {} {}))", target_smt, f_smt)),
-                                )
-                            } else {
-                                (None, None)
-                            }
-                        }
-                        Pattern::Wildcard | Pattern::Ident(_) => (None, None),
-                        _ => (None, None),
-                    };
+                    // 调用统一的模式条件生成器计算当前臂模式的匹配条件与未匹配否定条件
+                    let (match_cond_opt, neg_cond_opt) =
+                        pattern_condition_smt(&arm.pattern, &target_smt)?;
 
                     // 当前臂内部生效路径条件 = 之前所有臂的未匹配条件 + 当前臂的匹配条件
                     let mut arm_paths = accumulated_negations.clone();

@@ -3,7 +3,7 @@
 use axiom_ast::{EffectDecl, Expr, FunctionDecl, FunctionParam, Module, Type, TypeDef};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -263,6 +263,8 @@ pub struct DraftRecord {
 /// The immutable data payload of a commit, excluding the commit's self-identifying hash.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommitPayload {
+    #[serde(default)]
+    pub parent_commit: Option<NodeHash>,
     pub parent_root: Option<NodeHash>,
     pub new_root: NodeHash,
     pub envelope_hash: NodeHash,
@@ -294,6 +296,11 @@ impl CommitRecord {
             commit_hash,
             payload,
         }
+    }
+
+    /// Access parent commit hash reference in DAG topology.
+    pub fn parent_commit(&self) -> Option<&NodeHash> {
+        self.payload.parent_commit.as_ref()
     }
 
     /// Access parent root reference.
@@ -363,6 +370,7 @@ impl ModuleRecord {
 pub enum DbError {
     Io(std::io::Error),
     Serialization(serde_json::Error),
+    CorruptedCommitChain(String),
 }
 
 impl fmt::Display for DbError {
@@ -371,6 +379,9 @@ impl fmt::Display for DbError {
             Self::Io(error) => write!(formatter, "AST database I/O error: {error}"),
             Self::Serialization(error) => {
                 write!(formatter, "invalid AST database serialization: {error}")
+            }
+            Self::CorruptedCommitChain(msg) => {
+                write!(formatter, "AST database commit chain corrupted: {msg}")
             }
         }
     }
@@ -381,6 +392,7 @@ impl std::error::Error for DbError {
         match self {
             Self::Io(error) => Some(error),
             Self::Serialization(error) => Some(error),
+            Self::CorruptedCommitChain(_) => None,
         }
     }
 }
@@ -416,6 +428,11 @@ pub enum CasError {
         current: u64,
         expected: u64,
     },
+    StaleRootMismatch {
+        hole_id: String,
+        current: Option<NodeHash>,
+        expected: Option<NodeHash>,
+    },
     Db(DbError),
 }
 
@@ -450,6 +467,15 @@ impl fmt::Display for CasError {
             } => write!(
                 f,
                 "CAS rejected: stale draft revision for hole `{hole_id}` (expected {expected}, current is {current})"
+            ),
+            Self::StaleRootMismatch {
+                hole_id,
+                current,
+                expected,
+            } => write!(
+                f,
+                "CAS rejected: stale base root for hole `{hole_id}` (expected `{:?}`, current is `{:?}`)",
+                expected, current
             ),
             Self::Db(err) => write!(f, "database error during CAS: {err}"),
         }
@@ -523,6 +549,8 @@ impl CertifiedVerification {
 pub struct DatabaseState {
     #[serde(default)]
     pub(crate) root_ref: Option<NodeHash>,
+    #[serde(default)]
+    pub(crate) head_commit: Option<NodeHash>,
     #[serde(default)]
     pub(crate) types: BTreeMap<NodeHash, TypeDef>,
     #[serde(default)]
@@ -610,6 +638,46 @@ impl AstDatabase {
     /// Returns the current root module hash reference.
     pub fn current_root(&self) -> Option<NodeHash> {
         self.state.root_ref.clone()
+    }
+
+    /// Returns the current head commit hash reference.
+    pub fn head_commit(&self) -> Option<&NodeHash> {
+        self.state.head_commit.as_ref()
+    }
+
+    /// Returns the verified mainline commits sequence ordered from earliest ancestor to latest head.
+    /// Performs integrity validation, broken chain checks, and self-loop / cycle detection.
+    pub fn mainline_commits(&self) -> Result<Vec<&CommitRecord>, DbError> {
+        let mut ordered_commits = Vec::new();
+        let mut curr_commit_hash = self.state.head_commit.as_ref();
+        let mut visited: HashSet<&NodeHash> = HashSet::new();
+
+        while let Some(hash) = curr_commit_hash {
+            if !visited.insert(hash) {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "cycle detected in commit chain at commit hash {}",
+                    hash
+                )));
+            }
+            let commit = self.state.commits.get(hash).ok_or_else(|| {
+                DbError::CorruptedCommitChain(format!(
+                    "broken commit chain: parent commit hash {} not found in database",
+                    hash
+                ))
+            })?;
+            ordered_commits.push(commit);
+            curr_commit_hash = commit.parent_commit();
+        }
+
+        // 若历史旧版本数据库缺少 head_commit，但存在 commits，按时间戳稳定排序作为 fallback
+        if ordered_commits.is_empty() && !self.state.commits.is_empty() {
+            let mut fallback: Vec<&CommitRecord> = self.state.commits.values().collect();
+            fallback.sort_by_key(|c| c.timestamp());
+            return Ok(fallback);
+        }
+
+        ordered_commits.reverse();
+        Ok(ordered_commits)
     }
 
     fn lock_and_sync(&mut self) -> Result<Option<FileLockGuard>, DbError> {
@@ -970,6 +1038,7 @@ impl AstDatabase {
         let new_root = mod_record.module_hash;
 
         let payload = CommitPayload {
+            parent_commit: next_state.head_commit.clone(),
             parent_root: expected_root.clone(),
             new_root: new_root.clone(),
             envelope_hash: env_hash,
@@ -982,9 +1051,67 @@ impl AstDatabase {
             .commits
             .insert(final_commit.commit_hash.clone(), final_commit.clone());
         next_state.root_ref = Some(new_root);
+        next_state.head_commit = Some(final_commit.commit_hash.clone());
 
         // [Spec 4] 锁内原子化删除已晋升为正式提交的草稿，杜绝幽灵草稿与并发竞态
         next_state.drafts.remove(&envelope.target_hole_id);
+
+        self.persist(&next_state)?;
+        self.state = next_state;
+
+        Ok(final_commit)
+    }
+
+    /// 针对已存在于当前权威模块中的单洞实现，换发新的认证收据并生成 Re-attestation CommitRecord。
+    /// 解决嵌套洞在重验时因函数已填充而无法再次填洞的结构性缺陷。
+    pub fn try_commit_reattestation(
+        &mut self,
+        target_hole_id: &str,
+        envelope_hash: &NodeHash,
+        candidate_hash: &NodeHash,
+        receipt: VerificationReceipt,
+    ) -> Result<CommitRecord, CasError> {
+        let _guard = self.lock_and_sync()?;
+        let mut next_state = self.state.clone();
+
+        let current_root = next_state.root_ref.clone().ok_or_else(|| {
+            CasError::InvalidCandidate("cannot reattest candidate in an empty database".into())
+        })?;
+
+        // 验证收据合法性
+        if receipt.candidate_hash != *candidate_hash {
+            return Err(CasError::InvalidReceipt(
+                "receipt candidate hash does not match target candidate".into(),
+            ));
+        }
+        if receipt.verification_profile_hash != current_verification_profile_hash() {
+            return Err(CasError::InvalidReceipt(
+                "receipt profile hash does not match current profile".into(),
+            ));
+        }
+
+        let rcpt_hash = compute_receipt_hash(&receipt);
+        next_state
+            .receipts
+            .insert(rcpt_hash.clone(), receipt.clone());
+
+        let payload = CommitPayload {
+            parent_commit: next_state.head_commit.clone(),
+            parent_root: Some(current_root.clone()),
+            new_root: current_root,
+            envelope_hash: envelope_hash.clone(),
+            candidate_hash: candidate_hash.clone(),
+            receipt_hash: rcpt_hash,
+            timestamp: receipt.verified_at,
+        };
+        let final_commit = CommitRecord::new(payload);
+        next_state
+            .commits
+            .insert(final_commit.commit_hash.clone(), final_commit.clone());
+        next_state.head_commit = Some(final_commit.commit_hash.clone());
+
+        // 原子清理该洞可能残留的草稿
+        next_state.drafts.remove(target_hole_id);
 
         self.persist(&next_state)?;
         self.state = next_state;
@@ -1080,10 +1207,24 @@ impl AstDatabase {
         &mut self,
         mut draft: DraftRecord,
         expected_revision: Option<u64>,
+        expected_base_root: Option<&NodeHash>,
     ) -> Result<DraftRecord, CasError> {
         let _guard = self.lock_and_sync()?;
         let mut next_state = self.state.clone();
 
+        // 1. 严格检查 base_root 匹配，防止并发基于陈旧 baseline 覆写
+        if let Some(exp_root) = expected_base_root {
+            let current_sys_root = next_state.root_ref.as_ref();
+            if current_sys_root != Some(exp_root) {
+                return Err(CasError::StaleRootMismatch {
+                    hole_id: draft.hole_id.clone(),
+                    current: current_sys_root.cloned(),
+                    expected: Some(exp_root.clone()),
+                });
+            }
+        }
+
+        // 2. 严格检查 revision 版本匹配
         if let Some(existing) = next_state.drafts.get(&draft.hole_id) {
             if let Some(exp_rev) = expected_revision {
                 if existing.revision != exp_rev {
@@ -1109,7 +1250,7 @@ impl AstDatabase {
         }
 
         if draft.base_root.is_none() {
-            draft.base_root = self.state.root_ref.clone();
+            draft.base_root = next_state.root_ref.clone();
         }
 
         next_state
@@ -1120,23 +1261,9 @@ impl AstDatabase {
         Ok(draft)
     }
 
-    /// Inserts or updates a provisional draft for a hole and persists state.
-    pub fn insert_draft(&mut self, draft: DraftRecord) -> Result<(), DbError> {
-        let _guard = self.lock_and_sync()?;
-        let mut next_state = self.state.clone();
-        let mut d = draft;
-        if let Some(existing) = next_state.drafts.get(&d.hole_id) {
-            d.revision = existing.revision + 1;
-        } else if d.revision == 0 {
-            d.revision = 1;
-        }
-        if d.base_root.is_none() {
-            d.base_root = self.state.root_ref.clone();
-        }
-        next_state.drafts.insert(d.hole_id.clone(), d);
-        self.persist(&next_state)?;
-        self.state = next_state;
-        Ok(())
+    /// Convenience wrapper around insert_draft_cas without revision constraints.
+    pub fn insert_draft(&mut self, draft: DraftRecord) -> Result<DraftRecord, CasError> {
+        self.insert_draft_cas(draft, None, None)
     }
 
     /// Removes a provisional draft for a hole (e.g. upon promotion to verified commit).

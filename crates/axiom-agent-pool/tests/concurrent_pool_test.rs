@@ -792,11 +792,80 @@ fn profile_invalidation_and_reverify_unproved_holes_closed_loop() {
         // 4. 调用 reverify_unproved_holes 自动重新定理证明，闭环晋升为 Verified
         let rev_results = pool.reverify_unproved_holes().unwrap();
         assert_eq!(rev_results.len(), 1);
-        assert!(rev_results[0].smt_result.is_proved());
-        assert!(rev_results[0].committed);
-        assert!(rev_results[0].new_receipt_hash.is_some());
+        assert!(matches!(
+            &rev_results[0],
+            axiom_agent_pool::ReverifyOutcome::Committed { hole_id, .. } if hole_id == "add_hole"
+        ));
         assert_eq!(pool.hole_status("add_hole"), Some(HoleStatus::Verified));
         assert!(!pool.pending_hole_ids().contains(&"add_hole".to_string()));
+    }
+
+    let _ = std::fs::remove_file(&skel_path);
+    let _ = std::fs::remove_file(&db_path);
+}
+
+#[test]
+fn nested_hole_reattestation_reverify_closed_loop() {
+    use axiom_db::legacy_verification_profile_hash;
+
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let skel_path = std::env::temp_dir().join(format!("axiom_nested_skel_{nonce}.ax"));
+    let db_path = std::env::temp_dir().join(format!("axiom_nested_db_{nonce}.json"));
+
+    // [Spec 5, P1] 函数体为嵌套打洞：1 + ?inner_hole
+    let skel = r#"
+    fn test_nested(x: Int) -> Int
+        requires { x >= 0 }
+        ensures { result > 0 }
+    {
+        1 + ?inner_hole
+    }
+    "#;
+    std::fs::write(&skel_path, skel).unwrap();
+
+    // 1. 提交单洞候选表达式 "2"，函数被填充为 "1 + 2" 并正式提交
+    {
+        let mut pool = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        pool.submit_solution("inner_hole", "2").unwrap();
+        assert_eq!(
+            pool.hole_status("inner_hole"),
+            Some(axiom_agent_pool::HoleStatus::Verified)
+        );
+    }
+
+    // 2. 模拟升级规则集，将旧收据篡改为 legacy_verification_profile_hash
+    {
+        let db_content = std::fs::read_to_string(&db_path).unwrap();
+        let cur_hash = axiom_db::current_verification_profile_hash().to_string();
+        let leg_hash = legacy_verification_profile_hash().to_string();
+        let tampered_content = db_content.replace(&cur_hash, &leg_hash);
+        std::fs::write(&db_path, tampered_content).unwrap();
+    }
+
+    // 3. 重新打开池：当前函数体已为 "1 + 2"（无洞），断言降级并重新收录进 pending_holes
+    {
+        let mut pool = AgentTaskPool::open_persisted(&skel_path, &db_path).unwrap();
+        assert_eq!(
+            pool.hole_status("inner_hole"),
+            Some(axiom_agent_pool::HoleStatus::Unresolved)
+        );
+        assert!(pool.pending_hole_ids().contains(&"inner_hole".to_string()));
+
+        // 4. 执行重验：即使当前函数已为 "1 + 2"，原生 Re-attestation 机制也能成功换发新收据！
+        let rev_results = pool.reverify_unproved_holes().unwrap();
+        assert_eq!(rev_results.len(), 1);
+        assert!(matches!(
+            &rev_results[0],
+            axiom_agent_pool::ReverifyOutcome::Committed { hole_id, .. } if hole_id == "inner_hole"
+        ));
+        assert_eq!(
+            pool.hole_status("inner_hole"),
+            Some(axiom_agent_pool::HoleStatus::Verified)
+        );
+        assert!(pool.is_complete());
     }
 
     let _ = std::fs::remove_file(&skel_path);

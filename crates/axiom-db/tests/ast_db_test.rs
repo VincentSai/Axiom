@@ -747,7 +747,7 @@ fn persisted_database_persists_and_restores_draft_records() {
             revision: 0,
         };
         let committed_v1 = db
-            .insert_draft_cas(draft_v1, Some(0))
+            .insert_draft_cas(draft_v1, Some(0), None)
             .expect("initial cas draft should succeed");
         assert_eq!(committed_v1.revision, 1);
 
@@ -760,10 +760,29 @@ fn persisted_database_persists_and_restores_draft_records() {
             base_root: None,
             revision: 0,
         };
-        let cas_err = db.insert_draft_cas(draft_stale, Some(0));
+        let cas_err = db.insert_draft_cas(draft_stale, Some(0), None);
         assert!(matches!(
             cas_err,
             Err(axiom_db::CasError::StaleDraftRevision { .. })
+        ));
+
+        // 预期错误的 base_root 应被 StaleRootMismatch 拦截
+        let bogus_root: NodeHash =
+            "#mod_0000000000000000000000000000000000000000000000000000000000000001"
+                .parse()
+                .unwrap();
+        let draft_bogus_root = DraftRecord {
+            hole_id: "hole_cas".into(),
+            agent_id: "agent_c".into(),
+            code: "30".into(),
+            timestamp: 101,
+            base_root: None,
+            revision: 0,
+        };
+        let root_err = db.insert_draft_cas(draft_bogus_root, Some(1), Some(&bogus_root));
+        assert!(matches!(
+            root_err,
+            Err(axiom_db::CasError::StaleRootMismatch { .. })
         ));
 
         // 使用正确的 revision 提交应成功递增
@@ -776,7 +795,7 @@ fn persisted_database_persists_and_restores_draft_records() {
             revision: 0,
         };
         let committed_v2 = db
-            .insert_draft_cas(draft_v2, Some(1))
+            .insert_draft_cas(draft_v2, Some(1), None)
             .expect("subsequent cas draft should succeed");
         assert_eq!(committed_v2.revision, 2);
     }
@@ -823,4 +842,65 @@ fn legacy_receipt_without_profile_deserializes_with_fallback_and_invalidates_cur
         current_verification_profile_hash(),
         "Legacy receipt must never match current profile hash and will trigger downgrade!"
     );
+}
+
+#[test]
+fn test_mainline_commits_and_reattestation() {
+    use axiom_db::{
+        current_verification_profile_hash, AstDatabase, ProofLevel, VerificationReceipt,
+    };
+
+    let mut db = AstDatabase::in_memory();
+    assert!(db
+        .mainline_commits()
+        .expect("empty db should succeed")
+        .is_empty());
+
+    let mod_rec = db
+        .insert_module(&Module::default())
+        .expect("insert module should succeed");
+    db.initialize_root(mod_rec.module_hash.clone())
+        .expect("init root should succeed");
+
+    let cand_hash: NodeHash =
+        "#cand_1111111111111111111111111111111111111111111111111111111111111111"
+            .parse()
+            .unwrap();
+    let env_hash: NodeHash =
+        "#env_2222222222222222222222222222222222222222222222222222222222222222"
+            .parse()
+            .unwrap();
+    let obl_hash: NodeHash =
+        "#obl_3333333333333333333333333333333333333333333333333333333333333333"
+            .parse()
+            .unwrap();
+
+    let receipt = VerificationReceipt {
+        candidate_hash: cand_hash.clone(),
+        proof_level: ProofLevel::Proved,
+        solver: "z3".into(),
+        solver_version: "4.13.0".into(),
+        obligations_checked: 2,
+        proof_obligation_hash: obl_hash,
+        verification_profile_hash: current_verification_profile_hash(),
+        verified_at: 1000,
+    };
+
+    let commit1 = db
+        .try_commit_reattestation("hole_1", &env_hash, &cand_hash, receipt.clone())
+        .expect("reattestation 1 should succeed");
+    assert_eq!(db.head_commit(), Some(&commit1.commit_hash));
+    assert_eq!(commit1.parent_commit(), None);
+
+    let commit2 = db
+        .try_commit_reattestation("hole_2", &env_hash, &cand_hash, receipt)
+        .expect("reattestation 2 should succeed");
+    assert_eq!(db.head_commit(), Some(&commit2.commit_hash));
+    assert_eq!(commit2.parent_commit(), Some(&commit1.commit_hash));
+
+    // 验证 mainline_commits 严格正序从祖先到链头
+    let mainline = db.mainline_commits().expect("mainline should succeed");
+    assert_eq!(mainline.len(), 2);
+    assert_eq!(mainline[0].commit_hash, commit1.commit_hash);
+    assert_eq!(mainline[1].commit_hash, commit2.commit_hash);
 }

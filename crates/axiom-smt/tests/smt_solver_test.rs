@@ -675,3 +675,79 @@ fn match_dead_arm_safety_obligations_pruned() {
         ));
     }
 }
+
+#[test]
+fn match_ident_lexical_shadowing_prevents_false_proof() {
+    // [Spec 1, P0] match x { y => y }
+    // 外层存在参数 y: Int 与 x: Int。match 内部模式 Ident(y) 必须建立词法绑定到 x。
+    // 如果函数断言 ensures { result == y }，在运行时 result 实为 x，若误将模式 y 引用外层 y 会产生假证明 (Proved)！
+    // 正确实现的 SMT 编码必须生成 (let ((y x)) y)，从而被 SMT 证明器精准证伪 (CounterExample)！
+    let module = parse_module(
+        r#"
+        fn test_ident_shadowing(y: Int, x: Int) -> Int
+            ensures { result == y }
+        {
+            match x {
+                y => y
+            }
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let (smt_query, obligations) = axiom_smt::generate_smtlib2_with_module_and_obligations(
+        &module.functions[0],
+        Some(&module),
+    )
+    .expect("SMT generation should succeed");
+
+    // SMT 编码中必须包含词法作用域绑定 (let ((y x)) y)
+    assert!(smt_query.contains("(let ((y x)) y)"));
+    assert_eq!(obligations, 2);
+
+    let res = verify_function(&module.functions[0]);
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(res, SmtResult::CounterExample(_)),
+            "Lexical shadowing must bind to x, so result == y must be refuted by counterexample! Got: {:?}",
+            res
+        );
+    } else {
+        if std::env::var("AXIOM_REQUIRE_Z3").is_ok() {
+            panic!("AXIOM_REQUIRE_Z3 is set but Z3 executable was not found");
+        }
+        assert!(matches!(
+            res,
+            SmtResult::Sampled { .. } | SmtResult::CounterExample(_)
+        ));
+    }
+}
+
+#[test]
+fn let_bound_real_division_preserves_real_type() {
+    // [Spec 6, P1] let a = x + 1.0; let b = y + 1.0; a / b
+    // 局部变量 a 与 b 的类型必须被推导为 Real，除法必须生成实数除法 (/)，绝不能生成向零截断的整数除法
+    let module = parse_module(
+        r#"
+        fn test_real_div(x: Float, y: Float) -> Float
+            requires { y > 0.0 }
+            ensures { result > 0.0 }
+        {
+            let a = x + 1.0;
+            let b = y + 1.0;
+            a / b
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let (smt_query, _) = axiom_smt::generate_smtlib2_with_module_and_obligations(
+        &module.functions[0],
+        Some(&module),
+    )
+    .expect("SMT generation should succeed");
+
+    // 必须生成实数除法 (/ a b) 或其展开，绝不能生成整数 div
+    assert!(smt_query.contains("(/ a b)"));
+    assert!(!smt_query.contains("div a b"));
+}

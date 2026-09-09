@@ -5,8 +5,9 @@ use std::fmt;
 
 use axiom_ast::{Expr, Module};
 use axiom_db::{
-    compute_contract_hash, compute_envelope_hash, compute_expr_hash, compute_function_hash,
-    AstDatabase, Candidate, CasError, CommitRecord, NodeHash, ProofLevel, TaskEnvelope,
+    compute_candidate_hash, compute_contract_hash, compute_envelope_hash, compute_expr_hash,
+    compute_function_hash, AstDatabase, Candidate, CasError, CommitRecord, NodeHash, ProofLevel,
+    TaskEnvelope, VerificationReceipt,
 };
 use axiom_hole_extractor::extract_holes;
 pub use axiom_hole_extractor::HoleTask;
@@ -155,12 +156,38 @@ pub enum CasEvent {
 
 /// Detailed outcome of reverifying an unproved hole task against the current Verification Profile.
 #[derive(Debug, Clone, PartialEq)]
-pub struct ReverifyOutcome {
-    pub hole_id: String,
-    pub smt_result: SmtResult,
-    pub committed: bool,
-    pub new_receipt_hash: Option<NodeHash>,
-    pub error: Option<String>,
+pub enum ReverifyOutcome {
+    Committed {
+        hole_id: String,
+        receipt_hash: NodeHash,
+    },
+    Unproved {
+        hole_id: String,
+        smt_result: SmtResult,
+    },
+    Failed {
+        hole_id: String,
+        reason: String,
+    },
+    Skipped {
+        hole_id: String,
+        reason: String,
+    },
+}
+
+impl ReverifyOutcome {
+    pub fn hole_id(&self) -> &str {
+        match self {
+            Self::Committed { hole_id, .. }
+            | Self::Unproved { hole_id, .. }
+            | Self::Failed { hole_id, .. }
+            | Self::Skipped { hole_id, .. } => hole_id,
+        }
+    }
+
+    pub fn is_committed(&self) -> bool {
+        matches!(self, Self::Committed { .. })
+    }
 }
 
 /// Lifecycle status of a hole task in the pool.
@@ -245,29 +272,12 @@ impl AgentTaskPool {
         let mut pending_holes: HashSet<String> =
             remaining_tasks.into_iter().map(|t| t.hole_id).collect();
 
-        // 3. [Spec 3, P1] 从 base_root 出发，沿 parent_root 逆向追溯主干提交因果链，反转为拓扑正序正向水合
-        //    绝不能使用 db.commits().values() 的哈希字典序，防止新提交被哈希字典序靠前的旧提交覆盖！
-        let mut commits_by_new_root: HashMap<NodeHash, &CommitRecord> = HashMap::new();
-        for commit in db.commits().values() {
-            commits_by_new_root.insert(commit.new_root().clone(), commit);
-        }
-
-        let mut ordered_commits: Vec<CommitRecord> = Vec::new();
-        let mut curr_root = Some(base_root.clone());
-        let mut visited_roots: HashSet<NodeHash> = HashSet::new();
-
-        while let Some(r) = curr_root {
-            if !visited_roots.insert(r.clone()) {
-                break; // 环路防御
-            }
-            if let Some(commit) = commits_by_new_root.get(&r) {
-                ordered_commits.push((*commit).clone());
-                curr_root = commit.parent_root().cloned();
-            } else {
-                break;
-            }
-        }
-        ordered_commits.reverse(); // 反转为主干提交的时间/因果拓扑正序：Root -> ... -> current_root
+        // 3. [Standards 1, P1] 由 AstDatabase::mainline_commits() 提供经过完整性校验的拓扑有序序列
+        let ordered_commits_refs = db
+            .mainline_commits()
+            .map_err(|e| PoolError::CasFailure(e.to_string()))?;
+        let ordered_commits: Vec<CommitRecord> =
+            ordered_commits_refs.into_iter().cloned().collect();
 
         // 如果存在未处于主干链上的孤立提交（例如分支尝试），按时间戳稳定排序后补充在其后，确保历史完整性
         let main_line_commits: HashSet<NodeHash> = ordered_commits
@@ -293,15 +303,30 @@ impl AgentTaskPool {
         let mut hole_evidence = HashMap::new();
         let current_profile_hash = axiom_db::current_verification_profile_hash();
         for commit in &replay_sequence {
-            if let Ok(Some(receipt)) = db.get_receipt(commit.receipt_hash()) {
-                if let Ok(Some(env)) = db.get_envelope(commit.envelope_hash()) {
-                    // [Spec 2] 校验 Profile Hash 是否一致；如果不一致，旧收据失效，降级为 Unverified
-                    if receipt.verification_profile_hash == current_profile_hash {
-                        hole_evidence.insert(env.target_hole_id.clone(), receipt.proof_level);
-                    } else {
-                        hole_evidence.insert(env.target_hole_id.clone(), ProofLevel::Unverified);
-                    }
-                }
+            let receipt = db
+                .get_receipt(commit.receipt_hash())
+                .map_err(|e| PoolError::CasFailure(e.to_string()))?
+                .ok_or_else(|| {
+                    PoolError::CasFailure(format!(
+                        "receipt {} not found in database",
+                        commit.receipt_hash()
+                    ))
+                })?;
+            let env = db
+                .get_envelope(commit.envelope_hash())
+                .map_err(|e| PoolError::CasFailure(e.to_string()))?
+                .ok_or_else(|| {
+                    PoolError::CasFailure(format!(
+                        "envelope {} not found in database",
+                        commit.envelope_hash()
+                    ))
+                })?;
+
+            // [Spec 2] 校验 Profile Hash 是否一致；如果不一致，旧收据失效，降级为 Unverified
+            if receipt.verification_profile_hash == current_profile_hash {
+                hole_evidence.insert(env.target_hole_id.clone(), receipt.proof_level);
+            } else {
+                hole_evidence.insert(env.target_hole_id.clone(), ProofLevel::Unverified);
             }
         }
 
@@ -467,8 +492,8 @@ impl AgentTaskPool {
 
     /// 重新验证所有未达到当前 Verification Profile 证明标准（即非 Proved 状态）的已填洞。
     /// 遍历所有处于未证明状态的洞任务，提取当前权威模块中该函数的实现，使用当前规则集执行全量证明：
-    /// - 若证明通过，使用单洞候选表达式的独立哈希提交 CAS，铸造带有当前 Profile Hash 的新收据；
-    /// - 显式返回强类型 ReverifyOutcome，包含 committed 状态、新收据哈希及诊断信息。
+    /// - 若证明通过，使用原生 Re-attestation 接口提交换发带有当前 Profile Hash 的新收据；
+    /// - 显式返回正交强类型 ReverifyOutcome（Committed | Unproved | Failed | Skipped），杜绝静默丢失。
     pub fn reverify_unproved_holes(&mut self) -> Result<Vec<ReverifyOutcome>, PoolError> {
         let unproved_holes: Vec<String> = self
             .tasks
@@ -481,7 +506,13 @@ impl AgentTaskPool {
         for hole_id in unproved_holes {
             let env = match self.envelopes.get(&hole_id) {
                 Some(e) => e.clone(),
-                None => continue,
+                None => {
+                    results.push(ReverifyOutcome::Skipped {
+                        hole_id,
+                        reason: "envelope not found".into(),
+                    });
+                    continue;
+                }
             };
 
             let func_opt = self
@@ -491,104 +522,121 @@ impl AgentTaskPool {
                 .find(|f| f.name == env.target_function)
                 .cloned();
 
-            let Some(func) = func_opt else { continue };
+            let Some(func) = func_opt else {
+                results.push(ReverifyOutcome::Skipped {
+                    hole_id,
+                    reason: format!(
+                        "target function `{}` not found in module",
+                        env.target_function
+                    ),
+                });
+                continue;
+            };
+
             if axiom_ast::expr_contains_hole(&func.body) {
+                results.push(ReverifyOutcome::Skipped {
+                    hole_id,
+                    reason: "function still contains pending hole expression".into(),
+                });
                 continue;
             }
 
             let smt_res = axiom_smt::verify_function_in_module(&func, &self.verified_module);
 
             if !matches!(smt_res, SmtResult::Proved { .. }) {
-                results.push(ReverifyOutcome {
+                results.push(ReverifyOutcome::Unproved {
                     hole_id,
                     smt_result: smt_res,
-                    committed: false,
-                    new_receipt_hash: None,
-                    error: None,
                 });
                 continue;
             }
 
-            // 寻找该洞历史提交的候选表达式源码，或者草稿源码
-            let cand_source_opt = self
-                .commits
-                .iter()
-                .rev()
-                .find_map(|c| {
-                    if let Ok(Some(env_rec)) = self.db.get_envelope(c.envelope_hash()) {
-                        if env_rec.target_hole_id == hole_id {
-                            if let Ok(Some(cand)) = self.db.get_candidate(c.candidate_hash()) {
-                                return Some(cand.expression_source);
-                            }
-                        }
+            // 寻找该洞历史提交的 (envelope_hash, candidate_hash)，或从草稿构造
+            let cand_info_opt = self.commits.iter().rev().find_map(|c| {
+                if let Ok(Some(env_rec)) = self.db.get_envelope(c.envelope_hash()) {
+                    if env_rec.target_hole_id == hole_id {
+                        return Some((c.envelope_hash().clone(), c.candidate_hash().clone()));
                     }
-                    None
-                })
-                .or_else(|| self.db.get_draft(&hole_id).map(|d| d.code.clone()));
+                }
+                None
+            });
 
-            let Some(cand_source) = cand_source_opt else {
-                results.push(ReverifyOutcome {
-                    hole_id,
-                    smt_result: smt_res,
-                    committed: false,
-                    new_receipt_hash: None,
-                    error: Some("no previous candidate source or draft found for hole".into()),
-                });
-                continue;
-            };
-
-            let parsed_cand_expr = match parse_expr(&cand_source) {
-                Ok(e) => e,
-                Err(err) => {
-                    results.push(ReverifyOutcome {
-                        hole_id,
-                        smt_result: smt_res,
-                        committed: false,
-                        new_receipt_hash: None,
-                        error: Some(format!("candidate expression parse error: {err}")),
-                    });
-                    continue;
+            let (env_hash, cand_hash) = match cand_info_opt {
+                Some(info) => info,
+                None => {
+                    if let Some(draft) = self.db.get_draft(&hole_id) {
+                        let env_h = compute_envelope_hash(&env);
+                        let parsed = match parse_expr(&draft.code) {
+                            Ok(p) => p,
+                            Err(e) => {
+                                results.push(ReverifyOutcome::Failed {
+                                    hole_id,
+                                    reason: format!("draft expression parse error: {e}"),
+                                });
+                                continue;
+                            }
+                        };
+                        let expr_h = axiom_db::compute_expr_hash(&parsed);
+                        let cand = Candidate {
+                            envelope_hash: env_h.clone(),
+                            expression_source: draft.code.clone(),
+                            expression_hash: expr_h,
+                            author_agent_id: draft.agent_id.clone(),
+                            timestamp: draft.timestamp,
+                        };
+                        let c_hash = compute_candidate_hash(&cand);
+                        (env_h, c_hash)
+                    } else {
+                        results.push(ReverifyOutcome::Failed {
+                            hole_id,
+                            reason: "no historical candidate or draft found for hole".into(),
+                        });
+                        continue;
+                    }
                 }
             };
 
-            // [Spec 2, P1] 计算单洞候选表达式的真实 AST 哈希，必须与 cand_source 的 AST 一致！
-            let expr_hash = axiom_db::compute_expr_hash(&parsed_cand_expr);
-            let candidate = Candidate {
-                envelope_hash: compute_envelope_hash(&env),
-                expression_source: cand_source,
-                expression_hash: expr_hash,
-                author_agent_id: "axiom-reverifier".into(),
-                timestamp: std::time::SystemTime::now()
+            let obligations = match smt_res {
+                SmtResult::Proved {
+                    obligations_checked,
+                    ..
+                } => obligations_checked,
+                _ => 0,
+            };
+
+            let receipt = VerificationReceipt {
+                candidate_hash: cand_hash.clone(),
+                proof_level: ProofLevel::Proved,
+                solver: "z3".into(),
+                solver_version: axiom_smt::find_z3_executable()
+                    .map(|p| axiom_smt::get_z3_version(&p))
+                    .unwrap_or_else(|| "unknown".into()),
+                obligations_checked: obligations,
+                proof_obligation_hash: compute_function_hash(&func),
+                verification_profile_hash: axiom_db::current_verification_profile_hash(),
+                verified_at: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_secs(),
             };
 
-            let current_root = self.db.current_root();
-            match self.db.try_commit_candidate(
-                &current_root,
-                env.clone(),
-                candidate,
-                Some(&self.verified_module),
-            ) {
+            // [Spec 5, P1] 调用原生 Re-attestation 接口，直接为嵌套洞已填充的模块换发新收据并推进 Commit DAG
+            match self
+                .db
+                .try_commit_reattestation(&hole_id, &env_hash, &cand_hash, receipt)
+            {
                 Ok(commit) => {
                     let rcpt_hash = commit.receipt_hash().clone();
                     self.apply_verified_commit(commit, self.verified_module.clone(), &hole_id);
-                    results.push(ReverifyOutcome {
+                    results.push(ReverifyOutcome::Committed {
                         hole_id,
-                        smt_result: smt_res,
-                        committed: true,
-                        new_receipt_hash: Some(rcpt_hash),
-                        error: None,
+                        receipt_hash: rcpt_hash,
                     });
                 }
                 Err(cas_err) => {
-                    results.push(ReverifyOutcome {
+                    results.push(ReverifyOutcome::Failed {
                         hole_id,
-                        smt_result: smt_res,
-                        committed: false,
-                        new_receipt_hash: None,
-                        error: Some(format!("CAS commit failed: {cas_err}")),
+                        reason: format!("re-attestation CAS commit failed: {cas_err}"),
                     });
                 }
             }
@@ -625,7 +673,11 @@ impl AgentTaskPool {
         solution_source: &str,
         agent_id: &str,
     ) -> Result<(), PoolError> {
-        // [Spec 4] 跨进程原子持久化草稿到底层数据库，若失败则绝不更新内存并向上报错
+        // [Spec 2, P1] 生产路径全面接入 Draft CAS，获取已知 revision 与当前权威 base_root
+        let existing_draft = self.db.get_draft(hole_id);
+        let expected_revision = existing_draft.map(|d| d.revision);
+        let expected_base_root = self.db.current_root();
+
         let draft_rec = axiom_db::DraftRecord {
             hole_id: hole_id.to_string(),
             agent_id: agent_id.to_string(),
@@ -634,12 +686,17 @@ impl AgentTaskPool {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs(),
-            base_root: self.db.current_root(),
+            base_root: expected_base_root.clone(),
             revision: 0,
         };
-        self.db.insert_draft(draft_rec).map_err(|e| {
-            PoolError::CasFailure(format!("failed to persist provisional draft: {}", e))
-        })?;
+        self.db
+            .insert_draft_cas(draft_rec, expected_revision, expected_base_root.as_ref())
+            .map_err(|e| {
+                PoolError::CasFailure(format!(
+                    "failed to persist provisional draft via CAS: {}",
+                    e
+                ))
+            })?;
 
         self.provisional_drafts
             .insert(hole_id.to_string(), solution);
@@ -707,8 +764,7 @@ impl AgentTaskPool {
         self.hole_evidence
             .insert(hole_id.to_string(), ProofLevel::Proved);
 
-        // [Spec 4] 洞正式晋升为 Verified 后，从数据库持久化存储中清理该草稿
-        let _ = self.db.remove_draft(hole_id);
+        // [Spec 3, P1] DB 已在提交事务锁内原子删除草稿，严禁在锁外执行第二次删除以防误删并发新草稿！
 
         // 刷新 provisional_module：基于最新 verified_module，叠加剩余所有草稿
         self.rebuild_provisional_module();
