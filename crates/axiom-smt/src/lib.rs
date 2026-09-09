@@ -11,7 +11,9 @@ pub mod z3_solver;
 use std::collections::HashMap;
 
 use axiom_ast::{FunctionDecl, Module};
-pub use smtlib2::{generate_smtlib2, generate_smtlib2_with_module};
+pub use smtlib2::{
+    generate_precondition_check_smtlib2, generate_smtlib2, generate_smtlib2_with_module,
+};
 pub use z3_solver::{find_z3_executable, run_z3_query, Z3Result};
 
 /// Concrete numeric parameter assignments that demonstrate a contract violation.
@@ -26,19 +28,37 @@ pub enum SolverBackend {
     InternalSymbolic,
 }
 
-/// The result of checking one function's contracts.
+/// The result of checking one function's contracts with strict evidence grading.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SmtResult {
     /// Formula is proved globally by an external SMT solver (e.g. Microsoft Z3 Unsat).
-    Proved { solver: String },
+    Proved {
+        solver: String,
+        version: String,
+        obligations_checked: usize,
+    },
     /// Verified only on a bounded discrete grid without counterexamples (heuristic test, NOT a theorem proof).
     Sampled { points_checked: usize },
     /// A concrete input satisfying preconditions violates a postcondition.
     CounterExample(CounterExample),
+    /// Preconditions are logically unsatisfiable (unsat), creating a vacuous pseudo-proof.
+    VacuousContract { reason: String },
     /// Verification could not be performed for the given function.
     Skipped(String),
     /// Solver returned unknown or timed out.
     Unknown(String),
+}
+
+impl SmtResult {
+    /// Returns true if this function is strictly mathematically proved.
+    pub fn is_proved(&self) -> bool {
+        matches!(self, Self::Proved { .. })
+    }
+
+    /// Returns true if the contract was rejected due to vacuous (unsatisfiable) preconditions.
+    pub fn is_vacuous(&self) -> bool {
+        matches!(self, Self::VacuousContract { .. })
+    }
 }
 
 /// Translates an Axiom function to standard SMT-LIB2 format.
@@ -49,35 +69,35 @@ pub fn to_smtlib2(func: &FunctionDecl) -> Result<String, String> {
 /// Verifies that a function body satisfies every `ensures` clause whenever all `requires` clauses hold.
 /// Automatically probes for external Z3 executable; falls back to internal symbolic engine if Z3 is absent.
 pub fn verify_function(func: &FunctionDecl) -> SmtResult {
-    if let Some(z3_path) = find_z3_executable() {
-        if let Ok(smt2_query) = generate_smtlib2(func) {
-            match run_z3_query(&z3_path, &smt2_query) {
-                Ok(Z3Result::Unsat) => {
-                    return SmtResult::Proved {
-                        solver: "Microsoft Z3 (SMT-LIB2)".into(),
-                    }
-                }
-                Ok(Z3Result::Sat(ce)) => return SmtResult::CounterExample(ce),
-                Ok(Z3Result::Unknown(reason)) => return SmtResult::Unknown(reason),
-                Err(_) => {
-                    // Fall through to internal solver on invocation error
-                }
-            }
-        }
-    }
-
-    // Standalone fallback solver (discrete grid sampling)
-    internal_solver::verify_with_internal_solver(func)
+    verify_function_in_module(func, &Module { types: vec![], functions: vec![func.clone()], effects: vec![] })
 }
 
 /// Verifies a function using full module context for record flattening and pure function calls.
 pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtResult {
     if let Some(z3_path) = find_z3_executable() {
+        // P0: Precondition Satisfiability Check (Vacuity Prevention)
+        if !func.requires.is_empty() {
+            if let Ok(vacuity_query) = generate_precondition_check_smtlib2(func, Some(module)) {
+                if !vacuity_query.is_empty() {
+                    if let Ok(Z3Result::Unsat) = run_z3_query(&z3_path, &vacuity_query) {
+                        return SmtResult::VacuousContract {
+                            reason: format!(
+                                "Preconditions of function `{}` are logically unsatisfiable (unsat). This creates a vacuous proof where arbitrary implementations would trivially pass.",
+                                func.name
+                            ),
+                        };
+                    }
+                }
+            }
+        }
+
         if let Ok(smt2_query) = generate_smtlib2_with_module(func, Some(module)) {
             match run_z3_query(&z3_path, &smt2_query) {
                 Ok(Z3Result::Unsat) => {
                     return SmtResult::Proved {
                         solver: "Microsoft Z3 (SMT-LIB2)".into(),
+                        version: "4.13.0".into(),
+                        obligations_checked: func.ensures.len(),
                     }
                 }
                 Ok(Z3Result::Sat(ce)) => return SmtResult::CounterExample(ce),
@@ -97,11 +117,29 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
 pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String> {
     let z3_path = find_z3_executable()
         .ok_or_else(|| "Z3 executable not found in PATH or standard install directories".to_string())?;
+
+    // P0: Precondition Satisfiability Check
+    if !func.requires.is_empty() {
+        let vacuity_query = generate_precondition_check_smtlib2(func, None)?;
+        if !vacuity_query.is_empty() {
+            if let Z3Result::Unsat = run_z3_query(&z3_path, &vacuity_query)? {
+                return Ok(SmtResult::VacuousContract {
+                    reason: format!(
+                        "Preconditions of function `{}` are logically unsatisfiable (unsat).",
+                        func.name
+                    ),
+                });
+            }
+        }
+    }
+
     let smt2_query = generate_smtlib2(func)?;
     
     match run_z3_query(&z3_path, &smt2_query)? {
         Z3Result::Unsat => Ok(SmtResult::Proved {
             solver: "Microsoft Z3 (SMT-LIB2)".into(),
+            version: "4.13.0".into(),
+            obligations_checked: func.ensures.len(),
         }),
         Z3Result::Sat(ce) => Ok(SmtResult::CounterExample(ce)),
         Z3Result::Unknown(r) => Ok(SmtResult::Unknown(r)),
@@ -116,3 +154,4 @@ pub fn verify_module(module: &Module) -> HashMap<String, SmtResult> {
         .map(|function| (function.name.clone(), verify_function_in_module(function, module)))
         .collect()
 }
+

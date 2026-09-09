@@ -95,12 +95,20 @@ pub fn generate_smtlib2_with_module(
     }
     smt.push('\n');
 
+    let mut var_types: HashMap<String, &'static str> = HashMap::new();
+    for (name, smt_ty) in &flat_params {
+        var_types.insert(name.clone(), *smt_ty);
+    }
+    for (name, smt_ty) in &flat_results {
+        var_types.insert(name.clone(), *smt_ty);
+    }
+
     // 3. Assert preconditions (Requires)
     if !func.requires.is_empty() {
         smt.push_str("; Preconditions (Requires)\n");
         for req in &func.requires {
             let inlined_req = inline_calls(req, &ctx, 0)?;
-            let req_expr = expr_to_smt(&inlined_req)?;
+            let req_expr = expr_to_smt(&inlined_req, &var_types)?;
             smt.push_str(&format!("(assert {})\n", req_expr));
         }
         smt.push('\n');
@@ -110,24 +118,24 @@ pub fn generate_smtlib2_with_module(
     smt.push_str("; Function Body Definition\n");
     let inlined_body = inline_calls(&func.body, &ctx, 0)?;
     if flat_results.len() == 1 && flat_results[0].0 == "result" {
-        let body_expr = expr_to_smt(&inlined_body)?;
+        let body_expr = expr_to_smt(&inlined_body, &var_types)?;
         smt.push_str(&format!("(assert (= result {}))\n\n", body_expr));
     } else {
         // Returned a record: bind individual fields if body is a RecordInit or let block
-        bind_record_body_to_results(&inlined_body, &mut smt)?;
+        bind_record_body_to_results(&inlined_body, &var_types, &mut smt)?;
     }
 
     // 5. Assert negation of postconditions (Ensures)
     smt.push_str("; Goal: Find any counterexample violating Ensures clauses\n");
     if func.ensures.len() == 1 {
         let inlined_ens = inline_calls(&func.ensures[0], &ctx, 0)?;
-        let ens_expr = expr_to_smt(&inlined_ens)?;
+        let ens_expr = expr_to_smt(&inlined_ens, &var_types)?;
         smt.push_str(&format!("(assert (not {}))\n\n", ens_expr));
     } else {
         let mut all_ens = String::from("(and");
         for ens in &func.ensures {
             let inlined_ens = inline_calls(ens, &ctx, 0)?;
-            let ens_expr = expr_to_smt(&inlined_ens)?;
+            let ens_expr = expr_to_smt(&inlined_ens, &var_types)?;
             all_ens.push(' ');
             all_ens.push_str(&ens_expr);
         }
@@ -179,11 +187,15 @@ fn flatten_type_to_smt(
     }
 }
 
-fn bind_record_body_to_results(body: &Expr, smt: &mut String) -> Result<(), String> {
+fn bind_record_body_to_results(
+    body: &Expr,
+    var_types: &HashMap<String, &'static str>,
+    smt: &mut String,
+) -> Result<(), String> {
     match body {
         Expr::RecordInit { fields, .. } => {
             for (f_name, f_expr) in fields {
-                let val_smt = expr_to_smt(f_expr)?;
+                let val_smt = expr_to_smt(f_expr, var_types)?;
                 smt.push_str(&format!("(assert (= result_{} {}))\n", f_name, val_smt));
             }
             smt.push('\n');
@@ -194,7 +206,7 @@ fn bind_record_body_to_results(body: &Expr, smt: &mut String) -> Result<(), Stri
             let mut let_bindings = Vec::new();
             for s in statements {
                 if let Expr::Let { name, value } = s {
-                    let val_smt = expr_to_smt(value)?;
+                    let val_smt = expr_to_smt(value, var_types)?;
                     let_bindings.push((name.clone(), val_smt));
                 }
             }
@@ -202,7 +214,7 @@ fn bind_record_body_to_results(body: &Expr, smt: &mut String) -> Result<(), Stri
             if let Some(tail_expr) = tail {
                 if let Expr::RecordInit { fields, .. } = tail_expr.as_ref() {
                     for (f_name, f_expr) in fields {
-                        let inner_val = expr_to_smt(f_expr)?;
+                        let inner_val = expr_to_smt(f_expr, var_types)?;
                         let mut full_val = inner_val;
                         for (let_name, let_val) in let_bindings.iter().rev() {
                             full_val = format!("(let (({} {})) {})", let_name, let_val, full_val);
@@ -448,7 +460,7 @@ fn substitute_expr(expr: &Expr, subs: &HashMap<String, Expr>) -> Expr {
     }
 }
 
-fn expr_to_smt(expr: &Expr) -> Result<String, String> {
+fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result<String, String> {
     match expr {
         Expr::Literal(Literal::Int(n)) => {
             if *n < 0 {
@@ -477,21 +489,25 @@ fn expr_to_smt(expr: &Expr) -> Result<String, String> {
             }
         }
         Expr::UnaryOp { op, operand } => {
-            let inner = expr_to_smt(operand)?;
+            let inner = expr_to_smt(operand, var_types)?;
             match op {
                 UnaryOperator::Negate => Ok(format!("(- {})", inner)),
                 UnaryOperator::Not => Ok(format!("(not {})", inner)),
             }
         }
         Expr::BinaryOp { left, op, right } => {
-            let l = expr_to_smt(left)?;
-            let r = expr_to_smt(right)?;
+            let l = expr_to_smt(left, var_types)?;
+            let r = expr_to_smt(right, var_types)?;
             let smt_op = match op {
                 BinaryOperator::Add => "+",
                 BinaryOperator::Subtract => "-",
                 BinaryOperator::Multiply => "*",
                 BinaryOperator::Divide => {
-                    if l.contains('.') || r.contains('.') {
+                    let is_real = l.contains('.')
+                        || r.contains('.')
+                        || var_types.get(&l).copied() == Some("Real")
+                        || var_types.get(&r).copied() == Some("Real");
+                    if is_real {
                         "/"
                     } else {
                         "div"
@@ -510,39 +526,39 @@ fn expr_to_smt(expr: &Expr) -> Result<String, String> {
             Ok(format!("({} {} {})", smt_op, l, r))
         }
         Expr::Let { name, value } => {
-            let val = expr_to_smt(value)?;
+            let val = expr_to_smt(value, var_types)?;
             Ok(format!("(let (({} {})))", name, val))
         }
         Expr::Block { statements, tail } => {
             if statements.is_empty() {
                 if let Some(t) = tail {
-                    expr_to_smt(t)
+                    expr_to_smt(t, var_types)
                 } else {
                     Ok("0".into())
                 }
             } else {
-                build_block_smt(statements, tail.as_deref())
+                build_block_smt(statements, tail.as_deref(), var_types)
             }
         }
         Expr::Call { callee, args } => {
-            let callee_str = expr_to_smt(callee)?;
+            let callee_str = expr_to_smt(callee, var_types)?;
             let mut s = format!("({}", callee_str);
             for arg in args {
                 s.push(' ');
-                s.push_str(&expr_to_smt(arg)?);
+                s.push_str(&expr_to_smt(arg, var_types)?);
             }
             s.push(')');
             Ok(s)
         }
         Expr::Match { target, arms } => {
             if arms.len() == 2 {
-                let cond_str = expr_to_smt(target)?;
+                let cond_str = expr_to_smt(target, var_types)?;
                 let mut true_body = None;
                 let mut false_body = None;
                 for arm in arms {
                     match &arm.pattern {
                         Pattern::Literal(Literal::Bool(b)) => {
-                            let arm_smt = expr_to_smt(&arm.body)?;
+                            let arm_smt = expr_to_smt(&arm.body, var_types)?;
                             if *b {
                                 true_body = Some(arm_smt);
                             } else {
@@ -550,7 +566,7 @@ fn expr_to_smt(expr: &Expr) -> Result<String, String> {
                             }
                         }
                         Pattern::Wildcard | Pattern::Ident(_) => {
-                            let arm_smt = expr_to_smt(&arm.body)?;
+                            let arm_smt = expr_to_smt(&arm.body, var_types)?;
                             if true_body.is_none() {
                                 true_body = Some(arm_smt.clone());
                             }
@@ -582,10 +598,14 @@ fn expr_to_field_path(expr: &Expr) -> Option<String> {
     }
 }
 
-fn build_block_smt(statements: &[Expr], tail: Option<&Expr>) -> Result<String, String> {
+fn build_block_smt(
+    statements: &[Expr],
+    tail: Option<&Expr>,
+    var_types: &HashMap<String, &'static str>,
+) -> Result<String, String> {
     if statements.is_empty() {
         if let Some(t) = tail {
-            return expr_to_smt(t);
+            return expr_to_smt(t, var_types);
         }
         return Ok("0".into());
     }
@@ -594,11 +614,11 @@ fn build_block_smt(statements: &[Expr], tail: Option<&Expr>) -> Result<String, S
     let rest = &statements[1..];
 
     if let Expr::Let { name, value } = first {
-        let val_smt = expr_to_smt(value)?;
-        let rest_smt = build_block_smt(rest, tail)?;
+        let val_smt = expr_to_smt(value, var_types)?;
+        let rest_smt = build_block_smt(rest, tail, var_types)?;
         Ok(format!("(let (({} {})) {})", name, val_smt, rest_smt))
     } else {
-        build_block_smt(rest, tail)
+        build_block_smt(rest, tail, var_types)
     }
 }
 
@@ -610,3 +630,65 @@ fn format_float(val: f64) -> String {
         format!("{}.0", s)
     }
 }
+
+/// Translates ONLY the function's parameters and `requires` preconditions into an SMT-LIB2 query
+/// to verify that the preconditions are mathematically satisfiable (preventing vacuous proofs).
+pub fn generate_precondition_check_smtlib2(
+    func: &FunctionDecl,
+    module: Option<&Module>,
+) -> Result<String, String> {
+    if func.requires.is_empty() {
+        return Ok(String::new());
+    }
+
+    let empty_records = HashMap::new();
+    let empty_functions = HashMap::new();
+    let ctx = if let Some(m) = module {
+        SmtContext::from_module(m)
+    } else {
+        SmtContext {
+            records: empty_records,
+            functions: empty_functions,
+        }
+    };
+
+    let mut smt = String::new();
+    smt.push_str("; Axiom Precondition Satisfiability (Vacuity) Query for: ");
+    smt.push_str(&func.name);
+    smt.push_str("\n(reset)\n(set-logic ALL)\n\n");
+
+    let mut flat_params = Vec::new();
+    for p in &func.params {
+        flatten_type_to_smt(&p.name, &p.ty, &ctx.records, &mut flat_params, 0)?;
+    }
+    for (name, smt_ty) in &flat_params {
+        smt.push_str(&format!("(declare-const {} {})\n", name, smt_ty));
+    }
+    smt.push('\n');
+
+    for (name, smt_ty) in &flat_params {
+        if *smt_ty == "Int" {
+            smt.push_str(&format!(
+                "(assert (and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807)))\n",
+                name, name
+            ));
+        }
+    }
+    smt.push('\n');
+
+    let mut var_types: HashMap<String, &'static str> = HashMap::new();
+    for (name, smt_ty) in &flat_params {
+        var_types.insert(name.clone(), *smt_ty);
+    }
+
+    smt.push_str("; Assert all preconditions\n");
+    for req in &func.requires {
+        let inlined_req = inline_calls(req, &ctx, 0)?;
+        let req_expr = expr_to_smt(&inlined_req, &var_types)?;
+        smt.push_str(&format!("(assert {})\n", req_expr));
+    }
+    smt.push_str("\n(check-sat)\n");
+
+    Ok(smt)
+}
+

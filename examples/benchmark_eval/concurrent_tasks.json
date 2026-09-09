@@ -1,0 +1,374 @@
+{
+  "version": "3.0",
+  "name": "Axiom Concurrent Multi-Agent Evaluation Dataset (inventory_settlement)",
+  "description": "A cohesive 5-function game engine subsystem representing inventory trading, item stacking, and durability refund with tight contract constraints.",
+  "subsystem": "inventory_settlement",
+  "tasks": [
+    {
+      "id": 1,
+      "subsystem": "inventory_settlement",
+      "function_name": "can_stack_items",
+      "description": "Determine if item2 can be stacked into item1 slot: identical item_id and slot1 count is strictly below max_stack",
+      "inputs": [
+        {
+          "name": "item_id1",
+          "type": "Int"
+        },
+        {
+          "name": "count1",
+          "type": "Int"
+        },
+        {
+          "name": "max_stack1",
+          "type": "Int"
+        },
+        {
+          "name": "item_id2",
+          "type": "Int"
+        },
+        {
+          "name": "count2",
+          "type": "Int"
+        }
+      ],
+      "output": "Bool",
+      "contracts": {
+        "requires": [
+          "count1 >= 0",
+          "count2 >= 0",
+          "max_stack1 > 0"
+        ],
+        "ensures": [
+          "result == (item_id1 == item_id2 && count1 < max_stack1)"
+        ]
+      },
+      "canonical_axiom_expr": "item_id1 == item_id2 && count1 < max_stack1",
+      "test_vectors": [
+        {
+          "inputs": [
+            101,
+            5,
+            10,
+            101,
+            3
+          ],
+          "expected": true
+        },
+        {
+          "inputs": [
+            101,
+            10,
+            10,
+            101,
+            2
+          ],
+          "expected": false
+        },
+        {
+          "inputs": [
+            101,
+            3,
+            10,
+            102,
+            3
+          ],
+          "expected": false
+        },
+        {
+          "inputs": [
+            200,
+            0,
+            99,
+            200,
+            50
+          ],
+          "expected": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "subsystem": "inventory_settlement",
+      "function_name": "calc_stacked_counts",
+      "description": "Calculate final item count in target slot after stacking count2 into count1, capped by max_stack",
+      "inputs": [
+        {
+          "name": "count1",
+          "type": "Int"
+        },
+        {
+          "name": "count2",
+          "type": "Int"
+        },
+        {
+          "name": "max_stack",
+          "type": "Int"
+        }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": [
+          "count1 >= 0",
+          "count2 >= 0",
+          "max_stack > 0"
+        ],
+        "ensures": [
+          "result >= 0",
+          "result <= max_stack",
+          "count1 + count2 > max_stack => result == max_stack",
+          "count1 + count2 <= max_stack => result == count1 + count2"
+        ]
+      },
+      "canonical_axiom_expr": "match count1 + count2 > max_stack { true => max_stack, false => count1 + count2 }",
+      "test_vectors": [
+        {
+          "inputs": [
+            5,
+            3,
+            10
+          ],
+          "expected": 8
+        },
+        {
+          "inputs": [
+            8,
+            5,
+            10
+          ],
+          "expected": 10
+        },
+        {
+          "inputs": [
+            0,
+            99,
+            50
+          ],
+          "expected": 50
+        },
+        {
+          "inputs": [
+            10,
+            0,
+            10
+          ],
+          "expected": 10
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "subsystem": "inventory_settlement",
+      "function_name": "calculate_purchase_cost",
+      "description": "Calculate total discounted gold price for purchasing items: (unit_price * quantity * (100 - discount_pct)) / 100",
+      "inputs": [
+        {
+          "name": "unit_price",
+          "type": "Int"
+        },
+        {
+          "name": "quantity",
+          "type": "Int"
+        },
+        {
+          "name": "discount_pct",
+          "type": "Int"
+        }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": [
+          "unit_price >= 0",
+          "quantity >= 0",
+          "discount_pct >= 0",
+          "discount_pct <= 100"
+        ],
+        "ensures": [
+          "result >= 0",
+          "result <= unit_price * quantity",
+          "discount_pct == 0 => result == unit_price * quantity",
+          "discount_pct == 100 => result == 0"
+        ]
+      },
+      "canonical_axiom_expr": "(unit_price * quantity * (100 - discount_pct)) / 100",
+      "test_vectors": [
+        {
+          "inputs": [
+            100,
+            2,
+            0
+          ],
+          "expected": 200
+        },
+        {
+          "inputs": [
+            100,
+            2,
+            20
+          ],
+          "expected": 160
+        },
+        {
+          "inputs": [
+            50,
+            10,
+            50
+          ],
+          "expected": 250
+        },
+        {
+          "inputs": [
+            1000,
+            1,
+            100
+          ],
+          "expected": 0
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "subsystem": "inventory_settlement",
+      "function_name": "validate_trade_balance",
+      "description": "Verify buyer has sufficient gold and inventory has sufficient free slots to perform transaction",
+      "inputs": [
+        {
+          "name": "buyer_gold",
+          "type": "Int"
+        },
+        {
+          "name": "total_cost",
+          "type": "Int"
+        },
+        {
+          "name": "free_slots",
+          "type": "Int"
+        },
+        {
+          "name": "needed_slots",
+          "type": "Int"
+        }
+      ],
+      "output": "Bool",
+      "contracts": {
+        "requires": [
+          "buyer_gold >= 0",
+          "total_cost >= 0",
+          "free_slots >= 0",
+          "needed_slots >= 0"
+        ],
+        "ensures": [
+          "result == (buyer_gold >= total_cost && free_slots >= needed_slots)"
+        ]
+      },
+      "canonical_axiom_expr": "buyer_gold >= total_cost && free_slots >= needed_slots",
+      "test_vectors": [
+        {
+          "inputs": [
+            500,
+            300,
+            5,
+            2
+          ],
+          "expected": true
+        },
+        {
+          "inputs": [
+            200,
+            300,
+            5,
+            2
+          ],
+          "expected": false
+        },
+        {
+          "inputs": [
+            500,
+            300,
+            1,
+            2
+          ],
+          "expected": false
+        },
+        {
+          "inputs": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "expected": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "subsystem": "inventory_settlement",
+      "function_name": "calc_sell_refund",
+      "description": "Calculate item resell value factoring current durability fraction: (cost * durability_cur) / durability_max",
+      "inputs": [
+        {
+          "name": "cost",
+          "type": "Int"
+        },
+        {
+          "name": "durability_cur",
+          "type": "Int"
+        },
+        {
+          "name": "durability_max",
+          "type": "Int"
+        }
+      ],
+      "output": "Int",
+      "contracts": {
+        "requires": [
+          "cost >= 0",
+          "durability_max > 0",
+          "durability_cur >= 0",
+          "durability_cur <= durability_max"
+        ],
+        "ensures": [
+          "result >= 0",
+          "result <= cost",
+          "durability_cur == durability_max => result == cost",
+          "durability_cur == 0 => result == 0"
+        ]
+      },
+      "canonical_axiom_expr": "(cost * durability_cur) / durability_max",
+      "test_vectors": [
+        {
+          "inputs": [
+            1000,
+            100,
+            100
+          ],
+          "expected": 1000
+        },
+        {
+          "inputs": [
+            1000,
+            50,
+            100
+          ],
+          "expected": 500
+        },
+        {
+          "inputs": [
+            1000,
+            0,
+            100
+          ],
+          "expected": 0
+        },
+        {
+          "inputs": [
+            800,
+            30,
+            60
+          ],
+          "expected": 400
+        }
+      ]
+    }
+  ]
+}

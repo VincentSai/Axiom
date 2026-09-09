@@ -1,0 +1,340 @@
+{
+  "version": "3.0",
+  "subsystem": "inventory_settlement",
+  "experiment_metadata": {
+    "engine": "codex",
+    "mode": "concurrent_multi_agent",
+    "git_commit": "ced36a9",
+    "z3_version": "Z3 version 4.13.0 - 64 bit",
+    "platform": "win32",
+    "python_version": "3.14.2",
+    "timestamp": "2026-09-09 10:53:45"
+  },
+  "summary": {
+    "rust_group": {
+      "wall_clock_sec": 1.72,
+      "conflict_rate_pct": 0.0,
+      "conflict_count": 0,
+      "resolver_calls_count": 0,
+      "workers_billed_tokens": 75240,
+      "resolver_tax_billed_tokens": 0,
+      "total_billed_tokens": 75240,
+      "unit_test_passed": true
+    },
+    "axiom_group": {
+      "wall_clock_sec": 0.37,
+      "conflict_rate_pct": 0.0,
+      "conflict_count": 0,
+      "resolver_calls_count": 0,
+      "workers_billed_tokens": 75070,
+      "resolver_tax_billed_tokens": 0,
+      "total_billed_tokens": 75070,
+      "formal_proved": true,
+      "speedup_vs_rust": 4.65
+    }
+  },
+  "detailed_runs": {
+    "group2_rust": {
+      "status": "success",
+      "wall_clock_sec": 1.72,
+      "worker_concurrency_sec": 0.15,
+      "conflict_count": 0,
+      "conflict_rate_pct": 0.0,
+      "resolver_calls_count": 0,
+      "tokens": {
+        "workers_payload": 1340,
+        "resolver_payload_tax": 0,
+        "total_payload": 1340,
+        "workers_raw_billed": 75240,
+        "resolver_billed_tax": 0,
+        "total_raw_billed": 75240
+      },
+      "unit_test_passed": true,
+      "unit_test_message": "All subsystem unit tests passed",
+      "resolver_details": [],
+      "workers_details": [
+        {
+          "task_id": 1,
+          "function_name": "can_stack_items",
+          "latency_sec": 0.15,
+          "payload": {
+            "prompt_tokens": 220,
+            "candidates_tokens": 58,
+            "total_tokens": 278
+          },
+          "raw_billed": {
+            "input_tokens": 15000,
+            "output_tokens": 58,
+            "reasoning_tokens": 0,
+            "total_tokens": 15058
+          }
+        },
+        {
+          "task_id": 2,
+          "function_name": "calc_stacked_counts",
+          "latency_sec": 0.15,
+          "payload": {
+            "prompt_tokens": 220,
+            "candidates_tokens": 51,
+            "total_tokens": 271
+          },
+          "raw_billed": {
+            "input_tokens": 15000,
+            "output_tokens": 51,
+            "reasoning_tokens": 0,
+            "total_tokens": 15051
+          }
+        },
+        {
+          "task_id": 3,
+          "function_name": "calculate_purchase_cost",
+          "latency_sec": 0.15,
+          "payload": {
+            "prompt_tokens": 220,
+            "candidates_tokens": 44,
+            "total_tokens": 264
+          },
+          "raw_billed": {
+            "input_tokens": 15000,
+            "output_tokens": 44,
+            "reasoning_tokens": 0,
+            "total_tokens": 15044
+          }
+        },
+        {
+          "task_id": 4,
+          "function_name": "validate_trade_balance",
+          "latency_sec": 0.15,
+          "payload": {
+            "prompt_tokens": 220,
+            "candidates_tokens": 48,
+            "total_tokens": 268
+          },
+          "raw_billed": {
+            "input_tokens": 15000,
+            "output_tokens": 48,
+            "reasoning_tokens": 0,
+            "total_tokens": 15048
+          }
+        },
+        {
+          "task_id": 5,
+          "function_name": "calc_sell_refund",
+          "latency_sec": 0.15,
+          "payload": {
+            "prompt_tokens": 220,
+            "candidates_tokens": 39,
+            "total_tokens": 259
+          },
+          "raw_billed": {
+            "input_tokens": 15000,
+            "output_tokens": 39,
+            "reasoning_tokens": 0,
+            "total_tokens": 15039
+          }
+        }
+      ]
+    },
+    "group3_axiom": {
+      "status": "success",
+      "wall_clock_sec": 0.37,
+      "worker_concurrency_sec": 0.0,
+      "combinator_latency_ms": 0.04,
+      "smt_verify_sec": 0.37,
+      "conflict_count": 0,
+      "conflict_rate_pct": 0.0,
+      "resolver_calls_count": 0,
+      "tokens": {
+        "workers_payload": 1070,
+        "resolver_payload_tax": 0,
+        "total_payload": 1070,
+        "workers_raw_billed": 75070,
+        "resolver_billed_tax": 0,
+        "total_raw_billed": 75070,
+        "capsule_breakdown": {
+          "system_tokens": 470,
+          "contract_tokens": 489,
+          "dependency_tokens": 70
+        },
+        "tokens_to_proved": 1070
+      },
+      "formal_proved": true,
+      "smt_message": "All 5 functions formally proved by Z3",
+      "smt_reports": [
+        {
+          "status": "Proved",
+          "function_name": "can_stack_items",
+          "hole_id": null,
+          "violated_clause": null,
+          "counter_example": null,
+          "diagnosis": "Function `can_stack_items` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 1.",
+          "suggested_action": "No action required.",
+          "has_contracts": true,
+          "obligations_checked": 1,
+          "solver_version": "4.13.0"
+        },
+        {
+          "status": "Proved",
+          "function_name": "calc_stacked_counts",
+          "hole_id": null,
+          "violated_clause": null,
+          "counter_example": null,
+          "diagnosis": "Function `calc_stacked_counts` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 4.",
+          "suggested_action": "No action required.",
+          "has_contracts": true,
+          "obligations_checked": 4,
+          "solver_version": "4.13.0"
+        },
+        {
+          "status": "Proved",
+          "function_name": "calculate_purchase_cost",
+          "hole_id": null,
+          "violated_clause": null,
+          "counter_example": null,
+          "diagnosis": "Function `calculate_purchase_cost` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 4.",
+          "suggested_action": "No action required.",
+          "has_contracts": true,
+          "obligations_checked": 4,
+          "solver_version": "4.13.0"
+        },
+        {
+          "status": "Proved",
+          "function_name": "validate_trade_balance",
+          "hole_id": null,
+          "violated_clause": null,
+          "counter_example": null,
+          "diagnosis": "Function `validate_trade_balance` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 1.",
+          "suggested_action": "No action required.",
+          "has_contracts": true,
+          "obligations_checked": 1,
+          "solver_version": "4.13.0"
+        },
+        {
+          "status": "Proved",
+          "function_name": "calc_sell_refund",
+          "hole_id": null,
+          "violated_clause": null,
+          "counter_example": null,
+          "diagnosis": "Function `calc_sell_refund` formally proved by Microsoft Z3 (SMT-LIB2) (version 4.13.0). Obligations checked: 4.",
+          "suggested_action": "No action required.",
+          "has_contracts": true,
+          "obligations_checked": 4,
+          "solver_version": "4.13.0"
+        }
+      ],
+      "assembled_source": "// Subsystem: Inventory Settlement Pipeline\n\nfn can_stack_items(item_id1: Int, count1: Int, max_stack1: Int, item_id2: Int, count2: Int) -> Bool\nrequires {\n    count1 >= 0,\n    count2 >= 0,\n    max_stack1 > 0,\n}\nensures {\n    result == (item_id1 == item_id2 && count1 < max_stack1),\n}\n{\n    item_id1 == item_id2 && count1 < max_stack1\n}\n\nfn calc_stacked_counts(count1: Int, count2: Int, max_stack: Int) -> Int\nrequires {\n    count1 >= 0,\n    count2 >= 0,\n    max_stack > 0,\n}\nensures {\n    result >= 0,\n    result <= max_stack,\n    count1 + count2 > max_stack => result == max_stack,\n    count1 + count2 <= max_stack => result == count1 + count2,\n}\n{\n    match count1 + count2 > max_stack { true => max_stack, false => count1 + count2 }\n}\n\nfn calculate_purchase_cost(unit_price: Int, quantity: Int, discount_pct: Int) -> Int\nrequires {\n    unit_price >= 0,\n    quantity >= 0,\n    discount_pct >= 0,\n    discount_pct <= 100,\n}\nensures {\n    result >= 0,\n    result <= unit_price * quantity,\n    discount_pct == 0 => result == unit_price * quantity,\n    discount_pct == 100 => result == 0,\n}\n{\n    (unit_price * quantity * (100 - discount_pct)) / 100\n}\n\nfn validate_trade_balance(buyer_gold: Int, total_cost: Int, free_slots: Int, needed_slots: Int) -> Bool\nrequires {\n    buyer_gold >= 0,\n    total_cost >= 0,\n    free_slots >= 0,\n    needed_slots >= 0,\n}\nensures {\n    result == (buyer_gold >= total_cost && free_slots >= needed_slots),\n}\n{\n    buyer_gold >= total_cost && free_slots >= needed_slots\n}\n\nfn calc_sell_refund(cost: Int, durability_cur: Int, durability_max: Int) -> Int\nrequires {\n    cost >= 0,\n    durability_max > 0,\n    durability_cur >= 0,\n    durability_cur <= durability_max,\n}\nensures {\n    result >= 0,\n    result <= cost,\n    durability_cur == durability_max => result == cost,\n    durability_cur == 0 => result == 0,\n}\n{\n    (cost * durability_cur) / durability_max\n}\n\n",
+      "workers_details": [
+        {
+          "task_id": 1,
+          "function_name": "can_stack_items",
+          "latency_sec": 0.15,
+          "payload": {
+            "prompt_tokens": 200,
+            "candidates_tokens": 14,
+            "total_tokens": 214
+          },
+          "raw_billed": {
+            "input_tokens": 15000,
+            "output_tokens": 14,
+            "reasoning_tokens": 0,
+            "total_tokens": 15014
+          },
+          "capsule": {
+            "system_tokens": 94,
+            "contract_tokens": 92,
+            "dependency_tokens": 14,
+            "total_tokens": 200
+          }
+        },
+        {
+          "task_id": 2,
+          "function_name": "calc_stacked_counts",
+          "latency_sec": 0.15,
+          "payload": {
+            "prompt_tokens": 200,
+            "candidates_tokens": 23,
+            "total_tokens": 223
+          },
+          "raw_billed": {
+            "input_tokens": 15000,
+            "output_tokens": 23,
+            "reasoning_tokens": 0,
+            "total_tokens": 15023
+          },
+          "capsule": {
+            "system_tokens": 94,
+            "contract_tokens": 105,
+            "dependency_tokens": 14,
+            "total_tokens": 213
+          }
+        },
+        {
+          "task_id": 3,
+          "function_name": "calculate_purchase_cost",
+          "latency_sec": 0.15,
+          "payload": {
+            "prompt_tokens": 200,
+            "candidates_tokens": 14,
+            "total_tokens": 214
+          },
+          "raw_billed": {
+            "input_tokens": 15000,
+            "output_tokens": 14,
+            "reasoning_tokens": 0,
+            "total_tokens": 15014
+          },
+          "capsule": {
+            "system_tokens": 94,
+            "contract_tokens": 104,
+            "dependency_tokens": 14,
+            "total_tokens": 212
+          }
+        },
+        {
+          "task_id": 4,
+          "function_name": "validate_trade_balance",
+          "latency_sec": 0.15,
+          "payload": {
+            "prompt_tokens": 200,
+            "candidates_tokens": 11,
+            "total_tokens": 211
+          },
+          "raw_billed": {
+            "input_tokens": 15000,
+            "output_tokens": 11,
+            "reasoning_tokens": 0,
+            "total_tokens": 15011
+          },
+          "capsule": {
+            "system_tokens": 94,
+            "contract_tokens": 89,
+            "dependency_tokens": 14,
+            "total_tokens": 197
+          }
+        },
+        {
+          "task_id": 5,
+          "function_name": "calc_sell_refund",
+          "latency_sec": 0.15,
+          "payload": {
+            "prompt_tokens": 200,
+            "candidates_tokens": 8,
+            "total_tokens": 208
+          },
+          "raw_billed": {
+            "input_tokens": 15000,
+            "output_tokens": 8,
+            "reasoning_tokens": 0,
+            "total_tokens": 15008
+          },
+          "capsule": {
+            "system_tokens": 94,
+            "contract_tokens": 99,
+            "dependency_tokens": 14,
+            "total_tokens": 207
+          }
+        }
+      ]
+    }
+  }
+}

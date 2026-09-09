@@ -1,4 +1,4 @@
-﻿> **Languages / 语言 / 語言**: [English](../en/ROADMAP.md) | [简体中文](../zh-CN/ROADMAP.md) | [繁體中文](../zh-TW/ROADMAP.md)
+> **Languages / 语言 / 語言**: [English](../en/ROADMAP.md) | [简体中文](../zh-CN/ROADMAP.md) | [繁體中文](../zh-TW/ROADMAP.md)
 
 ---
 
@@ -22,7 +22,7 @@
 ## 階段三：內容定址 AST 代碼庫與多 Agent 協同 (Q3)
 - [x] 實現 AST 節點規範化雜湊與內容定址儲存引擎 (`axiom-db`)
 - [x] 開發虛擬代碼投影視圖與雙向原始碼同步 (`axiom-vfs`)
-- [x] 實現多 Agent 無鎖並發打洞派發與協作池 (`axiom-agent-pool`)
+- [x] 實現基於 AST 內容定址與 CAS (Compare-And-Swap) 的樂觀並發協作池 (`axiom-agent-pool`)
 - [x] CLI `axiom db` 工具集與 20+ Holes 多 Agent 並發協同端到端演示 (`axiom-cli`, 65 個全量測試 100% 通過)
 
 ## 階段四：全平臺與生態互操作 (Q4)

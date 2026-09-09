@@ -135,3 +135,59 @@ fn default_strict_proved_policy_rejects_unproved_sampled_solutions() {
     }
 }
 
+#[test]
+fn verifies_cas_optimistic_commit_and_audit_receipts() {
+    let mut pool = AgentTaskPool::from_source(TWO_HOLE_SKELETON)
+        .expect("skeleton should parse")
+        .with_policy(PoolVerificationPolicy::Permissive);
+
+    let initial_root = pool.current_root().expect("initial root should be set");
+
+    let res1 = pool
+        .submit_solution_with_agent("increment_impl", "value + 1", "agent-alpha")
+        .expect("submit should succeed");
+    assert!(matches!(res1, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
+
+    // Verify commit record was minted
+    if axiom_smt::find_z3_executable().is_some() {
+        assert_eq!(pool.commits().len(), 1);
+        let commit1 = pool.commits()[0].clone();
+        assert_eq!(commit1.parent_root, Some(initial_root));
+        assert_ne!(commit1.new_root, commit1.parent_root.clone().unwrap());
+
+        // Second submission by beta agent on next hole
+        let res2 = pool
+            .submit_solution_with_agent("double_impl", "value * 2", "agent-beta")
+            .expect("submit should succeed");
+        assert!(matches!(res2, SmtResult::Proved { .. }));
+        assert_eq!(pool.commits().len(), 2);
+        let commit2 = &pool.commits()[1];
+        assert_eq!(commit2.parent_root, Some(commit1.new_root.clone()));
+    }
+}
+
+#[test]
+fn pool_rejects_vacuous_contracts_without_polluting_state() {
+    const VACUOUS_SKELETON: &str = r#"
+        fn impossible(value: Int) -> Int
+            requires { value > 10 }
+            requires { value < 5 }
+            ensures { result == 0 }
+        {
+            ?impossible_impl
+        }
+    "#;
+
+    let mut pool = AgentTaskPool::from_source(VACUOUS_SKELETON).expect("skeleton parses");
+    let res = pool
+        .submit_solution("impossible_impl", "0")
+        .expect("submit completes");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(matches!(res, SmtResult::VacuousContract { .. }));
+        // State remains incomplete and hole is not resolved
+        assert!(!pool.is_complete());
+        assert_eq!(pool.pending_hole_ids(), vec!["impossible_impl"]);
+    }
+}
+

@@ -181,4 +181,38 @@ fn parses_z3_sat_model_with_real_numbers() {
     }
 }
 
+#[test]
+fn detects_and_rejects_vacuous_contract_with_unsatisfiable_preconditions() {
+    // 恶意/错误前置：x > 10 且 x < 5（在数学上自相矛盾，不可满足）
+    // 在传统一阶逻辑中，False => 任何事都是 True，如果不做 Vacuity 检查，任何荒谬函数体都会被误判为 Proved！
+    let module = parse_module(
+        r#"
+        fn impossible_precondition(x: Int) -> Int
+            requires { x > 10, x < 5 }
+            ensures { result == 99999 }
+        {
+            0
+        }
+        "#,
+    )
+    .expect("function should parse");
+
+    let res = verify_function(&module.functions[0]);
+
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            res.is_vacuous(),
+            "Z3 SMT must detect unsatisfiable precondition and reject vacuous contract! Got: {:?}",
+            res
+        );
+        match res {
+            SmtResult::VacuousContract { reason } => {
+                assert!(reason.contains("unsatisfiable"));
+            }
+            other => panic!("expected VacuousContract, got: {:?}", other),
+        }
+    }
+}
+
+
 

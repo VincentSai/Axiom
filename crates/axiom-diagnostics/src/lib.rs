@@ -14,8 +14,10 @@ use typecheck::check_module_types;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DiagnosticStatus {
     Proved,
+    Tested,
     Sampled,
     ContractViolation,
+    VacuousContract,
     Skipped,
     Unknown,
     TypeError,
@@ -36,6 +38,27 @@ pub struct DiagnosticReport {
     pub suggested_action: String,
     #[serde(default)]
     pub has_contracts: bool,
+    #[serde(default)]
+    pub obligations_checked: usize,
+    #[serde(default)]
+    pub solver_version: Option<String>,
+}
+
+impl Default for DiagnosticReport {
+    fn default() -> Self {
+        Self {
+            status: DiagnosticStatus::Unknown,
+            function_name: None,
+            hole_id: None,
+            violated_clause: None,
+            counter_example: None,
+            diagnosis: String::new(),
+            suggested_action: String::new(),
+            has_contracts: false,
+            obligations_checked: 0,
+            solver_version: None,
+        }
+    }
 }
 
 impl DiagnosticReport {
@@ -56,16 +79,12 @@ pub fn diagnose_source(source: &str) -> Vec<DiagnosticReport> {
         Ok(module) => diagnose_module(&module),
         Err(error) => vec![DiagnosticReport {
             status: DiagnosticStatus::ParseError,
-            function_name: None,
-            hole_id: None,
-            violated_clause: None,
-            counter_example: None,
             diagnosis: error.to_string(),
             suggested_action: format!(
                 "Correct the Axiom syntax near line {}, column {} and run diagnostics again.",
                 error.line, error.column
             ),
-            has_contracts: false,
+            ..Default::default()
         }],
     }
 }
@@ -95,6 +114,7 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
                     hole.hole_id
                 ),
                 has_contracts: false,
+                ..Default::default()
             })
             .collect();
     }
@@ -109,6 +129,7 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
             diagnosis: type_err.message,
             suggested_action: "Ensure the function return expression matches its declared type signature.".into(),
             has_contracts: false,
+            ..Default::default()
         }];
     }
 
@@ -118,18 +139,36 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
         .map(|function| {
             let has_contracts = !function.requires.is_empty() || !function.ensures.is_empty();
             match verify_function_in_module(function, module) {
-                SmtResult::Proved { solver } => DiagnosticReport {
+                SmtResult::Proved {
+                    solver,
+                    version,
+                    obligations_checked,
+                } => DiagnosticReport {
                     status: DiagnosticStatus::Proved,
                     function_name: Some(function.name.clone()),
                     hole_id: None,
                     violated_clause: None,
                     counter_example: None,
                     diagnosis: format!(
-                        "Function `{}` formally proved by {}.",
-                        function.name, solver
+                        "Function `{}` formally proved by {} (version {}). Obligations checked: {}.",
+                        function.name, solver, version, obligations_checked
                     ),
                     suggested_action: "No action required.".into(),
                     has_contracts,
+                    obligations_checked,
+                    solver_version: Some(version),
+                },
+                SmtResult::VacuousContract { reason } => DiagnosticReport {
+                    status: DiagnosticStatus::VacuousContract,
+                    function_name: Some(function.name.clone()),
+                    hole_id: None,
+                    violated_clause: None,
+                    counter_example: None,
+                    diagnosis: reason,
+                    suggested_action: "Correct or relax the preconditions so that they are mathematically satisfiable.".into(),
+                    has_contracts,
+                    obligations_checked: 0,
+                    solver_version: None,
                 },
                 SmtResult::Sampled { points_checked } => DiagnosticReport {
                     status: DiagnosticStatus::Sampled,
@@ -143,6 +182,8 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
                     ),
                     suggested_action: "Install Microsoft Z3 for full first-order SMT theorem proving.".into(),
                     has_contracts,
+                    obligations_checked: points_checked,
+                    solver_version: None,
                 },
                 SmtResult::CounterExample(counter_example) => DiagnosticReport {
                     status: DiagnosticStatus::ContractViolation,
@@ -161,6 +202,7 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
                         "Adjust the implementation or strengthen its preconditions, then verify again."
                             .into(),
                     has_contracts,
+                    ..Default::default()
                 },
                 SmtResult::Skipped(reason) => DiagnosticReport {
                     status: DiagnosticStatus::Skipped,
@@ -175,6 +217,7 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
                     suggested_action:
                         "Add supported contracts if formal postcondition verification is required.".into(),
                     has_contracts,
+                    ..Default::default()
                 },
                 SmtResult::Unknown(reason) => DiagnosticReport {
                     status: DiagnosticStatus::Unknown,
@@ -188,6 +231,7 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
                     ),
                     suggested_action: "Check solver timeouts or simplify non-linear constraints.".into(),
                     has_contracts,
+                    ..Default::default()
                 },
             }
         })
@@ -203,6 +247,7 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
             diagnosis: "The module contains no functions to verify.".into(),
             suggested_action: "No action required.".into(),
             has_contracts: false,
+            ..Default::default()
         }]
     } else {
         reports
@@ -239,6 +284,7 @@ fn effect_report(error: EffectError) -> DiagnosticReport {
         diagnosis: error.to_string(),
         suggested_action,
         has_contracts: false,
+        ..Default::default()
     }
 }
 

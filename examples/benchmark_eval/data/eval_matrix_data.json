@@ -1,279 +1,238 @@
 {
-  "version": "1.0",
-  "status": "completed_authentic",
+  "version": "2.2",
+  "status": "completed_authentic_dual_track_audited",
   "experiment_metadata": {
-    "target_model": "gemini-3.8-flash",
-    "mode": "count",
-    "evaluated_tasks_count": 20,
-    "timestamp": "2026-09-08 13:50:40"
+    "engine": "codex",
+    "target_model": "codex/default",
+    "mode": "generate",
+    "evaluated_tasks_count": 3,
+    "timestamp": "2026-09-08 19:06:50",
+    "git_commit": "ced36a9",
+    "z3_version": "Z3 version 4.13.0 - 64 bit",
+    "platform": "win32",
+    "python_version": "3.14.2"
   },
   "totals": {
-    "group1_rust_monolith_tokens": 7759,
-    "group2_rust_micro_tokens": 3175,
-    "group3_axiom_hole_tokens": 2697,
-    "net_savings_vs_micro": "15.1%",
-    "net_savings_vs_monolith": "65.2%"
+    "task_payload_tokens": {
+      "group1_rust_monolith": 1527,
+      "group2_rust_micro": 1056,
+      "group3_axiom_hole": 1174
+    },
+    "raw_billed_tokens": {
+      "group1_rust_monolith": 46143,
+      "group2_rust_micro": 45375,
+      "group2_reasoning": 82,
+      "group3_axiom_hole": 49324,
+      "group3_reasoning": 35
+    }
   },
   "detailed_tasks": [
     {
       "task_id": 1,
       "function_name": "calc_manhattan_dist",
       "group1_rust_monolith": {
-        "prompt_tokens": 379
+        "task_payload_tokens": 508,
+        "raw_billed_tokens": 15556
       },
       "group2_rust_micro": {
-        "prompt_tokens": 164
+        "task_payload_tokens": 348,
+        "raw_billed_tokens": 15174,
+        "reasoning_tokens": 82,
+        "pass_at_1": true,
+        "final_pass": true,
+        "attempts": 1,
+        "traces": [
+          {
+            "round": 1,
+            "group": 2,
+            "prompt_preview": "You are an expert Rust engineer. Implement the following single Rust function:\n\n```rust\n/// Description: Calculate Manha...",
+            "raw_output": "pub fn calc_manhattan_dist(x1: i64, y1: i64, x2: i64, y2: i64) -> i64 {\n    let dx = if x1 >= x2 { x1 - x2 } else { x2 - x1 };\n    let dy = if y1 >= y2 { y1 - y2 } else { y2 - y1 };\n    dx.checked_add(dy)\n        .expect(\"Manhattan distance exceeds i64::MAX\")\n}",
+            "clean_code": "pub fn calc_manhattan_dist(x1: i64, y1: i64, x2: i64, y2: i64) -> i64 {\n    let dx = if x1 >= x2 { x1 - x2 } else { x2 - x1 };\n    let dy = if y1 >= y2 { y1 - y2 } else { y2 - y1 };\n    dx.checked_add(dy)\n        .expect(\"Manhattan distance exceeds i64::MAX\")\n}",
+            "status": "Passed",
+            "diagnostic": "All unit tests passed",
+            "usage": {
+              "payload_prompt": 236,
+              "payload_candidates": 112,
+              "raw_billed_input": 14980,
+              "raw_billed_output": 194,
+              "raw_billed_reasoning": 82,
+              "raw_billed_total": 15174
+            }
+          }
+        ]
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 144
+        "task_payload_tokens": 369,
+        "raw_billed_tokens": 15140,
+        "reasoning_tokens": 0,
+        "pass_at_1": true,
+        "final_pass": true,
+        "attempts": 1,
+        "counterexample_encountered": false,
+        "traces": [
+          {
+            "round": 1,
+            "group": 3,
+            "prompt_preview": "You are an Axiom micro-worker. Write ONLY a single pure expression to fill the `?hole` in the function below:\n\n[Axiom Sy...",
+            "raw_output": "(match x1 >= x2 { true => x1 - x2, false => x2 - x1 }) + (match y1 >= y2 { true => y1 - y2, false => y2 - y1 })",
+            "clean_code": "(match x1 >= x2 { true => x1 - x2, false => x2 - x1 }) + (match y1 >= y2 { true => y1 - y2, false => y2 - y1 })",
+            "status": "Proved",
+            "diagnostic": "Axiom strict formal proof succeeded (Proved by Z3)",
+            "violated_clause": "",
+            "counter_example": null,
+            "usage": {
+              "payload_prompt": 317,
+              "payload_candidates": 52,
+              "raw_billed_input": 15088,
+              "raw_billed_output": 52,
+              "raw_billed_reasoning": 0,
+              "raw_billed_total": 15140
+            }
+          }
+        ]
       }
     },
     {
       "task_id": 2,
       "function_name": "calc_chebyshev_dist",
       "group1_rust_monolith": {
-        "prompt_tokens": 377
+        "task_payload_tokens": 586,
+        "raw_billed_tokens": 15360
       },
       "group2_rust_micro": {
-        "prompt_tokens": 162
+        "task_payload_tokens": 438,
+        "raw_billed_tokens": 15172,
+        "reasoning_tokens": 0,
+        "pass_at_1": true,
+        "final_pass": true,
+        "attempts": 1,
+        "traces": [
+          {
+            "round": 1,
+            "group": 2,
+            "prompt_preview": "You are an expert Rust engineer. Implement the following single Rust function:\n\n```rust\n/// Description: Calculate Cheby...",
+            "raw_output": "pub fn calc_chebyshev_dist(x1: i64, y1: i64, x2: i64, y2: i64) -> i64 {\n    let dx = if x1 >= x2 { x1 - x2 } else { x2 - x1 };\n    let dy = if y1 >= y2 { y1 - y2 } else { y2 - y1 };\n\n    if dx >= dy { dx } else { dy }\n}",
+            "clean_code": "pub fn calc_chebyshev_dist(x1: i64, y1: i64, x2: i64, y2: i64) -> i64 {\n    let dx = if x1 >= x2 { x1 - x2 } else { x2 - x1 };\n    let dy = if y1 >= y2 { y1 - y2 } else { y2 - y1 };\n\n    if dx >= dy { dx } else { dy }\n}",
+            "status": "Passed",
+            "diagnostic": "All unit tests passed",
+            "usage": {
+              "payload_prompt": 336,
+              "payload_candidates": 102,
+              "raw_billed_input": 15070,
+              "raw_billed_output": 102,
+              "raw_billed_reasoning": 0,
+              "raw_billed_total": 15172
+            }
+          }
+        ]
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 144
+        "task_payload_tokens": 519,
+        "raw_billed_tokens": 15321,
+        "reasoning_tokens": 35,
+        "pass_at_1": true,
+        "final_pass": true,
+        "attempts": 1,
+        "counterexample_encountered": false,
+        "traces": [
+          {
+            "round": 1,
+            "group": 3,
+            "prompt_preview": "You are an Axiom micro-worker. Write ONLY a single pure expression to fill the `?hole` in the function below:\n\n[Axiom Sy...",
+            "raw_output": "match (match x1 >= x2 { true => x1 - x2, false => x2 - x1 }) >= (match y1 >= y2 { true => y1 - y2, false => y2 - y1 }) { true => match x1 >= x2 { true => x1 - x2, false => x2 - x1 }, false => match y1 >= y2 { true => y1 - y2, false => y2 - y1 } }",
+            "clean_code": "match (match x1 >= x2 { true => x1 - x2, false => x2 - x1 }) >= (match y1 >= y2 { true => y1 - y2, false => y2 - y1 }) { true => match x1 >= x2 { true => x1 - x2, false => x2 - x1 }, false => match y1 >= y2 { true => y1 - y2, false => y2 - y1 } }",
+            "status": "Proved",
+            "diagnostic": "Axiom strict formal proof succeeded (Proved by Z3)",
+            "violated_clause": "",
+            "counter_example": null,
+            "usage": {
+              "payload_prompt": 411,
+              "payload_candidates": 108,
+              "raw_billed_input": 15178,
+              "raw_billed_output": 143,
+              "raw_billed_reasoning": 35,
+              "raw_billed_total": 15321
+            }
+          }
+        ]
       }
     },
     {
       "task_id": 3,
       "function_name": "is_aabb_intersect",
       "group1_rust_monolith": {
-        "prompt_tokens": 468
+        "task_payload_tokens": 433,
+        "raw_billed_tokens": 15227
       },
       "group2_rust_micro": {
-        "prompt_tokens": 253
+        "task_payload_tokens": 270,
+        "raw_billed_tokens": 15029,
+        "reasoning_tokens": 0,
+        "pass_at_1": true,
+        "final_pass": true,
+        "attempts": 1,
+        "traces": [
+          {
+            "round": 1,
+            "group": 2,
+            "prompt_preview": "You are an expert Rust engineer. Implement the following single Rust function:\n\n```rust\n/// Description: Check whether t...",
+            "raw_output": "pub fn is_aabb_intersect(\n    min_x1: i64,\n    min_y1: i64,\n    max_x1: i64,\n    max_y1: i64,\n    min_x2: i64,\n    min_y2: i64,\n    max_x2: i64,\n    max_y2: i64,\n) -> bool {\n    min_x1 <= max_x2 && max_x1 >= min_x2 && min_y1 <= max_y2 && max_y1 >= min_y2\n}",
+            "clean_code": "pub fn is_aabb_intersect(\n    min_x1: i64,\n    min_y1: i64,\n    max_x1: i64,\n    max_y1: i64,\n    min_x2: i64,\n    min_y2: i64,\n    max_x2: i64,\n    max_y2: i64,\n) -> bool {\n    min_x1 <= max_x2 && max_x1 >= min_x2 && min_y1 <= max_y2 && max_y1 >= min_y2\n}",
+            "status": "Passed",
+            "diagnostic": "All unit tests passed",
+            "usage": {
+              "payload_prompt": 156,
+              "payload_candidates": 114,
+              "raw_billed_input": 14915,
+              "raw_billed_output": 114,
+              "raw_billed_reasoning": 0,
+              "raw_billed_total": 15029
+            }
+          }
+        ]
       },
       "group3_axiom_hole": {
-        "prompt_tokens": 198
-      }
-    },
-    {
-      "task_id": 4,
-      "function_name": "pack_coords_to_hash",
-      "group1_rust_monolith": {
-        "prompt_tokens": 391
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 178
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 153
-      }
-    },
-    {
-      "task_id": 5,
-      "function_name": "calc_strength_to_phys_atk",
-      "group1_rust_monolith": {
-        "prompt_tokens": 334
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 113
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 107
-      }
-    },
-    {
-      "task_id": 6,
-      "function_name": "calc_armor_damage_reduction",
-      "group1_rust_monolith": {
-        "prompt_tokens": 368
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 151
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 127
-      }
-    },
-    {
-      "task_id": 7,
-      "function_name": "calc_crit_damage_multiplier",
-      "group1_rust_monolith": {
-        "prompt_tokens": 379
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 160
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 136
-      }
-    },
-    {
-      "task_id": 8,
-      "function_name": "calc_dodge_chance",
-      "group1_rust_monolith": {
-        "prompt_tokens": 371
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 154
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 129
-      }
-    },
-    {
-      "task_id": 9,
-      "function_name": "resolve_physical_hit",
-      "group1_rust_monolith": {
-        "prompt_tokens": 361
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 142
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 127
-      }
-    },
-    {
-      "task_id": 10,
-      "function_name": "apply_bleed_stack_tick",
-      "group1_rust_monolith": {
-        "prompt_tokens": 331
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 110
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 104
-      }
-    },
-    {
-      "task_id": 11,
-      "function_name": "calc_mana_shield_absorb",
-      "group1_rust_monolith": {
-        "prompt_tokens": 384
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 142
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 132
-      }
-    },
-    {
-      "task_id": 12,
-      "function_name": "calc_stamina_skill_cost",
-      "group1_rust_monolith": {
-        "prompt_tokens": 394
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 150
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 121
-      }
-    },
-    {
-      "task_id": 13,
-      "function_name": "calc_threat_decay_by_dist",
-      "group1_rust_monolith": {
-        "prompt_tokens": 381
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 138
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 129
-      }
-    },
-    {
-      "task_id": 14,
-      "function_name": "evaluate_ai_behavior_state",
-      "group1_rust_monolith": {
-        "prompt_tokens": 408
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 169
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 137
-      }
-    },
-    {
-      "task_id": 15,
-      "function_name": "calc_weighted_loot_tier",
-      "group1_rust_monolith": {
-        "prompt_tokens": 412
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 171
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 122
-      }
-    },
-    {
-      "task_id": 16,
-      "function_name": "calc_exp_gain_with_level_diff",
-      "group1_rust_monolith": {
-        "prompt_tokens": 440
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 195
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 143
-      }
-    },
-    {
-      "task_id": 17,
-      "function_name": "determine_turn_initiative",
-      "group1_rust_monolith": {
-        "prompt_tokens": 376
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 137
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 128
-      }
-    },
-    {
-      "task_id": 18,
-      "function_name": "resolve_boss_phase_transition",
-      "group1_rust_monolith": {
-        "prompt_tokens": 409
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 170
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 140
-      }
-    },
-    {
-      "task_id": 19,
-      "function_name": "simulate_single_turn_exchange",
-      "group1_rust_monolith": {
-        "prompt_tokens": 400
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 159
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 134
-      }
-    },
-    {
-      "task_id": 20,
-      "function_name": "resolve_terrain_hazard_tick",
-      "group1_rust_monolith": {
-        "prompt_tokens": 396
-      },
-      "group2_rust_micro": {
-        "prompt_tokens": 157
-      },
-      "group3_axiom_hole": {
-        "prompt_tokens": 142
+        "task_payload_tokens": 286,
+        "raw_billed_tokens": 18863,
+        "reasoning_tokens": 0,
+        "pass_at_1": true,
+        "final_pass": true,
+        "attempts": 1,
+        "counterexample_encountered": false,
+        "traces": [
+          {
+            "round": 1,
+            "group": 3,
+            "prompt_preview": "You are an Axiom micro-worker. Write ONLY a single pure expression to fill the `?hole` in the function below:\n\n[Axiom Sy...",
+            "raw_output": "min_x1 <= max_x2 && max_x1 >= min_x2 && min_y1 <= max_y2 && max_y1 >= min_y2",
+            "clean_code": "min_x1 <= max_x2 && max_x1 >= min_x2 && min_y1 <= max_y2 && max_y1 >= min_y2",
+            "status": "Proved",
+            "diagnostic": "Axiom strict formal proof succeeded (Proved by Z3)",
+            "violated_clause": "",
+            "counter_example": null,
+            "usage": {
+              "payload_prompt": 251,
+              "payload_candidates": 35,
+              "raw_billed_input": 18828,
+              "raw_billed_output": 35,
+              "raw_billed_reasoning": 0,
+              "raw_billed_total": 18863
+            }
+          }
+        ]
       }
     }
-  ]
+  ],
+  "verification_summary": {
+    "group2_rust": {
+      "pass_at_1": "3/3",
+      "final_pass": "3/3",
+      "verification_method": "rustc_test_vectors_discrete_sampling"
+    },
+    "group3_axiom": {
+      "pass_at_1": "3/3",
+      "final_proved": "3/3",
+      "verification_method": "microsoft_z3_strict_exhaustive_smt_proof"
+    }
+  }
 }

@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 axiom-ast = { path = "../axiom-ast" }
+axiom-db = { path = "../axiom-db" }
 axiom-hole-extractor = { path = "../axiom-hole-extractor" }
 axiom-parser = { path = "../axiom-parser" }
 axiom-smt = { path = "../axiom-smt" }

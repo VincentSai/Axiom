@@ -38,10 +38,10 @@
         "ensures": [
           "result >= 0",
           "(x1 == x2 && y1 == y2) => result == 0",
-          "x1 >= x2 => (result >= x1 - x2)",
-          "x2 >= x1 => (result >= x2 - x1)",
-          "y1 >= y2 => (result >= y1 - y2)",
-          "y2 >= y1 => (result >= y2 - y1)"
+          "(x1 >= x2 && y1 >= y2) => result == (x1 - x2) + (y1 - y2)",
+          "(x1 >= x2 && y2 >= y1) => result == (x1 - x2) + (y2 - y1)",
+          "(x2 >= x1 && y1 >= y2) => result == (x2 - x1) + (y1 - y2)",
+          "(x2 >= x1 && y2 >= y1) => result == (x2 - x1) + (y2 - y1)"
         ]
       },
       "edge_cases": [
@@ -84,10 +84,12 @@
         "ensures": [
           "result >= 0",
           "(x1 == x2 && y1 == y2) => result == 0",
-          "x1 >= x2 => (result >= x1 - x2)",
-          "x2 >= x1 => (result >= x2 - x1)",
-          "y1 >= y2 => (result >= y1 - y2)",
-          "y2 >= y1 => (result >= y2 - y1)"
+          "x1 >= x2 => result >= x1 - x2",
+          "x2 >= x1 => result >= x2 - x1",
+          "y1 >= y2 => result >= y1 - y2",
+          "y2 >= y1 => result >= y2 - y1",
+          "((match x1 >= x2 { true => x1 - x2, false => x2 - x1 }) >= (match y1 >= y2 { true => y1 - y2, false => y2 - y1 })) => result == (match x1 >= x2 { true => x1 - x2, false => x2 - x1 })",
+          "((match y1 >= y2 { true => y1 - y2, false => y2 - y1 }) >= (match x1 >= x2 { true => x1 - x2, false => x2 - x1 })) => result == (match y1 >= y2 { true => y1 - y2, false => y2 - y1 })"
         ]
       },
       "edge_cases": [

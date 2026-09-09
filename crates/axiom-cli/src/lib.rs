@@ -670,10 +670,11 @@ fn verify(file: &Path, json: bool, strict: bool) -> Result<(), CliError> {
     // 3. If function has NO contracts:
     //    - Skipped -> PASS (no contracts to prove)
     let all_ok = reports.iter().all(|r| match r.status {
-        DiagnosticStatus::Proved => true,
+        DiagnosticStatus::Proved | DiagnosticStatus::Tested => true,
         DiagnosticStatus::Sampled => !strict,
         DiagnosticStatus::Skipped => !r.has_contracts,
-        DiagnosticStatus::ContractViolation
+        DiagnosticStatus::VacuousContract
+        | DiagnosticStatus::ContractViolation
         | DiagnosticStatus::Unknown
         | DiagnosticStatus::TypeError
         | DiagnosticStatus::EffectViolation
@@ -696,6 +697,12 @@ fn verify(file: &Path, json: bool, strict: bool) -> Result<(), CliError> {
             match r.status {
                 DiagnosticStatus::Proved => {
                     println!("  [PROVED] {func_name} (formally proved by SMT solver)");
+                }
+                DiagnosticStatus::Tested => {
+                    println!("  [TESTED] {func_name} (verified on deterministic test vectors)");
+                }
+                DiagnosticStatus::VacuousContract => {
+                    println!("  [VACUOUS_FAIL] {func_name} - Contract is vacuously true: {}", r.diagnosis);
                 }
                 DiagnosticStatus::Sampled => {
                     if strict {
@@ -999,11 +1006,18 @@ fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
                 .submit_solution(&hole, &solution_expr)
                 .map_err(CliError::Pool)?;
             match verify_result {
-                SmtResult::Proved { solver } => {
+                SmtResult::Proved { solver, version, obligations_checked } => {
                     println!(
-                        "[ACCEPTED] Hole `?{hole}` formally verified with SMT proof ({solver})."
+                        "[ACCEPTED] Hole `?{hole}` formally verified with SMT proof ({solver} v{version}, obligations: {obligations_checked})."
                     );
                     Ok(())
+                }
+                SmtResult::VacuousContract { reason } => {
+                    println!("[REJECTED] SMT vacuous contract error (unsatisfiable preconditions)");
+                    println!("Vacuity diagnosis: {reason}");
+                    Err(CliError::HoleVerificationRejected(format!(
+                        "vacuous contract: {reason}"
+                    )))
                 }
                 SmtResult::Sampled { points_checked } => {
                     if strict {
