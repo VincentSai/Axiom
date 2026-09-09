@@ -187,10 +187,9 @@ pub fn compute_receipt_hash(rcpt: &VerificationReceipt) -> NodeHash {
     compute_hash("rcpt", rcpt)
 }
 
-/// An immutable commit record linking parent root, new root, envelope, candidate, and receipt.
+/// The immutable data payload of a commit, excluding the commit's self-identifying hash.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CommitRecord {
-    pub commit_hash: NodeHash,
+pub struct CommitPayload {
     pub parent_root: Option<NodeHash>,
     pub new_root: NodeHash,
     pub envelope_hash: NodeHash,
@@ -199,9 +198,75 @@ pub struct CommitRecord {
     pub timestamp: u64,
 }
 
+/// An immutable commit record linking parent root, new root, envelope, candidate, and receipt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommitRecord {
+    pub commit_hash: NodeHash,
+    #[serde(flatten)]
+    pub payload: CommitPayload,
+}
+
+impl std::ops::Deref for CommitRecord {
+    type Target = CommitPayload;
+    fn deref(&self) -> &Self::Target {
+        &self.payload
+    }
+}
+
+impl CommitRecord {
+    /// Creates a commit record by hashing the commit payload.
+    pub fn new(payload: CommitPayload) -> Self {
+        let commit_hash = compute_commit_payload_hash(&payload);
+        Self {
+            commit_hash,
+            payload,
+        }
+    }
+
+    /// Access parent root reference.
+    pub fn parent_root(&self) -> Option<&NodeHash> {
+        self.payload.parent_root.as_ref()
+    }
+
+    /// Access new root reference.
+    pub fn new_root(&self) -> &NodeHash {
+        &self.payload.new_root
+    }
+
+    /// Access envelope content identifier.
+    pub fn envelope_hash(&self) -> &NodeHash {
+        &self.payload.envelope_hash
+    }
+
+    /// Access candidate content identifier.
+    pub fn candidate_hash(&self) -> &NodeHash {
+        &self.payload.candidate_hash
+    }
+
+    /// Access receipt content identifier.
+    pub fn receipt_hash(&self) -> &NodeHash {
+        &self.payload.receipt_hash
+    }
+
+    /// Access commit timestamp.
+    pub fn timestamp(&self) -> u64 {
+        self.payload.timestamp
+    }
+
+    /// Verify cryptographic self-consistency of this commit record.
+    pub fn verify_self_hash(&self) -> bool {
+        compute_commit_payload_hash(&self.payload) == self.commit_hash
+    }
+}
+
+/// Computes content identifier for a commit payload.
+pub fn compute_commit_payload_hash(payload: &CommitPayload) -> NodeHash {
+    compute_hash("commit", payload)
+}
+
 /// Computes content identifier for a commit record.
 pub fn compute_commit_hash(commit: &CommitRecord) -> NodeHash {
-    compute_hash("commit", commit)
+    compute_commit_payload_hash(&commit.payload)
 }
 
 /// The content identifiers created while inserting a complete module.
@@ -267,6 +332,9 @@ pub enum CasError {
         expected: Option<NodeHash>,
     },
     InvalidReceipt(String),
+    InvalidCandidate(String),
+    InvalidEnvelope(String),
+    ForgedModule(String),
     UnverifiedCandidate(String),
     Db(DbError),
 }
@@ -280,6 +348,9 @@ impl fmt::Display for CasError {
                 expected, current
             ),
             Self::InvalidReceipt(msg) => write!(f, "CAS rejected: invalid verification receipt: {msg}"),
+            Self::InvalidCandidate(msg) => write!(f, "CAS rejected: invalid candidate: {msg}"),
+            Self::InvalidEnvelope(msg) => write!(f, "CAS rejected: invalid task envelope: {msg}"),
+            Self::ForgedModule(msg) => write!(f, "CAS rejected: forged module mismatch: {msg}"),
             Self::UnverifiedCandidate(msg) => write!(f, "CAS rejected: candidate does not meet proof bar: {msg}"),
             Self::Db(err) => write!(f, "database error during CAS: {err}"),
         }
@@ -291,6 +362,18 @@ impl std::error::Error for CasError {}
 impl From<DbError> for CasError {
     fn from(err: DbError) -> Self {
         Self::Db(err)
+    }
+}
+
+impl From<std::io::Error> for CasError {
+    fn from(err: std::io::Error) -> Self {
+        Self::Db(DbError::Io(err))
+    }
+}
+
+impl From<serde_json::Error> for CasError {
+    fn from(err: serde_json::Error) -> Self {
+        Self::Db(DbError::Serialization(err))
     }
 }
 
@@ -434,6 +517,11 @@ impl AstDatabase {
 
     /// Attempts an atomic CAS (Compare-And-Swap) commit of a verified candidate.
     ///
+    /// The database kernel independently parses and replaces the candidate expression into
+    /// the base module identified by `expected_root`, deriving `derived_new_module`.
+    /// If `new_module` is provided, it is strictly compared against `derived_new_module`
+    /// to detect and reject forged or tampered modules.
+    ///
     /// Preserves all envelopes, candidates, and receipts regardless of CAS success or failure.
     pub fn try_commit_candidate(
         &mut self,
@@ -443,6 +531,19 @@ impl AstDatabase {
         receipt: VerificationReceipt,
         new_module: &Module,
     ) -> Result<CommitRecord, CasError> {
+        // 1. 获取跨进程排他锁 (若为文件型数据库)
+        let _lock = self.path.as_ref().map(|p| FileLockGuard::acquire(p)).transpose()?;
+
+        // 2. 强一致性重读：从磁盘重新加载最新状态，确保多进程实例视图一致
+        if let Some(path) = &self.path {
+            if path.exists() {
+                let bytes = fs::read(path)?;
+                let disk_state: DatabaseState = serde_json::from_slice(&bytes)?;
+                self.state = disk_state;
+            }
+        }
+
+        // 3. 证据链密码学哈希全链路自验
         let cand_hash = compute_candidate_hash(&candidate);
         if receipt.candidate_hash != cand_hash {
             return Err(CasError::InvalidReceipt(format!(
@@ -451,6 +552,25 @@ impl AstDatabase {
             )));
         }
 
+        let env_hash = compute_envelope_hash(&envelope);
+        if candidate.envelope_hash != env_hash {
+            return Err(CasError::InvalidCandidate(format!(
+                "candidate envelope hash `{}` does not match computed `{}`",
+                candidate.envelope_hash, env_hash
+            )));
+        }
+
+        let parsed_expr = axiom_parser::parse_expr(&candidate.expression_source)
+            .map_err(|e| CasError::InvalidCandidate(format!("expression parse error: {e}")))?;
+        let expr_hash = compute_expr_hash(&parsed_expr);
+        if candidate.expression_hash != expr_hash {
+            return Err(CasError::InvalidCandidate(format!(
+                "candidate expression hash `{}` does not match parsed expr hash `{}`",
+                candidate.expression_hash, expr_hash
+            )));
+        }
+
+        // 4. 证据门禁拦截：Sampled / Unknown / Unverified 绝对不可推进正式 Root
         if matches!(receipt.proof_level, ProofLevel::Sampled | ProofLevel::Unknown | ProofLevel::Unverified) {
             return Err(CasError::UnverifiedCandidate(format!(
                 "candidate proof level `{:?}` cannot be committed to root ref",
@@ -458,14 +578,14 @@ impl AstDatabase {
             )));
         }
 
-        let env_hash = compute_envelope_hash(&envelope);
         let rcpt_hash = compute_receipt_hash(&receipt);
 
         let mut next_state = self.state.clone();
-        next_state.envelopes.insert(env_hash.clone(), envelope);
+        next_state.envelopes.insert(env_hash.clone(), envelope.clone());
         next_state.candidates.insert(cand_hash.clone(), candidate.clone());
         next_state.receipts.insert(rcpt_hash.clone(), receipt);
 
+        // 5. 比较当前 root 是否与 expected_root 匹配
         if &self.state.root_ref != expected_root {
             let _ = self.persist(&next_state);
             self.state = next_state;
@@ -475,11 +595,45 @@ impl AstDatabase {
             });
         }
 
-        let mod_record = self.insert_module_to_state(&mut next_state, new_module);
+        // 6. 内核 AST 独立自推导：根据 expected_root 取出基线模块，在内核中执行原子替换
+        let base_module = match expected_root {
+            Some(root) => self.state.modules.get(root).cloned().ok_or_else(|| {
+                CasError::Db(DbError::Io(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("base module with root `{root}` not found in database"),
+                )))
+            })?,
+            None => Module::default(),
+        };
+
+        let mut derived_module = base_module;
+        let mut replaced = false;
+        for func in &mut derived_module.functions {
+            if replace_hole_in_expr(&mut func.body, &envelope.target_hole_id, &parsed_expr) {
+                replaced = true;
+            }
+        }
+
+        if !replaced {
+            return Err(CasError::InvalidEnvelope(format!(
+                "target hole `{}` not found in base module functions",
+                envelope.target_hole_id
+            )));
+        }
+
+        // 7. 防伪造与篡改断言：比对调用方提供的模块与内核推导模块的哈希
+        let derived_hash = compute_module_hash(&derived_module);
+        let provided_hash = compute_module_hash(new_module);
+        if derived_hash != provided_hash {
+            return Err(CasError::ForgedModule(format!(
+                "provided module hash `{provided_hash}` does not match kernel-derived module `{derived_hash}`"
+            )));
+        }
+
+        let mod_record = self.insert_module_to_state(&mut next_state, &derived_module);
         let new_root = mod_record.module_hash;
 
-        let commit_proto = CommitRecord {
-            commit_hash: NodeHash::default(),
+        let payload = CommitPayload {
             parent_root: expected_root.clone(),
             new_root: new_root.clone(),
             envelope_hash: env_hash,
@@ -487,12 +641,8 @@ impl AstDatabase {
             receipt_hash: rcpt_hash,
             timestamp: candidate.timestamp,
         };
-        let commit_hash = compute_commit_hash(&commit_proto);
-        let final_commit = CommitRecord {
-            commit_hash: commit_hash.clone(),
-            ..commit_proto
-        };
-        next_state.commits.insert(commit_hash, final_commit.clone());
+        let final_commit = CommitRecord::new(payload);
+        next_state.commits.insert(final_commit.commit_hash.clone(), final_commit.clone());
         next_state.root_ref = Some(new_root);
 
         self.persist(&next_state)?;
@@ -562,8 +712,164 @@ impl AstDatabase {
             fs::create_dir_all(parent)?;
         }
         let bytes = serde_json::to_vec_pretty(state)?;
-        fs::write(path, bytes)?;
+        let tmp_path = path.with_extension(format!(
+            "tmp_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        {
+            use std::io::Write;
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&tmp_path)?;
+            file.write_all(&bytes)?;
+            file.sync_all()?;
+        }
+        atomic_replace_file(&tmp_path, path)?;
         Ok(())
+    }
+}
+
+/// RAII cross-process exclusive file lock guard.
+#[derive(Debug)]
+pub struct FileLockGuard {
+    lock_path: PathBuf,
+}
+
+impl FileLockGuard {
+    /// Attempts to acquire an exclusive lock on the target file with timeout and auto-recovery.
+    pub fn acquire(target_path: &Path) -> Result<Self, DbError> {
+        let lock_path = target_path.with_extension("lock");
+        let start = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(5);
+        let mut backoff = std::time::Duration::from_millis(5);
+
+        loop {
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&lock_path)
+            {
+                Ok(_) => return Ok(Self { lock_path }),
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    if start.elapsed() > timeout {
+                        if let Ok(metadata) = fs::metadata(&lock_path) {
+                            if let Ok(modified) = metadata.modified() {
+                                if let Ok(age) = modified.elapsed() {
+                                    if age > std::time::Duration::from_secs(10) {
+                                        let _ = fs::remove_file(&lock_path);
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                        return Err(DbError::Io(std::io::Error::new(
+                            std::io::ErrorKind::TimedOut,
+                            format!("timed out waiting for database lock `{}`", lock_path.display()),
+                        )));
+                    }
+                    std::thread::sleep(backoff);
+                    backoff = (backoff * 2).min(std::time::Duration::from_millis(100));
+                }
+                Err(e) => return Err(DbError::Io(e)),
+            }
+        }
+    }
+}
+
+impl Drop for FileLockGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.lock_path);
+    }
+}
+
+#[cfg(windows)]
+fn atomic_replace_file(from: &Path, to: &Path) -> Result<(), DbError> {
+    use std::os::windows::ffi::OsStrExt;
+    let from_wide: Vec<u16> = from.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+    let to_wide: Vec<u16> = to.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+
+    const MOVEFILE_REPLACE_EXISTING: u32 = 0x1;
+    const MOVEFILE_WRITE_THROUGH: u32 = 0x8;
+
+    extern "system" {
+        fn MoveFileExW(lpExistingFileName: *const u16, lpNewFileName: *const u16, dwFlags: u32) -> i32;
+    }
+
+    if !to.exists() {
+        fs::rename(from, to)?;
+        return Ok(());
+    }
+
+    let ret = unsafe {
+        MoveFileExW(from_wide.as_ptr(), to_wide.as_ptr(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)
+    };
+    if ret == 0 {
+        let err = std::io::Error::last_os_error();
+        let _ = fs::remove_file(from);
+        return Err(DbError::Io(err));
+    }
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn atomic_replace_file(from: &Path, to: &Path) -> Result<(), DbError> {
+    fs::rename(from, to)?;
+    Ok(())
+}
+
+/// Replaces occurrences of a hole identifier with a replacement expression within an AST expression.
+pub fn replace_hole_in_expr(expression: &mut Expr, hole_id: &str, solution: &Expr) -> bool {
+    match expression {
+        Expr::Hole(current_hole_id) if current_hole_id == hole_id => {
+            *expression = solution.clone();
+            true
+        }
+        Expr::BinaryOp { left, right, .. } => {
+            replace_hole_in_expr(left, hole_id, solution) | replace_hole_in_expr(right, hole_id, solution)
+        }
+        Expr::UnaryOp { operand, .. } | Expr::Let { value: operand, .. } => {
+            replace_hole_in_expr(operand, hole_id, solution)
+        }
+        Expr::Block { statements, tail } => {
+            let statements_changed = statements.iter_mut().fold(false, |changed, statement| {
+                replace_hole_in_expr(statement, hole_id, solution) | changed
+            });
+            let tail_changed = tail
+                .as_mut()
+                .is_some_and(|tail| replace_hole_in_expr(tail, hole_id, solution));
+            statements_changed | tail_changed
+        }
+        Expr::Call { callee, args } => {
+            let callee_changed = replace_hole_in_expr(callee, hole_id, solution);
+            let args_changed = args.iter_mut().fold(false, |changed, argument| {
+                replace_hole_in_expr(argument, hole_id, solution) | changed
+            });
+            callee_changed | args_changed
+        }
+        Expr::FieldAccess { target, .. } => replace_hole_in_expr(target, hole_id, solution),
+        Expr::RecordInit { fields, .. } => fields.iter_mut().fold(false, |changed, (_, value)| {
+            replace_hole_in_expr(value, hole_id, solution) | changed
+        }),
+        Expr::RecordUpdate { base, updates } => {
+            let base_changed = replace_hole_in_expr(base, hole_id, solution);
+            let updates_changed = updates.iter_mut().fold(false, |changed, (_, value)| {
+                replace_hole_in_expr(value, hole_id, solution) | changed
+            });
+            base_changed | updates_changed
+        }
+        Expr::Match { target, arms } => {
+            let target_changed = replace_hole_in_expr(target, hole_id, solution);
+            let arms_changed = arms.iter_mut().fold(false, |changed, arm| {
+                replace_hole_in_expr(&mut arm.body, hole_id, solution) | changed
+            });
+            target_changed | arms_changed
+        }
+        Expr::Literal(_) | Expr::Ident(_) | Expr::Hole(_) | Expr::Raw(_) => false,
     }
 }
 

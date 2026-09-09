@@ -75,23 +75,51 @@ pub fn verify_function(func: &FunctionDecl) -> SmtResult {
 /// Verifies a function using full module context for record flattening and pure function calls.
 pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtResult {
     if let Some(z3_path) = find_z3_executable() {
-        // P0: Precondition Satisfiability Check (Vacuity Prevention)
-        if !func.requires.is_empty() {
-            if let Ok(vacuity_query) = generate_precondition_check_smtlib2(func, Some(module)) {
+        if let Ok(smt2_query) = generate_smtlib2_with_module(func, Some(module)) {
+            // P0: Precondition Satisfiability Check (Vacuity Prevention)
+            // 绝对门禁：对于具有前置条件的函数，必须明确判定前置条件可满足 (sat)，方可进入后置证明。
+            // 若 unsat 则报 VacuousContract；若 unknown / 求解器崩溃 / 超时，绝不放行，必须 Fail-Closed 阻断。
+            if !func.requires.is_empty() {
+                let vacuity_query = match generate_precondition_check_smtlib2(func, Some(module)) {
+                    Ok(q) if !q.is_empty() => q,
+                    Ok(_) => "".into(),
+                    Err(err) => {
+                        return SmtResult::Unknown(format!(
+                            "Failed to generate precondition check query for `{}`: {}. Aborting to prevent vacuous proof.",
+                            func.name, err
+                        ));
+                    }
+                };
+
                 if !vacuity_query.is_empty() {
-                    if let Ok(Z3Result::Unsat) = run_z3_query(&z3_path, &vacuity_query) {
-                        return SmtResult::VacuousContract {
-                            reason: format!(
-                                "Preconditions of function `{}` are logically unsatisfiable (unsat). This creates a vacuous proof where arbitrary implementations would trivially pass.",
-                                func.name
-                            ),
-                        };
+                    match run_z3_query(&z3_path, &vacuity_query) {
+                        Ok(Z3Result::Sat(_)) => {
+                            // Preconditions are verified satisfiable, proceed safely
+                        }
+                        Ok(Z3Result::Unsat) => {
+                            return SmtResult::VacuousContract {
+                                reason: format!(
+                                    "Preconditions of function `{}` are logically unsatisfiable (unsat). This creates a vacuous proof where arbitrary implementations would trivially pass.",
+                                    func.name
+                                ),
+                            };
+                        }
+                        Ok(Z3Result::Unknown(reason)) => {
+                            return SmtResult::Unknown(format!(
+                                "Precondition satisfiability for `{}` is unknown ({}). Aborting to prevent vacuous proof.",
+                                func.name, reason
+                            ));
+                        }
+                        Err(err) => {
+                            return SmtResult::Unknown(format!(
+                                "Vacuity check solver error for `{}`: {}. Aborting to prevent vacuous proof.",
+                                func.name, err
+                            ));
+                        }
                     }
                 }
             }
-        }
 
-        if let Ok(smt2_query) = generate_smtlib2_with_module(func, Some(module)) {
             match run_z3_query(&z3_path, &smt2_query) {
                 Ok(Z3Result::Unsat) => {
                     return SmtResult::Proved {
@@ -118,17 +146,29 @@ pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String>
     let z3_path = find_z3_executable()
         .ok_or_else(|| "Z3 executable not found in PATH or standard install directories".to_string())?;
 
-    // P0: Precondition Satisfiability Check
+    // P0: Precondition Satisfiability Check (Vacuity Prevention)
+    // 强门禁：非 Sat 即阻断，坚决 Fail-Closed
     if !func.requires.is_empty() {
         let vacuity_query = generate_precondition_check_smtlib2(func, None)?;
         if !vacuity_query.is_empty() {
-            if let Z3Result::Unsat = run_z3_query(&z3_path, &vacuity_query)? {
-                return Ok(SmtResult::VacuousContract {
-                    reason: format!(
-                        "Preconditions of function `{}` are logically unsatisfiable (unsat).",
-                        func.name
-                    ),
-                });
+            match run_z3_query(&z3_path, &vacuity_query)? {
+                Z3Result::Sat(_) => {
+                    // Preconditions are satisfiable, proceed safely to postcondition verification
+                }
+                Z3Result::Unsat => {
+                    return Ok(SmtResult::VacuousContract {
+                        reason: format!(
+                            "Preconditions of function `{}` are logically unsatisfiable (unsat).",
+                            func.name
+                        ),
+                    });
+                }
+                Z3Result::Unknown(r) => {
+                    return Ok(SmtResult::Unknown(format!(
+                        "Precondition satisfiability could not be established (unknown: {}). Aborting to prevent vacuous proof.",
+                        r
+                    )));
+                }
             }
         }
     }

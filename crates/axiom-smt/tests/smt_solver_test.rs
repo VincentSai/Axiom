@@ -213,6 +213,3 @@ fn detects_and_rejects_vacuous_contract_with_unsatisfiable_preconditions() {
         }
     }
 }
-
-
-

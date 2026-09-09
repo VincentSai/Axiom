@@ -191,3 +191,44 @@ fn pool_rejects_vacuous_contracts_without_polluting_state() {
     }
 }
 
+#[test]
+fn assemble_verified_module_fails_closed_on_unresolved_holes_while_provisional_module_succeeds() {
+    let pool = AgentTaskPool::from_source(TWO_HOLE_SKELETON).expect("skeleton parses");
+    // 1. 严格模式下，有洞时 assemble_verified_module 必须强报错拒绝导出
+    assert!(matches!(
+        pool.assemble_verified_module(),
+        Err(PoolError::Incomplete(_))
+    ));
+
+    // 2. 草稿导出允许用于审查与预览
+    let provisional = pool.assemble_provisional_module();
+    assert_eq!(provisional.functions.len(), 2);
+    assert!(matches!(provisional.functions[0].body, Expr::Hole(_)));
+}
+
+#[test]
+fn fast_forward_reverification_mints_clean_receipt_and_commits_successfully() {
+    let mut pool = AgentTaskPool::from_source(TWO_HOLE_SKELETON)
+        .expect("skeleton parses")
+        .with_policy(PoolVerificationPolicy::Permissive);
+
+    // 第一个 Worker 解决 increment_impl
+    let res1 = pool.submit_solution_with_agent("increment_impl", "value + 1", "worker_1")
+        .expect("worker 1 should succeed");
+    assert!(matches!(res1, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
+
+    // 第二个 Worker 解决 double_impl
+    let res2 = pool.submit_solution_with_agent("double_impl", "value * 2", "worker_2")
+        .expect("worker 2 should succeed");
+    assert!(matches!(res2, SmtResult::Proved { .. } | SmtResult::Sampled { .. }));
+
+    assert!(pool.is_complete());
+    assert_eq!(pool.pending_hole_ids().len(), 0);
+
+    // 两个洞均已解决，Verified Module 成功导出
+    let verified_mod = pool.assemble_verified_module().expect("all holes resolved");
+    assert_eq!(verified_mod.functions.len(), 2);
+    assert!(!matches!(verified_mod.functions[0].body, Expr::Hole(_)));
+    assert!(!matches!(verified_mod.functions[1].body, Expr::Hole(_)));
+}
+

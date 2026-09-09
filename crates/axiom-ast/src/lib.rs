@@ -1,4 +1,4 @@
-﻿//! Core abstract syntax tree definitions for Axiom.
+//! Core abstract syntax tree definitions for Axiom.
 
 use serde::{Deserialize, Serialize};
 
@@ -163,7 +163,7 @@ pub struct FunctionDecl {
     pub body: Expr,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Module {
     pub types: Vec<TypeDef>,
     pub functions: Vec<FunctionDecl>,

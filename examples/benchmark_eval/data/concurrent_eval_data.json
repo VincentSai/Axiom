@@ -4,15 +4,15 @@
   "experiment_metadata": {
     "engine": "codex",
     "mode": "concurrent_multi_agent",
-    "git_commit": "ced36a9",
+    "git_commit": "096f284",
     "z3_version": "Z3 version 4.13.0 - 64 bit",
     "platform": "win32",
     "python_version": "3.14.2",
-    "timestamp": "2026-09-09 10:53:45"
+    "timestamp": "2026-09-09 11:41:41"
   },
   "summary": {
     "rust_group": {
-      "wall_clock_sec": 1.72,
+      "wall_clock_sec": 1.8,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -22,7 +22,7 @@
       "unit_test_passed": true
     },
     "axiom_group": {
-      "wall_clock_sec": 0.37,
+      "wall_clock_sec": 0.89,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -30,14 +30,14 @@
       "resolver_tax_billed_tokens": 0,
       "total_billed_tokens": 75070,
       "formal_proved": true,
-      "speedup_vs_rust": 4.65
+      "speedup_vs_rust": 2.02
     }
   },
   "detailed_runs": {
     "group2_rust": {
       "status": "success",
-      "wall_clock_sec": 1.72,
-      "worker_concurrency_sec": 0.15,
+      "wall_clock_sec": 1.8,
+      "worker_concurrency_sec": 0.23,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -137,10 +137,10 @@
     },
     "group3_axiom": {
       "status": "success",
-      "wall_clock_sec": 0.37,
+      "wall_clock_sec": 0.89,
       "worker_concurrency_sec": 0.0,
-      "combinator_latency_ms": 0.04,
-      "smt_verify_sec": 0.37,
+      "combinator_latency_ms": 408.56,
+      "smt_verify_sec": 0.39,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -153,7 +153,7 @@
         "total_raw_billed": 75070,
         "capsule_breakdown": {
           "system_tokens": 470,
-          "contract_tokens": 489,
+          "contract_tokens": 511,
           "dependency_tokens": 70
         },
         "tokens_to_proved": 1070
@@ -222,7 +222,23 @@
           "solver_version": "4.13.0"
         }
       ],
-      "assembled_source": "// Subsystem: Inventory Settlement Pipeline\n\nfn can_stack_items(item_id1: Int, count1: Int, max_stack1: Int, item_id2: Int, count2: Int) -> Bool\nrequires {\n    count1 >= 0,\n    count2 >= 0,\n    max_stack1 > 0,\n}\nensures {\n    result == (item_id1 == item_id2 && count1 < max_stack1),\n}\n{\n    item_id1 == item_id2 && count1 < max_stack1\n}\n\nfn calc_stacked_counts(count1: Int, count2: Int, max_stack: Int) -> Int\nrequires {\n    count1 >= 0,\n    count2 >= 0,\n    max_stack > 0,\n}\nensures {\n    result >= 0,\n    result <= max_stack,\n    count1 + count2 > max_stack => result == max_stack,\n    count1 + count2 <= max_stack => result == count1 + count2,\n}\n{\n    match count1 + count2 > max_stack { true => max_stack, false => count1 + count2 }\n}\n\nfn calculate_purchase_cost(unit_price: Int, quantity: Int, discount_pct: Int) -> Int\nrequires {\n    unit_price >= 0,\n    quantity >= 0,\n    discount_pct >= 0,\n    discount_pct <= 100,\n}\nensures {\n    result >= 0,\n    result <= unit_price * quantity,\n    discount_pct == 0 => result == unit_price * quantity,\n    discount_pct == 100 => result == 0,\n}\n{\n    (unit_price * quantity * (100 - discount_pct)) / 100\n}\n\nfn validate_trade_balance(buyer_gold: Int, total_cost: Int, free_slots: Int, needed_slots: Int) -> Bool\nrequires {\n    buyer_gold >= 0,\n    total_cost >= 0,\n    free_slots >= 0,\n    needed_slots >= 0,\n}\nensures {\n    result == (buyer_gold >= total_cost && free_slots >= needed_slots),\n}\n{\n    buyer_gold >= total_cost && free_slots >= needed_slots\n}\n\nfn calc_sell_refund(cost: Int, durability_cur: Int, durability_max: Int) -> Int\nrequires {\n    cost >= 0,\n    durability_max > 0,\n    durability_cur >= 0,\n    durability_cur <= durability_max,\n}\nensures {\n    result >= 0,\n    result <= cost,\n    durability_cur == durability_max => result == cost,\n    durability_cur == 0 => result == 0,\n}\n{\n    (cost * durability_cur) / durability_max\n}\n\n",
+      "assembled_source": "fn can_stack_items(item_id1: Int, count1: Int, max_stack1: Int, item_id2: Int, count2: Int) -> Bool\n    requires {\n        count1 >= 0,\n        count2 >= 0,\n        max_stack1 > 0,\n    }\n    ensures {\n        result == (item_id1 == item_id2 && count1 < max_stack1),\n    }\n{\n    item_id1 == item_id2 && count1 < max_stack1\n}\n\nfn calc_stacked_counts(count1: Int, count2: Int, max_stack: Int) -> Int\n    requires {\n        count1 >= 0,\n        count2 >= 0,\n        max_stack > 0,\n    }\n    ensures {\n        result >= 0,\n        result <= max_stack,\n        count1 + count2 > max_stack => result == max_stack,\n        count1 + count2 <= max_stack => result == count1 + count2,\n    }\n{\n    match count1 + count2 > max_stack { true => max_stack, false => count1 + count2 }\n}\n\nfn calculate_purchase_cost(unit_price: Int, quantity: Int, discount_pct: Int) -> Int\n    requires {\n        unit_price >= 0,\n        quantity >= 0,\n        discount_pct >= 0,\n        discount_pct <= 100,\n    }\n    ensures {\n        result >= 0,\n        result <= unit_price * quantity,\n        discount_pct == 0 => result == unit_price * quantity,\n        discount_pct == 100 => result == 0,\n    }\n{\n    unit_price * quantity * (100 - discount_pct) / 100\n}\n\nfn validate_trade_balance(buyer_gold: Int, total_cost: Int, free_slots: Int, needed_slots: Int) -> Bool\n    requires {\n        buyer_gold >= 0,\n        total_cost >= 0,\n        free_slots >= 0,\n        needed_slots >= 0,\n    }\n    ensures {\n        result == (buyer_gold >= total_cost && free_slots >= needed_slots),\n    }\n{\n    buyer_gold >= total_cost && free_slots >= needed_slots\n}\n\nfn calc_sell_refund(cost: Int, durability_cur: Int, durability_max: Int) -> Int\n    requires {\n        cost >= 0,\n        durability_max > 0,\n        durability_cur >= 0,\n        durability_cur <= durability_max,\n    }\n    ensures {\n        result >= 0,\n        result <= cost,\n        durability_cur == durability_max => result == cost,\n        durability_cur == 0 => result == 0,\n    }\n{\n    cost * durability_cur / durability_max\n}",
+      "cas_concurrency_benchmark": {
+        "race_workers": 2,
+        "success_submissions": 2,
+        "concurrency_elapsed_sec": 0.081,
+        "stale_root_fast_forward_supported": true,
+        "worker_a": {
+          "returncode": 0,
+          "stdout": "Submitting candidate solution for hole `?hole_a` in `C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\tmp2yi_7ffi\\race_skel.ax`...\n[ACCEPTED] Hole `?hole_a` formally verified with SMT proof (Microsoft Z3 (SMT-LIB2) v4.13.0, obligations: 1).",
+          "stderr": ""
+        },
+        "worker_b": {
+          "returncode": 0,
+          "stdout": "Submitting candidate solution for hole `?hole_b` in `C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\tmp2yi_7ffi\\race_skel.ax`...\n[ACCEPTED] Hole `?hole_b` formally verified with SMT proof (Microsoft Z3 (SMT-LIB2) v4.13.0, obligations: 1).",
+          "stderr": ""
+        }
+      },
       "workers_details": [
         {
           "task_id": 1,
@@ -241,9 +257,9 @@
           },
           "capsule": {
             "system_tokens": 94,
-            "contract_tokens": 92,
+            "contract_tokens": 96,
             "dependency_tokens": 14,
-            "total_tokens": 200
+            "total_tokens": 204
           }
         },
         {
@@ -263,9 +279,9 @@
           },
           "capsule": {
             "system_tokens": 94,
-            "contract_tokens": 105,
+            "contract_tokens": 110,
             "dependency_tokens": 14,
-            "total_tokens": 213
+            "total_tokens": 218
           }
         },
         {
@@ -285,9 +301,9 @@
           },
           "capsule": {
             "system_tokens": 94,
-            "contract_tokens": 104,
+            "contract_tokens": 108,
             "dependency_tokens": 14,
-            "total_tokens": 212
+            "total_tokens": 216
           }
         },
         {
@@ -307,9 +323,9 @@
           },
           "capsule": {
             "system_tokens": 94,
-            "contract_tokens": 89,
+            "contract_tokens": 93,
             "dependency_tokens": 14,
-            "total_tokens": 197
+            "total_tokens": 201
           }
         },
         {
@@ -329,9 +345,9 @@
           },
           "capsule": {
             "system_tokens": 94,
-            "contract_tokens": 99,
+            "contract_tokens": 104,
             "dependency_tokens": 14,
-            "total_tokens": 207
+            "total_tokens": 212
           }
         }
       ]

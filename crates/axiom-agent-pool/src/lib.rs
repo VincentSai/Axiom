@@ -5,8 +5,9 @@ use std::fmt;
 
 use axiom_ast::{Expr, Module};
 use axiom_db::{
-    compute_candidate_hash, compute_envelope_hash, compute_expr_hash, AstDatabase, Candidate,
-    CasError, CommitRecord, NodeHash, ProofLevel, TaskEnvelope, VerificationReceipt,
+    compute_candidate_hash, compute_envelope_hash, compute_expr_hash, compute_function_hash,
+    AstDatabase, Candidate, CasError, CommitRecord, NodeHash, ProofLevel, TaskEnvelope,
+    VerificationReceipt,
 };
 use axiom_hole_extractor::extract_holes;
 pub use axiom_hole_extractor::HoleTask;
@@ -55,11 +56,17 @@ impl AgentTaskPool {
 
         let mut envelopes = HashMap::new();
         for task in &tasks {
+            let func_hash = skeleton_module
+                .functions
+                .iter()
+                .find(|f| f.name == task.target_function)
+                .map(compute_function_hash)
+                .unwrap_or_default();
             let env = TaskEnvelope {
                 base_root_hash: Some(mod_rec.module_hash.clone()),
                 target_hole_id: task.hole_id.clone(),
                 target_function: task.target_function.clone(),
-                contract_hash: NodeHash::default(),
+                contract_hash: func_hash,
                 dependency_hashes: Vec::new(),
             };
             envelopes.insert(task.hole_id.clone(), env);
@@ -171,79 +178,33 @@ impl AgentTaskPool {
             return Err(PoolError::MissingHole(hole_id.to_owned()));
         }
 
-        let mut final_result = SmtResult::Sampled { points_checked: 0 };
-        for &function_index in &affected_functions {
-            let func = &candidate_module.functions[function_index];
-            let result = verify_function_in_module(func, &candidate_module);
-            match &result {
-                SmtResult::CounterExample { .. } => return Ok(result),
-                SmtResult::VacuousContract { .. } => return Ok(result),
-                SmtResult::Unknown(_) => {
-                    return Ok(result);
-                }
-                SmtResult::Skipped(_) => {
-                    if !func.ensures.is_empty() {
-                        return Ok(result);
-                    }
-                    final_result = result;
-                }
-                SmtResult::Sampled { .. } => {
-                    if self.policy == PoolVerificationPolicy::StrictProved && !func.ensures.is_empty() {
-                        return Ok(result);
-                    }
-                    final_result = result;
-                }
-                SmtResult::Proved { .. } => {
-                    final_result = result;
-                }
-            }
-        }
-
         let cand_expr_hash = compute_expr_hash(&solution);
+        let contract_hash = compute_function_hash(&candidate_module.functions[affected_functions[0]]);
         let envelope = self.envelopes.get(hole_id).cloned().unwrap_or_else(|| TaskEnvelope {
             base_root_hash: self.db.current_root(),
             target_hole_id: hole_id.to_owned(),
             target_function: candidate_module.functions[affected_functions[0]].name.clone(),
-            contract_hash: NodeHash::default(),
+            contract_hash,
             dependency_hashes: Vec::new(),
         });
 
         let candidate = Candidate {
             envelope_hash: compute_envelope_hash(&envelope),
             expression_source: solution_source.to_string(),
-            expression_hash: cand_expr_hash,
+            expression_hash: cand_expr_hash.clone(),
             author_agent_id: agent_id.to_string(),
             timestamp: 0,
         };
 
-        let (proof_level, solver, solver_version, obligations_checked) = match &final_result {
-            SmtResult::Proved {
-                solver,
-                version,
-                obligations_checked,
-            } => (
-                ProofLevel::Proved,
-                solver.clone(),
-                version.clone(),
-                *obligations_checked,
-            ),
-            SmtResult::Sampled { points_checked } => (
-                ProofLevel::Sampled,
-                "discrete-grid-evaluator".to_string(),
-                "0.1.0".to_string(),
-                *points_checked,
-            ),
-            _ => (ProofLevel::Unverified, "none".to_string(), "0".to_string(), 0),
-        };
-
-        let receipt = VerificationReceipt {
-            candidate_hash: compute_candidate_hash(&candidate),
-            proof_level,
-            solver,
-            solver_version,
-            obligations_checked,
-            proof_obligation_hash: NodeHash::default(),
-            verified_at: 0,
+        // 1. 首次验证通过单点函数执行
+        let (final_result, receipt) = match verify_candidate_and_mint_receipt(
+            &candidate_module,
+            &affected_functions,
+            &candidate,
+            self.policy,
+        ) {
+            Ok(pair) => pair,
+            Err(failure_result) => return Ok(failure_result),
         };
 
         let expected_root = envelope.base_root_hash.clone();
@@ -265,8 +226,7 @@ impl AgentTaskPool {
                 Ok(final_result)
             }
             Err(CasError::StaleRoot { current, .. }) => {
-                // Stale Root detected: concurrent commit occurred.
-                // Optimistic fast-forward: check if hole is still pending
+                // Stale Root 冲突处理：并发冲突检测成功
                 if !self.pending_holes.contains(hole_id) {
                     return Err(PoolError::AlreadyResolved(hole_id.to_owned()));
                 }
@@ -282,37 +242,31 @@ impl AgentTaskPool {
                     return Err(PoolError::MissingHole(hole_id.to_owned()));
                 }
 
-                // Re-verify on rebased module
-                for &idx in &rebased_affected {
-                    let func = &rebased_module.functions[idx];
-                    let recheck = verify_function_in_module(func, &rebased_module);
-                    match &recheck {
-                        SmtResult::CounterExample { .. }
-                        | SmtResult::VacuousContract { .. }
-                        | SmtResult::Unknown(_) => {
-                            return Ok(recheck);
-                        }
-                        SmtResult::Sampled { .. }
-                            if self.policy == PoolVerificationPolicy::StrictProved
-                                && !func.ensures.is_empty() =>
-                        {
-                            return Ok(recheck);
-                        }
-                        _ => {}
-                    }
-                }
-
+                let rebased_func_hash = compute_function_hash(&rebased_module.functions[rebased_affected[0]]);
                 let rebased_envelope = TaskEnvelope {
                     base_root_hash: current.clone(),
-                    ..envelope
+                    target_hole_id: hole_id.to_owned(),
+                    target_function: rebased_module.functions[rebased_affected[0]].name.clone(),
+                    contract_hash: rebased_func_hash,
+                    dependency_hashes: Vec::new(),
                 };
                 let rebased_candidate = Candidate {
                     envelope_hash: compute_envelope_hash(&rebased_envelope),
-                    ..candidate
+                    expression_source: solution_source.to_string(),
+                    expression_hash: cand_expr_hash,
+                    author_agent_id: agent_id.to_string(),
+                    timestamp: candidate.timestamp + 1,
                 };
-                let rebased_receipt = VerificationReceipt {
-                    candidate_hash: compute_candidate_hash(&rebased_candidate),
-                    ..receipt
+
+                // 2. 关键：Fast-Forward 重验 100% 走同一个纯函数，铸造全新收据，严禁继承旧收据！
+                let (recheck_result, rebased_receipt) = match verify_candidate_and_mint_receipt(
+                    &rebased_module,
+                    &rebased_affected,
+                    &rebased_candidate,
+                    self.policy,
+                ) {
+                    Ok(pair) => pair,
+                    Err(failure_result) => return Ok(failure_result),
                 };
 
                 let commit_record = self
@@ -333,7 +287,7 @@ impl AgentTaskPool {
                 for env in self.envelopes.values_mut() {
                     env.base_root_hash = latest_root.clone();
                 }
-                Ok(final_result)
+                Ok(recheck_result)
             }
             Err(CasError::UnverifiedCandidate(_)) => {
                 if self.policy == PoolVerificationPolicy::Permissive {
@@ -355,13 +309,99 @@ impl AgentTaskPool {
     }
 
     /// Assemble a clone of the verified, hole-free module.
+    ///
+    /// 严禁妥协：
+    /// 1. 所有已分发的洞必须已被解决；
+    /// 2. 深入 AST 扫描，若有残留的 Expr::Hole，拒绝导出；
     pub fn assemble_verified_module(&self) -> Result<Module, PoolError> {
-        if self.is_complete() {
-            Ok(self.module.clone())
-        } else {
-            Err(PoolError::Incomplete(self.pending_hole_ids()))
+        if !self.is_complete() {
+            return Err(PoolError::Incomplete(self.pending_hole_ids()));
+        }
+        if ast_contains_any_hole(&self.module) {
+            return Err(PoolError::Incomplete(vec!["unresolved_ast_hole".to_string()]));
+        }
+        Ok(self.module.clone())
+    }
+
+    /// Assemble a provisional module draft (for inspection, review, or debugging).
+    /// May contain unresolved holes or provisional implementations.
+    pub fn assemble_provisional_module(&self) -> Module {
+        self.module.clone()
+    }
+}
+
+/// 单点验证与收据铸造纯函数：
+/// 对给定模块中被填洞替换影响的所有函数执行 SMT 定理证明，
+/// 严格保证无论首次提交还是并发冲突后的 Fast-Forward 重验，100% 走完全一致的逻辑，
+/// 杜绝分支逻辑漂移，坚决禁止继承旧收据字段。
+pub fn verify_candidate_and_mint_receipt(
+    module: &Module,
+    affected_functions: &[usize],
+    candidate: &Candidate,
+    policy: PoolVerificationPolicy,
+) -> Result<(SmtResult, VerificationReceipt), SmtResult> {
+    let mut final_result = SmtResult::Sampled { points_checked: 0 };
+
+    for &function_index in affected_functions {
+        let func = &module.functions[function_index];
+        let result = verify_function_in_module(func, module);
+        match &result {
+            SmtResult::CounterExample { .. }
+            | SmtResult::VacuousContract { .. }
+            | SmtResult::Unknown(_) => {
+                return Err(result);
+            }
+            SmtResult::Skipped(_) => {
+                if !func.ensures.is_empty() {
+                    return Err(result);
+                }
+                final_result = result;
+            }
+            SmtResult::Sampled { .. } => {
+                if policy == PoolVerificationPolicy::StrictProved && !func.ensures.is_empty() {
+                    return Err(result);
+                }
+                final_result = result;
+            }
+            SmtResult::Proved { .. } => {
+                final_result = result;
+            }
         }
     }
+
+    let cand_hash = compute_candidate_hash(candidate);
+
+    let (proof_level, solver, solver_version, obligations_checked) = match &final_result {
+        SmtResult::Proved {
+            solver,
+            version,
+            obligations_checked,
+        } => (
+            ProofLevel::Proved,
+            solver.clone(),
+            version.clone(),
+            *obligations_checked,
+        ),
+        SmtResult::Sampled { points_checked } => (
+            ProofLevel::Sampled,
+            "discrete-grid-evaluator".to_string(),
+            "0.1.0".to_string(),
+            *points_checked,
+        ),
+        _ => (ProofLevel::Unverified, "none".to_string(), "0".to_string(), 0),
+    };
+
+    let receipt = VerificationReceipt {
+        candidate_hash: cand_hash.clone(),
+        proof_level,
+        solver,
+        solver_version,
+        obligations_checked,
+        proof_obligation_hash: cand_hash,
+        verified_at: candidate.timestamp,
+    };
+
+    Ok((final_result, receipt))
 }
 
 /// Errors that prevent a worker submission or final module assembly.
@@ -467,4 +507,38 @@ fn replace_hole(expression: &mut Expr, hole_id: &str, solution: &Expr) -> bool {
         }
         Expr::Literal(_) | Expr::Ident(_) | Expr::Hole(_) | Expr::Raw(_) => false,
     }
+}
+
+fn ast_contains_any_hole_in_expr(expr: &Expr) -> bool {
+    match expr {
+        Expr::Hole(_) => true,
+        Expr::BinaryOp { left, right, .. } => {
+            ast_contains_any_hole_in_expr(left) || ast_contains_any_hole_in_expr(right)
+        }
+        Expr::UnaryOp { operand, .. } | Expr::Let { value: operand, .. } => {
+            ast_contains_any_hole_in_expr(operand)
+        }
+        Expr::Block { statements, tail } => {
+            statements.iter().any(ast_contains_any_hole_in_expr)
+                || tail.as_deref().map_or(false, ast_contains_any_hole_in_expr)
+        }
+        Expr::Call { callee, args } => {
+            ast_contains_any_hole_in_expr(callee) || args.iter().any(ast_contains_any_hole_in_expr)
+        }
+        Expr::FieldAccess { target, .. } => ast_contains_any_hole_in_expr(target),
+        Expr::RecordInit { fields, .. } => fields.iter().any(|(_, v)| ast_contains_any_hole_in_expr(v)),
+        Expr::RecordUpdate { base, updates } => {
+            ast_contains_any_hole_in_expr(base)
+                || updates.iter().any(|(_, v)| ast_contains_any_hole_in_expr(v))
+        }
+        Expr::Match { target, arms } => {
+            ast_contains_any_hole_in_expr(target)
+                || arms.iter().any(|arm| ast_contains_any_hole_in_expr(&arm.body))
+        }
+        Expr::Literal(_) | Expr::Ident(_) | Expr::Raw(_) => false,
+    }
+}
+
+pub fn ast_contains_any_hole(module: &Module) -> bool {
+    module.functions.iter().any(|f| ast_contains_any_hole_in_expr(&f.body))
 }
