@@ -11,9 +11,12 @@ Tracks:
 
 import argparse
 import concurrent.futures
+from dataclasses import asdict, dataclass
+import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -54,50 +57,157 @@ def detect_recommended_proxy():
 
 
 
-def get_git_commit_sha() -> str:
+HEX40_RE = re.compile(r"^[0-9a-f]{40}$")
+HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+@dataclass(frozen=True)
+class GitProvenance:
+    git_commit: str
+    git_tree_hash: str
+    git_diff_hash: str
+    runner_script_sha256: str
+    staged_patch_sha256: str
+    unstaged_patch_sha256: str
+    untracked_files_sha256: dict
+    is_dirty: bool
+    dirty_files_count: int
+    dirty_files: list
+
+
+_CACHED_PROVENANCE = None
+
+
+def collect_git_provenance() -> GitProvenance:
+    """严格以 Fail-Closed 方式收集不可变 Git Provenance Capsule，任何失败直接抛出异常，严禁返回 unknown"""
     try:
-        out = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=SCRIPT_DIR, stderr=subprocess.DEVNULL)
-        return out.decode("utf-8").strip()
-    except Exception:
-        return "unknown"
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=SCRIPT_DIR,
+            stderr=subprocess.PIPE,
+            timeout=5
+        ).decode("utf-8").strip()
+    except Exception as e:
+        raise RuntimeError(f"GitProvenance 采集失败 (git rev-parse HEAD): {e}")
+    if not HEX40_RE.match(commit):
+        raise ValueError(f"Git commit sha 格式非法 (必须为40位十六进制): {commit}")
+
+    try:
+        tree = subprocess.check_output(
+            ["git", "rev-parse", "HEAD^{tree}"],
+            cwd=SCRIPT_DIR,
+            stderr=subprocess.PIPE,
+            timeout=5
+        ).decode("utf-8").strip()
+    except Exception as e:
+        raise RuntimeError(f"GitProvenance 采集失败 (git rev-parse HEAD^{{tree}}): {e}")
+    if not HEX40_RE.match(tree):
+        raise ValueError(f"Git tree hash 格式非法 (必须为40位十六进制): {tree}")
+
+    try:
+        staged_patch = subprocess.check_output(
+            ["git", "diff", "--cached"],
+            cwd=SCRIPT_DIR,
+            stderr=subprocess.PIPE,
+            timeout=5
+        )
+        staged_hash = hashlib.sha256(staged_patch).hexdigest()
+    except Exception as e:
+        raise RuntimeError(f"GitProvenance 采集失败 (git diff --cached): {e}")
+
+    try:
+        unstaged_patch = subprocess.check_output(
+            ["git", "diff"],
+            cwd=SCRIPT_DIR,
+            stderr=subprocess.PIPE,
+            timeout=5
+        )
+        unstaged_hash = hashlib.sha256(unstaged_patch).hexdigest()
+    except Exception as e:
+        raise RuntimeError(f"GitProvenance 采集失败 (git diff): {e}")
+
+    try:
+        head_diff = subprocess.check_output(
+            ["git", "diff", "HEAD"],
+            cwd=SCRIPT_DIR,
+            stderr=subprocess.PIPE,
+            timeout=5
+        )
+        diff_hash = hashlib.sha256(head_diff).hexdigest()
+    except Exception as e:
+        raise RuntimeError(f"GitProvenance 采集失败 (git diff HEAD): {e}")
+
+    runner_path = os.path.abspath(__file__)
+    with open(runner_path, "rb") as f:
+        runner_sha256 = hashlib.sha256(f.read()).hexdigest()
+
+    try:
+        repo_root = subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=SCRIPT_DIR,
+            stderr=subprocess.PIPE,
+            timeout=5
+        ).decode("utf-8").strip()
+        out = subprocess.check_output(
+            ["git", "status", "--porcelain"],
+            cwd=SCRIPT_DIR,
+            stderr=subprocess.PIPE,
+            timeout=5
+        )
+        lines = [line.strip() for line in out.decode("utf-8").splitlines() if line.strip()]
+        dirty_files = [l for l in lines if not l.endswith("graphify-out/") and "graphify-out" not in l]
+
+        untracked_sha256 = {}
+        for line in dirty_files:
+            if line.startswith("??"):
+                rel_path = line[3:].strip().strip('"')
+                full_path = os.path.join(repo_root, rel_path)
+                if os.path.isfile(full_path):
+                    with open(full_path, "rb") as uf:
+                        untracked_sha256[rel_path] = hashlib.sha256(uf.read()).hexdigest()
+    except Exception as e:
+        raise RuntimeError(f"GitProvenance 采集失败 (git status): {e}")
+
+    return GitProvenance(
+        git_commit=commit,
+        git_tree_hash=tree,
+        git_diff_hash=diff_hash,
+        runner_script_sha256=runner_sha256,
+        staged_patch_sha256=staged_hash,
+        unstaged_patch_sha256=unstaged_hash,
+        untracked_files_sha256=untracked_sha256,
+        is_dirty=len(dirty_files) > 0,
+        dirty_files_count=len(dirty_files),
+        dirty_files=dirty_files[:20],
+    )
+
+
+def get_git_provenance() -> GitProvenance:
+    global _CACHED_PROVENANCE
+    if _CACHED_PROVENANCE is None:
+        _CACHED_PROVENANCE = collect_git_provenance()
+    return _CACHED_PROVENANCE
+
+
+def get_git_commit_sha() -> str:
+    return get_git_provenance().git_commit
 
 
 def get_git_tree_hash() -> str:
-    try:
-        out = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], cwd=SCRIPT_DIR, stderr=subprocess.DEVNULL)
-        return out.decode("utf-8").strip()
-    except Exception:
-        return "unknown"
+    return get_git_provenance().git_tree_hash
 
 
 def get_git_diff_hash() -> str:
-    import hashlib
-    try:
-        out = subprocess.check_output(["git", "diff", "HEAD"], cwd=SCRIPT_DIR, stderr=subprocess.DEVNULL)
-        return hashlib.sha256(out).hexdigest()
-    except Exception:
-        return "unknown"
+    return get_git_provenance().git_diff_hash
 
 
 def get_git_status() -> dict:
-    """真实探测当前 Git 仓库的未跟踪与修改状态 (Fail-Closed Provenance)"""
-    try:
-        out = subprocess.check_output(["git", "status", "--porcelain"], cwd=SCRIPT_DIR, stderr=subprocess.DEVNULL)
-        lines = [line.strip() for line in out.decode("utf-8").splitlines() if line.strip()]
-        # 过滤掉仅用于知识图谱的 graphify-out
-        dirty_files = [l for l in lines if not l.endswith("graphify-out/") and "graphify-out" not in l]
-        return {
-            "is_dirty": len(dirty_files) > 0,
-            "dirty_files_count": len(dirty_files),
-            "dirty_files": dirty_files[:20],
-        }
-    except Exception as e:
-        return {
-            "is_dirty": "unknown",
-            "dirty_files_count": -1,
-            "dirty_files": [],
-            "error": str(e),
-        }
+    prov = get_git_provenance()
+    return {
+        "is_dirty": prov.is_dirty,
+        "dirty_files_count": prov.dirty_files_count,
+        "dirty_files": prov.dirty_files,
+    }
 
 
 def validate_task_envelope_schema(envelope: dict, expected_hole: str, expected_func: str):
@@ -128,23 +238,51 @@ def validate_task_envelope_schema(envelope: dict, expected_hole: str, expected_f
 
 
 def validate_benchmark_result_schema(data: dict):
-    """校验评测结果输出 JSON 顶层与各子系统的 Schema 规范"""
+    """校验评测结果输出 JSON 顶层与各子系统的 Schema 规范，Fail-Closed 严禁 unknown"""
     required_top_keys = ["version", "subsystem", "experiment_metadata", "summary", "detailed_runs"]
     for key in required_top_keys:
         if key not in data:
             raise ValueError(f"Benchmark 输出结果缺少必填顶层字段: {key}")
 
     meta = data["experiment_metadata"]
-    for req in ["engine", "eval_mode", "git_commit", "git_tree_hash", "git_diff_hash", "git_status", "z3_version"]:
+    for req in [
+        "engine", "eval_mode", "is_mock", "evidence_grade",
+        "git_commit", "git_tree_hash", "git_diff_hash", "git_provenance",
+        "z3_version"
+    ]:
         if req not in meta:
             raise ValueError(f"experiment_metadata 缺少字段: {req}")
+
+    if meta.get("evidence_grade") not in ("synthetic_non_evidentiary", "live_empirical"):
+        raise ValueError(f"非法 evidence_grade: {meta.get('evidence_grade')}")
+
+    if not HEX40_RE.match(meta["git_commit"]):
+        raise ValueError(f"git_commit 格式非法 (必须是 40 位小写十六进制): {meta['git_commit']}")
+
+    if not HEX40_RE.match(meta["git_tree_hash"]):
+        raise ValueError(f"git_tree_hash 格式非法 (必须是 40 位小写十六进制): {meta['git_tree_hash']}")
+
+    if not HEX64_RE.match(meta["git_diff_hash"]):
+        raise ValueError(f"git_diff_hash 格式非法 (必须是 64 位 sha256): {meta['git_diff_hash']}")
+
+    prov = meta["git_provenance"]
+    for prov_req in ["runner_script_sha256", "staged_patch_sha256", "unstaged_patch_sha256", "untracked_files_sha256", "is_dirty"]:
+        if prov_req not in prov:
+            raise ValueError(f"git_provenance 缺少字段: {prov_req}")
+
+    if not HEX64_RE.match(prov["runner_script_sha256"]):
+        raise ValueError(f"runner_script_sha256 格式非法: {prov['runner_script_sha256']}")
 
     g2 = data["detailed_runs"].get("group2_rust", {})
     g3 = data["detailed_runs"].get("group3_axiom", {})
     for g_data, g_name in [(g2, "Group 2"), (g3, "Group 3")]:
-        for req in ["total_tasks", "git_tree_hash", "git_diff_hash", "git_status"]:
+        for req in ["total_tasks", "git_tree_hash", "git_diff_hash", "git_provenance"]:
             if req not in g_data:
                 raise ValueError(f"{g_name} 缺少必要 provenance 字段: {req}")
+        if not HEX40_RE.match(g_data["git_tree_hash"]):
+            raise ValueError(f"{g_name} git_tree_hash 格式非法: {g_data['git_tree_hash']}")
+        if not HEX64_RE.match(g_data["git_diff_hash"]):
+            raise ValueError(f"{g_name} git_diff_hash 格式非法: {g_data['git_diff_hash']}")
 
 
 def get_z3_version() -> str:
@@ -155,8 +293,10 @@ def get_z3_version() -> str:
     for p in candidates:
         if p and os.path.exists(p):
             try:
-                out = subprocess.check_output([p, "--version"], stderr=subprocess.DEVNULL)
-                return out.decode("utf-8").strip()
+                out = subprocess.check_output([p, "--version"], stderr=subprocess.DEVNULL, timeout=5)
+                v = out.decode("utf-8").strip()
+                if v:
+                    return v
             except Exception:
                 pass
     return "unknown"
@@ -882,6 +1022,7 @@ def run_group2_rust_pipeline(tasks: list, args, proxy: str) -> dict:
             "git_commit_sha": get_git_commit_sha(),
             "git_tree_hash": get_git_tree_hash(),
             "git_diff_hash": get_git_diff_hash(),
+            "git_provenance": asdict(get_git_provenance()),
             "git_status": get_git_status(),
             "resolver_details": resolver_calls,
             "workers_details": [
@@ -1067,6 +1208,7 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
         "git_commit_sha": get_git_commit_sha(),
         "git_tree_hash": get_git_tree_hash(),
         "git_diff_hash": get_git_diff_hash(),
+        "git_provenance": asdict(get_git_provenance()),
         "git_status": get_git_status(),
         "smt_message": v_msg,
         "smt_reports": reports,
@@ -1110,6 +1252,12 @@ def main():
     print(f"引擎模式: {args.engine.upper()} {'[离线仿真模式]' if args.mock else ''}")
     if target_proxy and not args.mock:
         print(f"网络代理: {target_proxy}")
+    if args.mock:
+        print("\n" + "*" * 78)
+        print("⚠️  SYNTHETIC MOCK BENCHMARK RUN (NON-EVIDENTIARY)")
+        print("All latency and token measurements are synthetic simulations and MUST NOT")
+        print("be cited as production comparative metrics or empirical performance evidence!")
+        print("*" * 78)
     print("=" * 70)
 
     # 1. 运行 Group 2 (Rust)
@@ -1137,7 +1285,10 @@ def main():
     print(f"【维度 2: 端到端耗时与并发吞吐 (Wall-clock Time & Speedup)】")
     print(f"  • Rust 组端到端总耗时:   {g2_total_time}s (含 Worker 并发 {g2_res['worker_concurrency_sec']}s + 串行合并与冲突修复)")
     print(f"  • Axiom 组端到端总耗时:  {g3_total_time}s (含 Worker 并发 {g3_res['worker_concurrency_sec']}s + AST组装 {g3_res['combinator_latency_ms']}ms + Z3全域证明 {g3_res['smt_verify_sec']}s)")
-    print(f"  🔥 端到端交付耗时对比: Axiom 较 Rust 提速 {round((1.0 - g3_total_time/g2_total_time)*100, 1)}% (加速比: {speedup}x)")
+    if args.mock:
+        print("  ℹ️  [仿真模式] 比较性吞吐量与加速比仅供协议流程验证，不具备生产级实证结论效力。")
+    else:
+        print(f"  🔥 端到端交付耗时对比: Axiom 较 Rust 提速 {round((1.0 - g3_total_time/g2_total_time)*100, 1)}% (加速比: {speedup}x)")
     print("-" * 70)
 
     print(f"【维度 3: 真实总账单与交付有效 Payload (含冲突修复全口径)】")
@@ -1146,7 +1297,10 @@ def main():
     billed_diff = round((g3_billed - g2_billed) / g2_billed * 100, 1) if g2_billed > 0 else 0
     print(f"  • Rust 组全链路总账单:   {g2_billed:,} tokens (Worker生成: {g2_res['tokens']['workers_raw_billed']:,}t + 冲突修复: {g2_res['tokens']['resolver_billed_tax']:,}t)")
     print(f"  • Axiom 组全链路总账单: {g3_billed:,} tokens (Worker生成: {g3_res['tokens']['workers_raw_billed']:,}t + 组合器: 0t)")
-    print(f"  🔥 全链路总账单倍率:     Axiom 为 Rust 的 {round(g3_billed / g2_billed, 2)} 倍 ({'多 ' if billed_diff >= 0 else '省 '}{abs(billed_diff)}%)")
+    if args.mock:
+        print("  ℹ️  [仿真模式] 比较性 Token 账单倍率仅供协议流程验证，不具备生产级实证结论效力。")
+    else:
+        print(f"  🔥 全链路总账单倍率:     Axiom 为 Rust 的 {round(g3_billed / g2_billed, 2)} 倍 ({'多 ' if billed_diff >= 0 else '省 '}{abs(billed_diff)}%)")
     print("-" * 70)
 
     print(f"【维度 4: 交付质量与形式验证结论】")
@@ -1163,9 +1317,11 @@ def main():
             "mode": "concurrent_multi_agent",
             "eval_mode": "mock" if args.mock else "live_codex",
             "is_mock": args.mock,
+            "evidence_grade": "synthetic_non_evidentiary" if args.mock else "live_empirical",
             "git_commit": get_git_commit_sha(),
             "git_tree_hash": get_git_tree_hash(),
             "git_diff_hash": get_git_diff_hash(),
+            "git_provenance": asdict(get_git_provenance()),
             "git_status": get_git_status(),
             "z3_version": get_z3_version(),
             "platform": sys.platform,
@@ -1192,7 +1348,8 @@ def main():
                 "resolver_tax_billed_tokens": 0,
                 "total_billed_tokens": g3_billed,
                 "formal_proved": g3_res["formal_proved"],
-                "speedup_vs_rust": speedup
+                "speedup_vs_rust": None if args.mock else speedup,
+                "synthetic_note": "Comparative speedup is omitted in synthetic mock mode" if args.mock else None
             }
         },
         "detailed_runs": {

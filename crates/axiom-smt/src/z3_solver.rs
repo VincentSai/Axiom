@@ -20,10 +20,10 @@ pub enum Z3Result {
 
 /// Output from executing an external process with hard deadline and asynchronous I/O.
 #[derive(Debug)]
-pub struct ProcessExecutionOutput {
-    pub status: std::process::ExitStatus,
-    pub stdout: Vec<u8>,
-    pub stderr: Vec<u8>,
+pub(crate) struct ProcessExecutionOutput {
+    pub(crate) status: std::process::ExitStatus,
+    pub(crate) stdout: Vec<u8>,
+    pub(crate) stderr: Vec<u8>,
 }
 
 /// Locates the Z3 executable on the system.
@@ -83,6 +83,123 @@ pub struct TimeoutPolicy {
     pub poll_interval: std::time::Duration,
 }
 
+#[cfg(windows)]
+#[allow(clippy::upper_case_acronyms)]
+mod win32_job {
+    use std::os::windows::io::AsRawHandle;
+    use std::process::Child;
+
+    type HANDLE = *mut std::ffi::c_void;
+    type BOOL = i32;
+    type DWORD = u32;
+
+    const JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: DWORD = 0x0000_2000;
+    const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION: i32 = 9;
+
+    #[repr(C)]
+    struct IO_COUNTERS {
+        read_operation_count: u64,
+        write_operation_count: u64,
+        other_operation_count: u64,
+        read_transfer_count: u64,
+        write_transfer_count: u64,
+        other_transfer_count: u64,
+    }
+
+    #[repr(C)]
+    struct JOBOBJECT_BASIC_LIMIT_INFORMATION {
+        per_process_user_time_limit: i64,
+        per_job_user_time_limit: i64,
+        limit_flags: DWORD,
+        minimum_working_set_size: usize,
+        maximum_working_set_size: usize,
+        active_process_limit: DWORD,
+        affinity: usize,
+        priority_class: DWORD,
+        scheduling_class: DWORD,
+    }
+
+    #[repr(C)]
+    struct JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
+        basic_limit_information: JOBOBJECT_BASIC_LIMIT_INFORMATION,
+        io_info: IO_COUNTERS,
+        process_memory_limit: usize,
+        job_memory_limit: usize,
+        peak_process_memory_limit: usize,
+        peak_job_memory_limit: usize,
+    }
+
+    extern "system" {
+        fn CreateJobObjectW(
+            lp_job_attributes: *mut std::ffi::c_void,
+            lp_name: *const u16,
+        ) -> HANDLE;
+        fn SetInformationJobObject(
+            h_job: HANDLE,
+            job_object_info_class: i32,
+            lp_job_object_info: *const std::ffi::c_void,
+            cb_job_object_info_length: DWORD,
+        ) -> BOOL;
+        fn AssignProcessToJobObject(h_job: HANDLE, h_process: HANDLE) -> BOOL;
+        fn TerminateJobObject(h_job: HANDLE, u_exit_code: u32) -> BOOL;
+        fn CloseHandle(h_object: HANDLE) -> BOOL;
+    }
+
+    pub struct JobObjectGuard {
+        job_handle: HANDLE,
+    }
+
+    impl JobObjectGuard {
+        pub fn new() -> Option<Self> {
+            unsafe {
+                let job = CreateJobObjectW(std::ptr::null_mut(), std::ptr::null());
+                if job.is_null() {
+                    return None;
+                }
+
+                let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+                info.basic_limit_information.limit_flags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+
+                let ok = SetInformationJobObject(
+                    job,
+                    JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
+                    &info as *const _ as *const _,
+                    std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as DWORD,
+                );
+
+                if ok == 0 {
+                    CloseHandle(job);
+                    return None;
+                }
+
+                Some(Self { job_handle: job })
+            }
+        }
+
+        pub fn assign_process(&self, child: &Child) -> bool {
+            let handle = child.as_raw_handle() as HANDLE;
+            unsafe { AssignProcessToJobObject(self.job_handle, handle) != 0 }
+        }
+
+        pub fn terminate_now(&self) {
+            unsafe {
+                let _ = TerminateJobObject(self.job_handle, 1);
+            }
+        }
+    }
+
+    impl Drop for JobObjectGuard {
+        fn drop(&mut self) {
+            unsafe {
+                if !self.job_handle.is_null() {
+                    let _ = TerminateJobObject(self.job_handle, 1);
+                    CloseHandle(self.job_handle);
+                }
+            }
+        }
+    }
+}
+
 #[inline]
 fn configure_process_command(cmd: &mut Command) {
     #[cfg(unix)]
@@ -94,10 +211,16 @@ fn configure_process_command(cmd: &mut Command) {
 }
 
 /// Forcefully terminates a child process and all its descendants to release pipe handles.
-fn kill_process_tree(child: &mut std::process::Child) {
-    let pid = child.id();
+fn kill_process_tree(
+    child: &mut std::process::Child,
+    #[cfg(windows)] job_guard: Option<&win32_job::JobObjectGuard>,
+) {
     #[cfg(windows)]
     {
+        if let Some(guard) = job_guard {
+            guard.terminate_now();
+        }
+        let pid = child.id();
         let _ = Command::new("taskkill")
             .args(["/F", "/T", "/PID", &pid.to_string()])
             .stdin(Stdio::null())
@@ -107,6 +230,7 @@ fn kill_process_tree(child: &mut std::process::Child) {
     }
     #[cfg(unix)]
     {
+        let pid = child.id();
         let _ = Command::new("kill")
             .args(["-9", &format!("-{}", pid)])
             .stdin(Stdio::null())
@@ -115,12 +239,18 @@ fn kill_process_tree(child: &mut std::process::Child) {
             .output();
     }
     let _ = child.kill();
-    let _ = child.wait();
+    let kill_wait_deadline = std::time::Instant::now() + std::time::Duration::from_millis(100);
+    while std::time::Instant::now() < kill_wait_deadline {
+        if let Ok(Some(_)) = child.try_wait() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
 }
 
 /// Unified process execution engine with asynchronous I/O and strict absolute deadline enforcement.
 /// Kills process tree and all descendants immediately upon deadline expiry.
-pub fn execute_process_until_deadline(
+pub(crate) fn execute_process_until_deadline(
     mut cmd: Command,
     stdin_data: Option<&[u8]>,
     deadline: std::time::Instant,
@@ -136,9 +266,17 @@ pub fn execute_process_until_deadline(
     }
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
+    #[cfg(windows)]
+    let job_guard = win32_job::JobObjectGuard::new();
+
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to spawn process: {e}"))?;
+
+    #[cfg(windows)]
+    if let Some(ref guard) = job_guard {
+        guard.assign_process(&child);
+    }
 
     let stdin_join = if let Some(data) = stdin_data {
         if let Some(mut stdin) = child.stdin.take() {
@@ -169,7 +307,13 @@ pub fn execute_process_until_deadline(
         buf
     });
 
-    let status_res = TimeoutPolicy::wait_child_until_deadline(deadline, poll_interval, &mut child);
+    let status_res = TimeoutPolicy::wait_child_until_deadline(
+        deadline,
+        poll_interval,
+        &mut child,
+        #[cfg(windows)]
+        job_guard.as_ref(),
+    );
 
     if let Some(ref stdin_handle) = stdin_join {
         while !stdin_handle.is_finished() && std::time::Instant::now() < deadline {
@@ -178,7 +322,11 @@ pub fn execute_process_until_deadline(
     }
 
     if status_res.is_err() {
-        kill_process_tree(&mut child);
+        kill_process_tree(
+            &mut child,
+            #[cfg(windows)]
+            job_guard.as_ref(),
+        );
     }
 
     while (!stdout_join.is_finished() || !stderr_join.is_finished())
@@ -190,7 +338,17 @@ pub fn execute_process_until_deadline(
     let is_timed_out = std::time::Instant::now() >= deadline;
 
     if is_timed_out || status_res.is_err() {
-        kill_process_tree(&mut child);
+        kill_process_tree(
+            &mut child,
+            #[cfg(windows)]
+            job_guard.as_ref(),
+        );
+        let drain_deadline = std::time::Instant::now() + std::time::Duration::from_millis(100);
+        while (!stdout_join.is_finished() || !stderr_join.is_finished())
+            && std::time::Instant::now() < drain_deadline
+        {
+            std::thread::sleep(poll_interval);
+        }
         if is_timed_out {
             return Err("timed out waiting for process execution and I/O completion".into());
         }
@@ -203,11 +361,19 @@ pub fn execute_process_until_deadline(
             match stdin_handle.join() {
                 Ok(Ok(())) => {}
                 Ok(Err(io_err)) => {
-                    kill_process_tree(&mut child);
+                    kill_process_tree(
+                        &mut child,
+                        #[cfg(windows)]
+                        job_guard.as_ref(),
+                    );
                     return Err(format!("failed to write data to process stdin: {io_err}"));
                 }
                 Err(_) => {
-                    kill_process_tree(&mut child);
+                    kill_process_tree(
+                        &mut child,
+                        #[cfg(windows)]
+                        job_guard.as_ref(),
+                    );
                     return Err("process stdin writer thread panicked".into());
                 }
             }
@@ -219,7 +385,11 @@ pub fn execute_process_until_deadline(
             .join()
             .map_err(|_| "stdout reader thread panicked")?
     } else {
-        kill_process_tree(&mut child);
+        kill_process_tree(
+            &mut child,
+            #[cfg(windows)]
+            job_guard.as_ref(),
+        );
         return Err("timed out reading process stdout".into());
     };
 
@@ -228,7 +398,11 @@ pub fn execute_process_until_deadline(
             .join()
             .map_err(|_| "stderr reader thread panicked")?
     } else {
-        kill_process_tree(&mut child);
+        kill_process_tree(
+            &mut child,
+            #[cfg(windows)]
+            job_guard.as_ref(),
+        );
         return Err("timed out reading process stderr".into());
     };
 
@@ -260,17 +434,23 @@ impl TimeoutPolicy {
     }
 
     /// Waits for the child process to exit, terminating it and its process tree if it exceeds `deadline`.
-    pub fn wait_child_until_deadline(
+    #[allow(dead_code)]
+    pub(crate) fn wait_child_until_deadline(
         deadline: std::time::Instant,
         poll_interval: std::time::Duration,
         child: &mut std::process::Child,
+        #[cfg(windows)] job_guard: Option<&win32_job::JobObjectGuard>,
     ) -> Result<std::process::ExitStatus, String> {
         loop {
             match child.try_wait() {
                 Ok(Some(status)) => return Ok(status),
                 Ok(None) => {
                     if std::time::Instant::now() >= deadline {
-                        kill_process_tree(child);
+                        kill_process_tree(
+                            child,
+                            #[cfg(windows)]
+                            job_guard,
+                        );
                         return Err(
                             "child process hard-killed: execution time exceeded deadline threshold"
                                 .into(),
@@ -279,7 +459,11 @@ impl TimeoutPolicy {
                     std::thread::sleep(poll_interval);
                 }
                 Err(e) => {
-                    kill_process_tree(child);
+                    kill_process_tree(
+                        child,
+                        #[cfg(windows)]
+                        job_guard,
+                    );
                     return Err(format!("error polling child process: {}", e));
                 }
             }
@@ -287,12 +471,19 @@ impl TimeoutPolicy {
     }
 
     /// Waits for the child process to exit, terminating it and its process tree if it exceeds `self.timeout`.
-    pub fn wait_child_with_watchdog(
+    #[allow(dead_code)]
+    pub(crate) fn wait_child_with_watchdog(
         &self,
         child: &mut std::process::Child,
     ) -> Result<std::process::ExitStatus, String> {
         let deadline = std::time::Instant::now() + self.timeout;
-        Self::wait_child_until_deadline(deadline, self.poll_interval, child)
+        Self::wait_child_until_deadline(
+            deadline,
+            self.poll_interval,
+            child,
+            #[cfg(windows)]
+            None,
+        )
     }
 }
 
@@ -440,4 +631,42 @@ fn extract_numeric_value(text: &str) -> Option<f64> {
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_process_execution_deadline_watchdog_kills_hung_process() {
+        #[cfg(windows)]
+        let mut cmd = Command::new("powershell");
+        #[cfg(windows)]
+        cmd.args(["-Command", "Start-Sleep -Seconds 10"]);
+
+        #[cfg(unix)]
+        let mut cmd = Command::new("sleep");
+        #[cfg(unix)]
+        cmd.arg("10");
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(150);
+        let start = std::time::Instant::now();
+        let res = execute_process_until_deadline(
+            cmd,
+            None,
+            deadline,
+            std::time::Duration::from_millis(10),
+        );
+
+        let elapsed = start.elapsed();
+        assert!(
+            res.is_err(),
+            "expected process to be terminated due to deadline"
+        );
+        assert!(
+            elapsed < std::time::Duration::from_secs(3),
+            "process watchdog must kill process promptly without hanging, elapsed: {:?}",
+            elapsed
+        );
+    }
 }

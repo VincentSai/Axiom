@@ -6,8 +6,9 @@ use axiom_ast::Module;
 
 use crate::{
     compute_candidate_hash, compute_commit_payload_hash, compute_envelope_hash, compute_expr_hash,
-    compute_legacy_commit_payload_hash, compute_module_hash, compute_receipt_hash,
-    derive_candidate_module, CommitRecord, DatabaseState, DbError, LegacyCommitPayload, NodeHash,
+    compute_legacy_commit_payload_hash, compute_module_hash, compute_proof_obligation_hash,
+    compute_receipt_hash, current_verification_profile_hash, derive_candidate_module, CommitRecord,
+    DatabaseState, DbError, LegacyCommitPayload, NodeHash,
 };
 
 /// Topology and integrity auditor for AST database commits.
@@ -27,6 +28,14 @@ impl CommitGraph {
     /// 8. Candidate expression_source re-parses and matches expression_hash.
     /// 9. Deterministic replay: candidate expression derived against parent module matches commit.new_root.
     pub(crate) fn validate_mainline(state: &DatabaseState) -> Result<Vec<&CommitRecord>, DbError> {
+        let ordered_commits = Self::verify_commit_structure(state)?;
+        Self::verify_artifact_bindings(&ordered_commits, state)?;
+        Self::verify_semantic_replay(&ordered_commits, state)?;
+        Ok(ordered_commits)
+    }
+
+    /// Layer 1: 验证主线提交图的因果拓扑结构、双向指针自洽性与防篡改自哈希
+    fn verify_commit_structure(state: &DatabaseState) -> Result<Vec<&CommitRecord>, DbError> {
         let head_hash = match &state.head_commit {
             Some(h) => h,
             None => {
@@ -97,6 +106,69 @@ impl CommitGraph {
                 )));
             }
 
+            ordered_commits.push(commit);
+            curr_commit_hash = commit.parent_commit();
+        }
+
+        ordered_commits.reverse();
+
+        // Genesis commit in mainline must not have parent_commit
+        if let Some(genesis) = ordered_commits.first() {
+            if genesis.parent_commit().is_some() {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "mainline genesis commit `{}` has unexpected parent_commit pointer",
+                    genesis.commit_hash
+                )));
+            }
+        }
+
+        // Validate strictly sequential parent -> child causality
+        for i in 1..ordered_commits.len() {
+            let parent = ordered_commits[i - 1];
+            let child = ordered_commits[i];
+
+            let p_commit = child.parent_commit().ok_or_else(|| {
+                DbError::CorruptedCommitChain(format!(
+                    "child commit `{}` is missing parent_commit pointer",
+                    child.commit_hash
+                ))
+            })?;
+            if p_commit != &parent.commit_hash {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "discontinuous commit chain: child `{}` points to parent `{}`, expected `{}`",
+                    child.commit_hash, p_commit, parent.commit_hash
+                )));
+            }
+
+            let p_root = child.parent_root().ok_or_else(|| {
+                DbError::CorruptedCommitChain(format!(
+                    "child commit `{}` is missing parent_root pointer",
+                    child.commit_hash
+                ))
+            })?;
+            if p_root != parent.new_root() {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "discontinuous commit root: child `{}` points to parent root `{}`, expected `{}`",
+                    child.commit_hash,
+                    p_root,
+                    parent.new_root()
+                )));
+            }
+        }
+
+        Ok(ordered_commits)
+    }
+
+    /// Layer 2: 验证工件存在性、自哈希与交叉绑定；对 no-op 重签提交强校验历史真实 landing 绑定与证明义务
+    fn verify_artifact_bindings(
+        ordered_commits: &[&CommitRecord],
+        state: &DatabaseState,
+    ) -> Result<(), DbError> {
+        let mut seen_commits: HashSet<&NodeHash> = HashSet::new();
+
+        for commit in ordered_commits {
+            let hash = &commit.commit_hash;
+
             // Artifact existence and hash integrity checks
             let env = state.envelopes.get(commit.envelope_hash()).ok_or_else(|| {
                 DbError::CorruptedCommitChain(format!(
@@ -160,17 +232,6 @@ impl CommitGraph {
                 )));
             }
 
-            // Envelope base_root_hash consistency check for root-changing commits
-            if commit.parent_root() != Some(commit.new_root())
-                && env.base_root_hash.as_ref() != commit.parent_root()
-            {
-                return Err(DbError::CorruptedCommitChain(format!(
-                    "root-changing commit `{hash}` parent_root `{:?}` does not match envelope base_root_hash `{:?}`",
-                    commit.parent_root(),
-                    env.base_root_hash
-                )));
-            }
-
             // Candidate expression source re-parse and expression_hash check
             let parsed_expr = axiom_parser::parse_expr(&cand.expression_source).map_err(|e| {
                 DbError::CorruptedCommitChain(format!(
@@ -187,8 +248,145 @@ impl CommitGraph {
                 )));
             }
 
-            // Deterministic replay derivation check for root-changing commits
+            // [Spec 1 核心加固]: 对于 parent_root == Some(new_root) 的 receipt-only no-op 提交，必须绑定历史真实落地提交
+            if commit.parent_root() == Some(commit.new_root()) {
+                let att_hash = commit.attested_commit_hash().ok_or_else(|| {
+                    DbError::CorruptedCommitChain(format!(
+                        "receipt-only commit `{hash}` missing required attested_commit_hash"
+                    ))
+                })?;
+
+                if rcpt.attested_commit_hash.as_ref() != Some(att_hash) {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "commit `{hash}` attested_commit `{att_hash}` does not match receipt attested_commit `{:?}`",
+                        rcpt.attested_commit_hash
+                    )));
+                }
+
+                if !seen_commits.contains(att_hash) {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "commit `{hash}` attested_commit `{att_hash}` is not an ancestor in the active mainline history"
+                    )));
+                }
+
+                let landing_commit = state.commits.get(att_hash).ok_or_else(|| {
+                    DbError::CorruptedCommitChain(format!(
+                        "commit `{hash}` attested landing commit `{att_hash}` not found in database"
+                    ))
+                })?;
+
+                if landing_commit.parent_root() == Some(landing_commit.new_root()) {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "commit `{hash}` attested landing commit `{att_hash}` is itself a receipt-only commit"
+                    )));
+                }
+
+                if landing_commit.envelope_hash() != commit.envelope_hash() {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "commit `{hash}` envelope `{}` does not match attested landing commit envelope `{}`",
+                        commit.envelope_hash(),
+                        landing_commit.envelope_hash()
+                    )));
+                }
+
+                if landing_commit.candidate_hash() != commit.candidate_hash() {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "commit `{hash}` candidate `{}` does not match attested landing commit candidate `{}`",
+                        commit.candidate_hash(),
+                        landing_commit.candidate_hash()
+                    )));
+                }
+
+                if rcpt.verification_profile_hash != current_verification_profile_hash() {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "receipt-only commit `{hash}` verification_profile `{}` does not match current `{}`",
+                        rcpt.verification_profile_hash,
+                        current_verification_profile_hash()
+                    )));
+                }
+
+                let root_mod = state.modules.get(commit.new_root()).ok_or_else(|| {
+                    DbError::CorruptedCommitChain(format!(
+                        "commit `{hash}` root module `{}` not found in database",
+                        commit.new_root()
+                    ))
+                })?;
+
+                let target_fn = root_mod
+                    .functions
+                    .iter()
+                    .find(|f| f.name == env.target_function)
+                    .ok_or_else(|| {
+                        DbError::CorruptedCommitChain(format!(
+                            "commit `{hash}` target function `{}` not found in root module",
+                            env.target_function
+                        ))
+                    })?;
+
+                if axiom_ast::expr_contains_hole(&target_fn.body) {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "commit `{hash}` target function `{}` contains unresolved holes",
+                        env.target_function
+                    )));
+                }
+
+                let computed_obl_hash = compute_proof_obligation_hash(target_fn);
+                if computed_obl_hash != rcpt.proof_obligation_hash {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "commit `{hash}` proof_obligation_hash mismatch: recorded `{}`, computed `{computed_obl_hash}`",
+                        rcpt.proof_obligation_hash
+                    )));
+                }
+            }
+
+            seen_commits.insert(hash);
+        }
+
+        Ok(())
+    }
+
+    /// Layer 3: 验证语义重放与 AST 确定性推导一致性
+    fn verify_semantic_replay(
+        ordered_commits: &[&CommitRecord],
+        state: &DatabaseState,
+    ) -> Result<(), DbError> {
+        for commit in ordered_commits {
+            let hash = &commit.commit_hash;
+
+            // Envelope base_root_hash consistency check for root-changing commits
             if commit.parent_root() != Some(commit.new_root()) {
+                let env = state.envelopes.get(commit.envelope_hash()).ok_or_else(|| {
+                    DbError::CorruptedCommitChain(format!(
+                        "commit `{hash}` missing task envelope `{}`",
+                        commit.envelope_hash()
+                    ))
+                })?;
+
+                if env.base_root_hash.as_ref() != commit.parent_root() {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "root-changing commit `{hash}` parent_root `{:?}` does not match envelope base_root_hash `{:?}`",
+                        commit.parent_root(),
+                        env.base_root_hash
+                    )));
+                }
+
+                let cand = state
+                    .candidates
+                    .get(commit.candidate_hash())
+                    .ok_or_else(|| {
+                        DbError::CorruptedCommitChain(format!(
+                            "commit `{hash}` missing candidate `{}`",
+                            commit.candidate_hash()
+                        ))
+                    })?;
+
+                let parsed_expr =
+                    axiom_parser::parse_expr(&cand.expression_source).map_err(|e| {
+                        DbError::CorruptedCommitChain(format!(
+                            "commit `{hash}` candidate expression parse failure: {e}"
+                        ))
+                    })?;
+
                 let parent_mod = match commit.parent_root() {
                     Some(pr) => state.modules.get(pr).ok_or_else(|| {
                         DbError::CorruptedCommitChain(format!(
@@ -213,58 +411,9 @@ impl CommitGraph {
                     )));
                 }
             }
-
-            ordered_commits.push(commit);
-            curr_commit_hash = commit.parent_commit();
         }
 
-        ordered_commits.reverse();
-
-        // Genesis commit in mainline must not have parent_commit
-        if let Some(genesis) = ordered_commits.first() {
-            if genesis.parent_commit().is_some() {
-                return Err(DbError::CorruptedCommitChain(format!(
-                    "mainline genesis commit `{}` has unexpected parent_commit pointer",
-                    genesis.commit_hash
-                )));
-            }
-        }
-
-        // Validate strictly sequential parent -> child causality
-        for i in 1..ordered_commits.len() {
-            let parent = ordered_commits[i - 1];
-            let child = ordered_commits[i];
-
-            let p_commit = child.parent_commit().ok_or_else(|| {
-                DbError::CorruptedCommitChain(format!(
-                    "child commit `{}` is missing parent_commit pointer",
-                    child.commit_hash
-                ))
-            })?;
-            if p_commit != &parent.commit_hash {
-                return Err(DbError::CorruptedCommitChain(format!(
-                    "discontinuous commit chain: child `{}` points to parent `{}`, expected `{}`",
-                    child.commit_hash, p_commit, parent.commit_hash
-                )));
-            }
-
-            let p_root = child.parent_root().ok_or_else(|| {
-                DbError::CorruptedCommitChain(format!(
-                    "child commit `{}` is missing parent_root pointer",
-                    child.commit_hash
-                ))
-            })?;
-            if p_root != parent.new_root() {
-                return Err(DbError::CorruptedCommitChain(format!(
-                    "discontinuous commit root: child `{}` points to parent root `{}`, expected `{}`",
-                    child.commit_hash,
-                    p_root,
-                    parent.new_root()
-                )));
-            }
-        }
-
-        Ok(ordered_commits)
+        Ok(())
     }
 
     /// Performs causal topology healing and complete hash recalculation for legacy unversioned databases.

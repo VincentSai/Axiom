@@ -6,14 +6,32 @@
     "mode": "concurrent_multi_agent",
     "eval_mode": "mock",
     "is_mock": true,
-    "git_commit": "114768533e0a2168e61470a92a5838ddef6da714",
-    "git_tree_hash": "bafb4224a939945b930e5de4302d921ee0e486d2",
-    "git_diff_hash": "44f92a3dd590d2d2552383487c07b0484b6338658e00237e0e80a5e5e0c3d248",
+    "evidence_grade": "synthetic_non_evidentiary",
+    "git_commit": "4492184c820bbc15ef1295b7ac8664c94f1156d5",
+    "git_tree_hash": "3a9d0a2020fe0ad6b0cd4324b4f35710575650f3",
+    "git_diff_hash": "d00dd243415946fcc011b7d41e1074b3057ea9784c9a15f640a3cf4ffb598919",
+    "git_provenance": {
+      "git_commit": "4492184c820bbc15ef1295b7ac8664c94f1156d5",
+      "git_tree_hash": "3a9d0a2020fe0ad6b0cd4324b4f35710575650f3",
+      "git_diff_hash": "d00dd243415946fcc011b7d41e1074b3057ea9784c9a15f640a3cf4ffb598919",
+      "runner_script_sha256": "4d99ad59b551029fc4fab5a79a84aa033982a99618882f101e0e62ebc7a18700",
+      "staged_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "unstaged_patch_sha256": "d00dd243415946fcc011b7d41e1074b3057ea9784c9a15f640a3cf4ffb598919",
+      "untracked_files_sha256": {},
+      "is_dirty": true,
+      "dirty_files_count": 5,
+      "dirty_files": [
+        "M crates/axiom-db/src/commit_graph.rs",
+        "M crates/axiom-db/src/lib.rs",
+        "M crates/axiom-db/tests/ast_db_test.rs",
+        "M crates/axiom-smt/src/z3_solver.rs",
+        "M examples/benchmark_eval/concurrent_runner.py"
+      ]
+    },
     "git_status": {
       "is_dirty": true,
-      "dirty_files_count": 6,
+      "dirty_files_count": 5,
       "dirty_files": [
-        "M crates/axiom-agent-pool/tests/concurrent_pool_test.rs",
         "M crates/axiom-db/src/commit_graph.rs",
         "M crates/axiom-db/src/lib.rs",
         "M crates/axiom-db/tests/ast_db_test.rs",
@@ -24,11 +42,11 @@
     "z3_version": "Z3 version 4.13.0 - 64 bit",
     "platform": "win32",
     "python_version": "3.14.2",
-    "timestamp": "2026-09-10 14:03:34"
+    "timestamp": "2026-09-10 15:19:24"
   },
   "summary": {
     "rust_group": {
-      "wall_clock_sec": 1.68,
+      "wall_clock_sec": 3.68,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -38,7 +56,7 @@
       "unit_test_passed": true
     },
     "axiom_group": {
-      "wall_clock_sec": 2.25,
+      "wall_clock_sec": 2.32,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -46,15 +64,16 @@
       "resolver_tax_billed_tokens": 0,
       "total_billed_tokens": 75070,
       "formal_proved": true,
-      "speedup_vs_rust": 0.75
+      "speedup_vs_rust": null,
+      "synthetic_note": "Comparative speedup is omitted in synthetic mock mode"
     }
   },
   "detailed_runs": {
     "group2_rust": {
       "status": "success",
       "total_tasks": 5,
-      "wall_clock_sec": 1.68,
-      "worker_concurrency_sec": 0.16,
+      "wall_clock_sec": 3.68,
+      "worker_concurrency_sec": 0.27,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -68,14 +87,31 @@
       },
       "unit_test_passed": true,
       "unit_test_message": "All subsystem unit tests passed",
-      "git_commit_sha": "114768533e0a2168e61470a92a5838ddef6da714",
-      "git_tree_hash": "bafb4224a939945b930e5de4302d921ee0e486d2",
-      "git_diff_hash": "44f92a3dd590d2d2552383487c07b0484b6338658e00237e0e80a5e5e0c3d248",
+      "git_commit_sha": "4492184c820bbc15ef1295b7ac8664c94f1156d5",
+      "git_tree_hash": "3a9d0a2020fe0ad6b0cd4324b4f35710575650f3",
+      "git_diff_hash": "d00dd243415946fcc011b7d41e1074b3057ea9784c9a15f640a3cf4ffb598919",
+      "git_provenance": {
+        "git_commit": "4492184c820bbc15ef1295b7ac8664c94f1156d5",
+        "git_tree_hash": "3a9d0a2020fe0ad6b0cd4324b4f35710575650f3",
+        "git_diff_hash": "d00dd243415946fcc011b7d41e1074b3057ea9784c9a15f640a3cf4ffb598919",
+        "runner_script_sha256": "4d99ad59b551029fc4fab5a79a84aa033982a99618882f101e0e62ebc7a18700",
+        "staged_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "unstaged_patch_sha256": "d00dd243415946fcc011b7d41e1074b3057ea9784c9a15f640a3cf4ffb598919",
+        "untracked_files_sha256": {},
+        "is_dirty": true,
+        "dirty_files_count": 5,
+        "dirty_files": [
+          "M crates/axiom-db/src/commit_graph.rs",
+          "M crates/axiom-db/src/lib.rs",
+          "M crates/axiom-db/tests/ast_db_test.rs",
+          "M crates/axiom-smt/src/z3_solver.rs",
+          "M examples/benchmark_eval/concurrent_runner.py"
+        ]
+      },
       "git_status": {
         "is_dirty": true,
-        "dirty_files_count": 6,
+        "dirty_files_count": 5,
         "dirty_files": [
-          "M crates/axiom-agent-pool/tests/concurrent_pool_test.rs",
           "M crates/axiom-db/src/commit_graph.rs",
           "M crates/axiom-db/src/lib.rs",
           "M crates/axiom-db/tests/ast_db_test.rs",
@@ -170,10 +206,10 @@
     "group3_axiom": {
       "status": "success",
       "total_tasks": 5,
-      "wall_clock_sec": 2.25,
+      "wall_clock_sec": 2.32,
       "worker_concurrency_sec": 0.0,
-      "combinator_latency_ms": 1188.94,
-      "smt_verify_sec": 0.61,
+      "combinator_latency_ms": 1281.82,
+      "smt_verify_sec": 0.6,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -193,14 +229,31 @@
         "tokens_to_proved": 1375
       },
       "formal_proved": true,
-      "git_commit_sha": "114768533e0a2168e61470a92a5838ddef6da714",
-      "git_tree_hash": "bafb4224a939945b930e5de4302d921ee0e486d2",
-      "git_diff_hash": "44f92a3dd590d2d2552383487c07b0484b6338658e00237e0e80a5e5e0c3d248",
+      "git_commit_sha": "4492184c820bbc15ef1295b7ac8664c94f1156d5",
+      "git_tree_hash": "3a9d0a2020fe0ad6b0cd4324b4f35710575650f3",
+      "git_diff_hash": "d00dd243415946fcc011b7d41e1074b3057ea9784c9a15f640a3cf4ffb598919",
+      "git_provenance": {
+        "git_commit": "4492184c820bbc15ef1295b7ac8664c94f1156d5",
+        "git_tree_hash": "3a9d0a2020fe0ad6b0cd4324b4f35710575650f3",
+        "git_diff_hash": "d00dd243415946fcc011b7d41e1074b3057ea9784c9a15f640a3cf4ffb598919",
+        "runner_script_sha256": "4d99ad59b551029fc4fab5a79a84aa033982a99618882f101e0e62ebc7a18700",
+        "staged_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "unstaged_patch_sha256": "d00dd243415946fcc011b7d41e1074b3057ea9784c9a15f640a3cf4ffb598919",
+        "untracked_files_sha256": {},
+        "is_dirty": true,
+        "dirty_files_count": 5,
+        "dirty_files": [
+          "M crates/axiom-db/src/commit_graph.rs",
+          "M crates/axiom-db/src/lib.rs",
+          "M crates/axiom-db/tests/ast_db_test.rs",
+          "M crates/axiom-smt/src/z3_solver.rs",
+          "M examples/benchmark_eval/concurrent_runner.py"
+        ]
+      },
       "git_status": {
         "is_dirty": true,
-        "dirty_files_count": 6,
+        "dirty_files_count": 5,
         "dirty_files": [
-          "M crates/axiom-agent-pool/tests/concurrent_pool_test.rs",
           "M crates/axiom-db/src/commit_graph.rs",
           "M crates/axiom-db/src/lib.rs",
           "M crates/axiom-db/tests/ast_db_test.rs",
@@ -275,7 +328,7 @@
       "cas_concurrency_benchmark": {
         "race_workers": 2,
         "success_submissions": 2,
-        "concurrency_elapsed_sec": 0.372,
+        "concurrency_elapsed_sec": 0.405,
         "stale_root_conflicts_observed": 1,
         "fast_forward_retries_succeeded": 1,
         "final_commit_chain_length": 2,
@@ -283,20 +336,20 @@
         "final_root": "#mod_8892410a4f9ec42e4507b5b4546f24373ed41f8430d7c1d8d71d0a8090dc4b56",
         "eval_mode": "mock",
         "is_mock": true,
-        "git_commit_sha": "114768533e0a2168e61470a92a5838ddef6da714",
-        "git_tree_hash": "bafb4224a939945b930e5de4302d921ee0e486d2",
+        "git_commit_sha": "4492184c820bbc15ef1295b7ac8664c94f1156d5",
+        "git_tree_hash": "3a9d0a2020fe0ad6b0cd4324b4f35710575650f3",
         "cas_events_by_worker": {
-          "worker_b": [],
-          "worker_a": [
+          "worker_a": [],
+          "worker_b": [
             {
               "StaleRootDetected": {
                 "expected": "#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed",
-                "current": "#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f"
+                "current": "#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d"
               }
             },
             {
               "RebaseSucceeded": {
-                "rebased_root": "#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f",
+                "rebased_root": "#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d",
                 "attempts": 1
               }
             }
@@ -304,12 +357,12 @@
         },
         "worker_a": {
           "returncode": 0,
-          "stdout": "{\n  \"hole\": \"hole_a\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": false,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [\n    {\n      \"StaleRootDetected\": {\n        \"expected\": \"#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed\",\n        \"current\": \"#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f\"\n      }\n    },\n    {\n      \"RebaseSucceeded\": {\n        \"rebased_root\": \"#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f\",\n        \"attempts\": 1\n      }\n    }\n  ],\n  \"counter_example\": null,\n  \"reason\": null\n}",
+          "stdout": "{\n  \"hole\": \"hole_a\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": false,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [],\n  \"counter_example\": null,\n  \"reason\": null\n}",
           "stderr": ""
         },
         "worker_b": {
           "returncode": 0,
-          "stdout": "{\n  \"hole\": \"hole_b\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": false,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [],\n  \"counter_example\": null,\n  \"reason\": null\n}",
+          "stdout": "{\n  \"hole\": \"hole_b\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": false,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [\n    {\n      \"StaleRootDetected\": {\n        \"expected\": \"#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed\",\n        \"current\": \"#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d\"\n      }\n    },\n    {\n      \"RebaseSucceeded\": {\n        \"rebased_root\": \"#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d\",\n        \"attempts\": 1\n      }\n    }\n  ],\n  \"counter_example\": null,\n  \"reason\": null\n}",
           "stderr": ""
         }
       },

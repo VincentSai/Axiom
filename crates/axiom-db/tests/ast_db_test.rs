@@ -674,6 +674,7 @@ fn receipt_binds_verification_profile_hash_and_invalidates_on_profile_mismatch()
                 .parse()
                 .unwrap(),
         verification_profile_hash: current_hash.clone(),
+        attested_commit_hash: None,
         verified_at: 1000,
     };
 
@@ -851,9 +852,8 @@ fn legacy_receipt_without_profile_deserializes_with_fallback_and_invalidates_cur
 fn test_mainline_commits_and_reattestation() {
     use axiom_ast::{BinaryOperator, Expr, FunctionDecl, FunctionParam, Module, Type};
     use axiom_db::{
-        compute_candidate_hash, compute_contract_hash, compute_envelope_hash,
-        current_verification_profile_hash, AstDatabase, Candidate, CasError, ProofLevel,
-        TaskEnvelope,
+        compute_contract_hash, compute_envelope_hash, current_verification_profile_hash,
+        AstDatabase, Candidate, CasError, ProofLevel, TaskEnvelope,
     };
 
     let mut db = AstDatabase::in_memory();
@@ -944,60 +944,41 @@ fn test_mainline_commits_and_reattestation() {
         author_agent_id: "agent_1".into(),
         timestamp: 1000,
     };
-    let cand_hash = compute_candidate_hash(&cand);
 
     // 1. 通过公共标准 CAS 接口将合法 candidate 提交落地到主线
     let commit1 = db
         .try_commit_candidate(&Some(root0), env.clone(), cand.clone(), None)
         .expect("first candidate commit should succeed");
-    let root1 = db.current_root();
     let head1 = db.head_commit().cloned();
     assert_eq!(head1, Some(commit1.commit_hash.clone()));
 
-    // 2. [Spec 1 & Spec 2] 测试主线落地见证核验：未落地的虚假 candidate 绝不可被签发重验认证
-    let fake_hash: NodeHash =
-        "#cand_9999999999999999999999999999999999999999999999999999999999999999"
-            .parse()
-            .unwrap();
-    let forge_res =
-        db.test_certify_reattestation_offline(&root1, &head1, "hole_1", &env_hash, &fake_hash);
+    // 2. [Spec 1 核心] 测试主线落地见证核验：未在主线落地的虚假 hole 绝不可被签发重验认证
+    let forge_res = db.reverify_and_reattest_hole("unlanded_hole");
     assert!(
         matches!(forge_res, Err(CasError::InvalidCandidate(_))),
         "未在主线落地的 candidate 必须被拦截"
     );
 
-    // 3. 正确生成基于主线落地见证的密封 CertifiedReattestation
-    let certified = db
-        .test_certify_reattestation_offline(&root1, &head1, "hole_1", &env_hash, &cand_hash)
-        .expect("certify_reattestation_offline for landed candidate should succeed");
-
-    assert_eq!(certified.evidence().obligations_checked(), 3);
-    assert_eq!(certified.target_hole_id(), "hole_1");
-
-    // 4. [Standards 4] 通过下沉深接口 reverify_and_reattest_hole 执行重新验证并原子提交
+    // 3. 通过公共安全接口 reverify_and_reattest_hole 执行重新验证并原子提交
     let commit2 = db
         .reverify_and_reattest_hole("hole_1")
         .expect("reverify_and_reattest_hole should succeed");
     let head2 = db.head_commit().cloned();
     assert_eq!(head2, Some(commit2.commit_hash.clone()));
     assert_eq!(commit2.parent_commit(), Some(&commit1.commit_hash));
+    // 强断言：no-op commit 的 attested_commit_hash 必须严格指向原始 landing commit！
+    assert_eq!(commit2.attested_commit_hash(), Some(&commit1.commit_hash));
 
-    // 验证收据是由 DB 权威铸造且与当前 Profile 绑定
+    // 验证收据是由 DB 权威铸造，与当前 Profile 绑定，且同样记录了 attested_commit_hash
     let rcpt = db.get_receipt(commit2.receipt_hash()).unwrap().unwrap();
     assert_eq!(rcpt.proof_level, ProofLevel::Proved);
     assert_eq!(
         rcpt.verification_profile_hash,
         current_verification_profile_hash()
     );
+    assert_eq!(rcpt.attested_commit_hash, Some(commit1.commit_hash.clone()));
 
-    // 5. [Spec 3] 双重 CAS 门禁验证：再次使用持有旧 head1 的 certified 提交，必须被 StaleHead 拦截！
-    let stale_head_res = db.try_commit_reattestation(certified);
-    assert!(
-        matches!(stale_head_res, Err(CasError::StaleHead { .. })),
-        "持有过期 head 的重签提交必须被双重 CAS 门禁拦截"
-    );
-
-    // 6. 验证 mainline_commits 严格正序且各提交自身哈希自洽
+    // 5. 验证 mainline_commits 严格正序且各提交自身哈希自洽
     let mainline = db.mainline_commits().expect("mainline should succeed");
     assert_eq!(mainline.len(), 2);
     assert_eq!(mainline[0].commit_hash, commit1.commit_hash);
@@ -1007,170 +988,143 @@ fn test_mainline_commits_and_reattestation() {
 }
 
 #[test]
-fn test_legacy_commits_migration_and_ancestry_repair() {
-    use axiom_ast::{Expr, FunctionDecl, Module, Type};
+fn test_forged_noop_receipt_without_landing_commit_is_rejected() {
     use axiom_db::{
-        compute_candidate_hash, compute_contract_hash, compute_envelope_hash, compute_expr_hash,
-        compute_legacy_commit_payload_hash, compute_module_hash, compute_proof_obligation_hash,
+        compute_candidate_hash, compute_commit_payload_hash, compute_contract_hash,
+        compute_envelope_hash, compute_expr_hash, compute_proof_obligation_hash,
         compute_receipt_hash, current_verification_profile_hash, AstDatabase, Candidate,
-        LegacyCommitPayload, NodeHash, ProofLevel, TaskEnvelope, VerificationReceipt,
+        CommitPayload, ProofLevel, TaskEnvelope, VerificationReceipt,
     };
 
-    let mut mod0 = Module::default();
-    mod0.functions.push(FunctionDecl {
-        name: "f1".into(),
-        params: vec![],
-        return_type: Type::Int,
-        effects: vec![],
-        requires: vec![],
-        ensures: vec![],
-        body: Expr::Hole("h1".into()),
-    });
-    mod0.functions.push(FunctionDecl {
-        name: "f2".into(),
-        params: vec![],
-        return_type: Type::Int,
-        effects: vec![],
-        requires: vec![],
-        ensures: vec![],
-        body: Expr::Hole("h2".into()),
-    });
-    let root0 = compute_module_hash(&mod0);
+    let temp_dir = std::env::temp_dir().join(format!("test_forged_noop_db_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let db_path = temp_dir.join("test_forged_noop.json");
 
-    let mut mod1 = mod0.clone();
-    mod1.functions[0].body = axiom_parser::parse_expr("1").unwrap();
-    let root1 = compute_module_hash(&mod1);
+    let mut db_file = AstDatabase::open(&db_path).unwrap();
+    let initial_mod = sample_verifiable_skeleton();
+    let _ = db_file.insert_module(&initial_mod).unwrap();
+    let initial_root = db_file.current_root().unwrap();
 
-    let mut mod2 = mod1.clone();
-    mod2.functions[1].body = axiom_parser::parse_expr("2").unwrap();
-    let root2 = compute_module_hash(&mod2);
+    let envelope = TaskEnvelope {
+        base_root_hash: Some(initial_root.clone()),
+        target_hole_id: "inc_impl".into(),
+        target_function: "increment".into(),
+        contract_hash: compute_contract_hash(&initial_mod.functions[0]),
+        dependency_hashes: vec![],
+    };
+    let env_hash = compute_envelope_hash(&envelope);
 
-    let mk_artifacts =
-        |base_root: Option<NodeHash>, fn_name: &str, hole_id: &str, expr_src: &str, ts: u64| {
-            let env = TaskEnvelope {
-                base_root_hash: base_root,
-                target_hole_id: hole_id.into(),
-                target_function: fn_name.into(),
-                contract_hash: compute_contract_hash(&mod0.functions[0]),
-                dependency_hashes: vec![],
-            };
-            let env_hash = compute_envelope_hash(&env);
-
-            let parsed_expr = axiom_parser::parse_expr(expr_src).unwrap();
-            let cand = Candidate {
-                envelope_hash: env_hash.clone(),
-                expression_source: expr_src.into(),
-                expression_hash: compute_expr_hash(&parsed_expr),
-                author_agent_id: "agent_1".into(),
-                timestamp: ts,
-            };
-            let cand_hash = compute_candidate_hash(&cand);
-
-            let rcpt = VerificationReceipt {
-                candidate_hash: cand_hash.clone(),
-                proof_level: ProofLevel::Proved,
-                solver: "z3".into(),
-                solver_version: "4.12.0".into(),
-                obligations_checked: 1,
-                proof_obligation_hash: compute_proof_obligation_hash(&mod0.functions[0]),
-                verification_profile_hash: current_verification_profile_hash(),
-                verified_at: ts,
-            };
-            let rcpt_hash = compute_receipt_hash(&rcpt);
-
-            (env_hash, env, cand_hash, cand, rcpt_hash, rcpt)
-        };
-
-    let (e1_h, e1, c1_h, c1, r1_h, r1) = mk_artifacts(Some(root0.clone()), "f1", "h1", "1", 100);
-    let (e2_h, e2, c2_h, c2, r2_h, r2) = mk_artifacts(Some(root1.clone()), "f2", "h2", "2", 200);
-
-    let leg_p1 = LegacyCommitPayload {
-        parent_root: Some(root0.clone()),
-        new_root: root1.clone(),
-        envelope_hash: e1_h.clone(),
-        candidate_hash: c1_h.clone(),
-        receipt_hash: r1_h.clone(),
+    let parsed_cand = axiom_parser::parse_expr("x + 1").unwrap();
+    let candidate = Candidate {
+        envelope_hash: env_hash.clone(),
+        expression_source: "x + 1".into(),
+        expression_hash: compute_expr_hash(&parsed_cand),
+        author_agent_id: "honest_worker".into(),
         timestamp: 100,
     };
-    let old_commit_hash_1 = compute_legacy_commit_payload_hash(&leg_p1);
 
-    let leg_p2 = LegacyCommitPayload {
-        parent_root: Some(root1.clone()),
-        new_root: root2.clone(),
-        envelope_hash: e2_h.clone(),
-        candidate_hash: c2_h.clone(),
-        receipt_hash: r2_h.clone(),
+    let commit1 = db_file
+        .try_commit_candidate(
+            &Some(initial_root),
+            envelope.clone(),
+            candidate.clone(),
+            None,
+        )
+        .expect("landing commit must succeed");
+    let current_root = db_file.current_root().unwrap();
+    drop(db_file);
+
+    // 攻击者试图伪造一个 no-op receipt-only commit:
+    // parent_root == current_root, new_root == current_root
+    // 但这个 no-op commit 故意不提供合法的 attested_commit_hash (例如缺失)
+    let fake_cand = Candidate {
+        envelope_hash: env_hash.clone(),
+        expression_source: "x + 999".into(),
+        expression_hash: compute_expr_hash(&axiom_parser::parse_expr("x + 999").unwrap()),
+        author_agent_id: "forger".into(),
         timestamp: 200,
     };
-    let old_commit_hash_2 = compute_legacy_commit_payload_hash(&leg_p2);
+    let fake_cand_hash = compute_candidate_hash(&fake_cand);
 
-    let legacy_json = serde_json::json!({
-        "root_ref": root2.as_str(),
-        "head_commit": null,
-        "modules": {
-            root0.as_str(): mod0,
-            root1.as_str(): mod1,
-            root2.as_str(): mod2
-        },
-        "envelopes": {
-            e1_h.as_str(): e1,
-            e2_h.as_str(): e2
-        },
-        "candidates": {
-            c1_h.as_str(): c1,
-            c2_h.as_str(): c2
-        },
-        "receipts": {
-            r1_h.as_str(): r1,
-            r2_h.as_str(): r2
-        },
-        "commits": {
-            old_commit_hash_1.as_str(): {
-                "commit_hash": old_commit_hash_1.as_str(),
-                "parent_root": root0.as_str(),
-                "new_root": root1.as_str(),
-                "envelope_hash": e1_h.as_str(),
-                "candidate_hash": c1_h.as_str(),
-                "receipt_hash": r1_h.as_str(),
-                "timestamp": 100
-            },
-            old_commit_hash_2.as_str(): {
-                "commit_hash": old_commit_hash_2.as_str(),
-                "parent_root": root1.as_str(),
-                "new_root": root2.as_str(),
-                "envelope_hash": e2_h.as_str(),
-                "candidate_hash": c2_h.as_str(),
-                "receipt_hash": r2_h.as_str(),
+    let fake_rcpt = VerificationReceipt {
+        candidate_hash: fake_cand_hash.clone(),
+        proof_level: ProofLevel::Proved,
+        solver: "z3".into(),
+        solver_version: "4.12.0".into(),
+        obligations_checked: 1,
+        proof_obligation_hash: compute_proof_obligation_hash(&initial_mod.functions[0]),
+        verification_profile_hash: current_verification_profile_hash(),
+        attested_commit_hash: None, // 恶意缺失 attested_commit_hash
+        verified_at: 200,
+    };
+    let fake_rcpt_hash = compute_receipt_hash(&fake_rcpt);
+
+    let fake_commit_payload = CommitPayload {
+        parent_commit: Some(commit1.commit_hash.clone()),
+        parent_root: Some(current_root.clone()),
+        new_root: current_root.clone(),
+        envelope_hash: env_hash.clone(),
+        candidate_hash: fake_cand_hash.clone(),
+        receipt_hash: fake_rcpt_hash.clone(),
+        attested_commit_hash: None,
+        timestamp: 200,
+    };
+    let fake_commit_hash = compute_commit_payload_hash(&fake_commit_payload);
+
+    // 将伪造提交写入文件，head 指向 fake_commit_hash
+    let content = std::fs::read_to_string(&db_path).unwrap();
+    let mut val: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+    val.get_mut("candidates")
+        .unwrap()
+        .as_object_mut()
+        .unwrap()
+        .insert(
+            fake_cand_hash.as_str().into(),
+            serde_json::to_value(&fake_cand).unwrap(),
+        );
+    val.get_mut("receipts")
+        .unwrap()
+        .as_object_mut()
+        .unwrap()
+        .insert(
+            fake_rcpt_hash.as_str().into(),
+            serde_json::to_value(&fake_rcpt).unwrap(),
+        );
+    val.get_mut("commits")
+        .unwrap()
+        .as_object_mut()
+        .unwrap()
+        .insert(
+            fake_commit_hash.as_str().into(),
+            serde_json::json!({
+                "commit_hash": fake_commit_hash.as_str(),
+                "parent_commit": commit1.commit_hash.as_str(),
+                "parent_root": current_root.as_str(),
+                "new_root": current_root.as_str(),
+                "envelope_hash": env_hash.as_str(),
+                "candidate_hash": fake_cand_hash.as_str(),
+                "receipt_hash": fake_rcpt_hash.as_str(),
                 "timestamp": 200
-            }
+            }),
+        );
+    val["head_commit"] = serde_json::Value::String(fake_commit_hash.as_str().into());
+    std::fs::write(&db_path, serde_json::to_string_pretty(&val).unwrap()).unwrap();
+
+    // 重新打开数据库：必须被 Fail-Closed 拦截！
+    let open_res = AstDatabase::open(&db_path);
+    match open_res {
+        Err(axiom_db::DbError::CorruptedCommitChain(msg)) => {
+            assert!(
+                msg.contains("missing required attested_commit_hash"),
+                "error message should indicate missing attested_commit_hash: {msg}"
+            );
         }
-    });
-
-    let temp_dir = std::env::temp_dir().join(format!("test_legacy_db_{}", std::process::id()));
-    let _ = std::fs::create_dir_all(&temp_dir);
-    let db_path = temp_dir.join("test_legacy.json");
-    std::fs::write(&db_path, serde_json::to_vec_pretty(&legacy_json).unwrap()).unwrap();
-
-    // 打开旧库，AstDatabase::open 内部自动触发因果自愈迁移与 Genesis 重算
-    let db = AstDatabase::open(&db_path).expect("open legacy db should trigger migration");
-    assert!(
-        db.head_commit().is_some(),
-        "head_commit must be repaired after migration"
-    );
-
-    let mainline = db
-        .mainline_commits()
-        .expect("mainline commits validation should succeed");
-    assert_eq!(mainline.len(), 2, "all legacy commits must be in mainline");
-    assert_eq!(mainline[1].parent_commit(), Some(&mainline[0].commit_hash));
-    assert!(
-        mainline[0].verify_self_hash(),
-        "migrated genesis self hash must be valid"
-    );
-    assert!(
-        mainline[1].verify_self_hash(),
-        "migrated c2 self hash must be valid"
-    );
+        other => panic!(
+            "expected open to reject un-attested no-op commit, got {:?}",
+            other
+        ),
+    }
 
     let _ = std::fs::remove_file(&db_path);
     let _ = std::fs::remove_dir_all(&temp_dir);
@@ -1242,6 +1196,7 @@ fn test_reattestation_deterministic_replay_rejects_mismatch() {
         obligations_checked: 3,
         proof_obligation_hash: commit.receipt_hash().clone(),
         verification_profile_hash: current_verification_profile_hash(),
+        attested_commit_hash: None,
         verified_at: 1000,
     };
     let rcpt_mismatch_hash = compute_receipt_hash(&rcpt_mismatch);
@@ -1520,120 +1475,130 @@ fn test_nested_hole_repeated_reattestation_success() {
 }
 
 #[test]
-fn test_tampered_legacy_payload_fails_closed_without_whitewashing() {
-    use axiom_ast::{Expr, FunctionDecl, Module, Type};
+fn test_noop_receipt_with_invalid_attested_commit_is_rejected() {
     use axiom_db::{
-        compute_candidate_hash, compute_contract_hash, compute_envelope_hash, compute_expr_hash,
-        compute_legacy_commit_payload_hash, compute_module_hash, compute_proof_obligation_hash,
-        compute_receipt_hash, current_verification_profile_hash, AstDatabase, Candidate, DbError,
-        LegacyCommitPayload, ProofLevel, TaskEnvelope, VerificationReceipt,
+        compute_commit_payload_hash, compute_contract_hash, compute_envelope_hash,
+        compute_expr_hash, compute_proof_obligation_hash, compute_receipt_hash,
+        current_verification_profile_hash, AstDatabase, Candidate, DbError, NodeHash, ProofLevel,
+        TaskEnvelope, VerificationReceipt,
     };
 
-    let mut mod0 = Module::default();
-    mod0.functions.push(FunctionDecl {
-        name: "f1".into(),
-        params: vec![],
-        return_type: Type::Int,
-        effects: vec![],
-        requires: vec![],
-        ensures: vec![],
-        body: Expr::Hole("h1".into()),
-    });
-    let root0 = compute_module_hash(&mod0);
+    let temp_dir =
+        std::env::temp_dir().join(format!("test_invalid_attested_db_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let db_path = temp_dir.join("test_invalid_attested.json");
 
-    let mut mod1 = mod0.clone();
-    mod1.functions[0].body = axiom_parser::parse_expr("1").unwrap();
-    let root1 = compute_module_hash(&mod1);
+    let mut db_file = AstDatabase::open(&db_path).unwrap();
+    let initial_mod = sample_verifiable_skeleton();
+    let _ = db_file.insert_module(&initial_mod).unwrap();
+    let initial_root = db_file.current_root().unwrap();
 
-    let env = TaskEnvelope {
-        base_root_hash: Some(root0.clone()),
-        target_hole_id: "h1".into(),
-        target_function: "f1".into(),
-        contract_hash: compute_contract_hash(&mod0.functions[0]),
+    let envelope = TaskEnvelope {
+        base_root_hash: Some(initial_root.clone()),
+        target_hole_id: "inc_impl".into(),
+        target_function: "increment".into(),
+        contract_hash: compute_contract_hash(&initial_mod.functions[0]),
         dependency_hashes: vec![],
     };
-    let env_hash = compute_envelope_hash(&env);
+    let env_hash = compute_envelope_hash(&envelope);
 
-    let parsed_expr = axiom_parser::parse_expr("1").unwrap();
-    let cand = Candidate {
+    let parsed_cand = axiom_parser::parse_expr("x + 1").unwrap();
+    let candidate = Candidate {
         envelope_hash: env_hash.clone(),
-        expression_source: "1".into(),
-        expression_hash: compute_expr_hash(&parsed_expr),
-        author_agent_id: "agent_1".into(),
+        expression_source: "x + 1".into(),
+        expression_hash: compute_expr_hash(&parsed_cand),
+        author_agent_id: "honest_worker".into(),
         timestamp: 100,
     };
-    let cand_hash = compute_candidate_hash(&cand);
 
-    let rcpt = VerificationReceipt {
-        candidate_hash: cand_hash.clone(),
+    let commit1 = db_file
+        .try_commit_candidate(
+            &Some(initial_root),
+            envelope.clone(),
+            candidate.clone(),
+            None,
+        )
+        .expect("landing commit must succeed");
+    let current_root = db_file.current_root().unwrap();
+    drop(db_file);
+
+    // 构造一个 no-op commit，其 attested_commit_hash 指向不存在的祖先提交
+    let invalid_attested_hash: NodeHash =
+        "#commit_0000000000000000000000000000000000000000000000000000000000000000"
+            .parse()
+            .unwrap();
+
+    let fake_rcpt = VerificationReceipt {
+        candidate_hash: commit1.candidate_hash().clone(),
         proof_level: ProofLevel::Proved,
         solver: "z3".into(),
         solver_version: "4.12.0".into(),
         obligations_checked: 1,
-        proof_obligation_hash: compute_proof_obligation_hash(&mod0.functions[0]),
+        proof_obligation_hash: compute_proof_obligation_hash(&initial_mod.functions[0]),
         verification_profile_hash: current_verification_profile_hash(),
-        verified_at: 100,
+        attested_commit_hash: Some(invalid_attested_hash.clone()),
+        verified_at: 200,
     };
-    let rcpt_hash = compute_receipt_hash(&rcpt);
+    let fake_rcpt_hash = compute_receipt_hash(&fake_rcpt);
 
-    let leg_p1 = LegacyCommitPayload {
-        parent_root: Some(root0.clone()),
-        new_root: root1.clone(),
-        envelope_hash: env_hash.clone(),
-        candidate_hash: cand_hash.clone(),
-        receipt_hash: rcpt_hash.clone(),
-        timestamp: 100,
+    let fake_commit_payload = axiom_db::CommitPayload {
+        parent_commit: Some(commit1.commit_hash.clone()),
+        parent_root: Some(current_root.clone()),
+        new_root: current_root.clone(),
+        envelope_hash: env_hash,
+        candidate_hash: commit1.candidate_hash().clone(),
+        receipt_hash: fake_rcpt_hash.clone(),
+        attested_commit_hash: Some(invalid_attested_hash.clone()),
+        timestamp: 200,
     };
-    let old_commit_hash = compute_legacy_commit_payload_hash(&leg_p1);
+    let fake_commit_hash = compute_commit_payload_hash(&fake_commit_payload);
 
-    // [Spec 2 核心] 构造一个被恶意篡改的旧提交：将 candidate_hash 替换为伪造值，
-    // 但 map key 与 commit_hash 仍然是旧的 old_commit_hash。
-    // 如果没有 LegacyCommitPayload 预验真，此损坏数据将在迁移时被重新计算新 hash 并“洗白”为合法提交！
-    let fake_cand_hash = "#cand_9999999999999999999999999999999999999999999999999999999999999999";
-    let legacy_json = serde_json::json!({
-        "root_ref": root1.as_str(),
-        "head_commit": null,
-        "modules": {
-            root0.as_str(): mod0,
-            root1.as_str(): mod1
-        },
-        "envelopes": {
-            env_hash.as_str(): env
-        },
-        "candidates": {
-            cand_hash.as_str(): cand
-        },
-        "receipts": {
-            rcpt_hash.as_str(): rcpt
-        },
-        "commits": {
-            old_commit_hash.as_str(): {
-                "commit_hash": old_commit_hash.as_str(),
-                "parent_root": root0.as_str(),
-                "new_root": root1.as_str(),
-                "envelope_hash": env_hash.as_str(),
-                "candidate_hash": fake_cand_hash,
-                "receipt_hash": rcpt_hash.as_str(),
-                "timestamp": 100
-            }
-        }
-    });
+    let content = std::fs::read_to_string(&db_path).unwrap();
+    let mut val: serde_json::Value = serde_json::from_str(&content).unwrap();
 
-    let temp_dir = std::env::temp_dir().join(format!("test_whitewash_db_{}", std::process::id()));
-    let _ = std::fs::create_dir_all(&temp_dir);
-    let db_path = temp_dir.join("test_whitewash.json");
-    std::fs::write(&db_path, serde_json::to_vec_pretty(&legacy_json).unwrap()).unwrap();
+    val.get_mut("receipts")
+        .unwrap()
+        .as_object_mut()
+        .unwrap()
+        .insert(
+            fake_rcpt_hash.as_str().into(),
+            serde_json::to_value(&fake_rcpt).unwrap(),
+        );
+    val.get_mut("commits")
+        .unwrap()
+        .as_object_mut()
+        .unwrap()
+        .insert(
+            fake_commit_hash.as_str().into(),
+            serde_json::json!({
+                "commit_hash": fake_commit_hash.as_str(),
+                "parent_commit": commit1.commit_hash.as_str(),
+                "parent_root": current_root.as_str(),
+                "new_root": current_root.as_str(),
+                "envelope_hash": commit1.envelope_hash().as_str(),
+                "candidate_hash": commit1.candidate_hash().as_str(),
+                "receipt_hash": fake_rcpt_hash.as_str(),
+                "attested_commit_hash": invalid_attested_hash.as_str(),
+                "timestamp": 200
+            }),
+        );
+    val["head_commit"] = serde_json::Value::String(fake_commit_hash.as_str().into());
+    std::fs::write(&db_path, serde_json::to_string_pretty(&val).unwrap()).unwrap();
 
-    // 严密断言：AstDatabase::open 必须在迁移预验真阶段立即拒绝，绝不写脏盘！
+    // 重新打开数据库：必须被 Fail-Closed 拦截！
     let open_res = AstDatabase::open(&db_path);
     match open_res {
         Err(DbError::CorruptedCommitChain(msg)) => {
             assert!(
-                msg.contains("legacy commit hash mismatch"),
-                "error message should indicate legacy hash mismatch: {msg}"
+                msg.contains("is not an ancestor in the active mainline history")
+                    || msg.contains("attested landing commit"),
+                "error message should indicate invalid attested commit: {msg}"
             );
         }
-        other => panic!("expected legacy commit hash mismatch, got {:?}", other),
+        other => panic!(
+            "expected open to reject invalid attested commit, got {:?}",
+            other
+        ),
     }
 
     let _ = std::fs::remove_file(&db_path);

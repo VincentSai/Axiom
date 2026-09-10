@@ -242,6 +242,8 @@ pub struct VerificationReceipt {
     pub proof_obligation_hash: NodeHash,
     #[serde(default = "legacy_verification_profile_hash")]
     pub verification_profile_hash: NodeHash,
+    #[serde(default)]
+    pub attested_commit_hash: Option<NodeHash>,
     pub verified_at: u64,
 }
 
@@ -306,6 +308,8 @@ pub struct CommitPayload {
     pub envelope_hash: NodeHash,
     pub candidate_hash: NodeHash,
     pub receipt_hash: NodeHash,
+    #[serde(default)]
+    pub attested_commit_hash: Option<NodeHash>,
     pub timestamp: u64,
 }
 
@@ -364,6 +368,11 @@ impl CommitRecord {
         &self.payload.receipt_hash
     }
 
+    /// Access optional attested commit hash (for receipt-only no-op commits).
+    pub fn attested_commit_hash(&self) -> Option<&NodeHash> {
+        self.payload.attested_commit_hash.as_ref()
+    }
+
     /// Access commit timestamp.
     pub fn timestamp(&self) -> u64 {
         self.payload.timestamp
@@ -387,17 +396,17 @@ pub fn compute_commit_hash(commit: &CommitRecord) -> NodeHash {
 
 /// Legacy commit payload (6 fields) used in pre-ancestry DAG database schemas.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct LegacyCommitPayload {
-    pub parent_root: Option<NodeHash>,
-    pub new_root: NodeHash,
-    pub envelope_hash: NodeHash,
-    pub candidate_hash: NodeHash,
-    pub receipt_hash: NodeHash,
-    pub timestamp: u64,
+pub(crate) struct LegacyCommitPayload {
+    pub(crate) parent_root: Option<NodeHash>,
+    pub(crate) new_root: NodeHash,
+    pub(crate) envelope_hash: NodeHash,
+    pub(crate) candidate_hash: NodeHash,
+    pub(crate) receipt_hash: NodeHash,
+    pub(crate) timestamp: u64,
 }
 
 /// Computes content identifier for a legacy commit payload.
-pub fn compute_legacy_commit_payload_hash(payload: &LegacyCommitPayload) -> NodeHash {
+pub(crate) fn compute_legacy_commit_payload_hash(payload: &LegacyCommitPayload) -> NodeHash {
     compute_hash("commit", payload)
 }
 
@@ -689,6 +698,7 @@ impl CommitTip {
 pub struct CertifiedReattestation {
     pub(crate) expected_tip: CommitTip,
     pub(crate) target_hole_id: String,
+    pub(crate) attested_commit_hash: NodeHash,
     pub(crate) evidence: CertifiedProofEvidence,
 }
 
@@ -704,6 +714,9 @@ impl CertifiedReattestation {
     }
     pub fn target_hole_id(&self) -> &str {
         &self.target_hole_id
+    }
+    pub fn attested_commit_hash(&self) -> &NodeHash {
+        &self.attested_commit_hash
     }
     pub fn evidence(&self) -> &CertifiedProofEvidence {
         &self.evidence
@@ -1254,6 +1267,7 @@ impl AstDatabase {
         Ok(CertifiedReattestation {
             expected_tip: tip.clone(),
             target_hole_id: target_hole_id.to_string(),
+            attested_commit_hash: landing_commit.commit_hash.clone(),
             evidence,
         })
     }
@@ -1272,6 +1286,7 @@ impl AstDatabase {
 
     /// Performs offline theorem proving and verification for re-attesting an existing hole implementation
     /// without holding database locks. Returns a sealed CertifiedReattestation.
+    #[allow(dead_code)]
     pub(crate) fn certify_reattestation_offline(
         &self,
         tip: &CommitTip,
@@ -1285,19 +1300,6 @@ impl AstDatabase {
             Some(envelope_hash),
             Some(candidate_hash),
         )
-    }
-
-    #[doc(hidden)]
-    pub fn test_certify_reattestation_offline(
-        &self,
-        expected_root: &Option<NodeHash>,
-        expected_head: &Option<NodeHash>,
-        target_hole_id: &str,
-        envelope_hash: &NodeHash,
-        candidate_hash: &NodeHash,
-    ) -> Result<CertifiedReattestation, CasError> {
-        let tip = CommitTip::new(expected_root.clone(), expected_head.clone());
-        self.certify_reattestation_offline(&tip, target_hole_id, envelope_hash, candidate_hash)
     }
 
     /// Two-phase commit Phase 2: Atomically applies a certified verification candidate to the CAS database.
@@ -1383,6 +1385,7 @@ impl AstDatabase {
             obligations_checked: certified.evidence.obligations_checked,
             proof_obligation_hash: certified.evidence.proof_obligation_hash,
             verification_profile_hash: current_verification_profile_hash(),
+            attested_commit_hash: None,
             verified_at: candidate.timestamp,
         };
         let rcpt_hash = compute_receipt_hash(&receipt);
@@ -1399,6 +1402,7 @@ impl AstDatabase {
             envelope_hash: env_hash,
             candidate_hash: cand_hash,
             receipt_hash: rcpt_hash,
+            attested_commit_hash: None,
             timestamp: candidate.timestamp,
         };
         self.append_commit(&mut next_state, payload, Some(&envelope.target_hole_id))
@@ -1465,6 +1469,7 @@ impl AstDatabase {
             obligations_checked: certified.evidence.obligations_checked,
             proof_obligation_hash: certified.evidence.proof_obligation_hash,
             verification_profile_hash: current_verification_profile_hash(),
+            attested_commit_hash: Some(certified.attested_commit_hash.clone()),
             verified_at: timestamp,
         };
         let rcpt_hash = compute_receipt_hash(&receipt);
@@ -1478,6 +1483,7 @@ impl AstDatabase {
             envelope_hash: certified.evidence.envelope_hash,
             candidate_hash: certified.evidence.candidate_hash,
             receipt_hash: rcpt_hash,
+            attested_commit_hash: Some(certified.attested_commit_hash),
             timestamp,
         };
         self.append_commit(&mut next_state, payload, Some(&certified.target_hole_id))
@@ -2000,6 +2006,7 @@ mod tests {
                     obligations_checked: 1,
                     proof_obligation_hash: compute_proof_obligation_hash(&mod0.functions[0]),
                     verification_profile_hash: current_verification_profile_hash(),
+                    attested_commit_hash: None,
                     verified_at: ts,
                 };
                 let rcpt_hash = compute_receipt_hash(&rcpt);
@@ -2051,6 +2058,7 @@ mod tests {
                     envelope_hash: env_hash,
                     candidate_hash: cand_hash,
                     receipt_hash: rcpt_hash,
+                    attested_commit_hash: None,
                     timestamp: ts,
                 },
             }
@@ -2081,5 +2089,168 @@ mod tests {
         for c in &mainline {
             assert!(c.verify_self_hash());
         }
+    }
+
+    #[test]
+    fn test_internal_tampered_legacy_payload_fails_closed_without_whitewashing() {
+        let mut state = DatabaseState::default();
+
+        let mut mod0 = Module::default();
+        mod0.functions.push(FunctionDecl {
+            name: "f1".into(),
+            params: vec![],
+            return_type: Type::Int,
+            effects: vec![],
+            requires: vec![],
+            ensures: vec![],
+            body: Expr::Hole("h1".into()),
+        });
+        let root0 = compute_module_hash(&mod0);
+
+        let mut mod1 = mod0.clone();
+        mod1.functions[0].body = axiom_parser::parse_expr("1").unwrap();
+        let root1 = compute_module_hash(&mod1);
+
+        state.modules.insert(root0.clone(), mod0.clone());
+        state.modules.insert(root1.clone(), mod1);
+
+        let env = TaskEnvelope {
+            base_root_hash: Some(root0.clone()),
+            target_hole_id: "h1".into(),
+            target_function: "f1".into(),
+            contract_hash: compute_contract_hash(&mod0.functions[0]),
+            dependency_hashes: vec![],
+        };
+        let env_hash = compute_envelope_hash(&env);
+
+        let parsed_expr = axiom_parser::parse_expr("1").unwrap();
+        let cand = Candidate {
+            envelope_hash: env_hash.clone(),
+            expression_source: "1".into(),
+            expression_hash: compute_expr_hash(&parsed_expr),
+            author_agent_id: "test_agent".into(),
+            timestamp: 100,
+        };
+        let cand_hash = compute_candidate_hash(&cand);
+
+        let rcpt = VerificationReceipt {
+            candidate_hash: cand_hash.clone(),
+            proof_level: ProofLevel::Proved,
+            solver: "z3".into(),
+            solver_version: "4.12.0".into(),
+            obligations_checked: 1,
+            proof_obligation_hash: compute_proof_obligation_hash(&mod0.functions[0]),
+            verification_profile_hash: current_verification_profile_hash(),
+            attested_commit_hash: None,
+            verified_at: 100,
+        };
+        let rcpt_hash = compute_receipt_hash(&rcpt);
+
+        state.envelopes.insert(env_hash.clone(), env);
+        state.candidates.insert(cand_hash.clone(), cand);
+        state.receipts.insert(rcpt_hash.clone(), rcpt);
+
+        let leg_payload = LegacyCommitPayload {
+            parent_root: Some(root0),
+            new_root: root1.clone(),
+            envelope_hash: env_hash.clone(),
+            candidate_hash: cand_hash.clone(),
+            receipt_hash: rcpt_hash.clone(),
+            timestamp: 100,
+        };
+        let honest_hash = compute_legacy_commit_payload_hash(&leg_payload);
+
+        let tampered_record = CommitRecord {
+            commit_hash: honest_hash.clone(),
+            payload: CommitPayload {
+                parent_commit: None,
+                parent_root: None,
+                new_root: root1.clone(),
+                envelope_hash: env_hash,
+                candidate_hash: cand_hash,
+                receipt_hash: rcpt_hash,
+                attested_commit_hash: None,
+                timestamp: 999,
+            },
+        };
+
+        state.commits.insert(honest_hash, tampered_record);
+        state.root_ref = Some(root1);
+        state.head_commit = None;
+
+        let res = AstDatabase::migrate_legacy_commits_if_needed(&mut state);
+        match res {
+            Err(DbError::CorruptedCommitChain(msg)) => {
+                assert!(
+                    msg.contains("legacy commit hash mismatch"),
+                    "expected legacy commit hash mismatch, got: {msg}"
+                );
+            }
+            other => panic!(
+                "expected migration to fail-closed on tampered legacy payload, got: {other:?}"
+            ),
+        }
+    }
+
+    #[test]
+    fn test_internal_reattestation_offline_binding_and_strict_cas() {
+        let mut db = AstDatabase::in_memory();
+        let mod0 = axiom_parser::parse_module(
+            r#"
+            fn increment(x: Int) -> Int
+                requires { x >= 0, x < 1000000 }
+                ensures { result > x }
+            {
+                ?inc_impl
+            }
+            "#,
+        )
+        .expect("skeleton must parse");
+
+        let mod_rec = db.insert_module(&mod0).unwrap();
+        let root0 = mod_rec.module_hash;
+        db.initialize_root(root0.clone()).unwrap();
+
+        let env = TaskEnvelope {
+            base_root_hash: Some(root0.clone()),
+            target_hole_id: "inc_impl".into(),
+            target_function: "increment".into(),
+            contract_hash: compute_contract_hash(&mod0.functions[0]),
+            dependency_hashes: vec![],
+        };
+        let env_hash = compute_envelope_hash(&env);
+
+        let parsed_cand = axiom_parser::parse_expr("x + 1").unwrap();
+        let cand = Candidate {
+            envelope_hash: env_hash.clone(),
+            expression_source: "x + 1".into(),
+            expression_hash: compute_expr_hash(&parsed_cand),
+            author_agent_id: "agent_1".into(),
+            timestamp: 1000,
+        };
+        let cand_hash = compute_candidate_hash(&cand);
+
+        let commit1 = db
+            .try_commit_candidate(&Some(root0), env, cand, None)
+            .expect("first candidate commit should succeed");
+
+        let tip = db.commit_tip();
+        let certified = db
+            .certify_reattestation_offline(&tip, "inc_impl", &env_hash, &cand_hash)
+            .expect("certify_reattestation_offline should succeed");
+
+        assert_eq!(certified.attested_commit_hash(), &commit1.commit_hash);
+
+        let commit2 = db
+            .try_commit_reattestation(certified.clone())
+            .expect("try_commit_reattestation should succeed");
+        assert_eq!(commit2.attested_commit_hash(), Some(&commit1.commit_hash));
+
+        // 双重 CAS 校验：再次使用持有旧 head (commit1) 的 certified 提交，必须被 StaleHead 拦截！
+        let stale_res = db.try_commit_reattestation(certified);
+        assert!(
+            matches!(stale_res, Err(CasError::StaleHead { .. })),
+            "stale certified reattestation must be rejected by double CAS"
+        );
     }
 }
