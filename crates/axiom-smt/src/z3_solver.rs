@@ -67,13 +67,32 @@ pub struct TimeoutPolicy {
     pub poll_interval: std::time::Duration,
 }
 
+#[inline]
+fn configure_process_command(cmd: &mut Command) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+    let _ = cmd;
+}
+
 /// Forcefully terminates a child process and all its descendants to release pipe handles.
-pub fn kill_process_tree(child: &mut std::process::Child) {
+fn kill_process_tree(child: &mut std::process::Child) {
     let pid = child.id();
     #[cfg(windows)]
     {
         let _ = Command::new("taskkill")
             .args(["/F", "/T", "/PID", &pid.to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .output();
+    }
+    #[cfg(unix)]
+    {
+        let _ = Command::new("kill")
+            .args(["-9", &format!("-{}", pid)])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -131,12 +150,12 @@ impl TimeoutPolicy {
 
 /// Retrieves the dynamically detected version string of Z3 executable with hard timeout watchdog.
 pub fn get_z3_version(z3_path: &Path) -> String {
-    let mut child = match Command::new(z3_path)
-        .arg("--version")
+    let mut cmd = Command::new(z3_path);
+    cmd.arg("--version")
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-    {
+        .stderr(std::process::Stdio::null());
+    configure_process_command(&mut cmd);
+    let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(_) => return "unknown".to_string(),
     };
@@ -180,13 +199,15 @@ pub fn run_z3_query_with_timeout(
     let global_deadline =
         std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms as u64 + 1500);
 
-    let mut child = Command::new(z3_path)
-        .arg("-in")
+    let mut cmd = Command::new(z3_path);
+    cmd.arg("-in")
         .arg("-smt2")
         .arg(format!("-t:{}", timeout_ms))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    configure_process_command(&mut cmd);
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to spawn z3 at {}: {}", z3_path.display(), e))?;
 

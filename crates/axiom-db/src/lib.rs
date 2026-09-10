@@ -449,6 +449,10 @@ pub enum CasError {
         current: Option<NodeHash>,
         expected: Option<NodeHash>,
     },
+    StaleHead {
+        current: Option<NodeHash>,
+        expected: Option<NodeHash>,
+    },
     InvalidReceipt(String),
     InvalidCandidate(String),
     InvalidEnvelope(String),
@@ -475,6 +479,11 @@ impl fmt::Display for CasError {
             Self::StaleRoot { current, expected } => write!(
                 f,
                 "CAS rejected: stale root ref (expected `{:?}`, current is `{:?}`)",
+                expected, current
+            ),
+            Self::StaleHead { current, expected } => write!(
+                f,
+                "CAS rejected: stale head commit ref (expected `{:?}`, current is `{:?}`)",
                 expected, current
             ),
             Self::InvalidReceipt(msg) => {
@@ -535,25 +544,20 @@ impl From<serde_json::Error> for CasError {
     }
 }
 
-/// Kernel-minted cryptographic verification certificate computed offline without database locks.
-/// This certificate is sealed: it cannot be constructed from outside axiom-db or deserialized arbitrarily.
-#[derive(Debug, Clone, PartialEq)]
-pub struct CertifiedVerification {
-    pub(crate) base_root_hash: Option<NodeHash>,
+/// Kernel-minted cryptographic proof evidence computed offline by the SMT engine.
+/// This evidence is sealed and can only be constructed within the axiom-db kernel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CertifiedProofEvidence {
     pub(crate) envelope_hash: NodeHash,
     pub(crate) candidate_hash: NodeHash,
     pub(crate) proof_obligation_hash: NodeHash,
-    pub(crate) derived_module: Module,
     pub(crate) solver: String,
     pub(crate) solver_version: String,
     pub(crate) obligations_checked: usize,
     pub(crate) _sealed: (),
 }
 
-impl CertifiedVerification {
-    pub fn base_root_hash(&self) -> Option<&NodeHash> {
-        self.base_root_hash.as_ref()
-    }
+impl CertifiedProofEvidence {
     pub fn envelope_hash(&self) -> &NodeHash {
         &self.envelope_hash
     }
@@ -563,9 +567,6 @@ impl CertifiedVerification {
     pub fn proof_obligation_hash(&self) -> &NodeHash {
         &self.proof_obligation_hash
     }
-    pub fn derived_module(&self) -> &Module {
-        &self.derived_module
-    }
     pub fn solver(&self) -> &str {
         &self.solver
     }
@@ -574,6 +575,83 @@ impl CertifiedVerification {
     }
     pub fn obligations_checked(&self) -> usize {
         self.obligations_checked
+    }
+}
+
+/// Unified SMT theorem proving validator extracting solver metadata or returning strict CasError.
+fn require_proved(
+    smt_result: axiom_smt::SmtResult,
+    target_name: &str,
+) -> Result<(String, String, usize), CasError> {
+    match smt_result {
+        axiom_smt::SmtResult::Proved {
+            solver,
+            version,
+            obligations_checked,
+        } => Ok((solver, version, obligations_checked)),
+        axiom_smt::SmtResult::VacuousContract { reason } => {
+            Err(CasError::VacuousContract(reason))
+        }
+        axiom_smt::SmtResult::CounterExample(ce) => {
+            Err(CasError::VerificationRejected(format!(
+                "SMT counterexample found for `{target_name}`: {:?}",
+                ce
+            )))
+        }
+        axiom_smt::SmtResult::Sampled { points_checked } => {
+            Err(CasError::UnverifiedCandidate(format!(
+                "candidate for `{target_name}` was only heuristically sampled ({points_checked} points), strict mathematical proof required"
+            )))
+        }
+        axiom_smt::SmtResult::Unknown(reason) => {
+            Err(CasError::UnverifiedCandidate(format!(
+                "SMT solver returned unknown for `{target_name}`: {reason}"
+            )))
+        }
+        axiom_smt::SmtResult::Skipped(reason) => {
+            Err(CasError::UnverifiedCandidate(format!(
+                "verification skipped for `{target_name}`: {reason}"
+            )))
+        }
+    }
+}
+
+/// Kernel-minted cryptographic verification certificate computed offline without database locks.
+/// This certificate is sealed: it cannot be constructed from outside axiom-db or deserialized arbitrarily.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CertifiedVerification {
+    pub(crate) base_root_hash: Option<NodeHash>,
+    pub(crate) derived_module: Module,
+    pub(crate) evidence: CertifiedProofEvidence,
+}
+
+impl CertifiedVerification {
+    pub fn base_root_hash(&self) -> Option<&NodeHash> {
+        self.base_root_hash.as_ref()
+    }
+    pub fn derived_module(&self) -> &Module {
+        &self.derived_module
+    }
+    pub fn evidence(&self) -> &CertifiedProofEvidence {
+        &self.evidence
+    }
+    pub fn envelope_hash(&self) -> &NodeHash {
+        &self.evidence.envelope_hash
+    }
+    pub fn candidate_hash(&self) -> &NodeHash {
+        &self.evidence.candidate_hash
+    }
+    pub fn proof_obligation_hash(&self) -> &NodeHash {
+        &self.evidence.proof_obligation_hash
+    }
+    pub fn solver(&self) -> &str {
+        &self.evidence.solver
+    }
+    pub fn solver_version(&self) -> &str {
+        &self.evidence.solver_version
+    }
+    pub fn obligations_checked(&self) -> usize {
+        self.evidence.obligations_checked
     }
 }
 
@@ -582,68 +660,69 @@ impl CertifiedVerification {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CertifiedReattestation {
     pub(crate) expected_root: Option<NodeHash>,
+    pub(crate) expected_head: Option<NodeHash>,
     pub(crate) target_hole_id: String,
-    pub(crate) envelope_hash: NodeHash,
-    pub(crate) candidate_hash: NodeHash,
-    pub(crate) proof_obligation_hash: NodeHash,
-    pub(crate) solver: String,
-    pub(crate) solver_version: String,
-    pub(crate) obligations_checked: usize,
-    pub(crate) _sealed: (),
+    pub(crate) evidence: CertifiedProofEvidence,
 }
 
 impl CertifiedReattestation {
     pub fn expected_root(&self) -> Option<&NodeHash> {
         self.expected_root.as_ref()
     }
+    pub fn expected_head(&self) -> Option<&NodeHash> {
+        self.expected_head.as_ref()
+    }
     pub fn target_hole_id(&self) -> &str {
         &self.target_hole_id
     }
+    pub fn evidence(&self) -> &CertifiedProofEvidence {
+        &self.evidence
+    }
     pub fn envelope_hash(&self) -> &NodeHash {
-        &self.envelope_hash
+        &self.evidence.envelope_hash
     }
     pub fn candidate_hash(&self) -> &NodeHash {
-        &self.candidate_hash
+        &self.evidence.candidate_hash
     }
     pub fn proof_obligation_hash(&self) -> &NodeHash {
-        &self.proof_obligation_hash
+        &self.evidence.proof_obligation_hash
     }
     pub fn solver(&self) -> &str {
-        &self.solver
+        &self.evidence.solver
     }
     pub fn solver_version(&self) -> &str {
-        &self.solver_version
+        &self.evidence.solver_version
     }
     pub fn obligations_checked(&self) -> usize {
-        self.obligations_checked
+        self.evidence.obligations_checked
     }
 }
 
 /// Internal storage state of the AST database, accessible within transactions.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct DatabaseState {
+pub(crate) struct DatabaseState {
     #[serde(default)]
-    pub root_ref: Option<NodeHash>,
+    pub(crate) root_ref: Option<NodeHash>,
     #[serde(default)]
-    pub head_commit: Option<NodeHash>,
+    pub(crate) head_commit: Option<NodeHash>,
     #[serde(default)]
-    pub types: BTreeMap<NodeHash, TypeDef>,
+    pub(crate) types: BTreeMap<NodeHash, TypeDef>,
     #[serde(default)]
-    pub functions: BTreeMap<NodeHash, FunctionDecl>,
+    pub(crate) functions: BTreeMap<NodeHash, FunctionDecl>,
     #[serde(default)]
-    pub effects: BTreeMap<NodeHash, EffectDecl>,
+    pub(crate) effects: BTreeMap<NodeHash, EffectDecl>,
     #[serde(default)]
-    pub modules: BTreeMap<NodeHash, Module>,
+    pub(crate) modules: BTreeMap<NodeHash, Module>,
     #[serde(default)]
-    pub envelopes: BTreeMap<NodeHash, TaskEnvelope>,
+    pub(crate) envelopes: BTreeMap<NodeHash, TaskEnvelope>,
     #[serde(default)]
-    pub candidates: BTreeMap<NodeHash, Candidate>,
+    pub(crate) candidates: BTreeMap<NodeHash, Candidate>,
     #[serde(default)]
-    pub receipts: BTreeMap<NodeHash, VerificationReceipt>,
+    pub(crate) receipts: BTreeMap<NodeHash, VerificationReceipt>,
     #[serde(default)]
-    pub commits: BTreeMap<NodeHash, CommitRecord>,
+    pub(crate) commits: BTreeMap<NodeHash, CommitRecord>,
     #[serde(default)]
-    pub drafts: BTreeMap<String, DraftRecord>,
+    pub(crate) drafts: BTreeMap<String, DraftRecord>,
 }
 
 /// A content-addressed AST database backed by a JSON file or memory.
@@ -685,54 +764,91 @@ pub fn derive_candidate_module(
 impl AstDatabase {
     /// 针对缺少 head_commit 的旧版本数据库，执行自愈迁移：
     /// 依据 root 链拓扑关系（parent_root -> new_root）及时间戳重建 parent_commit 祖先链，并推举最新提交为 head_commit。
-    pub fn migrate_legacy_commits_if_needed(state: &mut DatabaseState) -> bool {
+    pub(crate) fn migrate_legacy_commits_if_needed(state: &mut DatabaseState) -> bool {
         if state.head_commit.is_some() || state.commits.is_empty() {
             return false;
         }
 
-        let mut commit_list: Vec<CommitRecord> = state.commits.values().cloned().collect();
-        commit_list.sort_by_key(|c| (c.timestamp(), c.commit_hash.clone()));
+        let commit_list: Vec<CommitRecord> = state.commits.values().cloned().collect();
 
-        let mut root_to_commit: HashMap<Option<NodeHash>, CommitRecord> = HashMap::new();
+        // 收集所有提交产生的 new_root
+        let all_new_roots: HashSet<&NodeHash> = commit_list.iter().map(|c| c.new_root()).collect();
+
+        // [Spec 4] Genesis commit：其 parent_root 绝不属于库中任何其他提交的 new_root
+        let mut genesis_commits: Vec<&CommitRecord> = commit_list
+            .iter()
+            .filter(|c| {
+                c.parent_root()
+                    .map(|pr| !all_new_roots.contains(pr))
+                    .unwrap_or(true)
+            })
+            .collect();
+        genesis_commits.sort_by_key(|c| (c.timestamp(), c.commit_hash.clone()));
+
+        let mut root_to_child: HashMap<NodeHash, Vec<CommitRecord>> = HashMap::new();
         for c in &commit_list {
-            root_to_commit.insert(c.parent_root().cloned(), c.clone());
+            if let Some(pr) = c.parent_root() {
+                root_to_child.entry(pr.clone()).or_default().push(c.clone());
+            }
+        }
+        for children in root_to_child.values_mut() {
+            children.sort_by_key(|c| (c.timestamp(), c.commit_hash.clone()));
         }
 
         let mut sorted_commits = Vec::new();
-        let mut curr_parent: Option<NodeHash> = None;
         let mut visited = HashSet::new();
 
-        while let Some(c) = root_to_commit.remove(&curr_parent) {
-            if !visited.insert(c.commit_hash.clone()) {
-                break;
+        // 从入度为 0 的 Genesis commit 沿 parent_root -> new_root 线性展开
+        for genesis in genesis_commits {
+            if !visited.insert(genesis.commit_hash.clone()) {
+                continue;
             }
-            curr_parent = Some(c.new_root().clone());
-            sorted_commits.push(c);
+            sorted_commits.push(genesis.clone());
+            let mut curr_root = genesis.new_root().clone();
+
+            while let Some(children) = root_to_child.get_mut(&curr_root) {
+                if let Some(next_c) = children
+                    .iter()
+                    .find(|c| !visited.contains(&c.commit_hash))
+                    .cloned()
+                {
+                    visited.insert(next_c.commit_hash.clone());
+                    curr_root = next_c.new_root().clone();
+                    sorted_commits.push(next_c);
+                } else {
+                    break;
+                }
+            }
         }
 
-        for c in commit_list {
-            if visited.insert(c.commit_hash.clone()) {
-                sorted_commits.push(c);
-            }
+        // 追加剩余孤立 commit（按时间戳排序）
+        let mut remaining: Vec<CommitRecord> = commit_list
+            .into_iter()
+            .filter(|c| !visited.contains(&c.commit_hash))
+            .collect();
+        remaining.sort_by_key(|c| (c.timestamp(), c.commit_hash.clone()));
+        for c in remaining {
+            sorted_commits.push(c);
         }
 
         if sorted_commits.is_empty() {
             return false;
         }
 
+        // 串接 parent_commit 祖先链，并关键地重新计算每个 commit 的 commit_hash，
+        // 保证修改 payload 后 c.verify_self_hash() 恒为 true！
         let mut prev_commit_hash: Option<NodeHash> = None;
-        for c in &mut sorted_commits {
+        let mut new_commits = BTreeMap::new();
+        for mut c in sorted_commits {
             if c.parent_commit().is_none() && prev_commit_hash.is_some() {
                 c.payload.parent_commit = prev_commit_hash.clone();
                 c.commit_hash = compute_commit_payload_hash(&c.payload);
             }
             prev_commit_hash = Some(c.commit_hash.clone());
+            new_commits.insert(c.commit_hash.clone(), c);
         }
 
-        state.commits.clear();
-        for c in sorted_commits {
-            state.commits.insert(c.commit_hash.clone(), c);
-        }
+        state.commits = new_commits;
         state.head_commit = prev_commit_hash;
         true
     }
@@ -808,6 +924,15 @@ impl AstDatabase {
                     hash
                 ))
             })?;
+
+            // [Spec 4] 逐节点自哈希防篡改核验
+            if !commit.verify_self_hash() {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "commit hash mismatch for commit {}: payload corrupted or tampered",
+                    hash
+                )));
+            }
+
             ordered_commits.push(commit);
 
             if let Some(parent_hash) = commit.parent_commit() {
@@ -831,10 +956,42 @@ impl AstDatabase {
         if ordered_commits.is_empty() && !self.state.commits.is_empty() {
             let mut fallback: Vec<&CommitRecord> = self.state.commits.values().collect();
             fallback.sort_by_key(|c| c.timestamp());
+            for c in &fallback {
+                if !c.verify_self_hash() {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "commit hash mismatch for fallback commit {}: payload corrupted",
+                        c.commit_hash
+                    )));
+                }
+            }
             return Ok(fallback);
         }
 
         ordered_commits.reverse();
+
+        // [Spec 4] 祖先连续性严格校验：确保 child.parent_commit 严格等于 parent.commit_hash，
+        // 且 child.parent_root 严格等于 parent.new_root（若有记录）
+        for i in 1..ordered_commits.len() {
+            let parent = ordered_commits[i - 1];
+            let child = ordered_commits[i];
+            if let Some(p_hash) = child.parent_commit() {
+                if p_hash != &parent.commit_hash {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "discontinuous commit chain: child {} points to parent commit {}, but prior commit in chain is {}",
+                        child.commit_hash, p_hash, parent.commit_hash
+                    )));
+                }
+            }
+            if let Some(p_root) = child.parent_root() {
+                if p_root != parent.new_root() {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "discontinuous commit root: child {} points to parent root {}, but prior commit root is {}",
+                        child.commit_hash, p_root, parent.new_root()
+                    )));
+                }
+            }
+        }
+
         Ok(ordered_commits)
     }
 
@@ -855,7 +1012,7 @@ impl AstDatabase {
     }
 
     /// Executes a state-mutating transaction with an exclusive OS file lock and read-latest consistency.
-    pub fn locked_transaction<T, E>(
+    pub(crate) fn locked_transaction<T, E>(
         &mut self,
         action: impl FnOnce(&mut DatabaseState) -> Result<T, E>,
     ) -> Result<T, E>
@@ -1052,54 +1209,25 @@ impl AstDatabase {
             .expect("target function exists in derived module");
 
         let smt_result = axiom_smt::verify_function_in_module(affected_func, &derived_module);
-
-        let (solver, solver_version, obligations_checked) = match smt_result {
-            axiom_smt::SmtResult::Proved {
-                solver,
-                version,
-                obligations_checked,
-            } => (solver, version, obligations_checked),
-            axiom_smt::SmtResult::VacuousContract { reason } => {
-                return Err(CasError::VacuousContract(reason));
-            }
-            axiom_smt::SmtResult::CounterExample(ce) => {
-                return Err(CasError::VerificationRejected(format!(
-                    "SMT counterexample found for `{}`: {:?}",
-                    envelope.target_function, ce
-                )));
-            }
-            axiom_smt::SmtResult::Sampled { points_checked } => {
-                return Err(CasError::UnverifiedCandidate(format!(
-                    "candidate for `{}` was only heuristically sampled ({points_checked} points), strict mathematical proof required",
-                    envelope.target_function
-                )));
-            }
-            axiom_smt::SmtResult::Unknown(reason) => {
-                return Err(CasError::UnverifiedCandidate(format!(
-                    "SMT solver returned unknown for `{}`: {reason}",
-                    envelope.target_function
-                )));
-            }
-            axiom_smt::SmtResult::Skipped(reason) => {
-                return Err(CasError::UnverifiedCandidate(format!(
-                    "verification skipped for `{}`: {reason}",
-                    envelope.target_function
-                )));
-            }
-        };
+        let (solver, solver_version, obligations_checked) =
+            require_proved(smt_result, &envelope.target_function)?;
 
         let proof_obligation_hash = compute_proof_obligation_hash(affected_func);
 
-        Ok(CertifiedVerification {
-            base_root_hash: expected_root.clone(),
+        let evidence = CertifiedProofEvidence {
             envelope_hash: env_hash,
             candidate_hash: cand_hash,
             proof_obligation_hash,
-            derived_module,
             solver,
             solver_version,
             obligations_checked,
             _sealed: (),
+        };
+
+        Ok(CertifiedVerification {
+            base_root_hash: expected_root.clone(),
+            derived_module,
+            evidence,
         })
     }
 
@@ -1129,55 +1257,60 @@ impl AstDatabase {
         Ok(final_commit)
     }
 
-    /// Performs offline theorem proving and verification for re-attesting an existing hole implementation
-    /// without holding database locks. Returns a sealed CertifiedReattestation.
-    pub fn certify_reattestation_offline(
-        &self,
-        expected_root: &Option<NodeHash>,
+    /// 对指定 hole 的当前生效实现执行重新验证与证明签发，并原子提交重验收据。
+    /// 严格核验：
+    /// 1. 目标 hole 必须在当前主线历史中有落地见证（由某个历史 commit 引入，且在该 commit 之后未被覆写）；
+    /// 2. candidate 表达式解析后必须与当前 root 中目标函数匹配；
+    /// 3. 函数中无未填洞，且 SMT 定理证明成功；
+    /// 4. 锁内通过 (expected_root, expected_head) 双重 CAS 原子提交。
+    pub fn reverify_and_reattest_hole(
+        &mut self,
         target_hole_id: &str,
-        envelope_hash: &NodeHash,
-        candidate_hash: &NodeHash,
-    ) -> Result<CertifiedReattestation, CasError> {
-        // 1. 检验 expected_root 在当前 DB 是否存在
+    ) -> Result<CommitRecord, CasError> {
+        let expected_root = self.state.root_ref.clone();
+        let expected_head = self.state.head_commit.clone();
+
         let root_hash = expected_root.as_ref().ok_or_else(|| {
             CasError::InvalidCandidate("cannot reattest candidate in an empty database".into())
         })?;
-        let root_module = self.state.modules.get(root_hash).ok_or_else(|| {
+        let root_module = self.state.modules.get(root_hash).cloned().ok_or_else(|| {
             CasError::InvalidEnvelope(format!(
                 "expected root module {} not found in database",
                 root_hash
             ))
         })?;
 
-        // 2. 检验 envelope_hash 与 target_hole_id 绑定
-        let env = self.state.envelopes.get(envelope_hash).ok_or_else(|| {
-            CasError::InvalidEnvelope(format!(
-                "task envelope {} not found in database",
-                envelope_hash
-            ))
-        })?;
-        if env.target_hole_id != target_hole_id {
-            return Err(CasError::InvalidEnvelope(format!(
-                "task envelope hole `{}` does not match target hole `{}`",
-                env.target_hole_id, target_hole_id
-            )));
+        // 1. 获取当前经过严格防伪校验的主线提交历史
+        let mainline = self.mainline_commits()?;
+
+        // 2. 主线落地见证核验：倒序遍历寻找针对该 target_hole_id 的最新生效引入提交
+        let mut landing_commit_opt = None;
+        for commit in mainline.iter().rev() {
+            if let Some(env) = self.state.envelopes.get(commit.envelope_hash()) {
+                if env.target_hole_id == target_hole_id {
+                    landing_commit_opt = Some((*commit).clone());
+                    break;
+                }
+            }
         }
 
-        // 3. 检验 candidate_hash 绑定
-        let cand = self.state.candidates.get(candidate_hash).ok_or_else(|| {
+        let landing_commit = landing_commit_opt.ok_or_else(|| {
             CasError::InvalidCandidate(format!(
-                "candidate {} not found in database",
-                candidate_hash
+                "candidate for hole `{target_hole_id}` has never landed in the active mainline history"
             ))
         })?;
-        if cand.envelope_hash != *envelope_hash {
-            return Err(CasError::InvalidCandidate(format!(
-                "candidate envelope hash {} does not match target envelope {}",
-                cand.envelope_hash, envelope_hash
-            )));
-        }
 
-        // 4. 寻找目标函数并确保已无未填洞
+        let envelope_hash = landing_commit.envelope_hash().clone();
+        let candidate_hash = landing_commit.candidate_hash().clone();
+
+        let env = self.state.envelopes.get(&envelope_hash).ok_or_else(|| {
+            CasError::InvalidEnvelope(format!("task envelope `{envelope_hash}` not found"))
+        })?;
+        let _cand = self.state.candidates.get(&candidate_hash).ok_or_else(|| {
+            CasError::InvalidCandidate(format!("candidate `{candidate_hash}` not found"))
+        })?;
+
+        // 3. 校验目标函数与未填洞检查
         let func = root_module
             .functions
             .iter()
@@ -1195,59 +1328,145 @@ impl AstDatabase {
             ));
         }
 
-        // 5. 调用外部 SMT 验证
-        let smt_result = axiom_smt::verify_function_in_module(func, root_module);
-        let obligations_checked = match smt_result {
-            axiom_smt::SmtResult::Proved {
-                obligations_checked,
-                ..
-            } => obligations_checked,
-            axiom_smt::SmtResult::VacuousContract { reason } => {
-                return Err(CasError::VacuousContract(reason));
-            }
-            axiom_smt::SmtResult::CounterExample(ce) => {
-                return Err(CasError::VerificationRejected(format!(
-                    "SMT counterexample found for `{}`: {:?}",
-                    func.name, ce
-                )));
-            }
-            axiom_smt::SmtResult::Sampled { points_checked } => {
-                return Err(CasError::UnverifiedCandidate(format!(
-                    "candidate for `{}` was only heuristically sampled ({points_checked} points), strict mathematical proof required",
-                    func.name
-                )));
-            }
-            axiom_smt::SmtResult::Unknown(reason) => {
-                return Err(CasError::UnverifiedCandidate(format!(
-                    "SMT solver returned unknown for `{}`: {reason}",
-                    func.name
-                )));
-            }
-            axiom_smt::SmtResult::Skipped(reason) => {
-                return Err(CasError::UnverifiedCandidate(format!(
-                    "verification skipped for `{}`: {reason}",
-                    func.name
-                )));
-            }
-        };
+        // 4. 无锁调用 SMT 定理证明
+        let smt_result = axiom_smt::verify_function_in_module(func, &root_module);
+        let (solver, solver_version, obligations_checked) = require_proved(smt_result, &func.name)?;
 
-        // 6. [Spec 2] 统一使用 compute_proof_obligation_hash
         let proof_obligation_hash = compute_proof_obligation_hash(func);
 
-        let solver_version = axiom_smt::find_z3_executable()
-            .map(|p| axiom_smt::get_z3_version(&p))
-            .unwrap_or_else(|| "unknown".into());
-
-        Ok(CertifiedReattestation {
-            expected_root: expected_root.clone(),
-            target_hole_id: target_hole_id.to_string(),
-            envelope_hash: envelope_hash.clone(),
-            candidate_hash: candidate_hash.clone(),
+        let evidence = CertifiedProofEvidence {
+            envelope_hash,
+            candidate_hash,
             proof_obligation_hash,
-            solver: "z3".into(),
+            solver,
             solver_version,
             obligations_checked,
             _sealed: (),
+        };
+
+        let certified = CertifiedReattestation {
+            expected_root,
+            expected_head,
+            target_hole_id: target_hole_id.to_string(),
+            evidence,
+        };
+
+        self.try_commit_reattestation(certified)
+    }
+
+    /// Performs offline theorem proving and verification for re-attesting an existing hole implementation
+    /// without holding database locks. Returns a sealed CertifiedReattestation.
+    ///
+    /// [Spec 2 & Spec 3] 严格校验 candidate 是否由当前 head 主线引入且未被覆写，并绑定 (expected_root, expected_head)。
+    pub fn certify_reattestation_offline(
+        &self,
+        expected_root: &Option<NodeHash>,
+        expected_head: &Option<NodeHash>,
+        target_hole_id: &str,
+        envelope_hash: &NodeHash,
+        candidate_hash: &NodeHash,
+    ) -> Result<CertifiedReattestation, CasError> {
+        // 1. 检验 expected_root 在当前 DB 是否存在
+        let root_hash = expected_root.as_ref().ok_or_else(|| {
+            CasError::InvalidCandidate("cannot reattest candidate in an empty database".into())
+        })?;
+        let root_module = self.state.modules.get(root_hash).ok_or_else(|| {
+            CasError::InvalidEnvelope(format!(
+                "expected root module {} not found in database",
+                root_hash
+            ))
+        })?;
+
+        // 2. 主线落地见证核验：candidate 必须由当前 head 主线引入且未被覆写
+        let mainline = self.mainline_commits()?;
+        let mut is_active_in_mainline = false;
+        for commit in mainline.iter().rev() {
+            if let Some(env) = self.state.envelopes.get(commit.envelope_hash()) {
+                if env.target_hole_id == target_hole_id {
+                    if commit.envelope_hash() == envelope_hash
+                        && commit.candidate_hash() == candidate_hash
+                    {
+                        is_active_in_mainline = true;
+                    }
+                    break;
+                }
+            }
+        }
+
+        if !is_active_in_mainline {
+            return Err(CasError::InvalidCandidate(format!(
+                "candidate {} for hole `{target_hole_id}` has not landed as active in current mainline",
+                candidate_hash
+            )));
+        }
+
+        // 3. 检验 envelope_hash 与 target_hole_id 绑定
+        let env = self.state.envelopes.get(envelope_hash).ok_or_else(|| {
+            CasError::InvalidEnvelope(format!(
+                "task envelope {} not found in database",
+                envelope_hash
+            ))
+        })?;
+        if env.target_hole_id != target_hole_id {
+            return Err(CasError::InvalidEnvelope(format!(
+                "task envelope hole `{}` does not match target hole `{}`",
+                env.target_hole_id, target_hole_id
+            )));
+        }
+
+        // 4. 检验 candidate_hash 绑定
+        let cand = self.state.candidates.get(candidate_hash).ok_or_else(|| {
+            CasError::InvalidCandidate(format!(
+                "candidate {} not found in database",
+                candidate_hash
+            ))
+        })?;
+        if cand.envelope_hash != *envelope_hash {
+            return Err(CasError::InvalidCandidate(format!(
+                "candidate envelope hash {} does not match target envelope {}",
+                cand.envelope_hash, envelope_hash
+            )));
+        }
+
+        // 5. 寻找目标函数并确保已无未填洞
+        let func = root_module
+            .functions
+            .iter()
+            .find(|f| f.name == env.target_function)
+            .ok_or_else(|| {
+                CasError::InvalidEnvelope(format!(
+                    "target function `{}` not found in root module",
+                    env.target_function
+                ))
+            })?;
+
+        if axiom_ast::expr_contains_hole(&func.body) {
+            return Err(CasError::UnverifiedCandidate(
+                "target function still contains unresolved holes".into(),
+            ));
+        }
+
+        // 6. 调用外部 SMT 验证
+        let smt_result = axiom_smt::verify_function_in_module(func, root_module);
+        let (solver, solver_version, obligations_checked) = require_proved(smt_result, &func.name)?;
+
+        let proof_obligation_hash = compute_proof_obligation_hash(func);
+
+        let evidence = CertifiedProofEvidence {
+            envelope_hash: envelope_hash.clone(),
+            candidate_hash: candidate_hash.clone(),
+            proof_obligation_hash,
+            solver,
+            solver_version,
+            obligations_checked,
+            _sealed: (),
+        };
+
+        Ok(CertifiedReattestation {
+            expected_root: expected_root.clone(),
+            expected_head: expected_head.clone(),
+            target_hole_id: target_hole_id.to_string(),
+            evidence,
         })
     }
 
@@ -1266,7 +1485,7 @@ impl AstDatabase {
         let env_hash = compute_envelope_hash(&envelope);
         let cand_hash = compute_candidate_hash(&candidate);
 
-        if certified.envelope_hash != env_hash || certified.candidate_hash != cand_hash {
+        if certified.envelope_hash() != &env_hash || certified.candidate_hash() != &cand_hash {
             return Err(CasError::InvalidCandidate(
                 "certified verification does not match envelope or candidate".to_string(),
             ));
@@ -1325,14 +1544,14 @@ impl AstDatabase {
             )));
         }
 
-        // 3. 内核铸造防伪证明收据
+        // 3. 内核铸造防伪证明收据（直接继承原始证明求解器与版本信息）
         let receipt = VerificationReceipt {
             candidate_hash: cand_hash.clone(),
             proof_level: ProofLevel::Proved,
-            solver: certified.solver,
-            solver_version: certified.solver_version,
-            obligations_checked: certified.obligations_checked,
-            proof_obligation_hash: certified.proof_obligation_hash,
+            solver: certified.evidence.solver,
+            solver_version: certified.evidence.solver_version,
+            obligations_checked: certified.evidence.obligations_checked,
+            proof_obligation_hash: certified.evidence.proof_obligation_hash,
             verification_profile_hash: current_verification_profile_hash(),
             verified_at: candidate.timestamp,
         };
@@ -1356,7 +1575,7 @@ impl AstDatabase {
     }
 
     /// 针对已存在于当前权威模块中的单洞实现，核验 CertifiedReattestation 并生成 Re-attestation CommitRecord。
-    /// 锁内核验 expected_root CAS、candidate 与 envelope 存在性，由内核权威铸造绑定当前 Profile 的收据。
+    /// 锁内核验 (expected_root, expected_head) 双重 CAS、candidate 与 envelope 存在性，由内核权威铸造绑定当前 Profile 的收据。
     pub fn try_commit_reattestation(
         &mut self,
         certified: CertifiedReattestation,
@@ -1364,11 +1583,17 @@ impl AstDatabase {
         let _guard = self.lock_and_sync()?;
         let mut next_state = self.state.clone();
 
-        // 1. CAS 门禁：expected_root 必须严格等于当前 root_ref
+        // 1. 双重 CAS 门禁：expected_root 与 expected_head 必须严格匹配
         if self.state.root_ref != certified.expected_root {
             return Err(CasError::StaleRoot {
                 current: self.state.root_ref.clone(),
                 expected: certified.expected_root,
+            });
+        }
+        if self.state.head_commit != certified.expected_head {
+            return Err(CasError::StaleHead {
+                current: self.state.head_commit.clone(),
+                expected: certified.expected_head,
             });
         }
 
@@ -1379,33 +1604,36 @@ impl AstDatabase {
         // 2. 锁内核验 candidate 与 envelope 依然存在于数据库中
         if !next_state
             .candidates
-            .contains_key(&certified.candidate_hash)
+            .contains_key(&certified.evidence.candidate_hash)
         {
             return Err(CasError::InvalidCandidate(format!(
                 "candidate {} not found in database",
-                certified.candidate_hash
+                certified.evidence.candidate_hash
             )));
         }
-        if !next_state.envelopes.contains_key(&certified.envelope_hash) {
+        if !next_state
+            .envelopes
+            .contains_key(&certified.evidence.envelope_hash)
+        {
             return Err(CasError::InvalidEnvelope(format!(
                 "task envelope {} not found in database",
-                certified.envelope_hash
+                certified.evidence.envelope_hash
             )));
         }
 
-        // 3. 由 DB 内核权威铸造认证收据（绑定当前 Profile）
+        // 3. 由 DB 内核权威铸造认证收据（绑定当前 Profile 并保真原始求解器元数据）
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
 
         let receipt = VerificationReceipt {
-            candidate_hash: certified.candidate_hash.clone(),
+            candidate_hash: certified.evidence.candidate_hash.clone(),
             proof_level: ProofLevel::Proved,
-            solver: certified.solver,
-            solver_version: certified.solver_version,
-            obligations_checked: certified.obligations_checked,
-            proof_obligation_hash: certified.proof_obligation_hash,
+            solver: certified.evidence.solver,
+            solver_version: certified.evidence.solver_version,
+            obligations_checked: certified.evidence.obligations_checked,
+            proof_obligation_hash: certified.evidence.proof_obligation_hash,
             verification_profile_hash: current_verification_profile_hash(),
             verified_at: timestamp,
         };
@@ -1417,8 +1645,8 @@ impl AstDatabase {
             parent_commit: self.state.head_commit.clone(),
             parent_root: Some(current_root.clone()),
             new_root: current_root,
-            envelope_hash: certified.envelope_hash,
-            candidate_hash: certified.candidate_hash,
+            envelope_hash: certified.evidence.envelope_hash,
+            candidate_hash: certified.evidence.candidate_hash,
             receipt_hash: rcpt_hash,
             timestamp,
         };
@@ -1854,5 +2082,93 @@ pub fn replace_hole_in_expr(expression: &mut Expr, hole_id: &str, solution: &Exp
 impl Default for AstDatabase {
     fn default() -> Self {
         Self::in_memory()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_internal_genesis_detection_and_ancestry_repair() {
+        let mut state = DatabaseState::default();
+
+        let root0: NodeHash =
+            "#mod_0000000000000000000000000000000000000000000000000000000000000000"
+                .parse()
+                .unwrap();
+        let root1: NodeHash =
+            "#mod_1111111111111111111111111111111111111111111111111111111111111111"
+                .parse()
+                .unwrap();
+        let root2: NodeHash =
+            "#mod_2222222222222222222222222222222222222222222222222222222222222222"
+                .parse()
+                .unwrap();
+        let root3: NodeHash =
+            "#mod_3333333333333333333333333333333333333333333333333333333333333333"
+                .parse()
+                .unwrap();
+
+        let dummy_env: NodeHash = format!("#env_{}", "0".repeat(64)).parse().unwrap();
+        let dummy_cand: NodeHash = format!("#cand_{}", "0".repeat(64)).parse().unwrap();
+        let dummy_rcpt: NodeHash = format!("#rcpt_{}", "0".repeat(64)).parse().unwrap();
+
+        // c1: root0 -> root1 (Genesis，因为 root0 并非任何提交的 new_root)
+        let p1 = CommitPayload {
+            parent_commit: None,
+            parent_root: Some(root0),
+            new_root: root1.clone(),
+            envelope_hash: dummy_env.clone(),
+            candidate_hash: dummy_cand.clone(),
+            receipt_hash: dummy_rcpt.clone(),
+            timestamp: 100,
+        };
+        let c1 = CommitRecord::new(p1);
+
+        // c2: root1 -> root2
+        let p2 = CommitPayload {
+            parent_commit: None,
+            parent_root: Some(root1),
+            new_root: root2.clone(),
+            envelope_hash: dummy_env.clone(),
+            candidate_hash: dummy_cand.clone(),
+            receipt_hash: dummy_rcpt.clone(),
+            timestamp: 200,
+        };
+        let c2 = CommitRecord::new(p2);
+
+        // c3: root2 -> root3
+        let p3 = CommitPayload {
+            parent_commit: None,
+            parent_root: Some(root2),
+            new_root: root3.clone(),
+            envelope_hash: dummy_env,
+            candidate_hash: dummy_cand,
+            receipt_hash: dummy_rcpt,
+            timestamp: 300,
+        };
+        let c3 = CommitRecord::new(p3);
+
+        state.commits.insert(c2.commit_hash.clone(), c2);
+        state.commits.insert(c1.commit_hash.clone(), c1);
+        state.commits.insert(c3.commit_hash.clone(), c3);
+        state.root_ref = Some(root3);
+        state.head_commit = None;
+
+        let migrated = AstDatabase::migrate_legacy_commits_if_needed(&mut state);
+        assert!(migrated);
+        assert!(state.head_commit.is_some());
+
+        let db = AstDatabase { path: None, state };
+        let mainline = db
+            .mainline_commits()
+            .expect("mainline validation must succeed");
+        assert_eq!(mainline.len(), 3);
+        assert_eq!(mainline[1].parent_commit(), Some(&mainline[0].commit_hash));
+        assert_eq!(mainline[2].parent_commit(), Some(&mainline[1].commit_hash));
+        for c in &mainline {
+            assert!(c.verify_self_hash());
+        }
     }
 }

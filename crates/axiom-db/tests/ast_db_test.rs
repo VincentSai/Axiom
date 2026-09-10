@@ -861,9 +861,8 @@ fn test_mainline_commits_and_reattestation() {
         .mainline_commits()
         .expect("empty db should succeed")
         .is_empty());
-
-    // 构造具备形式化证明契约与闭合实现的函数
-    let func = FunctionDecl {
+    // 构造初始带有 Hole 的函数
+    let func_with_hole = FunctionDecl {
         name: "add".into(),
         params: vec![
             FunctionParam {
@@ -908,109 +907,110 @@ fn test_mainline_commits_and_reattestation() {
                 right: Box::new(Expr::Ident("y".into())),
             }),
         }],
-        body: Expr::BinaryOp {
-            op: BinaryOperator::Add,
-            left: Box::new(Expr::Ident("x".into())),
-            right: Box::new(Expr::Ident("y".into())),
-        },
+        body: Expr::Hole("hole_1".into()),
     };
 
     let module = Module {
         types: vec![],
-        functions: vec![func.clone()],
+        functions: vec![func_with_hole.clone()],
         effects: vec![],
     };
 
     let mod_rec = db
         .insert_module(&module)
         .expect("insert module should succeed");
-    let root_hash = mod_rec.module_hash;
-    db.initialize_root(root_hash.clone())
+    let root0 = mod_rec.module_hash;
+    db.initialize_root(root0.clone())
         .expect("init root should succeed");
 
     let env = TaskEnvelope {
-        base_root_hash: Some(root_hash.clone()),
+        base_root_hash: Some(root0.clone()),
         target_hole_id: "hole_1".into(),
         target_function: "add".into(),
-        contract_hash: compute_contract_hash(&func),
+        contract_hash: compute_contract_hash(&func_with_hole),
         dependency_hashes: vec![],
     };
     let env_hash = compute_envelope_hash(&env);
-    db.locked_transaction(|state| {
-        state.envelopes.insert(env_hash.clone(), env.clone());
-        Ok::<(), axiom_db::DbError>(())
-    })
-    .unwrap();
 
+    let parsed_body = Expr::BinaryOp {
+        op: BinaryOperator::Add,
+        left: Box::new(Expr::Ident("x".into())),
+        right: Box::new(Expr::Ident("y".into())),
+    };
     let cand = Candidate {
         envelope_hash: env_hash.clone(),
         expression_source: "x + y".into(),
-        expression_hash: axiom_db::compute_expr_hash(&func.body),
+        expression_hash: axiom_db::compute_expr_hash(&parsed_body),
         author_agent_id: "agent_1".into(),
         timestamp: 1000,
     };
     let cand_hash = compute_candidate_hash(&cand);
-    db.locked_transaction(|state| {
-        state.candidates.insert(cand_hash.clone(), cand.clone());
-        Ok::<(), axiom_db::DbError>(())
-    })
-    .unwrap();
 
-    // 1. 测试伪造防护：尝试对不存在的 candidate/envelope 离线认证应被拒绝
+    // 1. 通过公共标准 CAS 接口将合法 candidate 提交落地到主线
+    let commit1 = db
+        .try_commit_candidate(&Some(root0), env.clone(), cand.clone(), None)
+        .expect("first candidate commit should succeed");
+    let root1 = db.current_root();
+    let head1 = db.head_commit().cloned();
+    assert_eq!(head1, Some(commit1.commit_hash.clone()));
+
+    // 2. [Spec 1 & Spec 2] 测试主线落地见证核验：未落地的虚假 candidate 绝不可被签发重验认证
     let fake_hash: NodeHash =
         "#cand_9999999999999999999999999999999999999999999999999999999999999999"
             .parse()
             .unwrap();
     let forge_res =
-        db.certify_reattestation_offline(&Some(root_hash.clone()), "hole_1", &env_hash, &fake_hash);
-    assert!(matches!(forge_res, Err(CasError::InvalidCandidate(_))));
+        db.certify_reattestation_offline(&root1, &head1, "hole_1", &env_hash, &fake_hash);
+    assert!(
+        matches!(forge_res, Err(CasError::InvalidCandidate(_))),
+        "未在主线落地的 candidate 必须被拦截"
+    );
 
-    // 2. 正确生成内核密封的 CertifiedReattestation
+    // 3. 正确生成基于主线落地见证的密封 CertifiedReattestation
     let certified = db
-        .certify_reattestation_offline(&Some(root_hash.clone()), "hole_1", &env_hash, &cand_hash)
-        .expect("certify_reattestation_offline should succeed");
+        .certify_reattestation_offline(&root1, &head1, "hole_1", &env_hash, &cand_hash)
+        .expect("certify_reattestation_offline for landed candidate should succeed");
 
-    // 3. 验证密封结构体字段与当前规则一致（包含契约义务与整数安全溢出检查义务）
     assert_eq!(certified.obligations_checked(), 3);
     assert_eq!(certified.target_hole_id(), "hole_1");
 
-    // 4. 执行 try_commit_reattestation 提交
-    let commit1 = db
-        .try_commit_reattestation(certified.clone())
-        .expect("first reattestation should succeed");
-    assert_eq!(db.head_commit(), Some(&commit1.commit_hash));
-    assert_eq!(commit1.parent_commit(), None);
+    // 4. [Standards 4] 通过下沉深接口 reverify_and_reattest_hole 执行重新验证并原子提交
+    let commit2 = db
+        .reverify_and_reattest_hole("hole_1")
+        .expect("reverify_and_reattest_hole should succeed");
+    let head2 = db.head_commit().cloned();
+    assert_eq!(head2, Some(commit2.commit_hash.clone()));
+    assert_eq!(commit2.parent_commit(), Some(&commit1.commit_hash));
 
     // 验证收据是由 DB 权威铸造且与当前 Profile 绑定
-    let rcpt = db.get_receipt(commit1.receipt_hash()).unwrap().unwrap();
+    let rcpt = db.get_receipt(commit2.receipt_hash()).unwrap().unwrap();
     assert_eq!(rcpt.proof_level, ProofLevel::Proved);
     assert_eq!(
         rcpt.verification_profile_hash,
         current_verification_profile_hash()
     );
 
-    // 5. 第二次重签提交，验证 Commit DAG parent_commit 拓扑正常推进
-    let commit2 = db
-        .try_commit_reattestation(certified)
-        .expect("second reattestation should succeed");
-    assert_eq!(db.head_commit(), Some(&commit2.commit_hash));
-    assert_eq!(commit2.parent_commit(), Some(&commit1.commit_hash));
+    // 5. [Spec 3] 双重 CAS 门禁验证：再次使用持有旧 head1 的 certified 提交，必须被 StaleHead 拦截！
+    let stale_head_res = db.try_commit_reattestation(certified);
+    assert!(
+        matches!(stale_head_res, Err(CasError::StaleHead { .. })),
+        "持有过期 head 的重签提交必须被双重 CAS 门禁拦截"
+    );
 
-    // 验证 mainline_commits 严格正序从祖先到链头
+    // 6. 验证 mainline_commits 严格正序且各提交自身哈希自洽
     let mainline = db.mainline_commits().expect("mainline should succeed");
     assert_eq!(mainline.len(), 2);
     assert_eq!(mainline[0].commit_hash, commit1.commit_hash);
     assert_eq!(mainline[1].commit_hash, commit2.commit_hash);
+    assert!(mainline[0].verify_self_hash());
+    assert!(mainline[1].verify_self_hash());
 }
 
 #[test]
 fn test_legacy_commits_migration_and_ancestry_repair() {
     use axiom_db::{
-        compute_commit_payload_hash, AstDatabase, CommitPayload, CommitRecord, DatabaseState,
-        NodeHash,
+        compute_commit_payload_hash, AstDatabase, CommitPayload, CommitRecord, NodeHash,
     };
-
-    let mut state = DatabaseState::default();
 
     let root0: NodeHash = "#mod_0000000000000000000000000000000000000000000000000000000000000000"
         .parse()
@@ -1026,10 +1026,11 @@ fn test_legacy_commits_migration_and_ancestry_repair() {
     let dummy_cand: NodeHash = format!("#cand_{}", "0".repeat(64)).parse().unwrap();
     let dummy_rcpt: NodeHash = format!("#rcpt_{}", "0".repeat(64)).parse().unwrap();
 
-    // 模拟旧版本数据库：有多个提交，但 parent_commit 均为 None，且 head_commit 为 None
+    // 模拟旧版本数据库（真实场景）：首个提交 parent_root 具有初始 root0，new_root 为 root1；
+    // 且所有旧提交的 parent_commit 均为 None，head_commit 为 None
     let p1 = CommitPayload {
         parent_commit: None,
-        parent_root: Some(root0.clone()),
+        parent_root: Some(root0),
         new_root: root1.clone(),
         envelope_hash: dummy_env.clone(),
         candidate_hash: dummy_cand.clone(),
@@ -1043,7 +1044,7 @@ fn test_legacy_commits_migration_and_ancestry_repair() {
 
     let p2 = CommitPayload {
         parent_commit: None,
-        parent_root: Some(root1.clone()),
+        parent_root: Some(root1),
         new_root: root2.clone(),
         envelope_hash: dummy_env,
         candidate_hash: dummy_cand,
@@ -1055,32 +1056,41 @@ fn test_legacy_commits_migration_and_ancestry_repair() {
         payload: p2,
     };
 
-    state.commits.insert(c1.commit_hash.clone(), c1.clone());
-    state.commits.insert(c2.commit_hash.clone(), c2.clone());
-    state.root_ref = Some(root2);
-    assert_eq!(state.head_commit, None);
+    // 构造纯 JSON 格式的旧库文件，不依赖任何库内私有状态后门
+    let legacy_json = serde_json::json!({
+        "root_ref": root2.as_str(),
+        "head_commit": null,
+        "commits": {
+            c1.commit_hash.as_str(): c1,
+            c2.commit_hash.as_str(): c2,
+        }
+    });
 
-    // 执行迁移
-    let migrated = AstDatabase::migrate_legacy_commits_if_needed(&mut state);
-    assert!(
-        migrated,
-        "legacy database without head_commit must be migrated"
-    );
-    assert!(
-        state.head_commit.is_some(),
-        "head_commit must be set after migration"
-    );
-
-    // 验证新数据库实例可通过 mainline_commits 正确追溯全量祖先链
     let temp_dir = std::env::temp_dir().join(format!("test_legacy_db_{}", std::process::id()));
     let _ = std::fs::create_dir_all(&temp_dir);
     let db_path = temp_dir.join("test_legacy.json");
-    std::fs::write(&db_path, serde_json::to_vec_pretty(&state).unwrap()).unwrap();
+    std::fs::write(&db_path, serde_json::to_vec_pretty(&legacy_json).unwrap()).unwrap();
 
-    let db = AstDatabase::open(&db_path).expect("open migrated db should succeed");
-    let mainline = db.mainline_commits().expect("mainline should succeed");
+    // 打开旧库，AstDatabase::open 内部自动执行 migrate_legacy_commits_if_needed
+    let db = AstDatabase::open(&db_path).expect("open legacy db should trigger migration");
+    assert!(
+        db.head_commit().is_some(),
+        "head_commit must be repaired after migration"
+    );
+
+    let mainline = db
+        .mainline_commits()
+        .expect("mainline commits validation should succeed");
     assert_eq!(mainline.len(), 2, "all legacy commits must be in mainline");
     assert_eq!(mainline[1].parent_commit(), Some(&mainline[0].commit_hash));
+    assert!(
+        mainline[0].verify_self_hash(),
+        "migrated c1 self hash must be valid"
+    );
+    assert!(
+        mainline[1].verify_self_hash(),
+        "migrated c2 self hash must be valid"
+    );
 
     let _ = std::fs::remove_file(&db_path);
     let _ = std::fs::remove_dir_all(&temp_dir);

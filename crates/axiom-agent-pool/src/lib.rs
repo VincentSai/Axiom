@@ -5,9 +5,9 @@ use std::fmt;
 
 use axiom_ast::{Expr, Module};
 use axiom_db::{
-    compute_candidate_hash, compute_contract_hash, compute_envelope_hash, compute_expr_hash,
-    compute_function_hash, AstDatabase, Candidate, CasError, CommitRecord, DraftCasExpectation,
-    NodeHash, ProofLevel, TaskEnvelope,
+    compute_contract_hash, compute_envelope_hash, compute_expr_hash, compute_function_hash,
+    AstDatabase, Candidate, CasError, CommitRecord, DraftCasExpectation, NodeHash, ProofLevel,
+    TaskEnvelope,
 };
 use axiom_hole_extractor::extract_holes;
 pub use axiom_hole_extractor::HoleTask;
@@ -491,10 +491,10 @@ impl AgentTaskPool {
     }
 
     /// 针对单个未证明洞执行离线重新验证与原生 Re-attestation 提交。
-    /// 基础设施错误（DB 查询失败）显式向上传播；业务不满足条件显式返回 ReverifyOutcome。
+    /// 委托给数据库内核下沉接口 reverify_and_reattest_hole，并由当前池同步更新内存账本。
     fn reverify_single_hole(&mut self, hole_id: &str) -> Result<ReverifyOutcome, PoolError> {
         let env = match self.envelopes.get(hole_id) {
-            Some(e) => e.clone(),
+            Some(e) => e,
             None => {
                 return Ok(ReverifyOutcome::Skipped {
                     hole_id: hole_id.to_string(),
@@ -507,8 +507,7 @@ impl AgentTaskPool {
             .verified_module
             .functions
             .iter()
-            .find(|f| f.name == env.target_function)
-            .cloned();
+            .find(|f| f.name == env.target_function);
 
         let Some(func) = func_opt else {
             return Ok(ReverifyOutcome::Skipped {
@@ -527,94 +526,8 @@ impl AgentTaskPool {
             });
         }
 
-        // 寻找该洞历史提交的 (envelope_hash, candidate_hash)，或从草稿构造
-        let mut cand_info_opt = None;
-        for c in self.commits.iter().rev() {
-            // [Standards 2] 数据库基础设施错误显式向上传播，杜绝 if let Ok 吞错
-            let env_opt = self.db.get_envelope(c.envelope_hash())?;
-            if let Some(env_rec) = env_opt {
-                if env_rec.target_hole_id == hole_id {
-                    cand_info_opt = Some((c.envelope_hash().clone(), c.candidate_hash().clone()));
-                    break;
-                }
-            }
-        }
-
-        let (env_hash, cand_hash) = match cand_info_opt {
-            Some(info) => info,
-            None => {
-                if let Some(draft) = self.db.get_draft(hole_id) {
-                    let env_h = compute_envelope_hash(&env);
-                    let parsed = match parse_expr(&draft.code) {
-                        Ok(p) => p,
-                        Err(e) => {
-                            return Ok(ReverifyOutcome::Failed {
-                                hole_id: hole_id.to_string(),
-                                reason: format!("draft expression parse error: {e}"),
-                            });
-                        }
-                    };
-                    let expr_h = axiom_db::compute_expr_hash(&parsed);
-                    let cand = Candidate {
-                        envelope_hash: env_h.clone(),
-                        expression_source: draft.code.clone(),
-                        expression_hash: expr_h,
-                        author_agent_id: draft.agent_id.clone(),
-                        timestamp: draft.timestamp,
-                    };
-                    let c_hash = compute_candidate_hash(&cand);
-                    (env_h, c_hash)
-                } else {
-                    return Ok(ReverifyOutcome::Failed {
-                        hole_id: hole_id.to_string(),
-                        reason: "no historical candidate or draft found for hole".into(),
-                    });
-                }
-            }
-        };
-
-        // 获取当前权威 root_ref 作为 expected_root
-        let expected_root = self.db.current_root();
-
-        // [Spec 1 & Standards 1] 通过 DB 离线认证接口生成密封的 CertifiedReattestation，
-        // 并在内部统一执行定理证明与 compute_proof_obligation_hash
-        let certified = match self.db.certify_reattestation_offline(
-            &expected_root,
-            hole_id,
-            &env_hash,
-            &cand_hash,
-        ) {
-            Ok(cert) => cert,
-            Err(cas_err) => match cas_err {
-                CasError::UnverifiedCandidate(reason) => {
-                    return Ok(ReverifyOutcome::Unproved {
-                        hole_id: hole_id.to_string(),
-                        smt_result: SmtResult::Unknown(reason),
-                    });
-                }
-                CasError::VerificationRejected(reason) => {
-                    return Ok(ReverifyOutcome::Failed {
-                        hole_id: hole_id.to_string(),
-                        reason: format!("SMT rejected: {reason}"),
-                    });
-                }
-                CasError::VacuousContract(reason) => {
-                    return Ok(ReverifyOutcome::Failed {
-                        hole_id: hole_id.to_string(),
-                        reason: format!("vacuous contract: {reason}"),
-                    });
-                }
-                other => {
-                    return Ok(ReverifyOutcome::Failed {
-                        hole_id: hole_id.to_string(),
-                        reason: format!("offline reattestation failed: {other}"),
-                    });
-                }
-            },
-        };
-
-        // [Spec 1, P0] 传入密封认证，由 DB 锁内核验 expected_root CAS 并权威铸造收据与提交
-        match self.db.try_commit_reattestation(certified) {
+        // [Standards 4] 下沉深接口：直接交由数据库内核完成主线落地见证核验、SMT 定理证明与原子双重 CAS 提交
+        match self.db.reverify_and_reattest_hole(hole_id) {
             Ok(commit) => {
                 let rcpt_hash = commit.receipt_hash().clone();
                 self.apply_verified_commit(commit, self.verified_module.clone(), hole_id);
@@ -623,9 +536,30 @@ impl AgentTaskPool {
                     receipt_hash: rcpt_hash,
                 })
             }
-            Err(cas_err) => Ok(ReverifyOutcome::Failed {
+            Err(CasError::UnverifiedCandidate(reason)) => Ok(ReverifyOutcome::Unproved {
                 hole_id: hole_id.to_string(),
-                reason: format!("re-attestation CAS commit failed: {cas_err}"),
+                smt_result: SmtResult::Unknown(reason),
+            }),
+            Err(CasError::VerificationRejected(reason)) => Ok(ReverifyOutcome::Failed {
+                hole_id: hole_id.to_string(),
+                reason: format!("SMT rejected: {reason}"),
+            }),
+            Err(CasError::VacuousContract(reason)) => Ok(ReverifyOutcome::Failed {
+                hole_id: hole_id.to_string(),
+                reason: format!("vacuous contract: {reason}"),
+            }),
+            Err(CasError::InvalidCandidate(reason)) => Ok(ReverifyOutcome::Failed {
+                hole_id: hole_id.to_string(),
+                reason,
+            }),
+            Err(CasError::InvalidEnvelope(reason)) => Ok(ReverifyOutcome::Failed {
+                hole_id: hole_id.to_string(),
+                reason,
+            }),
+            Err(CasError::Db(db_err)) => Err(PoolError::CasFailure(db_err.to_string())),
+            Err(other) => Ok(ReverifyOutcome::Failed {
+                hole_id: hole_id.to_string(),
+                reason: format!("re-attestation failed: {other}"),
             }),
         }
     }

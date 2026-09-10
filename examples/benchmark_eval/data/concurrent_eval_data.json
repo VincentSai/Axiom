@@ -6,27 +6,26 @@
     "mode": "concurrent_multi_agent",
     "eval_mode": "mock",
     "is_mock": true,
-    "git_commit": "1560f92c8558e162fbd2dfe822629f899892846a",
-    "git_tree_hash": "41b0f8a809e7154042a61560154ddb7ed6401f2f",
+    "git_commit": "b6add62a45547345e4cb9756cfc93ebcf9cb3452",
+    "git_tree_hash": "1abc49d6f0f4f65caa7cc083b216e33dae1f9883",
     "git_status": {
       "is_dirty": true,
-      "dirty_files_count": 5,
+      "dirty_files_count": 4,
       "dirty_files": [
         "M crates/axiom-agent-pool/src/lib.rs",
         "M crates/axiom-db/src/lib.rs",
         "M crates/axiom-db/tests/ast_db_test.rs",
-        "M crates/axiom-smt/src/smtlib2.rs",
         "M crates/axiom-smt/src/z3_solver.rs"
       ]
     },
     "z3_version": "Z3 version 4.13.0 - 64 bit",
     "platform": "win32",
     "python_version": "3.14.2",
-    "timestamp": "2026-09-10 10:09:37"
+    "timestamp": "2026-09-10 10:58:03"
   },
   "summary": {
     "rust_group": {
-      "wall_clock_sec": 4.7,
+      "wall_clock_sec": 1.65,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -36,7 +35,7 @@
       "unit_test_passed": true
     },
     "axiom_group": {
-      "wall_clock_sec": 2.73,
+      "wall_clock_sec": 2.79,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -44,14 +43,14 @@
       "resolver_tax_billed_tokens": 0,
       "total_billed_tokens": 75070,
       "formal_proved": true,
-      "speedup_vs_rust": 1.72
+      "speedup_vs_rust": 0.59
     }
   },
   "detailed_runs": {
     "group2_rust": {
       "status": "success",
       "total_tasks": 5,
-      "wall_clock_sec": 4.7,
+      "wall_clock_sec": 1.65,
       "worker_concurrency_sec": 0.15,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
@@ -66,16 +65,15 @@
       },
       "unit_test_passed": true,
       "unit_test_message": "All subsystem unit tests passed",
-      "git_commit_sha": "1560f92c8558e162fbd2dfe822629f899892846a",
-      "git_tree_hash": "41b0f8a809e7154042a61560154ddb7ed6401f2f",
+      "git_commit_sha": "b6add62a45547345e4cb9756cfc93ebcf9cb3452",
+      "git_tree_hash": "1abc49d6f0f4f65caa7cc083b216e33dae1f9883",
       "git_status": {
         "is_dirty": true,
-        "dirty_files_count": 5,
+        "dirty_files_count": 4,
         "dirty_files": [
           "M crates/axiom-agent-pool/src/lib.rs",
           "M crates/axiom-db/src/lib.rs",
           "M crates/axiom-db/tests/ast_db_test.rs",
-          "M crates/axiom-smt/src/smtlib2.rs",
           "M crates/axiom-smt/src/z3_solver.rs"
         ]
       },
@@ -166,9 +164,9 @@
     "group3_axiom": {
       "status": "success",
       "total_tasks": 5,
-      "wall_clock_sec": 2.73,
+      "wall_clock_sec": 2.79,
       "worker_concurrency_sec": 0.0,
-      "combinator_latency_ms": 1453.65,
+      "combinator_latency_ms": 1509.12,
       "smt_verify_sec": 0.72,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
@@ -188,16 +186,15 @@
         "tokens_to_proved": 1070
       },
       "formal_proved": true,
-      "git_commit_sha": "1560f92c8558e162fbd2dfe822629f899892846a",
-      "git_tree_hash": "41b0f8a809e7154042a61560154ddb7ed6401f2f",
+      "git_commit_sha": "b6add62a45547345e4cb9756cfc93ebcf9cb3452",
+      "git_tree_hash": "1abc49d6f0f4f65caa7cc083b216e33dae1f9883",
       "git_status": {
         "is_dirty": true,
-        "dirty_files_count": 5,
+        "dirty_files_count": 4,
         "dirty_files": [
           "M crates/axiom-agent-pool/src/lib.rs",
           "M crates/axiom-db/src/lib.rs",
           "M crates/axiom-db/tests/ast_db_test.rs",
-          "M crates/axiom-smt/src/smtlib2.rs",
           "M crates/axiom-smt/src/z3_solver.rs"
         ]
       },
@@ -268,7 +265,7 @@
       "cas_concurrency_benchmark": {
         "race_workers": 2,
         "success_submissions": 2,
-        "concurrency_elapsed_sec": 0.467,
+        "concurrency_elapsed_sec": 0.477,
         "stale_root_conflicts_observed": 1,
         "fast_forward_retries_succeeded": 1,
         "final_commit_chain_length": 2,
@@ -276,20 +273,20 @@
         "final_root": "#mod_8892410a4f9ec42e4507b5b4546f24373ed41f8430d7c1d8d71d0a8090dc4b56",
         "eval_mode": "mock",
         "is_mock": true,
-        "git_commit_sha": "1560f92c8558e162fbd2dfe822629f899892846a",
-        "git_tree_hash": "41b0f8a809e7154042a61560154ddb7ed6401f2f",
+        "git_commit_sha": "b6add62a45547345e4cb9756cfc93ebcf9cb3452",
+        "git_tree_hash": "1abc49d6f0f4f65caa7cc083b216e33dae1f9883",
         "cas_events_by_worker": {
-          "worker_b": [],
-          "worker_a": [
+          "worker_a": [],
+          "worker_b": [
             {
               "StaleRootDetected": {
                 "expected": "#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed",
-                "current": "#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f"
+                "current": "#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d"
               }
             },
             {
               "RebaseSucceeded": {
-                "rebased_root": "#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f",
+                "rebased_root": "#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d",
                 "attempts": 1
               }
             }
@@ -297,12 +294,12 @@
         },
         "worker_a": {
           "returncode": 0,
-          "stdout": "{\n  \"hole\": \"hole_a\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": false,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [\n    {\n      \"StaleRootDetected\": {\n        \"expected\": \"#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed\",\n        \"current\": \"#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f\"\n      }\n    },\n    {\n      \"RebaseSucceeded\": {\n        \"rebased_root\": \"#mod_5e49db7e7da16cf9cbe1363b31fc7f6ba0d7b49e71d06f7053092c44c2c7fb9f\",\n        \"attempts\": 1\n      }\n    }\n  ],\n  \"counter_example\": null,\n  \"reason\": null\n}",
+          "stdout": "{\n  \"hole\": \"hole_a\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": false,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [],\n  \"counter_example\": null,\n  \"reason\": null\n}",
           "stderr": ""
         },
         "worker_b": {
           "returncode": 0,
-          "stdout": "{\n  \"hole\": \"hole_b\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": false,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [],\n  \"counter_example\": null,\n  \"reason\": null\n}",
+          "stdout": "{\n  \"hole\": \"hole_b\",\n  \"status\": \"ACCEPTED\",\n  \"proved\": true,\n  \"upgraded_to_verified\": false,\n  \"solver\": \"Microsoft Z3 (SMT-LIB2)\",\n  \"solver_version\": \"4.13.0\",\n  \"obligations_checked\": 3,\n  \"cas_events\": [\n    {\n      \"StaleRootDetected\": {\n        \"expected\": \"#mod_707719e1024047e0906806c943e9019fd4d05c65f38c23369462a28b86f5bfed\",\n        \"current\": \"#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d\"\n      }\n    },\n    {\n      \"RebaseSucceeded\": {\n        \"rebased_root\": \"#mod_6bfc42688c1042a8a5647c44617b5a0bc8bc4f8afe247292122d3b770878c04d\",\n        \"attempts\": 1\n      }\n    }\n  ],\n  \"counter_example\": null,\n  \"reason\": null\n}",
           "stderr": ""
         }
       },
