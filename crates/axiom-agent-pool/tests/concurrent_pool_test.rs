@@ -740,7 +740,6 @@ fn permissive_skipped_and_sampled_persist_drafts_to_db() {
 #[test]
 fn profile_invalidation_and_reverify_unproved_holes_closed_loop() {
     use axiom_agent_pool::HoleStatus;
-    use axiom_db::legacy_verification_profile_hash;
 
     const REVERIFY_SKELETON: &str = r#"
         fn add_safe(a: Int, b: Int) -> Int
@@ -771,41 +770,7 @@ fn profile_invalidation_and_reverify_unproved_holes_closed_loop() {
     }
 
     // 2. 模拟底层收据来自旧规则（将收据的 profile hash 更新为 legacy 并同步自哈希与 commit 引用）
-    {
-        let db_content = std::fs::read_to_string(&db_path).unwrap();
-        let mut val: serde_json::Value = serde_json::from_str(&db_content).unwrap();
-        let leg_hash = legacy_verification_profile_hash();
-
-        let receipts = val.get_mut("receipts").unwrap().as_object_mut().unwrap();
-        let old_rcpt_hash = receipts.keys().next().unwrap().clone();
-        let mut rcpt: axiom_db::VerificationReceipt =
-            serde_json::from_value(receipts.remove(&old_rcpt_hash).unwrap()).unwrap();
-        rcpt.verification_profile_hash = leg_hash;
-        let new_rcpt_hash = axiom_db::compute_receipt_hash(&rcpt);
-        receipts.insert(
-            new_rcpt_hash.as_str().into(),
-            serde_json::to_value(&rcpt).unwrap(),
-        );
-
-        let commits = val.get_mut("commits").unwrap().as_object_mut().unwrap();
-        let old_commit_hash = commits.keys().next().unwrap().clone();
-        let mut commit_rec: axiom_db::CommitRecord =
-            serde_json::from_value(commits.remove(&old_commit_hash).unwrap()).unwrap();
-        commit_rec.payload.receipt_hash = new_rcpt_hash;
-        commit_rec.commit_hash = axiom_db::compute_commit_payload_hash(&commit_rec.payload);
-        let new_commit_hash = commit_rec.commit_hash.clone();
-        commits.insert(
-            new_commit_hash.as_str().into(),
-            serde_json::to_value(&commit_rec).unwrap(),
-        );
-
-        val.as_object_mut().unwrap().insert(
-            "head_commit".into(),
-            serde_json::to_value(&new_commit_hash).unwrap(),
-        );
-
-        std::fs::write(&db_path, serde_json::to_string_pretty(&val).unwrap()).unwrap();
-    }
+    simulate_legacy_profile_receipt(&db_path);
 
     // 3. 重新打开池：断言已填洞被降级为 Unresolved，并且被重新收录进 pending_holes
     {
@@ -830,8 +795,6 @@ fn profile_invalidation_and_reverify_unproved_holes_closed_loop() {
 
 #[test]
 fn nested_hole_reattestation_reverify_closed_loop() {
-    use axiom_db::legacy_verification_profile_hash;
-
     let nonce = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -861,41 +824,7 @@ fn nested_hole_reattestation_reverify_closed_loop() {
     }
 
     // 2. 模拟升级规则集，将旧收据的 profile hash 更新为 legacy 并同步自哈希与 commit 引用
-    {
-        let db_content = std::fs::read_to_string(&db_path).unwrap();
-        let mut val: serde_json::Value = serde_json::from_str(&db_content).unwrap();
-        let leg_hash = legacy_verification_profile_hash();
-
-        let receipts = val.get_mut("receipts").unwrap().as_object_mut().unwrap();
-        let old_rcpt_hash = receipts.keys().next().unwrap().clone();
-        let mut rcpt: axiom_db::VerificationReceipt =
-            serde_json::from_value(receipts.remove(&old_rcpt_hash).unwrap()).unwrap();
-        rcpt.verification_profile_hash = leg_hash;
-        let new_rcpt_hash = axiom_db::compute_receipt_hash(&rcpt);
-        receipts.insert(
-            new_rcpt_hash.as_str().into(),
-            serde_json::to_value(&rcpt).unwrap(),
-        );
-
-        let commits = val.get_mut("commits").unwrap().as_object_mut().unwrap();
-        let old_commit_hash = commits.keys().next().unwrap().clone();
-        let mut commit_rec: axiom_db::CommitRecord =
-            serde_json::from_value(commits.remove(&old_commit_hash).unwrap()).unwrap();
-        commit_rec.payload.receipt_hash = new_rcpt_hash;
-        commit_rec.commit_hash = axiom_db::compute_commit_payload_hash(&commit_rec.payload);
-        let new_commit_hash = commit_rec.commit_hash.clone();
-        commits.insert(
-            new_commit_hash.as_str().into(),
-            serde_json::to_value(&commit_rec).unwrap(),
-        );
-
-        val.as_object_mut().unwrap().insert(
-            "head_commit".into(),
-            serde_json::to_value(&new_commit_hash).unwrap(),
-        );
-
-        std::fs::write(&db_path, serde_json::to_string_pretty(&val).unwrap()).unwrap();
-    }
+    simulate_legacy_profile_receipt(&db_path);
 
     // 3. 重新打开池：当前函数体已为 "1 + 2"（无洞），断言降级并重新收录进 pending_holes
     {
@@ -964,4 +893,41 @@ fn reopen_pool_hydrates_commits_in_causal_order_preventing_hash_order_inversion(
 
     let _ = std::fs::remove_file(&skel_path);
     let _ = std::fs::remove_file(&db_path);
+}
+
+/// 模拟将数据库中的最新收据降级为旧版 Profile（用于测试规则升级自愈与重签机制）
+fn simulate_legacy_profile_receipt(db_path: &std::path::Path) {
+    let db_content = std::fs::read_to_string(db_path).unwrap();
+    let mut val: serde_json::Value = serde_json::from_str(&db_content).unwrap();
+    let leg_hash = axiom_db::legacy_verification_profile_hash();
+
+    let receipts = val.get_mut("receipts").unwrap().as_object_mut().unwrap();
+    let old_rcpt_hash = receipts.keys().next().unwrap().clone();
+    let mut rcpt: axiom_db::VerificationReceipt =
+        serde_json::from_value(receipts.remove(&old_rcpt_hash).unwrap()).unwrap();
+    rcpt.verification_profile_hash = leg_hash;
+    let new_rcpt_hash = axiom_db::compute_receipt_hash(&rcpt);
+    receipts.insert(
+        new_rcpt_hash.as_str().into(),
+        serde_json::to_value(&rcpt).unwrap(),
+    );
+
+    let commits = val.get_mut("commits").unwrap().as_object_mut().unwrap();
+    let old_commit_hash = commits.keys().next().unwrap().clone();
+    let mut commit_rec: axiom_db::CommitRecord =
+        serde_json::from_value(commits.remove(&old_commit_hash).unwrap()).unwrap();
+    commit_rec.payload.receipt_hash = new_rcpt_hash;
+    commit_rec.commit_hash = axiom_db::compute_commit_payload_hash(&commit_rec.payload);
+    let new_commit_hash = commit_rec.commit_hash.clone();
+    commits.insert(
+        new_commit_hash.as_str().into(),
+        serde_json::to_value(&commit_rec).unwrap(),
+    );
+
+    val.as_object_mut().unwrap().insert(
+        "head_commit".into(),
+        serde_json::to_value(&new_commit_hash).unwrap(),
+    );
+
+    std::fs::write(db_path, serde_json::to_string_pretty(&val).unwrap()).unwrap();
 }

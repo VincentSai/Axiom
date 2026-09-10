@@ -6,28 +6,29 @@
     "mode": "concurrent_multi_agent",
     "eval_mode": "mock",
     "is_mock": true,
-    "git_commit": "a2f83015bf67ae80158e47a10ec1be871789a8f1",
-    "git_tree_hash": "ab6a461c5d0fdd10a2f2c9871cdc897c98010cef",
+    "git_commit": "114768533e0a2168e61470a92a5838ddef6da714",
+    "git_tree_hash": "bafb4224a939945b930e5de4302d921ee0e486d2",
+    "git_diff_hash": "44f92a3dd590d2d2552383487c07b0484b6338658e00237e0e80a5e5e0c3d248",
     "git_status": {
       "is_dirty": true,
       "dirty_files_count": 6,
       "dirty_files": [
-        "M crates/axiom-agent-pool/Cargo.toml",
         "M crates/axiom-agent-pool/tests/concurrent_pool_test.rs",
+        "M crates/axiom-db/src/commit_graph.rs",
         "M crates/axiom-db/src/lib.rs",
         "M crates/axiom-db/tests/ast_db_test.rs",
         "M crates/axiom-smt/src/z3_solver.rs",
-        "?? crates/axiom-db/src/commit_graph.rs"
+        "M examples/benchmark_eval/concurrent_runner.py"
       ]
     },
     "z3_version": "Z3 version 4.13.0 - 64 bit",
     "platform": "win32",
     "python_version": "3.14.2",
-    "timestamp": "2026-09-10 11:39:37"
+    "timestamp": "2026-09-10 14:03:34"
   },
   "summary": {
     "rust_group": {
-      "wall_clock_sec": 1.73,
+      "wall_clock_sec": 1.68,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -37,7 +38,7 @@
       "unit_test_passed": true
     },
     "axiom_group": {
-      "wall_clock_sec": 2.38,
+      "wall_clock_sec": 2.25,
       "conflict_rate_pct": 0.0,
       "conflict_count": 0,
       "resolver_calls_count": 0,
@@ -45,15 +46,15 @@
       "resolver_tax_billed_tokens": 0,
       "total_billed_tokens": 75070,
       "formal_proved": true,
-      "speedup_vs_rust": 0.73
+      "speedup_vs_rust": 0.75
     }
   },
   "detailed_runs": {
     "group2_rust": {
       "status": "success",
       "total_tasks": 5,
-      "wall_clock_sec": 1.73,
-      "worker_concurrency_sec": 0.25,
+      "wall_clock_sec": 1.68,
+      "worker_concurrency_sec": 0.16,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
@@ -67,18 +68,19 @@
       },
       "unit_test_passed": true,
       "unit_test_message": "All subsystem unit tests passed",
-      "git_commit_sha": "a2f83015bf67ae80158e47a10ec1be871789a8f1",
-      "git_tree_hash": "ab6a461c5d0fdd10a2f2c9871cdc897c98010cef",
+      "git_commit_sha": "114768533e0a2168e61470a92a5838ddef6da714",
+      "git_tree_hash": "bafb4224a939945b930e5de4302d921ee0e486d2",
+      "git_diff_hash": "44f92a3dd590d2d2552383487c07b0484b6338658e00237e0e80a5e5e0c3d248",
       "git_status": {
         "is_dirty": true,
         "dirty_files_count": 6,
         "dirty_files": [
-          "M crates/axiom-agent-pool/Cargo.toml",
           "M crates/axiom-agent-pool/tests/concurrent_pool_test.rs",
+          "M crates/axiom-db/src/commit_graph.rs",
           "M crates/axiom-db/src/lib.rs",
           "M crates/axiom-db/tests/ast_db_test.rs",
           "M crates/axiom-smt/src/z3_solver.rs",
-          "?? crates/axiom-db/src/commit_graph.rs"
+          "M examples/benchmark_eval/concurrent_runner.py"
         ]
       },
       "resolver_details": [],
@@ -168,40 +170,42 @@
     "group3_axiom": {
       "status": "success",
       "total_tasks": 5,
-      "wall_clock_sec": 2.38,
+      "wall_clock_sec": 2.25,
       "worker_concurrency_sec": 0.0,
-      "combinator_latency_ms": 1222.89,
-      "smt_verify_sec": 0.64,
+      "combinator_latency_ms": 1188.94,
+      "smt_verify_sec": 0.61,
       "conflict_count": 0,
       "conflict_rate_pct": 0.0,
       "resolver_calls_count": 0,
       "tokens": {
-        "workers_payload": 1070,
+        "workers_payload": 1375,
         "resolver_payload_tax": 0,
-        "total_payload": 1070,
+        "total_payload": 1375,
         "workers_raw_billed": 75070,
         "resolver_billed_tax": 0,
         "total_raw_billed": 75070,
         "capsule_breakdown": {
           "system_tokens": 470,
           "contract_tokens": 570,
-          "dependency_tokens": 265
+          "dependency_tokens": 265,
+          "candidates_tokens": 70
         },
-        "tokens_to_proved": 1070
+        "tokens_to_proved": 1375
       },
       "formal_proved": true,
-      "git_commit_sha": "a2f83015bf67ae80158e47a10ec1be871789a8f1",
-      "git_tree_hash": "ab6a461c5d0fdd10a2f2c9871cdc897c98010cef",
+      "git_commit_sha": "114768533e0a2168e61470a92a5838ddef6da714",
+      "git_tree_hash": "bafb4224a939945b930e5de4302d921ee0e486d2",
+      "git_diff_hash": "44f92a3dd590d2d2552383487c07b0484b6338658e00237e0e80a5e5e0c3d248",
       "git_status": {
         "is_dirty": true,
         "dirty_files_count": 6,
         "dirty_files": [
-          "M crates/axiom-agent-pool/Cargo.toml",
           "M crates/axiom-agent-pool/tests/concurrent_pool_test.rs",
+          "M crates/axiom-db/src/commit_graph.rs",
           "M crates/axiom-db/src/lib.rs",
           "M crates/axiom-db/tests/ast_db_test.rs",
           "M crates/axiom-smt/src/z3_solver.rs",
-          "?? crates/axiom-db/src/commit_graph.rs"
+          "M examples/benchmark_eval/concurrent_runner.py"
         ]
       },
       "smt_message": "All 5 functions formally proved by Z3",
@@ -271,7 +275,7 @@
       "cas_concurrency_benchmark": {
         "race_workers": 2,
         "success_submissions": 2,
-        "concurrency_elapsed_sec": 0.421,
+        "concurrency_elapsed_sec": 0.372,
         "stale_root_conflicts_observed": 1,
         "fast_forward_retries_succeeded": 1,
         "final_commit_chain_length": 2,
@@ -279,8 +283,8 @@
         "final_root": "#mod_8892410a4f9ec42e4507b5b4546f24373ed41f8430d7c1d8d71d0a8090dc4b56",
         "eval_mode": "mock",
         "is_mock": true,
-        "git_commit_sha": "a2f83015bf67ae80158e47a10ec1be871789a8f1",
-        "git_tree_hash": "ab6a461c5d0fdd10a2f2c9871cdc897c98010cef",
+        "git_commit_sha": "114768533e0a2168e61470a92a5838ddef6da714",
+        "git_tree_hash": "bafb4224a939945b930e5de4302d921ee0e486d2",
         "cas_events_by_worker": {
           "worker_b": [],
           "worker_a": [
@@ -315,9 +319,9 @@
           "function_name": "can_stack_items",
           "latency_sec": 0.15,
           "payload": {
-            "prompt_tokens": 200,
+            "prompt_tokens": 249,
             "candidates_tokens": 14,
-            "total_tokens": 214
+            "total_tokens": 263
           },
           "raw_billed": {
             "input_tokens": 15000,
@@ -337,9 +341,9 @@
           "function_name": "calc_stacked_counts",
           "latency_sec": 0.15,
           "payload": {
-            "prompt_tokens": 200,
+            "prompt_tokens": 280,
             "candidates_tokens": 23,
-            "total_tokens": 223
+            "total_tokens": 303
           },
           "raw_billed": {
             "input_tokens": 15000,
@@ -359,9 +363,9 @@
           "function_name": "calculate_purchase_cost",
           "latency_sec": 0.15,
           "payload": {
-            "prompt_tokens": 200,
+            "prompt_tokens": 267,
             "candidates_tokens": 14,
-            "total_tokens": 214
+            "total_tokens": 281
           },
           "raw_billed": {
             "input_tokens": 15000,
@@ -381,9 +385,9 @@
           "function_name": "validate_trade_balance",
           "latency_sec": 0.15,
           "payload": {
-            "prompt_tokens": 200,
+            "prompt_tokens": 244,
             "candidates_tokens": 11,
-            "total_tokens": 211
+            "total_tokens": 255
           },
           "raw_billed": {
             "input_tokens": 15000,
@@ -403,9 +407,9 @@
           "function_name": "calc_sell_refund",
           "latency_sec": 0.15,
           "payload": {
-            "prompt_tokens": 200,
+            "prompt_tokens": 265,
             "candidates_tokens": 8,
-            "total_tokens": 208
+            "total_tokens": 273
           },
           "raw_billed": {
             "input_tokens": 15000,

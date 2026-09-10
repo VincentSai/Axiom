@@ -70,6 +70,15 @@ def get_git_tree_hash() -> str:
         return "unknown"
 
 
+def get_git_diff_hash() -> str:
+    import hashlib
+    try:
+        out = subprocess.check_output(["git", "diff", "HEAD"], cwd=SCRIPT_DIR, stderr=subprocess.DEVNULL)
+        return hashlib.sha256(out).hexdigest()
+    except Exception:
+        return "unknown"
+
+
 def get_git_status() -> dict:
     """真实探测当前 Git 仓库的未跟踪与修改状态 (Fail-Closed Provenance)"""
     try:
@@ -126,14 +135,14 @@ def validate_benchmark_result_schema(data: dict):
             raise ValueError(f"Benchmark 输出结果缺少必填顶层字段: {key}")
 
     meta = data["experiment_metadata"]
-    for req in ["engine", "eval_mode", "git_commit", "git_tree_hash", "git_status", "z3_version"]:
+    for req in ["engine", "eval_mode", "git_commit", "git_tree_hash", "git_diff_hash", "git_status", "z3_version"]:
         if req not in meta:
             raise ValueError(f"experiment_metadata 缺少字段: {req}")
 
     g2 = data["detailed_runs"].get("group2_rust", {})
     g3 = data["detailed_runs"].get("group3_axiom", {})
     for g_data, g_name in [(g2, "Group 2"), (g3, "Group 3")]:
-        for req in ["total_tasks", "git_tree_hash", "git_status"]:
+        for req in ["total_tasks", "git_tree_hash", "git_diff_hash", "git_status"]:
             if req not in g_data:
                 raise ValueError(f"{g_name} 缺少必要 provenance 字段: {req}")
 
@@ -323,7 +332,7 @@ def call_codex_generate(prompt: str, model: str = None, proxy: str = None, timeo
                 pass
 
 
-def mock_generate_worker(task: dict, group: int) -> dict:
+def mock_generate_worker(task: dict, group: int, capsule: "ContextCapsule" = None) -> dict:
     tid = task["id"]
     fname = task["function_name"]
     if group == 2:
@@ -342,7 +351,7 @@ def mock_generate_worker(task: dict, group: int) -> dict:
     else:
         code = task["canonical_axiom_expr"]
         c_tok = count_exact_tokens(code)
-        p_tok = 200
+        p_tok = capsule.total_tokens if capsule is not None else 200
 
     return {
         "text": code,
@@ -872,6 +881,7 @@ def run_group2_rust_pipeline(tasks: list, args, proxy: str) -> dict:
             "unit_test_message": t_msg,
             "git_commit_sha": get_git_commit_sha(),
             "git_tree_hash": get_git_tree_hash(),
+            "git_diff_hash": get_git_diff_hash(),
             "git_status": get_git_status(),
             "resolver_details": resolver_calls,
             "workers_details": [
@@ -945,7 +955,7 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
         capsule = build_axiom_context_capsule(task, envelope)
         prompt = capsule.render_prompt()
         if args.mock:
-            res = mock_generate_worker(task, group=3)
+            res = mock_generate_worker(task, group=3, capsule=capsule)
         else:
             res = call_codex_generate(prompt, model=args.codex_model, proxy=proxy)
         expr = extract_code(res["text"], "axiom")
@@ -1019,6 +1029,12 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
     t_pipeline_end = time.time()
     pipeline_wall_time = round(t_pipeline_end - t_pipeline_start, 2)
 
+    # 保证口径完全一致：Axiom 组 worker payload 严格等于 capsule(system + contract + dep) + candidate
+    for w in worker_results:
+        if "capsule" in w:
+            w["raw_result"]["task_payload"]["prompt_tokens"] = w["capsule"]["total_tokens"]
+            w["raw_result"]["task_payload"]["total_tokens"] = w["capsule"]["total_tokens"] + w["raw_result"]["task_payload"]["candidates_tokens"]
+
     workers_payload = sum(w["raw_result"]["task_payload"]["total_tokens"] for w in worker_results)
     workers_billed = sum(w["raw_result"]["raw_billed"]["total_tokens"] for w in worker_results)
 
@@ -1043,12 +1059,14 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
                 "system_tokens": sum(w["capsule"]["system_tokens"] for w in worker_results),
                 "contract_tokens": sum(w["capsule"]["contract_tokens"] for w in worker_results),
                 "dependency_tokens": sum(w["capsule"]["dependency_tokens"] for w in worker_results),
+                "candidates_tokens": sum(w["raw_result"]["task_payload"]["candidates_tokens"] for w in worker_results),
             },
             "tokens_to_proved": workers_payload if v_ok else None,
         },
         "formal_proved": v_ok,
         "git_commit_sha": get_git_commit_sha(),
         "git_tree_hash": get_git_tree_hash(),
+        "git_diff_hash": get_git_diff_hash(),
         "git_status": get_git_status(),
         "smt_message": v_msg,
         "smt_reports": reports,
@@ -1147,6 +1165,7 @@ def main():
             "is_mock": args.mock,
             "git_commit": get_git_commit_sha(),
             "git_tree_hash": get_git_tree_hash(),
+            "git_diff_hash": get_git_diff_hash(),
             "git_status": get_git_status(),
             "z3_version": get_z3_version(),
             "platform": sys.platform,
@@ -1181,6 +1200,13 @@ def main():
             "group3_axiom": g3_res
         }
     }
+
+    # 强不变式断言 Fail-Closed 校验
+    assert sum(g3_res["tokens"]["capsule_breakdown"].values()) == g3_res["tokens"]["workers_payload"], \
+        f"Axiom capsule_breakdown 必须与 workers_payload 完全自洽: {sum(g3_res['tokens']['capsule_breakdown'].values())} != {g3_res['tokens']['workers_payload']}"
+    if g3_res["formal_proved"]:
+        assert g3_res["tokens"]["tokens_to_proved"] == g3_res["tokens"]["workers_payload"], \
+            f"formal_proved 下 tokens_to_proved 必须严格等于 workers_payload: {g3_res['tokens']['tokens_to_proved']} != {g3_res['tokens']['workers_payload']}"
 
     validate_benchmark_result_schema(output_payload)
 

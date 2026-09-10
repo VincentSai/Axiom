@@ -2,9 +2,12 @@
 
 use std::collections::{BTreeMap, HashSet};
 
+use axiom_ast::Module;
+
 use crate::{
-    compute_candidate_hash, compute_commit_payload_hash, compute_envelope_hash,
-    compute_receipt_hash, CommitRecord, DatabaseState, DbError, NodeHash,
+    compute_candidate_hash, compute_commit_payload_hash, compute_envelope_hash, compute_expr_hash,
+    compute_legacy_commit_payload_hash, compute_module_hash, compute_receipt_hash,
+    derive_candidate_module, CommitRecord, DatabaseState, DbError, LegacyCommitPayload, NodeHash,
 };
 
 /// Topology and integrity auditor for AST database commits.
@@ -20,11 +23,21 @@ impl CommitGraph {
     /// 4. TaskEnvelope, Candidate, and VerificationReceipt artifacts exist and match content hashes.
     /// 5. Cross-binding consistency between candidate, envelope, and receipt.
     /// 6. Strict genealogical continuity (`child.parent_commit == parent.commit_hash` and `child.parent_root == parent.new_root`).
+    /// 7. Envelope base_root_hash strictly matches commit.parent_root.
+    /// 8. Candidate expression_source re-parses and matches expression_hash.
+    /// 9. Deterministic replay: candidate expression derived against parent module matches commit.new_root.
     pub(crate) fn validate_mainline(state: &DatabaseState) -> Result<Vec<&CommitRecord>, DbError> {
         let head_hash = match &state.head_commit {
             Some(h) => h,
             None => {
                 if state.commits.is_empty() {
+                    if let Some(ref root_ref) = state.root_ref {
+                        if !state.modules.contains_key(root_ref) {
+                            return Err(DbError::CorruptedCommitChain(format!(
+                                "root_ref `{root_ref}` not found in database modules"
+                            )));
+                        }
+                    }
                     return Ok(Vec::new());
                 } else {
                     return Err(DbError::CorruptedCommitChain(
@@ -40,14 +53,18 @@ impl CommitGraph {
             ))
         })?;
 
-        if let Some(ref root_ref) = state.root_ref {
-            if head_commit.new_root() != root_ref {
-                return Err(DbError::CorruptedCommitChain(format!(
-                    "head commit new root `{}` does not match database root_ref `{}`",
-                    head_commit.new_root(),
-                    root_ref
-                )));
-            }
+        let root_ref = state.root_ref.as_ref().ok_or_else(|| {
+            DbError::CorruptedCommitChain(format!(
+                "head commit `{head_hash}` exists but root_ref is None"
+            ))
+        })?;
+
+        if head_commit.new_root() != root_ref {
+            return Err(DbError::CorruptedCommitChain(format!(
+                "head commit new root `{}` does not match database root_ref `{}`",
+                head_commit.new_root(),
+                root_ref
+            )));
         }
 
         let mut ordered_commits = Vec::new();
@@ -143,6 +160,60 @@ impl CommitGraph {
                 )));
             }
 
+            // Envelope base_root_hash consistency check for root-changing commits
+            if commit.parent_root() != Some(commit.new_root())
+                && env.base_root_hash.as_ref() != commit.parent_root()
+            {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "root-changing commit `{hash}` parent_root `{:?}` does not match envelope base_root_hash `{:?}`",
+                    commit.parent_root(),
+                    env.base_root_hash
+                )));
+            }
+
+            // Candidate expression source re-parse and expression_hash check
+            let parsed_expr = axiom_parser::parse_expr(&cand.expression_source).map_err(|e| {
+                DbError::CorruptedCommitChain(format!(
+                    "commit `{hash}` candidate `{}` expression parse failure: {e}",
+                    commit.candidate_hash()
+                ))
+            })?;
+            let computed_expr_hash = compute_expr_hash(&parsed_expr);
+            if computed_expr_hash != cand.expression_hash {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "commit `{hash}` candidate `{}` expression_hash mismatch: recorded `{}`, computed `{computed_expr_hash}`",
+                    commit.candidate_hash(),
+                    cand.expression_hash
+                )));
+            }
+
+            // Deterministic replay derivation check for root-changing commits
+            if commit.parent_root() != Some(commit.new_root()) {
+                let parent_mod = match commit.parent_root() {
+                    Some(pr) => state.modules.get(pr).ok_or_else(|| {
+                        DbError::CorruptedCommitChain(format!(
+                            "commit `{hash}` parent root module `{pr}` not found in database",
+                        ))
+                    })?,
+                    None => &Module::default(),
+                };
+
+                let derived =
+                    derive_candidate_module(parent_mod, env, &parsed_expr).map_err(|e| {
+                        DbError::CorruptedCommitChain(format!(
+                            "commit `{hash}` candidate replay derivation failed: {e}",
+                        ))
+                    })?;
+
+                let derived_hash = compute_module_hash(&derived);
+                if &derived_hash != commit.new_root() {
+                    return Err(DbError::CorruptedCommitChain(format!(
+                        "commit `{hash}` new_root mismatch: recorded `{}`, replayed `{derived_hash}`",
+                        commit.new_root()
+                    )));
+                }
+            }
+
             ordered_commits.push(commit);
             curr_commit_hash = commit.parent_commit();
         }
@@ -212,6 +283,32 @@ impl CommitGraph {
     pub(crate) fn repair_legacy_ancestry(state: &mut DatabaseState) -> Result<bool, DbError> {
         if state.head_commit.is_some() || state.commits.is_empty() {
             return Ok(false);
+        }
+
+        // 预验真：按 LegacyCommitPayload（旧 6 字段）严格核算原有哈希与 map_key，防止损坏数据被洗白
+        for (map_key, commit) in &state.commits {
+            if map_key != &commit.commit_hash {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "legacy commits map key `{map_key}` does not match commit_hash `{}`",
+                    commit.commit_hash
+                )));
+            }
+
+            let legacy_payload = LegacyCommitPayload {
+                parent_root: commit.parent_root().cloned(),
+                new_root: commit.new_root().clone(),
+                envelope_hash: commit.envelope_hash().clone(),
+                candidate_hash: commit.candidate_hash().clone(),
+                receipt_hash: commit.receipt_hash().clone(),
+                timestamp: commit.timestamp(),
+            };
+            let computed_legacy_hash = compute_legacy_commit_payload_hash(&legacy_payload);
+            if computed_legacy_hash != commit.commit_hash {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "legacy commit hash mismatch for `{}`: computed legacy hash `{computed_legacy_hash}`",
+                    commit.commit_hash
+                )));
+            }
         }
 
         let commit_list: Vec<CommitRecord> = state.commits.values().cloned().collect();

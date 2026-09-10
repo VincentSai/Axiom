@@ -385,6 +385,22 @@ pub fn compute_commit_hash(commit: &CommitRecord) -> NodeHash {
     compute_commit_payload_hash(&commit.payload)
 }
 
+/// Legacy commit payload (6 fields) used in pre-ancestry DAG database schemas.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LegacyCommitPayload {
+    pub parent_root: Option<NodeHash>,
+    pub new_root: NodeHash,
+    pub envelope_hash: NodeHash,
+    pub candidate_hash: NodeHash,
+    pub receipt_hash: NodeHash,
+    pub timestamp: u64,
+}
+
+/// Computes content identifier for a legacy commit payload.
+pub fn compute_legacy_commit_payload_hash(payload: &LegacyCommitPayload) -> NodeHash {
+    compute_hash("commit", payload)
+}
+
 /// The content identifiers created while inserting a complete module.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModuleRecord {
@@ -584,11 +600,11 @@ impl CertifiedProofEvidence {
 /// Unified SMT theorem proving validator constructing sealed CertifiedProofEvidence or returning CasError.
 fn require_proved(
     smt_result: axiom_smt::SmtResult,
-    target_name: &str,
     envelope_hash: NodeHash,
     candidate_hash: NodeHash,
     target_func: &FunctionDecl,
 ) -> Result<CertifiedProofEvidence, CasError> {
+    let target_name = &target_func.name;
     match smt_result {
         axiom_smt::SmtResult::Proved {
             solver,
@@ -654,22 +670,37 @@ impl CertifiedVerification {
     }
 }
 
+/// Represents the tip of a commit branch, encapsulating both AST root hash and DAG commit hash.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CommitTip {
+    pub root: Option<NodeHash>,
+    pub head: Option<NodeHash>,
+}
+
+impl CommitTip {
+    pub fn new(root: Option<NodeHash>, head: Option<NodeHash>) -> Self {
+        Self { root, head }
+    }
+}
+
 /// Kernel-minted cryptographic reattestation certificate computed offline without database locks.
 /// This certificate is sealed: it cannot be constructed from outside axiom-db or deserialized arbitrarily.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CertifiedReattestation {
-    pub(crate) expected_root: Option<NodeHash>,
-    pub(crate) expected_head: Option<NodeHash>,
+    pub(crate) expected_tip: CommitTip,
     pub(crate) target_hole_id: String,
     pub(crate) evidence: CertifiedProofEvidence,
 }
 
 impl CertifiedReattestation {
+    pub fn expected_tip(&self) -> &CommitTip {
+        &self.expected_tip
+    }
     pub fn expected_root(&self) -> Option<&NodeHash> {
-        self.expected_root.as_ref()
+        self.expected_tip.root.as_ref()
     }
     pub fn expected_head(&self) -> Option<&NodeHash> {
-        self.expected_head.as_ref()
+        self.expected_tip.head.as_ref()
     }
     pub fn target_hole_id(&self) -> &str {
         &self.target_hole_id
@@ -756,18 +787,17 @@ impl AstDatabase {
         if path.exists() {
             let bytes = fs::read(path)?;
             let mut state: DatabaseState = serde_json::from_slice(&bytes)?;
-            if Self::migrate_legacy_commits_if_needed(&mut state)? {
-                let database = Self {
-                    path: Some(path.to_path_buf()),
-                    state,
-                };
-                database.persist(&database.state)?;
-                return Ok(database);
-            }
-            Ok(Self {
+            let migrated = Self::migrate_legacy_commits_if_needed(&mut state)?;
+            // 语义完整性全面核验（先核验再决定落盘，防写脏盘）
+            CommitGraph::validate_mainline(&state)?;
+            let database = Self {
                 path: Some(path.to_path_buf()),
                 state,
-            })
+            };
+            if migrated {
+                database.persist(&database.state)?;
+            }
+            Ok(database)
         } else {
             let database = Self {
                 path: Some(path.to_path_buf()),
@@ -794,6 +824,14 @@ impl AstDatabase {
     /// Returns the current head commit hash reference.
     pub fn head_commit(&self) -> Option<&NodeHash> {
         self.state.head_commit.as_ref()
+    }
+
+    /// Returns the current commit tip encapsulating both root and head references.
+    pub fn commit_tip(&self) -> CommitTip {
+        CommitTip {
+            root: self.state.root_ref.clone(),
+            head: self.state.head_commit.clone(),
+        }
     }
 
     /// Returns the verified mainline commits sequence ordered from earliest ancestor to latest head.
@@ -1016,13 +1054,7 @@ impl AstDatabase {
             .expect("target function exists in derived module");
 
         let smt_result = axiom_smt::verify_function_in_module(affected_func, &derived_module);
-        let evidence = require_proved(
-            smt_result,
-            &envelope.target_function,
-            env_hash,
-            cand_hash,
-            affected_func,
-        )?;
+        let evidence = require_proved(smt_result, env_hash, cand_hash, affected_func)?;
 
         Ok(CertifiedVerification {
             base_root_hash: expected_root.clone(),
@@ -1058,21 +1090,21 @@ impl AstDatabase {
     }
 
     /// 统一私有重签认证内核：
-    /// 1. 检验 expected_root 在当前 state 存在；
-    /// 2. 检验主线落地见证，确保 candidate 是针对 target_hole_id 最新生效的提交引入且自该提交起未被覆写；
+    /// 1. 检验 tip.root 在当前 state 存在；
+    /// 2. 检验主线落地见证，确保 candidate 是针对 target_hole_id 最新生效且修改了 root 的提交引入；
+    ///    跳过后续 parent_root == new_root 的 receipt-only / no-op 提交，防止连续重签升级二次重放失败；
     /// 3. [Spec 1 核心] 确定性可重放验证：从 landing_commit 的 parent_root 重放 candidate 表达式，
     ///    核对推导模块哈希严格等于 landing_commit.new_root；
     /// 4. 确保当前 root 中目标函数无未填洞；
     /// 5. 严格 SMT 全域定理证明，通过 require_proved 密封铸造 CertifiedProofEvidence。
     fn certify_reattestation_kernel(
         &self,
-        expected_root: &Option<NodeHash>,
-        expected_head: &Option<NodeHash>,
+        tip: &CommitTip,
         target_hole_id: &str,
         envelope_hash: Option<&NodeHash>,
         candidate_hash: Option<&NodeHash>,
     ) -> Result<CertifiedReattestation, CasError> {
-        let root_hash = expected_root.as_ref().ok_or_else(|| {
+        let root_hash = tip.root.as_ref().ok_or_else(|| {
             CasError::InvalidCandidate("cannot reattest candidate in an empty database".into())
         })?;
         let root_module = self.state.modules.get(root_hash).ok_or_else(|| {
@@ -1085,9 +1117,13 @@ impl AstDatabase {
         // 1. 获取当前主线历史
         let mainline = self.mainline_commits()?;
 
-        // 2. 主线落地见证倒序查找：必须是针对该 target_hole_id 最新生效的提交
+        // 2. 主线落地见证倒序查找：必须是针对该 target_hole_id 最新生效且改变了 root 的提交
+        // （跳过 parent_root == new_root 的 receipt-only / no-op 提交，防止连续重签升级在已无洞的 parent 上二次重放报错）
         let mut landing_commit_opt: Option<&CommitRecord> = None;
         for commit in mainline.iter().rev() {
+            if commit.parent_root() == Some(commit.new_root()) {
+                continue;
+            }
             if let Some(env) = self.state.envelopes.get(commit.envelope_hash()) {
                 if env.target_hole_id == target_hole_id {
                     landing_commit_opt = Some(*commit);
@@ -1210,15 +1246,13 @@ impl AstDatabase {
         let smt_result = axiom_smt::verify_function_in_module(func, root_module);
         let evidence = require_proved(
             smt_result,
-            &func.name,
             landing_commit.envelope_hash().clone(),
             landing_commit.candidate_hash().clone(),
             func,
         )?;
 
         Ok(CertifiedReattestation {
-            expected_root: expected_root.clone(),
-            expected_head: expected_head.clone(),
+            expected_tip: tip.clone(),
             target_hole_id: target_hole_id.to_string(),
             evidence,
         })
@@ -1229,23 +1263,32 @@ impl AstDatabase {
         &mut self,
         target_hole_id: &str,
     ) -> Result<CommitRecord, CasError> {
-        let expected_root = self.state.root_ref.clone();
-        let expected_head = self.state.head_commit.clone();
+        let tip = self.commit_tip();
 
-        let certified = self.certify_reattestation_kernel(
-            &expected_root,
-            &expected_head,
-            target_hole_id,
-            None,
-            None,
-        )?;
+        let certified = self.certify_reattestation_kernel(&tip, target_hole_id, None, None)?;
 
         self.try_commit_reattestation(certified)
     }
 
     /// Performs offline theorem proving and verification for re-attesting an existing hole implementation
     /// without holding database locks. Returns a sealed CertifiedReattestation.
-    pub fn certify_reattestation_offline(
+    pub(crate) fn certify_reattestation_offline(
+        &self,
+        tip: &CommitTip,
+        target_hole_id: &str,
+        envelope_hash: &NodeHash,
+        candidate_hash: &NodeHash,
+    ) -> Result<CertifiedReattestation, CasError> {
+        self.certify_reattestation_kernel(
+            tip,
+            target_hole_id,
+            Some(envelope_hash),
+            Some(candidate_hash),
+        )
+    }
+
+    #[doc(hidden)]
+    pub fn test_certify_reattestation_offline(
         &self,
         expected_root: &Option<NodeHash>,
         expected_head: &Option<NodeHash>,
@@ -1253,13 +1296,8 @@ impl AstDatabase {
         envelope_hash: &NodeHash,
         candidate_hash: &NodeHash,
     ) -> Result<CertifiedReattestation, CasError> {
-        self.certify_reattestation_kernel(
-            expected_root,
-            expected_head,
-            target_hole_id,
-            Some(envelope_hash),
-            Some(candidate_hash),
-        )
+        let tip = CommitTip::new(expected_root.clone(), expected_head.clone());
+        self.certify_reattestation_offline(&tip, target_hole_id, envelope_hash, candidate_hash)
     }
 
     /// Two-phase commit Phase 2: Atomically applies a certified verification candidate to the CAS database.
@@ -1375,17 +1413,17 @@ impl AstDatabase {
         let _guard = self.lock_and_sync()?;
         let mut next_state = self.state.clone();
 
-        // 1. 双重 CAS 门禁：expected_root 与 expected_head 必须严格匹配
-        if self.state.root_ref != certified.expected_root {
+        // 1. 双重 CAS 门禁：expected_tip 必须严格匹配
+        if self.state.root_ref != certified.expected_tip.root {
             return Err(CasError::StaleRoot {
                 current: self.state.root_ref.clone(),
-                expected: certified.expected_root,
+                expected: certified.expected_tip.root,
             });
         }
-        if self.state.head_commit != certified.expected_head {
+        if self.state.head_commit != certified.expected_tip.head {
             return Err(CasError::StaleHead {
                 current: self.state.head_commit.clone(),
-                expected: certified.expected_head,
+                expected: certified.expected_tip.head,
             });
         }
 
@@ -1885,96 +1923,147 @@ mod tests {
     fn test_internal_genesis_detection_and_ancestry_repair() {
         let mut state = DatabaseState::default();
 
-        let root0: NodeHash =
-            "#mod_0000000000000000000000000000000000000000000000000000000000000000"
-                .parse()
-                .unwrap();
-        let root1: NodeHash =
-            "#mod_1111111111111111111111111111111111111111111111111111111111111111"
-                .parse()
-                .unwrap();
-        let root2: NodeHash =
-            "#mod_2222222222222222222222222222222222222222222222222222222222222222"
-                .parse()
-                .unwrap();
-        let root3: NodeHash =
-            "#mod_3333333333333333333333333333333333333333333333333333333333333333"
-                .parse()
-                .unwrap();
+        let mut mod0 = Module::default();
+        mod0.functions.push(FunctionDecl {
+            name: "f1".into(),
+            params: vec![],
+            return_type: Type::Int,
+            effects: vec![],
+            requires: vec![],
+            ensures: vec![],
+            body: Expr::Hole("h1".into()),
+        });
+        mod0.functions.push(FunctionDecl {
+            name: "f2".into(),
+            params: vec![],
+            return_type: Type::Int,
+            effects: vec![],
+            requires: vec![],
+            ensures: vec![],
+            body: Expr::Hole("h2".into()),
+        });
+        mod0.functions.push(FunctionDecl {
+            name: "f3".into(),
+            params: vec![],
+            return_type: Type::Int,
+            effects: vec![],
+            requires: vec![],
+            ensures: vec![],
+            body: Expr::Hole("h3".into()),
+        });
+        let root0 = compute_module_hash(&mod0);
 
-        let env = TaskEnvelope {
-            base_root_hash: None,
-            target_hole_id: "dummy_hole".into(),
-            target_function: "dummy_fn".into(),
-            contract_hash: NodeHash::default(),
-            dependency_hashes: vec![],
+        let mut mod1 = mod0.clone();
+        mod1.functions[0].body = axiom_parser::parse_expr("1").unwrap();
+        let root1 = compute_module_hash(&mod1);
+
+        let mut mod2 = mod1.clone();
+        mod2.functions[1].body = axiom_parser::parse_expr("2").unwrap();
+        let root2 = compute_module_hash(&mod2);
+
+        let mut mod3 = mod2.clone();
+        mod3.functions[2].body = axiom_parser::parse_expr("3").unwrap();
+        let root3 = compute_module_hash(&mod3);
+
+        state.modules.insert(root0.clone(), mod0.clone());
+        state.modules.insert(root1.clone(), mod1.clone());
+        state.modules.insert(root2.clone(), mod2.clone());
+        state.modules.insert(root3.clone(), mod3.clone());
+
+        // 构造三步变更的合法信封、候选与收据工件
+        let mk_artifacts =
+            |base_root: Option<NodeHash>, fn_name: &str, hole_id: &str, expr_src: &str, ts: u64| {
+                let env = TaskEnvelope {
+                    base_root_hash: base_root,
+                    target_hole_id: hole_id.into(),
+                    target_function: fn_name.into(),
+                    contract_hash: compute_contract_hash(&mod0.functions[0]),
+                    dependency_hashes: vec![],
+                };
+                let env_hash = compute_envelope_hash(&env);
+
+                let parsed_expr = axiom_parser::parse_expr(expr_src).unwrap();
+                let cand = Candidate {
+                    envelope_hash: env_hash.clone(),
+                    expression_source: expr_src.into(),
+                    expression_hash: compute_expr_hash(&parsed_expr),
+                    author_agent_id: "test_agent".into(),
+                    timestamp: ts,
+                };
+                let cand_hash = compute_candidate_hash(&cand);
+
+                let rcpt = VerificationReceipt {
+                    candidate_hash: cand_hash.clone(),
+                    proof_level: ProofLevel::Proved,
+                    solver: "z3".into(),
+                    solver_version: "4.12.0".into(),
+                    obligations_checked: 1,
+                    proof_obligation_hash: compute_proof_obligation_hash(&mod0.functions[0]),
+                    verification_profile_hash: current_verification_profile_hash(),
+                    verified_at: ts,
+                };
+                let rcpt_hash = compute_receipt_hash(&rcpt);
+
+                (env_hash, env, cand_hash, cand, rcpt_hash, rcpt)
+            };
+
+        let (e1_h, e1, c1_h, c1, r1_h, r1) =
+            mk_artifacts(Some(root0.clone()), "f1", "h1", "1", 100);
+        let (e2_h, e2, c2_h, c2, r2_h, r2) =
+            mk_artifacts(Some(root1.clone()), "f2", "h2", "2", 200);
+        let (e3_h, e3, c3_h, c3, r3_h, r3) =
+            mk_artifacts(Some(root2.clone()), "f3", "h3", "3", 300);
+
+        state.envelopes.insert(e1_h.clone(), e1);
+        state.candidates.insert(c1_h.clone(), c1);
+        state.receipts.insert(r1_h.clone(), r1);
+
+        state.envelopes.insert(e2_h.clone(), e2);
+        state.candidates.insert(c2_h.clone(), c2);
+        state.receipts.insert(r2_h.clone(), r2);
+
+        state.envelopes.insert(e3_h.clone(), e3);
+        state.candidates.insert(c3_h.clone(), c3);
+        state.receipts.insert(r3_h.clone(), r3);
+
+        // 构造未版本化的 LegacyCommitPayload（6 字段）并计算历史旧哈希
+        let mk_legacy_commit = |parent_root: Option<NodeHash>,
+                                new_root: NodeHash,
+                                env_hash: NodeHash,
+                                cand_hash: NodeHash,
+                                rcpt_hash: NodeHash,
+                                ts: u64| {
+            let leg_payload = LegacyCommitPayload {
+                parent_root: parent_root.clone(),
+                new_root: new_root.clone(),
+                envelope_hash: env_hash.clone(),
+                candidate_hash: cand_hash.clone(),
+                receipt_hash: rcpt_hash.clone(),
+                timestamp: ts,
+            };
+            let commit_hash = compute_legacy_commit_payload_hash(&leg_payload);
+            CommitRecord {
+                commit_hash,
+                payload: CommitPayload {
+                    parent_commit: None,
+                    parent_root,
+                    new_root,
+                    envelope_hash: env_hash,
+                    candidate_hash: cand_hash,
+                    receipt_hash: rcpt_hash,
+                    timestamp: ts,
+                },
+            }
         };
-        let env_hash = compute_envelope_hash(&env);
 
-        let cand = Candidate {
-            envelope_hash: env_hash.clone(),
-            expression_source: "0".into(),
-            expression_hash: NodeHash::default(),
-            author_agent_id: "dummy_agent".into(),
-            timestamp: 100,
-        };
-        let cand_hash = compute_candidate_hash(&cand);
+        let com1 = mk_legacy_commit(Some(root0), root1.clone(), e1_h, c1_h, r1_h, 100);
+        let com2 = mk_legacy_commit(Some(root1), root2.clone(), e2_h, c2_h, r2_h, 200);
+        let com3 = mk_legacy_commit(Some(root2), root3.clone(), e3_h, c3_h, r3_h, 300);
 
-        let rcpt = VerificationReceipt {
-            candidate_hash: cand_hash.clone(),
-            proof_level: ProofLevel::Proved,
-            solver: "z3".into(),
-            solver_version: "4.12.0".into(),
-            obligations_checked: 1,
-            proof_obligation_hash: NodeHash::default(),
-            verification_profile_hash: current_verification_profile_hash(),
-            verified_at: 100,
-        };
-        let rcpt_hash = compute_receipt_hash(&rcpt);
-
-        state.envelopes.insert(env_hash.clone(), env);
-        state.candidates.insert(cand_hash.clone(), cand);
-        state.receipts.insert(rcpt_hash.clone(), rcpt);
-
-        // c1: root0 -> root1 (Genesis，因为 root0 并非任何提交的 new_root)
-        let p1 = CommitPayload {
-            parent_commit: None,
-            parent_root: Some(root0),
-            new_root: root1.clone(),
-            envelope_hash: env_hash.clone(),
-            candidate_hash: cand_hash.clone(),
-            receipt_hash: rcpt_hash.clone(),
-            timestamp: 100,
-        };
-        let c1 = CommitRecord::new(p1);
-
-        // c2: root1 -> root2
-        let p2 = CommitPayload {
-            parent_commit: None,
-            parent_root: Some(root1),
-            new_root: root2.clone(),
-            envelope_hash: env_hash.clone(),
-            candidate_hash: cand_hash.clone(),
-            receipt_hash: rcpt_hash.clone(),
-            timestamp: 200,
-        };
-        let c2 = CommitRecord::new(p2);
-
-        // c3: root2 -> root3
-        let p3 = CommitPayload {
-            parent_commit: None,
-            parent_root: Some(root2),
-            new_root: root3.clone(),
-            envelope_hash: env_hash,
-            candidate_hash: cand_hash,
-            receipt_hash: rcpt_hash,
-            timestamp: 300,
-        };
-        let c3 = CommitRecord::new(p3);
-
-        state.commits.insert(c2.commit_hash.clone(), c2);
-        state.commits.insert(c1.commit_hash.clone(), c1);
-        state.commits.insert(c3.commit_hash.clone(), c3);
+        // 乱序存入 commits map，模拟真实旧版本数据库且 head_commit 未初始化
+        state.commits.insert(com2.commit_hash.clone(), com2);
+        state.commits.insert(com1.commit_hash.clone(), com1);
+        state.commits.insert(com3.commit_hash.clone(), com3);
         state.root_ref = Some(root3);
         state.head_commit = None;
 

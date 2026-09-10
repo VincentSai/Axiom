@@ -18,8 +18,16 @@ pub enum Z3Result {
     Unknown(String),
 }
 
+/// Output from executing an external process with hard deadline and asynchronous I/O.
+#[derive(Debug)]
+pub struct ProcessExecutionOutput {
+    pub status: std::process::ExitStatus,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
 /// Locates the Z3 executable on the system.
-/// Checks `AXIOM_Z3_PATH`, system `PATH`, and default user install paths.
+/// Checks `AXIOM_Z3_PATH`, system `PATH` (with strict 2s timeout watchdog), and default user install paths.
 pub fn find_z3_executable() -> Option<PathBuf> {
     if let Ok(env_path) = std::env::var("AXIOM_Z3_PATH") {
         let p = PathBuf::from(env_path);
@@ -28,9 +36,17 @@ pub fn find_z3_executable() -> Option<PathBuf> {
         }
     }
 
-    // Check system PATH by probing `z3 --version`
-    if let Ok(output) = Command::new("z3").arg("--version").output() {
-        if output.status.success() {
+    // [Spec 4] Check system PATH with hard deadline watchdog (prevents permanent hang on frozen z3)
+    let mut probe_cmd = Command::new("z3");
+    probe_cmd.arg("--version");
+    let probe_deadline = std::time::Instant::now() + std::time::Duration::from_millis(2000);
+    if let Ok(out) = execute_process_until_deadline(
+        probe_cmd,
+        None,
+        probe_deadline,
+        std::time::Duration::from_millis(10),
+    ) {
+        if out.status.success() {
             return Some(PathBuf::from("z3"));
         }
     }
@@ -102,6 +118,129 @@ fn kill_process_tree(child: &mut std::process::Child) {
     let _ = child.wait();
 }
 
+/// Unified process execution engine with asynchronous I/O and strict absolute deadline enforcement.
+/// Kills process tree and all descendants immediately upon deadline expiry.
+pub fn execute_process_until_deadline(
+    mut cmd: Command,
+    stdin_data: Option<&[u8]>,
+    deadline: std::time::Instant,
+    poll_interval: std::time::Duration,
+) -> Result<ProcessExecutionOutput, String> {
+    use std::io::Read;
+
+    configure_process_command(&mut cmd);
+    if stdin_data.is_some() {
+        cmd.stdin(Stdio::piped());
+    } else {
+        cmd.stdin(Stdio::null());
+    }
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("failed to spawn process: {e}"))?;
+
+    let stdin_join = if let Some(data) = stdin_data {
+        if let Some(mut stdin) = child.stdin.take() {
+            let bytes = data.to_vec();
+            Some(std::thread::spawn(move || {
+                let res = stdin.write_all(&bytes);
+                drop(stdin);
+                res
+            }))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let mut stdout_handle = child.stdout.take().ok_or("failed to capture stdout pipe")?;
+    let mut stderr_handle = child.stderr.take().ok_or("failed to capture stderr pipe")?;
+
+    let stdout_join = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stdout_handle.read_to_end(&mut buf);
+        buf
+    });
+    let stderr_join = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stderr_handle.read_to_end(&mut buf);
+        buf
+    });
+
+    let status_res = TimeoutPolicy::wait_child_until_deadline(deadline, poll_interval, &mut child);
+
+    if let Some(ref stdin_handle) = stdin_join {
+        while !stdin_handle.is_finished() && std::time::Instant::now() < deadline {
+            std::thread::sleep(poll_interval);
+        }
+    }
+
+    if status_res.is_err() {
+        kill_process_tree(&mut child);
+    }
+
+    while (!stdout_join.is_finished() || !stderr_join.is_finished())
+        && std::time::Instant::now() < deadline
+    {
+        std::thread::sleep(poll_interval);
+    }
+
+    let is_timed_out = std::time::Instant::now() >= deadline;
+
+    if is_timed_out || status_res.is_err() {
+        kill_process_tree(&mut child);
+        if is_timed_out {
+            return Err("timed out waiting for process execution and I/O completion".into());
+        }
+        status_res?;
+        return Err("process exited abnormally".into());
+    }
+
+    if let Some(stdin_handle) = stdin_join {
+        if stdin_handle.is_finished() {
+            match stdin_handle.join() {
+                Ok(Ok(())) => {}
+                Ok(Err(io_err)) => {
+                    kill_process_tree(&mut child);
+                    return Err(format!("failed to write data to process stdin: {io_err}"));
+                }
+                Err(_) => {
+                    kill_process_tree(&mut child);
+                    return Err("process stdin writer thread panicked".into());
+                }
+            }
+        }
+    }
+
+    let stdout_bytes = if stdout_join.is_finished() {
+        stdout_join
+            .join()
+            .map_err(|_| "stdout reader thread panicked")?
+    } else {
+        kill_process_tree(&mut child);
+        return Err("timed out reading process stdout".into());
+    };
+
+    let stderr_bytes = if stderr_join.is_finished() {
+        stderr_join
+            .join()
+            .map_err(|_| "stderr reader thread panicked")?
+    } else {
+        kill_process_tree(&mut child);
+        return Err("timed out reading process stderr".into());
+    };
+
+    let status = status_res?;
+
+    Ok(ProcessExecutionOutput {
+        status,
+        stdout: stdout_bytes,
+        stderr: stderr_bytes,
+    })
+}
+
 impl TimeoutPolicy {
     pub const DEFAULT_VERSION_PROBE: Self = Self {
         timeout: std::time::Duration::from_millis(3000),
@@ -159,56 +298,14 @@ impl TimeoutPolicy {
 
 /// Retrieves the dynamically detected version string of Z3 executable with hard timeout watchdog and async I/O.
 pub fn get_z3_version(z3_path: &Path) -> String {
-    use std::io::Read;
+    let mut cmd = Command::new(z3_path);
+    cmd.arg("--version");
     let deadline = std::time::Instant::now() + TimeoutPolicy::DEFAULT_VERSION_PROBE.timeout;
     let poll_interval = TimeoutPolicy::DEFAULT_VERSION_PROBE.poll_interval;
 
-    let mut cmd = Command::new(z3_path);
-    cmd.arg("--version")
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null());
-    configure_process_command(&mut cmd);
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
-        Err(_) => return "unknown".to_string(),
-    };
-
-    let mut stdout_handle = match child.stdout.take() {
-        Some(h) => h,
-        None => {
-            kill_process_tree(&mut child);
-            return "unknown".to_string();
-        }
-    };
-
-    let stdout_join = std::thread::spawn(move || {
-        let mut buf = Vec::new();
-        let _ = stdout_handle.read_to_end(&mut buf);
-        buf
-    });
-
-    let status_res = TimeoutPolicy::wait_child_until_deadline(deadline, poll_interval, &mut child);
-
-    while !stdout_join.is_finished() && std::time::Instant::now() < deadline {
-        std::thread::sleep(poll_interval);
-    }
-
-    if std::time::Instant::now() >= deadline || status_res.is_err() {
-        kill_process_tree(&mut child);
-        return "unknown".to_string();
-    }
-
-    let stdout_bytes = match stdout_join.join() {
-        Ok(b) => b,
-        Err(_) => {
-            kill_process_tree(&mut child);
-            return "unknown".to_string();
-        }
-    };
-
-    match status_res {
-        Ok(status) if status.success() => {
-            let s = String::from_utf8_lossy(&stdout_bytes);
+    if let Ok(out) = execute_process_until_deadline(cmd, None, deadline, poll_interval) {
+        if out.status.success() {
+            let s = String::from_utf8_lossy(&out.stdout);
             if let Some(pos) = s.find("version ") {
                 let rest = &s[pos + 8..];
                 let ver = rest.split_whitespace().next().unwrap_or("").trim();
@@ -216,10 +313,10 @@ pub fn get_z3_version(z3_path: &Path) -> String {
                     return ver.to_string();
                 }
             }
-            "unknown".to_string()
         }
-        _ => "unknown".to_string(),
     }
+
+    "unknown".to_string()
 }
 
 /// Executes a verification query using the Z3 solver via standard input with a 10s timeout.
@@ -233,121 +330,20 @@ pub fn run_z3_query_with_timeout(
     smt2_query: &str,
     timeout_ms: u32,
 ) -> Result<Z3Result, String> {
-    use std::io::Read;
-
-    // [Spec 4] 全局单一绝对截止时间控制，覆盖子进程执行与全部 I/O 操作
+    // [Spec 4] 全局精确绝对截止时间控制，严格等于调用方设定的 timeout_ms
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms as u64);
     let poll_interval = std::time::Duration::from_millis(5);
-    let global_deadline =
-        std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms as u64 + 1500);
 
     let mut cmd = Command::new(z3_path);
     cmd.arg("-in")
         .arg("-smt2")
-        .arg(format!("-t:{}", timeout_ms))
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    configure_process_command(&mut cmd);
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("failed to spawn z3 at {}: {}", z3_path.display(), e))?;
+        .arg(format!("-t:{}", timeout_ms));
 
-    let stdin_join = if let Some(mut stdin) = child.stdin.take() {
-        let query_bytes = smt2_query.as_bytes().to_vec();
-        Some(std::thread::spawn(move || {
-            let res = stdin.write_all(&query_bytes);
-            drop(stdin);
-            res
-        }))
-    } else {
-        None
-    };
+    let out =
+        execute_process_until_deadline(cmd, Some(smt2_query.as_bytes()), deadline, poll_interval)?;
 
-    let mut stdout_handle = child.stdout.take().ok_or("failed to take stdout")?;
-    let mut stderr_handle = child.stderr.take().ok_or("failed to take stderr")?;
-
-    let stdout_join = std::thread::spawn(move || {
-        let mut buf = Vec::new();
-        let _ = stdout_handle.read_to_end(&mut buf);
-        buf
-    });
-    let stderr_join = std::thread::spawn(move || {
-        let mut buf = Vec::new();
-        let _ = stderr_handle.read_to_end(&mut buf);
-        buf
-    });
-
-    let status_res =
-        TimeoutPolicy::wait_child_until_deadline(global_deadline, poll_interval, &mut child);
-
-    // 无论子进程状态如何，安全回收/等待 I/O 线程，杜绝无界阻塞挂起
-    if let Some(ref stdin_handle) = stdin_join {
-        while !stdin_handle.is_finished() && std::time::Instant::now() < global_deadline {
-            std::thread::sleep(poll_interval);
-        }
-    }
-
-    // 若子进程执行异常或超时，强杀进程树
-    if status_res.is_err() {
-        kill_process_tree(&mut child);
-    }
-
-    // 等待 stdout 与 stderr 线程在全局截止时间内完成
-    while (!stdout_join.is_finished() || !stderr_join.is_finished())
-        && std::time::Instant::now() < global_deadline
-    {
-        std::thread::sleep(poll_interval);
-    }
-
-    let is_timed_out = std::time::Instant::now() >= global_deadline;
-
-    if is_timed_out || status_res.is_err() {
-        kill_process_tree(&mut child);
-        // 杜绝无界 join：未完成的线程直接 detach，避免卡死主线程
-        if is_timed_out {
-            return Err("timed out waiting for z3 execution and I/O completion".into());
-        }
-        status_res?;
-        return Err("z3 process exited abnormally".into());
-    }
-
-    if let Some(stdin_handle) = stdin_join {
-        if stdin_handle.is_finished() {
-            match stdin_handle.join() {
-                Ok(Ok(())) => {}
-                Ok(Err(io_err)) => {
-                    kill_process_tree(&mut child);
-                    return Err(format!("failed to write query to z3 stdin: {}", io_err));
-                }
-                Err(_) => {
-                    kill_process_tree(&mut child);
-                    return Err("z3 stdin writer thread panicked".into());
-                }
-            }
-        }
-    }
-
-    let stdout_bytes = if stdout_join.is_finished() {
-        stdout_join
-            .join()
-            .map_err(|_| "stdout reader thread panicked")?
-    } else {
-        kill_process_tree(&mut child);
-        return Err("timed out reading z3 stdout".into());
-    };
-
-    let stderr_bytes = if stderr_join.is_finished() {
-        stderr_join
-            .join()
-            .map_err(|_| "stderr reader thread panicked")?
-    } else {
-        kill_process_tree(&mut child);
-        return Err("timed out reading z3 stderr".into());
-    };
-    status_res?;
-
-    let stdout = String::from_utf8_lossy(&stdout_bytes);
-    let stderr = String::from_utf8_lossy(&stderr_bytes);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
 
     if !stderr.is_empty() && stderr.contains("error") {
         return Err(format!("z3 error: {}", stderr.trim()));
