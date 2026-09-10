@@ -67,6 +67,22 @@ pub struct TimeoutPolicy {
     pub poll_interval: std::time::Duration,
 }
 
+/// Forcefully terminates a child process and all its descendants to release pipe handles.
+pub fn kill_process_tree(child: &mut std::process::Child) {
+    let pid = child.id();
+    #[cfg(windows)]
+    {
+        let _ = Command::new("taskkill")
+            .args(["/F", "/T", "/PID", &pid.to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .output();
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
 impl TimeoutPolicy {
     pub const DEFAULT_VERSION_PROBE: Self = Self {
         timeout: std::time::Duration::from_millis(3000),
@@ -85,7 +101,7 @@ impl TimeoutPolicy {
         }
     }
 
-    /// Waits for the child process to exit, terminating it if it exceeds `self.timeout`.
+    /// Waits for the child process to exit, terminating it and its process tree if it exceeds `self.timeout`.
     pub fn wait_child_with_watchdog(
         &self,
         child: &mut std::process::Child,
@@ -96,8 +112,7 @@ impl TimeoutPolicy {
                 Ok(Some(status)) => return Ok(status),
                 Ok(None) => {
                     if start.elapsed() >= self.timeout {
-                        let _ = child.kill();
-                        let _ = child.wait();
+                        kill_process_tree(child);
                         return Err(format!(
                             "child process hard-killed: execution time exceeded timeout threshold of {}ms",
                             self.timeout.as_millis()
@@ -106,8 +121,7 @@ impl TimeoutPolicy {
                     std::thread::sleep(self.poll_interval);
                 }
                 Err(e) => {
-                    let _ = child.kill();
-                    let _ = child.wait();
+                    kill_process_tree(child);
                     return Err(format!("error polling child process: {}", e));
                 }
             }
@@ -162,6 +176,10 @@ pub fn run_z3_query_with_timeout(
 ) -> Result<Z3Result, String> {
     use std::io::Read;
 
+    // [Spec 5] 全局单一绝对截止时间控制，覆盖子进程执行与全部 I/O 操作
+    let global_deadline =
+        std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms as u64 + 1500);
+
     let mut child = Command::new(z3_path)
         .arg("-in")
         .arg("-smt2")
@@ -200,70 +218,72 @@ pub fn run_z3_query_with_timeout(
     let policy = TimeoutPolicy::from_millis(timeout_ms);
     let status_res = policy.wait_child_with_watchdog(&mut child);
 
-    // [Spec 7 & Standards 2] 读写线程退出全局绝对截止时间控制与资源无泄漏回收
-    let join_grace = std::time::Duration::from_millis(1500);
-    let deadline = std::time::Instant::now() + join_grace;
+    // 无论子进程状态如何，安全回收/等待 I/O 线程，杜绝无界阻塞挂起
+    let poll_interval = std::time::Duration::from_millis(5);
 
-    let mut io_timed_out = false;
-    while !stdout_join.is_finished() || !stderr_join.is_finished() {
-        if std::time::Instant::now() > deadline {
-            io_timed_out = true;
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(5));
-    }
-
-    if !io_timed_out {
-        if let Some(ref stdin_handle) = stdin_join {
-            while !stdin_handle.is_finished() {
-                if std::time::Instant::now() > deadline {
-                    io_timed_out = true;
-                    break;
-                }
-                std::thread::sleep(std::time::Duration::from_millis(5));
-            }
+    if let Some(ref stdin_handle) = stdin_join {
+        while !stdin_handle.is_finished() && std::time::Instant::now() < global_deadline {
+            std::thread::sleep(poll_interval);
         }
     }
 
-    // 若读写线程超时或子进程监控报错，立即强杀子进程切断管道，并强制回收线程句柄杜绝泄漏
-    if io_timed_out || status_res.is_err() {
-        let _ = child.kill();
-        let _ = child.wait();
-        if let Some(stdin_handle) = stdin_join {
-            let _ = stdin_handle.join();
-        }
-        let _ = stdout_join.join();
-        let _ = stderr_join.join();
+    // 若子进程执行异常或超时，强杀进程树
+    if status_res.is_err() {
+        kill_process_tree(&mut child);
+    }
 
-        if io_timed_out {
-            return Err("timed out waiting for z3 reader/writer threads to exit".into());
+    // 等待 stdout 与 stderr 线程在全局截止时间内完成
+    while (!stdout_join.is_finished() || !stderr_join.is_finished())
+        && std::time::Instant::now() < global_deadline
+    {
+        std::thread::sleep(poll_interval);
+    }
+
+    let is_timed_out = std::time::Instant::now() >= global_deadline;
+
+    if is_timed_out || status_res.is_err() {
+        kill_process_tree(&mut child);
+        // 杜绝无界 join：未完成的线程直接 detach，避免卡死主线程
+        if is_timed_out {
+            return Err("timed out waiting for z3 execution and I/O completion".into());
         }
         status_res?;
         return Err("z3 process exited abnormally".into());
     }
 
     if let Some(stdin_handle) = stdin_join {
-        match stdin_handle.join() {
-            Ok(Ok(())) => {}
-            Ok(Err(io_err)) => {
-                let _ = stdout_join.join();
-                let _ = stderr_join.join();
-                return Err(format!("failed to write query to z3 stdin: {}", io_err));
-            }
-            Err(_) => {
-                let _ = stdout_join.join();
-                let _ = stderr_join.join();
-                return Err("z3 stdin writer thread panicked".into());
+        if stdin_handle.is_finished() {
+            match stdin_handle.join() {
+                Ok(Ok(())) => {}
+                Ok(Err(io_err)) => {
+                    kill_process_tree(&mut child);
+                    return Err(format!("failed to write query to z3 stdin: {}", io_err));
+                }
+                Err(_) => {
+                    kill_process_tree(&mut child);
+                    return Err("z3 stdin writer thread panicked".into());
+                }
             }
         }
     }
 
-    let stdout_bytes = stdout_join
-        .join()
-        .map_err(|_| "stdout reader thread panicked")?;
-    let stderr_bytes = stderr_join
-        .join()
-        .map_err(|_| "stderr reader thread panicked")?;
+    let stdout_bytes = if stdout_join.is_finished() {
+        stdout_join
+            .join()
+            .map_err(|_| "stdout reader thread panicked")?
+    } else {
+        kill_process_tree(&mut child);
+        return Err("timed out reading z3 stdout".into());
+    };
+
+    let stderr_bytes = if stderr_join.is_finished() {
+        stderr_join
+            .join()
+            .map_err(|_| "stderr reader thread panicked")?
+    } else {
+        kill_process_tree(&mut child);
+        return Err("timed out reading z3 stderr".into());
+    };
     status_res?;
 
     let stdout = String::from_utf8_lossy(&stdout_bytes);

@@ -731,7 +731,7 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
 }
 
 /// 提取统一的模式匹配 SMT 条件生成器 (match_cond, neg_cond)
-pub fn pattern_condition_smt(
+fn pattern_condition_smt(
     pattern: &Pattern,
     target_smt: &str,
 ) -> Result<(Option<String>, Option<String>), String> {

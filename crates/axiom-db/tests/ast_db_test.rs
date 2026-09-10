@@ -1,7 +1,7 @@
 use axiom_ast::{EffectDecl, EffectOp, Expr, FunctionDecl, FunctionParam, Module, Type, TypeDef};
 use axiom_db::{
     compute_contract_hash, compute_effect_hash, compute_function_hash, compute_module_hash,
-    compute_type_hash, AstDatabase, NodeHash,
+    compute_type_hash, AstDatabase, DraftCasExpectation, NodeHash,
 };
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -747,7 +747,7 @@ fn persisted_database_persists_and_restores_draft_records() {
             revision: 0,
         };
         let committed_v1 = db
-            .insert_draft_cas(draft_v1, Some(0), None)
+            .insert_draft_cas(draft_v1, &DraftCasExpectation::initial(None))
             .expect("initial cas draft should succeed");
         assert_eq!(committed_v1.revision, 1);
 
@@ -760,7 +760,7 @@ fn persisted_database_persists_and_restores_draft_records() {
             base_root: None,
             revision: 0,
         };
-        let cas_err = db.insert_draft_cas(draft_stale, Some(0), None);
+        let cas_err = db.insert_draft_cas(draft_stale, &DraftCasExpectation::initial(None));
         assert!(matches!(
             cas_err,
             Err(axiom_db::CasError::StaleDraftRevision { .. })
@@ -779,7 +779,10 @@ fn persisted_database_persists_and_restores_draft_records() {
             base_root: None,
             revision: 0,
         };
-        let root_err = db.insert_draft_cas(draft_bogus_root, Some(1), Some(&bogus_root));
+        let root_err = db.insert_draft_cas(
+            draft_bogus_root,
+            &DraftCasExpectation::update(1, Some(bogus_root)),
+        );
         assert!(matches!(
             root_err,
             Err(axiom_db::CasError::StaleRootMismatch { .. })
@@ -795,7 +798,7 @@ fn persisted_database_persists_and_restores_draft_records() {
             revision: 0,
         };
         let committed_v2 = db
-            .insert_draft_cas(draft_v2, Some(1), None)
+            .insert_draft_cas(draft_v2, &DraftCasExpectation::update(1, None))
             .expect("subsequent cas draft should succeed");
         assert_eq!(committed_v2.revision, 2);
     }
@@ -846,8 +849,11 @@ fn legacy_receipt_without_profile_deserializes_with_fallback_and_invalidates_cur
 
 #[test]
 fn test_mainline_commits_and_reattestation() {
+    use axiom_ast::{BinaryOperator, Expr, FunctionDecl, FunctionParam, Module, Type};
     use axiom_db::{
-        current_verification_profile_hash, AstDatabase, ProofLevel, VerificationReceipt,
+        compute_candidate_hash, compute_contract_hash, compute_envelope_hash,
+        current_verification_profile_hash, AstDatabase, Candidate, CasError, ProofLevel,
+        TaskEnvelope,
     };
 
     let mut db = AstDatabase::in_memory();
@@ -856,45 +862,137 @@ fn test_mainline_commits_and_reattestation() {
         .expect("empty db should succeed")
         .is_empty());
 
-    let mod_rec = db
-        .insert_module(&Module::default())
-        .expect("insert module should succeed");
-    db.initialize_root(mod_rec.module_hash.clone())
-        .expect("init root should succeed");
-
-    let cand_hash: NodeHash =
-        "#cand_1111111111111111111111111111111111111111111111111111111111111111"
-            .parse()
-            .unwrap();
-    let env_hash: NodeHash =
-        "#env_2222222222222222222222222222222222222222222222222222222222222222"
-            .parse()
-            .unwrap();
-    let obl_hash: NodeHash =
-        "#obl_3333333333333333333333333333333333333333333333333333333333333333"
-            .parse()
-            .unwrap();
-
-    let receipt = VerificationReceipt {
-        candidate_hash: cand_hash.clone(),
-        proof_level: ProofLevel::Proved,
-        solver: "z3".into(),
-        solver_version: "4.13.0".into(),
-        obligations_checked: 2,
-        proof_obligation_hash: obl_hash,
-        verification_profile_hash: current_verification_profile_hash(),
-        verified_at: 1000,
+    // 构造具备形式化证明契约与闭合实现的函数
+    let func = FunctionDecl {
+        name: "add".into(),
+        params: vec![
+            FunctionParam {
+                name: "x".into(),
+                ty: Type::Int,
+            },
+            FunctionParam {
+                name: "y".into(),
+                ty: Type::Int,
+            },
+        ],
+        return_type: Type::Int,
+        effects: vec![],
+        requires: vec![
+            Expr::BinaryOp {
+                op: BinaryOperator::GreaterThanOrEqual,
+                left: Box::new(Expr::Ident("x".into())),
+                right: Box::new(Expr::Literal(axiom_ast::Literal::Int(0))),
+            },
+            Expr::BinaryOp {
+                op: BinaryOperator::LessThanOrEqual,
+                left: Box::new(Expr::Ident("x".into())),
+                right: Box::new(Expr::Literal(axiom_ast::Literal::Int(1000))),
+            },
+            Expr::BinaryOp {
+                op: BinaryOperator::GreaterThanOrEqual,
+                left: Box::new(Expr::Ident("y".into())),
+                right: Box::new(Expr::Literal(axiom_ast::Literal::Int(0))),
+            },
+            Expr::BinaryOp {
+                op: BinaryOperator::LessThanOrEqual,
+                left: Box::new(Expr::Ident("y".into())),
+                right: Box::new(Expr::Literal(axiom_ast::Literal::Int(1000))),
+            },
+        ],
+        ensures: vec![Expr::BinaryOp {
+            op: BinaryOperator::Equal,
+            left: Box::new(Expr::Ident("result".into())),
+            right: Box::new(Expr::BinaryOp {
+                op: BinaryOperator::Add,
+                left: Box::new(Expr::Ident("x".into())),
+                right: Box::new(Expr::Ident("y".into())),
+            }),
+        }],
+        body: Expr::BinaryOp {
+            op: BinaryOperator::Add,
+            left: Box::new(Expr::Ident("x".into())),
+            right: Box::new(Expr::Ident("y".into())),
+        },
     };
 
+    let module = Module {
+        types: vec![],
+        functions: vec![func.clone()],
+        effects: vec![],
+    };
+
+    let mod_rec = db
+        .insert_module(&module)
+        .expect("insert module should succeed");
+    let root_hash = mod_rec.module_hash;
+    db.initialize_root(root_hash.clone())
+        .expect("init root should succeed");
+
+    let env = TaskEnvelope {
+        base_root_hash: Some(root_hash.clone()),
+        target_hole_id: "hole_1".into(),
+        target_function: "add".into(),
+        contract_hash: compute_contract_hash(&func),
+        dependency_hashes: vec![],
+    };
+    let env_hash = compute_envelope_hash(&env);
+    db.locked_transaction(|state| {
+        state.envelopes.insert(env_hash.clone(), env.clone());
+        Ok::<(), axiom_db::DbError>(())
+    })
+    .unwrap();
+
+    let cand = Candidate {
+        envelope_hash: env_hash.clone(),
+        expression_source: "x + y".into(),
+        expression_hash: axiom_db::compute_expr_hash(&func.body),
+        author_agent_id: "agent_1".into(),
+        timestamp: 1000,
+    };
+    let cand_hash = compute_candidate_hash(&cand);
+    db.locked_transaction(|state| {
+        state.candidates.insert(cand_hash.clone(), cand.clone());
+        Ok::<(), axiom_db::DbError>(())
+    })
+    .unwrap();
+
+    // 1. 测试伪造防护：尝试对不存在的 candidate/envelope 离线认证应被拒绝
+    let fake_hash: NodeHash =
+        "#cand_9999999999999999999999999999999999999999999999999999999999999999"
+            .parse()
+            .unwrap();
+    let forge_res =
+        db.certify_reattestation_offline(&Some(root_hash.clone()), "hole_1", &env_hash, &fake_hash);
+    assert!(matches!(forge_res, Err(CasError::InvalidCandidate(_))));
+
+    // 2. 正确生成内核密封的 CertifiedReattestation
+    let certified = db
+        .certify_reattestation_offline(&Some(root_hash.clone()), "hole_1", &env_hash, &cand_hash)
+        .expect("certify_reattestation_offline should succeed");
+
+    // 3. 验证密封结构体字段与当前规则一致（包含契约义务与整数安全溢出检查义务）
+    assert_eq!(certified.obligations_checked(), 3);
+    assert_eq!(certified.target_hole_id(), "hole_1");
+
+    // 4. 执行 try_commit_reattestation 提交
     let commit1 = db
-        .try_commit_reattestation("hole_1", &env_hash, &cand_hash, receipt.clone())
-        .expect("reattestation 1 should succeed");
+        .try_commit_reattestation(certified.clone())
+        .expect("first reattestation should succeed");
     assert_eq!(db.head_commit(), Some(&commit1.commit_hash));
     assert_eq!(commit1.parent_commit(), None);
 
+    // 验证收据是由 DB 权威铸造且与当前 Profile 绑定
+    let rcpt = db.get_receipt(commit1.receipt_hash()).unwrap().unwrap();
+    assert_eq!(rcpt.proof_level, ProofLevel::Proved);
+    assert_eq!(
+        rcpt.verification_profile_hash,
+        current_verification_profile_hash()
+    );
+
+    // 5. 第二次重签提交，验证 Commit DAG parent_commit 拓扑正常推进
     let commit2 = db
-        .try_commit_reattestation("hole_2", &env_hash, &cand_hash, receipt)
-        .expect("reattestation 2 should succeed");
+        .try_commit_reattestation(certified)
+        .expect("second reattestation should succeed");
     assert_eq!(db.head_commit(), Some(&commit2.commit_hash));
     assert_eq!(commit2.parent_commit(), Some(&commit1.commit_hash));
 
@@ -903,4 +1001,87 @@ fn test_mainline_commits_and_reattestation() {
     assert_eq!(mainline.len(), 2);
     assert_eq!(mainline[0].commit_hash, commit1.commit_hash);
     assert_eq!(mainline[1].commit_hash, commit2.commit_hash);
+}
+
+#[test]
+fn test_legacy_commits_migration_and_ancestry_repair() {
+    use axiom_db::{
+        compute_commit_payload_hash, AstDatabase, CommitPayload, CommitRecord, DatabaseState,
+        NodeHash,
+    };
+
+    let mut state = DatabaseState::default();
+
+    let root0: NodeHash = "#mod_0000000000000000000000000000000000000000000000000000000000000000"
+        .parse()
+        .unwrap();
+    let root1: NodeHash = "#mod_1111111111111111111111111111111111111111111111111111111111111111"
+        .parse()
+        .unwrap();
+    let root2: NodeHash = "#mod_2222222222222222222222222222222222222222222222222222222222222222"
+        .parse()
+        .unwrap();
+
+    let dummy_env: NodeHash = format!("#env_{}", "0".repeat(64)).parse().unwrap();
+    let dummy_cand: NodeHash = format!("#cand_{}", "0".repeat(64)).parse().unwrap();
+    let dummy_rcpt: NodeHash = format!("#rcpt_{}", "0".repeat(64)).parse().unwrap();
+
+    // 模拟旧版本数据库：有多个提交，但 parent_commit 均为 None，且 head_commit 为 None
+    let p1 = CommitPayload {
+        parent_commit: None,
+        parent_root: Some(root0.clone()),
+        new_root: root1.clone(),
+        envelope_hash: dummy_env.clone(),
+        candidate_hash: dummy_cand.clone(),
+        receipt_hash: dummy_rcpt.clone(),
+        timestamp: 100,
+    };
+    let c1 = CommitRecord {
+        commit_hash: compute_commit_payload_hash(&p1),
+        payload: p1,
+    };
+
+    let p2 = CommitPayload {
+        parent_commit: None,
+        parent_root: Some(root1.clone()),
+        new_root: root2.clone(),
+        envelope_hash: dummy_env,
+        candidate_hash: dummy_cand,
+        receipt_hash: dummy_rcpt,
+        timestamp: 200,
+    };
+    let c2 = CommitRecord {
+        commit_hash: compute_commit_payload_hash(&p2),
+        payload: p2,
+    };
+
+    state.commits.insert(c1.commit_hash.clone(), c1.clone());
+    state.commits.insert(c2.commit_hash.clone(), c2.clone());
+    state.root_ref = Some(root2);
+    assert_eq!(state.head_commit, None);
+
+    // 执行迁移
+    let migrated = AstDatabase::migrate_legacy_commits_if_needed(&mut state);
+    assert!(
+        migrated,
+        "legacy database without head_commit must be migrated"
+    );
+    assert!(
+        state.head_commit.is_some(),
+        "head_commit must be set after migration"
+    );
+
+    // 验证新数据库实例可通过 mainline_commits 正确追溯全量祖先链
+    let temp_dir = std::env::temp_dir().join(format!("test_legacy_db_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let db_path = temp_dir.join("test_legacy.json");
+    std::fs::write(&db_path, serde_json::to_vec_pretty(&state).unwrap()).unwrap();
+
+    let db = AstDatabase::open(&db_path).expect("open migrated db should succeed");
+    let mainline = db.mainline_commits().expect("mainline should succeed");
+    assert_eq!(mainline.len(), 2, "all legacy commits must be in mainline");
+    assert_eq!(mainline[1].parent_commit(), Some(&mainline[0].commit_hash));
+
+    let _ = std::fs::remove_file(&db_path);
+    let _ = std::fs::remove_dir_all(&temp_dir);
 }
