@@ -591,7 +591,7 @@ fn two_phase_cas_offline_verification_and_short_lock_commit() {
         .verify_candidate_offline(&root, &envelope, &candidate, None)
         .expect("offline verification should succeed");
 
-    assert_eq!(certified.obligations_checked(), 3);
+    assert_eq!(certified.evidence().obligations_checked(), 3);
 
     // 2. 微秒级短锁原子提交
     let commit = db
@@ -971,7 +971,7 @@ fn test_mainline_commits_and_reattestation() {
         .certify_reattestation_offline(&root1, &head1, "hole_1", &env_hash, &cand_hash)
         .expect("certify_reattestation_offline for landed candidate should succeed");
 
-    assert_eq!(certified.obligations_checked(), 3);
+    assert_eq!(certified.evidence().obligations_checked(), 3);
     assert_eq!(certified.target_hole_id(), "hole_1");
 
     // 4. [Standards 4] 通过下沉深接口 reverify_and_reattest_hole 执行重新验证并原子提交
@@ -1009,7 +1009,9 @@ fn test_mainline_commits_and_reattestation() {
 #[test]
 fn test_legacy_commits_migration_and_ancestry_repair() {
     use axiom_db::{
-        compute_commit_payload_hash, AstDatabase, CommitPayload, CommitRecord, NodeHash,
+        compute_candidate_hash, compute_envelope_hash, compute_receipt_hash,
+        current_verification_profile_hash, AstDatabase, Candidate, NodeHash, ProofLevel,
+        TaskEnvelope, VerificationReceipt,
     };
 
     let root0: NodeHash = "#mod_0000000000000000000000000000000000000000000000000000000000000000"
@@ -1022,47 +1024,97 @@ fn test_legacy_commits_migration_and_ancestry_repair() {
         .parse()
         .unwrap();
 
-    let dummy_env: NodeHash = format!("#env_{}", "0".repeat(64)).parse().unwrap();
-    let dummy_cand: NodeHash = format!("#cand_{}", "0".repeat(64)).parse().unwrap();
-    let dummy_rcpt: NodeHash = format!("#rcpt_{}", "0".repeat(64)).parse().unwrap();
+    let env = TaskEnvelope {
+        base_root_hash: None,
+        target_hole_id: "test_hole".into(),
+        target_function: "test_fn".into(),
+        contract_hash: NodeHash::default(),
+        dependency_hashes: vec![],
+    };
+    let env_hash = compute_envelope_hash(&env);
 
-    // 模拟旧版本数据库（真实场景）：首个提交 parent_root 具有初始 root0，new_root 为 root1；
-    // 且所有旧提交的 parent_commit 均为 None，head_commit 为 None
-    let p1 = CommitPayload {
-        parent_commit: None,
-        parent_root: Some(root0),
-        new_root: root1.clone(),
-        envelope_hash: dummy_env.clone(),
-        candidate_hash: dummy_cand.clone(),
-        receipt_hash: dummy_rcpt.clone(),
+    let cand = Candidate {
+        envelope_hash: env_hash.clone(),
+        expression_source: "0".into(),
+        expression_hash: NodeHash::default(),
+        author_agent_id: "agent_1".into(),
         timestamp: 100,
     };
-    let c1 = CommitRecord {
-        commit_hash: compute_commit_payload_hash(&p1),
-        payload: p1,
-    };
+    let cand_hash = compute_candidate_hash(&cand);
 
-    let p2 = CommitPayload {
-        parent_commit: None,
-        parent_root: Some(root1),
-        new_root: root2.clone(),
-        envelope_hash: dummy_env,
-        candidate_hash: dummy_cand,
-        receipt_hash: dummy_rcpt,
-        timestamp: 200,
+    let rcpt = VerificationReceipt {
+        candidate_hash: cand_hash.clone(),
+        proof_level: ProofLevel::Proved,
+        solver: "z3".into(),
+        solver_version: "4.12.0".into(),
+        obligations_checked: 1,
+        proof_obligation_hash: NodeHash::default(),
+        verification_profile_hash: current_verification_profile_hash(),
+        verified_at: 100,
     };
-    let c2 = CommitRecord {
-        commit_hash: compute_commit_payload_hash(&p2),
-        payload: p2,
-    };
+    let rcpt_hash = compute_receipt_hash(&rcpt);
 
-    // 构造纯 JSON 格式的旧库文件，不依赖任何库内私有状态后门
+    // [Spec 2] 模拟真实旧版数据库：物理缺少 "parent_commit" 键，且 hash 由当时 6 字段生成
+    let old_payload_1 = serde_json::json!({
+        "parent_root": root0.as_str(),
+        "new_root": root1.as_str(),
+        "envelope_hash": env_hash.as_str(),
+        "candidate_hash": cand_hash.as_str(),
+        "receipt_hash": rcpt_hash.as_str(),
+        "timestamp": 100
+    });
+    let compute_legacy_hash = |val: &serde_json::Value| -> NodeHash {
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(b"commit:");
+        let serialized = serde_json::to_vec(val).unwrap();
+        hasher.update(&serialized);
+        let digest = format!("{:x}", hasher.finalize());
+        format!("#commit_{digest}").parse().unwrap()
+    };
+    let old_commit_hash_1 = compute_legacy_hash(&old_payload_1);
+
+    let old_payload_2 = serde_json::json!({
+        "parent_root": root1.as_str(),
+        "new_root": root2.as_str(),
+        "envelope_hash": env_hash.as_str(),
+        "candidate_hash": cand_hash.as_str(),
+        "receipt_hash": rcpt_hash.as_str(),
+        "timestamp": 200
+    });
+    let old_commit_hash_2 = compute_legacy_hash(&old_payload_2);
+
     let legacy_json = serde_json::json!({
         "root_ref": root2.as_str(),
         "head_commit": null,
+        "envelopes": {
+            env_hash.as_str(): env
+        },
+        "candidates": {
+            cand_hash.as_str(): cand
+        },
+        "receipts": {
+            rcpt_hash.as_str(): rcpt
+        },
         "commits": {
-            c1.commit_hash.as_str(): c1,
-            c2.commit_hash.as_str(): c2,
+            old_commit_hash_1.as_str(): {
+                "commit_hash": old_commit_hash_1.as_str(),
+                "parent_root": root0.as_str(),
+                "new_root": root1.as_str(),
+                "envelope_hash": env_hash.as_str(),
+                "candidate_hash": cand_hash.as_str(),
+                "receipt_hash": rcpt_hash.as_str(),
+                "timestamp": 100
+            },
+            old_commit_hash_2.as_str(): {
+                "commit_hash": old_commit_hash_2.as_str(),
+                "parent_root": root1.as_str(),
+                "new_root": root2.as_str(),
+                "envelope_hash": env_hash.as_str(),
+                "candidate_hash": cand_hash.as_str(),
+                "receipt_hash": rcpt_hash.as_str(),
+                "timestamp": 200
+            }
         }
     });
 
@@ -1071,7 +1123,7 @@ fn test_legacy_commits_migration_and_ancestry_repair() {
     let db_path = temp_dir.join("test_legacy.json");
     std::fs::write(&db_path, serde_json::to_vec_pretty(&legacy_json).unwrap()).unwrap();
 
-    // 打开旧库，AstDatabase::open 内部自动执行 migrate_legacy_commits_if_needed
+    // 打开旧库，AstDatabase::open 内部自动触发因果自愈迁移与 Genesis 重算
     let db = AstDatabase::open(&db_path).expect("open legacy db should trigger migration");
     assert!(
         db.head_commit().is_some(),
@@ -1085,12 +1137,254 @@ fn test_legacy_commits_migration_and_ancestry_repair() {
     assert_eq!(mainline[1].parent_commit(), Some(&mainline[0].commit_hash));
     assert!(
         mainline[0].verify_self_hash(),
-        "migrated c1 self hash must be valid"
+        "migrated genesis self hash must be valid"
     );
     assert!(
         mainline[1].verify_self_hash(),
         "migrated c2 self hash must be valid"
     );
+
+    let _ = std::fs::remove_file(&db_path);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_reattestation_deterministic_replay_rejects_mismatch() {
+    use axiom_db::{
+        compute_candidate_hash, compute_commit_payload_hash, compute_contract_hash,
+        compute_envelope_hash, compute_expr_hash, compute_receipt_hash,
+        current_verification_profile_hash, AstDatabase, Candidate, CasError, CommitPayload,
+        ProofLevel, TaskEnvelope, VerificationReceipt,
+    };
+
+    let temp_dir = std::env::temp_dir().join(format!("test_replay_db_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let db_path = temp_dir.join("test_replay.json");
+
+    let mut db_file = AstDatabase::open(&db_path).unwrap();
+    let initial_mod = sample_verifiable_skeleton();
+    let _ = db_file.insert_module(&initial_mod).unwrap();
+    let initial_root = db_file.current_root().unwrap();
+
+    let envelope = TaskEnvelope {
+        base_root_hash: Some(initial_root.clone()),
+        target_hole_id: "inc_impl".into(),
+        target_function: "increment".into(),
+        contract_hash: compute_contract_hash(&initial_mod.functions[0]),
+        dependency_hashes: vec![],
+    };
+    let env_hash = compute_envelope_hash(&envelope);
+
+    let expr_src = "x + 1";
+    let parsed_expr = axiom_parser::parse_expr(expr_src).unwrap();
+    let candidate = Candidate {
+        envelope_hash: env_hash.clone(),
+        expression_source: expr_src.into(),
+        expression_hash: compute_expr_hash(&parsed_expr),
+        author_agent_id: "agent_42".into(),
+        timestamp: 1000,
+    };
+
+    let commit = db_file
+        .try_commit_candidate(
+            &Some(initial_root),
+            envelope.clone(),
+            candidate.clone(),
+            None,
+        )
+        .expect("initial candidate commit should succeed");
+
+    // [Spec 1] 构造一个自洽但表达式不匹配的 candidate_mismatch ("x + 2") 及其合法收据
+    let expr_mismatch = "x + 2";
+    let parsed_mismatch = axiom_parser::parse_expr(expr_mismatch).unwrap();
+    let cand_mismatch = Candidate {
+        envelope_hash: env_hash.clone(),
+        expression_source: expr_mismatch.into(),
+        expression_hash: compute_expr_hash(&parsed_mismatch),
+        author_agent_id: "agent_adversary".into(),
+        timestamp: 1000,
+    };
+    let cand_mismatch_hash = compute_candidate_hash(&cand_mismatch);
+
+    let rcpt_mismatch = VerificationReceipt {
+        candidate_hash: cand_mismatch_hash.clone(),
+        proof_level: ProofLevel::Proved,
+        solver: "z3".into(),
+        solver_version: "4.12.0".into(),
+        obligations_checked: 3,
+        proof_obligation_hash: commit.receipt_hash().clone(),
+        verification_profile_hash: current_verification_profile_hash(),
+        verified_at: 1000,
+    };
+    let rcpt_mismatch_hash = compute_receipt_hash(&rcpt_mismatch);
+
+    // 将 candidate_mismatch 与其 receipt 写入落盘文件，并将 commit 中的 candidate_hash 和 receipt_hash 指向它们
+    // （此时工件自哈希与交叉绑定均完全自洽，但 landing commit 的 new_root 实际上是由 "x + 1" 生成的）
+    let content = std::fs::read_to_string(&db_path).unwrap();
+    let mut val: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+    val.get_mut("candidates")
+        .unwrap()
+        .as_object_mut()
+        .unwrap()
+        .insert(
+            cand_mismatch_hash.as_str().into(),
+            serde_json::to_value(&cand_mismatch).unwrap(),
+        );
+    val.get_mut("receipts")
+        .unwrap()
+        .as_object_mut()
+        .unwrap()
+        .insert(
+            rcpt_mismatch_hash.as_str().into(),
+            serde_json::to_value(&rcpt_mismatch).unwrap(),
+        );
+
+    let commit_obj = val
+        .get_mut("commits")
+        .unwrap()
+        .as_object_mut()
+        .unwrap()
+        .get_mut(commit.commit_hash.as_str())
+        .unwrap()
+        .as_object_mut()
+        .unwrap();
+    commit_obj.insert(
+        "candidate_hash".into(),
+        serde_json::to_value(&cand_mismatch_hash).unwrap(),
+    );
+    commit_obj.insert(
+        "receipt_hash".into(),
+        serde_json::to_value(&rcpt_mismatch_hash).unwrap(),
+    );
+
+    // 重新计算并更新该 commit 的 commit_hash（以满足主链 self-hash 校验）
+    let payload: CommitPayload =
+        serde_json::from_value(serde_json::Value::Object(commit_obj.clone())).unwrap();
+    let new_commit_hash = compute_commit_payload_hash(&payload);
+    commit_obj.insert(
+        "commit_hash".into(),
+        serde_json::to_value(&new_commit_hash).unwrap(),
+    );
+
+    let commits_map = val.get_mut("commits").unwrap().as_object_mut().unwrap();
+    let commit_val = commits_map.remove(commit.commit_hash.as_str()).unwrap();
+    commits_map.insert(new_commit_hash.as_str().into(), commit_val);
+    val.as_object_mut().unwrap().insert(
+        "head_commit".into(),
+        serde_json::to_value(&new_commit_hash).unwrap(),
+    );
+
+    std::fs::write(&db_path, serde_json::to_string_pretty(&val).unwrap()).unwrap();
+
+    let reopened_db = AstDatabase::open(&db_path).unwrap();
+
+    // 尝试重签：内核确定性可重放推导必须立即发现模块哈希与 landing commit 不匹配并拒绝！
+    let reattest_res = reopened_db.certify_reattestation_offline(
+        &reopened_db.current_root(),
+        &reopened_db.head_commit().cloned(),
+        "inc_impl",
+        &env_hash,
+        &cand_mismatch_hash,
+    );
+
+    match reattest_res {
+        Err(CasError::ForgedModule(msg)) => {
+            assert!(
+                msg.contains("candidate replay derived module hash"),
+                "error message should indicate replay hash mismatch: {msg}"
+            );
+        }
+        other => panic!("expected CasError::ForgedModule, got {:?}", other),
+    }
+
+    let _ = std::fs::remove_file(&db_path);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_mainline_commits_validates_artifacts_and_cross_bindings() {
+    use axiom_db::{
+        compute_contract_hash, compute_envelope_hash, compute_expr_hash, AstDatabase, Candidate,
+        DbError, TaskEnvelope,
+    };
+
+    let temp_dir = std::env::temp_dir().join(format!("test_bindings_db_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let db_path = temp_dir.join("test_bindings.json");
+
+    let mut db = AstDatabase::open(&db_path).unwrap();
+    let initial_mod = sample_verifiable_skeleton();
+    let _ = db.insert_module(&initial_mod).unwrap();
+    let initial_root = db.current_root().unwrap();
+
+    let envelope = TaskEnvelope {
+        base_root_hash: Some(initial_root.clone()),
+        target_hole_id: "inc_impl".into(),
+        target_function: "increment".into(),
+        contract_hash: compute_contract_hash(&initial_mod.functions[0]),
+        dependency_hashes: vec![],
+    };
+
+    let expr_src = "x + 1";
+    let parsed_expr = axiom_parser::parse_expr(expr_src).unwrap();
+    let candidate = Candidate {
+        envelope_hash: compute_envelope_hash(&envelope),
+        expression_source: expr_src.into(),
+        expression_hash: compute_expr_hash(&parsed_expr),
+        author_agent_id: "agent_42".into(),
+        timestamp: 1000,
+    };
+
+    let _commit = db
+        .try_commit_candidate(&Some(initial_root), envelope, candidate, None)
+        .expect("candidate commit should succeed");
+
+    assert!(db.mainline_commits().is_ok());
+
+    // [Spec 3] 篡改场景 A：删除 envelope 工件，断言 mainline_commits 深度校验拦截
+    let content = std::fs::read_to_string(&db_path).unwrap();
+    let mut val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    val.as_object_mut().unwrap().remove("envelopes");
+    std::fs::write(&db_path, serde_json::to_string_pretty(&val).unwrap()).unwrap();
+
+    let reopened = AstDatabase::open(&db_path).unwrap();
+    match reopened.mainline_commits() {
+        Err(DbError::CorruptedCommitChain(msg)) => {
+            assert!(msg.contains("references missing task envelope"));
+        }
+        other => panic!(
+            "expected missing envelope CorruptedCommitChain error, got {:?}",
+            other
+        ),
+    }
+
+    // [Spec 3] 篡改场景 B：交叉绑定破坏，将 receipt 的 candidate 篡改成伪造值
+    let mut val: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let receipts = val.get_mut("receipts").unwrap().as_object_mut().unwrap();
+    for (_rcpt_hash, rcpt_val) in receipts.iter_mut() {
+        rcpt_val.as_object_mut().unwrap().insert(
+            "candidate_hash".into(),
+            serde_json::json!(
+                "#cand_0000000000000000000000000000000000000000000000000000000000000000"
+            ),
+        );
+    }
+    std::fs::write(&db_path, serde_json::to_string_pretty(&val).unwrap()).unwrap();
+
+    let reopened2 = AstDatabase::open(&db_path).unwrap();
+    match reopened2.mainline_commits() {
+        Err(DbError::CorruptedCommitChain(msg)) => {
+            assert!(
+                msg.contains("receipt hash mismatch") || msg.contains("does not match"),
+                "expected hash mismatch or cross-binding mismatch, got {msg}"
+            );
+        }
+        other => panic!(
+            "expected receipt cross-binding CorruptedCommitChain error, got {:?}",
+            other
+        ),
+    }
 
     let _ = std::fs::remove_file(&db_path);
     let _ = std::fs::remove_dir_all(&temp_dir);

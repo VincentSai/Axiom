@@ -13,3 +13,4 @@ serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
 axiom-transpiler = { path = "../axiom-transpiler" }
+serde_json = "1.0"

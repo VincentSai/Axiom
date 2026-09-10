@@ -120,24 +120,24 @@ impl TimeoutPolicy {
         }
     }
 
-    /// Waits for the child process to exit, terminating it and its process tree if it exceeds `self.timeout`.
-    pub fn wait_child_with_watchdog(
-        &self,
+    /// Waits for the child process to exit, terminating it and its process tree if it exceeds `deadline`.
+    pub fn wait_child_until_deadline(
+        deadline: std::time::Instant,
+        poll_interval: std::time::Duration,
         child: &mut std::process::Child,
     ) -> Result<std::process::ExitStatus, String> {
-        let start = std::time::Instant::now();
         loop {
             match child.try_wait() {
                 Ok(Some(status)) => return Ok(status),
                 Ok(None) => {
-                    if start.elapsed() >= self.timeout {
+                    if std::time::Instant::now() >= deadline {
                         kill_process_tree(child);
-                        return Err(format!(
-                            "child process hard-killed: execution time exceeded timeout threshold of {}ms",
-                            self.timeout.as_millis()
-                        ));
+                        return Err(
+                            "child process hard-killed: execution time exceeded deadline threshold"
+                                .into(),
+                        );
                     }
-                    std::thread::sleep(self.poll_interval);
+                    std::thread::sleep(poll_interval);
                 }
                 Err(e) => {
                     kill_process_tree(child);
@@ -146,10 +146,23 @@ impl TimeoutPolicy {
             }
         }
     }
+
+    /// Waits for the child process to exit, terminating it and its process tree if it exceeds `self.timeout`.
+    pub fn wait_child_with_watchdog(
+        &self,
+        child: &mut std::process::Child,
+    ) -> Result<std::process::ExitStatus, String> {
+        let deadline = std::time::Instant::now() + self.timeout;
+        Self::wait_child_until_deadline(deadline, self.poll_interval, child)
+    }
 }
 
-/// Retrieves the dynamically detected version string of Z3 executable with hard timeout watchdog.
+/// Retrieves the dynamically detected version string of Z3 executable with hard timeout watchdog and async I/O.
 pub fn get_z3_version(z3_path: &Path) -> String {
+    use std::io::Read;
+    let deadline = std::time::Instant::now() + TimeoutPolicy::DEFAULT_VERSION_PROBE.timeout;
+    let poll_interval = TimeoutPolicy::DEFAULT_VERSION_PROBE.poll_interval;
+
     let mut cmd = Command::new(z3_path);
     cmd.arg("--version")
         .stdout(std::process::Stdio::piped())
@@ -160,20 +173,47 @@ pub fn get_z3_version(z3_path: &Path) -> String {
         Err(_) => return "unknown".to_string(),
     };
 
-    let policy = TimeoutPolicy::DEFAULT_VERSION_PROBE;
-    match policy.wait_child_with_watchdog(&mut child) {
+    let mut stdout_handle = match child.stdout.take() {
+        Some(h) => h,
+        None => {
+            kill_process_tree(&mut child);
+            return "unknown".to_string();
+        }
+    };
+
+    let stdout_join = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stdout_handle.read_to_end(&mut buf);
+        buf
+    });
+
+    let status_res = TimeoutPolicy::wait_child_until_deadline(deadline, poll_interval, &mut child);
+
+    while !stdout_join.is_finished() && std::time::Instant::now() < deadline {
+        std::thread::sleep(poll_interval);
+    }
+
+    if std::time::Instant::now() >= deadline || status_res.is_err() {
+        kill_process_tree(&mut child);
+        return "unknown".to_string();
+    }
+
+    let stdout_bytes = match stdout_join.join() {
+        Ok(b) => b,
+        Err(_) => {
+            kill_process_tree(&mut child);
+            return "unknown".to_string();
+        }
+    };
+
+    match status_res {
         Ok(status) if status.success() => {
-            if let Some(mut out) = child.stdout.take() {
-                use std::io::Read;
-                let mut buf = Vec::new();
-                let _ = out.read_to_end(&mut buf);
-                let s = String::from_utf8_lossy(&buf);
-                if let Some(pos) = s.find("version ") {
-                    let rest = &s[pos + 8..];
-                    let ver = rest.split_whitespace().next().unwrap_or("").trim();
-                    if !ver.is_empty() {
-                        return ver.to_string();
-                    }
+            let s = String::from_utf8_lossy(&stdout_bytes);
+            if let Some(pos) = s.find("version ") {
+                let rest = &s[pos + 8..];
+                let ver = rest.split_whitespace().next().unwrap_or("").trim();
+                if !ver.is_empty() {
+                    return ver.to_string();
                 }
             }
             "unknown".to_string()
@@ -195,7 +235,8 @@ pub fn run_z3_query_with_timeout(
 ) -> Result<Z3Result, String> {
     use std::io::Read;
 
-    // [Spec 5] 全局单一绝对截止时间控制，覆盖子进程执行与全部 I/O 操作
+    // [Spec 4] 全局单一绝对截止时间控制，覆盖子进程执行与全部 I/O 操作
+    let poll_interval = std::time::Duration::from_millis(5);
     let global_deadline =
         std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms as u64 + 1500);
 
@@ -236,12 +277,10 @@ pub fn run_z3_query_with_timeout(
         buf
     });
 
-    let policy = TimeoutPolicy::from_millis(timeout_ms);
-    let status_res = policy.wait_child_with_watchdog(&mut child);
+    let status_res =
+        TimeoutPolicy::wait_child_until_deadline(global_deadline, poll_interval, &mut child);
 
     // 无论子进程状态如何，安全回收/等待 I/O 线程，杜绝无界阻塞挂起
-    let poll_interval = std::time::Duration::from_millis(5);
-
     if let Some(ref stdin_handle) = stdin_join {
         while !stdin_handle.is_finished() && std::time::Instant::now() < global_deadline {
             std::thread::sleep(poll_interval);
