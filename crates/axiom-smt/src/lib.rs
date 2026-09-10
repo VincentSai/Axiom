@@ -5,6 +5,7 @@
 //!   2. Built-in standalone symbolic interval and boundary grid verification.
 
 pub mod internal_solver;
+pub mod process_supervisor;
 pub mod smtlib2;
 pub mod z3_solver;
 

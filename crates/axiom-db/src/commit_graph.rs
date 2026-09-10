@@ -6,9 +6,11 @@ use axiom_ast::Module;
 
 use crate::{
     compute_candidate_hash, compute_commit_payload_hash, compute_envelope_hash, compute_expr_hash,
-    compute_legacy_commit_payload_hash, compute_module_hash, compute_proof_obligation_hash,
-    compute_receipt_hash, current_verification_profile_hash, derive_candidate_module, CommitRecord,
-    DatabaseState, DbError, LegacyCommitPayload, NodeHash,
+    compute_legacy_commit_payload_hash, compute_legacy_v2_commit_payload_hash,
+    compute_legacy_v2_receipt_hash, compute_module_hash, compute_proof_obligation_hash,
+    compute_receipt_hash, derive_candidate_module, CommitRecord, DatabaseState, DbError,
+    LegacyCommitPayload, LegacyV2CommitPayload, LegacyV2VerificationReceipt, NodeHash,
+    CURRENT_SCHEMA_VERSION,
 };
 
 /// Topology and integrity auditor for AST database commits.
@@ -297,11 +299,14 @@ impl CommitGraph {
                     )));
                 }
 
-                if rcpt.verification_profile_hash != current_verification_profile_hash() {
+                if !rcpt
+                    .verification_profile_hash
+                    .as_str()
+                    .starts_with("#vprof_")
+                {
                     return Err(DbError::CorruptedCommitChain(format!(
-                        "receipt-only commit `{hash}` verification_profile `{}` does not match current `{}`",
-                        rcpt.verification_profile_hash,
-                        current_verification_profile_hash()
+                        "receipt-only commit `{hash}` verification_profile `{}` has invalid format",
+                        rcpt.verification_profile_hash
                     )));
                 }
 
@@ -558,6 +563,185 @@ impl CommitGraph {
 
         state.commits = new_commits;
         state.head_commit = prev_commit_hash;
+
+        Ok(true)
+    }
+
+    /// 针对 Commit 4492184（Schema V2）数据库执行自底向上自愈迁移：
+    /// 1. 预验真（防洗白）：使用 LegacyV2CommitPayload 与 LegacyV2VerificationReceipt 核验全库原始哈希，
+    ///    若存在任何被篡改数据，立即拒绝迁移并返回 CorruptedCommitChain；
+    /// 2. 拓扑扫描：从 head_commit 追溯至 Genesis，对每个 no-op 提交定位其在主线上的前驱 landing commit；
+    /// 3. 收据与提交升级：为 no-op 收据与 commit payload 补齐 attested_commit_hash 语义绑定并重算收据哈希；
+    /// 4. 重算全链哈希：自底向上重新计算全链 commit_hash，更新 parent_commit 指针、head_commit 以及 schema_version。
+    pub(crate) fn repair_v2_migration(state: &mut DatabaseState) -> Result<bool, DbError> {
+        if state.commits.is_empty() {
+            state.schema_version = Some(CURRENT_SCHEMA_VERSION);
+            return Ok(false);
+        }
+
+        let head_hash = match &state.head_commit {
+            Some(h) => h,
+            None => {
+                return Err(DbError::CorruptedCommitChain(
+                    "V2 database migration requires a non-empty head_commit".to_string(),
+                ));
+            }
+        };
+
+        // 步骤 1: 预验真 (防洗白)
+        // 1.1 校验 receipts
+        for (map_key, rcpt) in &state.receipts {
+            let is_v3_valid = compute_receipt_hash(rcpt) == *map_key;
+            let is_v2_valid = {
+                let legacy_rcpt = LegacyV2VerificationReceipt {
+                    candidate_hash: rcpt.candidate_hash.clone(),
+                    proof_level: rcpt.proof_level,
+                    solver: rcpt.solver.clone(),
+                    solver_version: rcpt.solver_version.clone(),
+                    obligations_checked: rcpt.obligations_checked,
+                    proof_obligation_hash: rcpt.proof_obligation_hash.clone(),
+                    verification_profile_hash: rcpt.verification_profile_hash.clone(),
+                    verified_at: rcpt.verified_at,
+                };
+                compute_legacy_v2_receipt_hash(&legacy_rcpt) == *map_key
+            };
+            if !is_v3_valid && !is_v2_valid {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "legacy receipt hash mismatch for `{map_key}`: neither valid V3 nor valid V2"
+                )));
+            }
+        }
+
+        // 1.2 校验 commits
+        for (map_key, commit) in &state.commits {
+            if map_key != &commit.commit_hash {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "commits map key `{map_key}` does not match commit_hash `{}`",
+                    commit.commit_hash
+                )));
+            }
+            let is_v3_valid = compute_commit_payload_hash(&commit.payload) == commit.commit_hash;
+            let is_v2_valid = {
+                let legacy_commit = LegacyV2CommitPayload {
+                    parent_commit: commit.parent_commit().cloned(),
+                    parent_root: commit.parent_root().cloned(),
+                    new_root: commit.new_root().clone(),
+                    envelope_hash: commit.envelope_hash().clone(),
+                    candidate_hash: commit.candidate_hash().clone(),
+                    receipt_hash: commit.receipt_hash().clone(),
+                    timestamp: commit.timestamp(),
+                };
+                compute_legacy_v2_commit_payload_hash(&legacy_commit) == commit.commit_hash
+            };
+            if !is_v3_valid && !is_v2_valid {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "legacy commit hash mismatch for `{}`: neither valid V3 nor valid V2",
+                    commit.commit_hash
+                )));
+            }
+        }
+
+        // 步骤 2: 沿 parent_commit 回溯构建主线序列并检测孤儿
+        let mut curr_opt = Some(head_hash);
+        let mut backwards = Vec::new();
+        let mut visited = HashSet::new();
+
+        while let Some(curr_hash) = curr_opt {
+            if !visited.insert(curr_hash.clone()) {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "cycle detected in parent_commit pointer at `{curr_hash}`"
+                )));
+            }
+            let commit = state.commits.get(curr_hash).ok_or_else(|| {
+                DbError::CorruptedCommitChain(format!(
+                    "parent_commit `{curr_hash}` not found in database commits"
+                ))
+            })?;
+            backwards.push(commit.clone());
+            curr_opt = commit.parent_commit();
+        }
+
+        if backwards.len() != state.commits.len() {
+            return Err(DbError::CorruptedCommitChain(format!(
+                "legacy database migration failed: {} unlinked or orphaned commits detected",
+                state.commits.len() - backwards.len()
+            )));
+        }
+
+        backwards.reverse();
+        let ordered_commits = backwards;
+
+        // 步骤 3 & 4: 自底向上重构收据、补齐 landing 绑定与重算全链 commit hash
+        let mut latest_landing: std::collections::HashMap<(NodeHash, NodeHash), NodeHash> =
+            std::collections::HashMap::new();
+        let mut new_receipts = state.receipts.clone();
+        let mut new_commits = BTreeMap::new();
+        let mut prev_commit_hash: Option<NodeHash> = None;
+
+        for mut commit in ordered_commits {
+            let orig_rcpt = state
+                .receipts
+                .get(commit.receipt_hash())
+                .ok_or_else(|| {
+                    DbError::CorruptedCommitChain(format!(
+                        "receipt `{}` not found in database",
+                        commit.receipt_hash()
+                    ))
+                })?
+                .clone();
+
+            let is_noop = commit.parent_root() == Some(commit.new_root());
+
+            let (att_commit_hash, new_rcpt_hash) = if is_noop {
+                let landing_key = (
+                    commit.envelope_hash().clone(),
+                    commit.candidate_hash().clone(),
+                );
+                let landing_hash = latest_landing.get(&landing_key).ok_or_else(|| {
+                    DbError::CorruptedCommitChain(format!(
+                        "no-op commit `{}` has no preceding landing commit with envelope `{}` and candidate `{}`",
+                        commit.commit_hash,
+                        commit.envelope_hash(),
+                        commit.candidate_hash()
+                    ))
+                })?;
+
+                let mut upgraded_rcpt = orig_rcpt;
+                upgraded_rcpt.attested_commit_hash = Some(landing_hash.clone());
+                let h = compute_receipt_hash(&upgraded_rcpt);
+                new_receipts.insert(h.clone(), upgraded_rcpt);
+                (Some(landing_hash.clone()), h)
+            } else {
+                let mut upgraded_rcpt = orig_rcpt;
+                upgraded_rcpt.attested_commit_hash = None;
+                let h = compute_receipt_hash(&upgraded_rcpt);
+                new_receipts.insert(h.clone(), upgraded_rcpt);
+                (None, h)
+            };
+
+            commit.payload.receipt_hash = new_rcpt_hash;
+            commit.payload.parent_commit = prev_commit_hash.clone();
+            commit.payload.attested_commit_hash = att_commit_hash;
+            commit.commit_hash = compute_commit_payload_hash(&commit.payload);
+
+            if !is_noop {
+                latest_landing.insert(
+                    (
+                        commit.envelope_hash().clone(),
+                        commit.candidate_hash().clone(),
+                    ),
+                    commit.commit_hash.clone(),
+                );
+            }
+
+            prev_commit_hash = Some(commit.commit_hash.clone());
+            new_commits.insert(commit.commit_hash.clone(), commit);
+        }
+
+        state.receipts = new_receipts;
+        state.commits = new_commits;
+        state.head_commit = prev_commit_hash;
+        state.schema_version = Some(CURRENT_SCHEMA_VERSION);
 
         Ok(true)
     }
