@@ -1729,4 +1729,188 @@ fn test_receipt_hash_includes_solver_sha256_and_backward_compatible() {
     let deserialized: VerificationReceipt = serde_json::from_str(legacy_json).unwrap();
     assert_eq!(deserialized.solver_sha256, None);
     assert_eq!(deserialized.solver, "z3");
+
+    // 关键断言：当 solver_sha256 为 None 时，跳过序列化该字段，避免输出 solver_sha256: null 破坏历史哈希
+    let serialized_again = serde_json::to_string(&deserialized).unwrap();
+    assert!(
+        !serialized_again.contains("solver_sha256"),
+        "None 值的 solver_sha256 严禁序列化为 null，必须保持与历史 Schema V3 字节完全一致"
+    );
+}
+
+#[test]
+fn test_v3_database_golden_fixture_migration_to_v4() {
+    use axiom_ast::{BinaryOperator, Expr, FunctionDecl, FunctionParam, Literal, Module, Type};
+    use axiom_db::{
+        compute_candidate_hash, compute_commit_payload_hash, compute_contract_hash,
+        compute_envelope_hash, compute_expr_hash, compute_module_hash,
+        compute_proof_obligation_hash, compute_receipt_hash, AstDatabase, Candidate, CommitPayload,
+        CommitRecord, ProofLevel, TaskEnvelope, VerificationReceipt, CURRENT_SCHEMA_VERSION,
+    };
+    use std::collections::BTreeMap;
+
+    // 构建一个真实的 Schema V3 数据库状态（收据中无 solver_sha256，schema_version 为 3）
+    let initial_fn = FunctionDecl {
+        name: "test_inc".into(),
+        params: vec![FunctionParam {
+            name: "x".into(),
+            ty: Type::Int,
+        }],
+        return_type: Type::Int,
+        effects: vec![],
+        requires: vec![],
+        ensures: vec![],
+        body: Expr::Hole("h1".into()),
+    };
+    let initial_mod = Module {
+        types: vec![],
+        functions: vec![initial_fn.clone()],
+        effects: vec![],
+    };
+    let root_hash = compute_module_hash(&initial_mod);
+
+    let parsed_cand = Expr::BinaryOp {
+        op: BinaryOperator::Add,
+        left: Box::new(Expr::Ident("x".into())),
+        right: Box::new(Expr::Literal(Literal::Int(1))),
+    };
+    let cand_expr_hash = compute_expr_hash(&parsed_cand);
+
+    let env = TaskEnvelope {
+        target_hole_id: "h1".into(),
+        target_function: "test_inc".into(),
+        contract_hash: compute_contract_hash(&initial_fn),
+        base_root_hash: Some(root_hash.clone()),
+        dependency_hashes: vec![],
+    };
+    let env_hash = compute_envelope_hash(&env);
+
+    let cand = Candidate {
+        envelope_hash: env_hash.clone(),
+        expression_source: "x + 1".into(),
+        expression_hash: cand_expr_hash,
+        author_agent_id: "agent_golden".into(),
+        timestamp: 1000,
+    };
+    let cand_hash = compute_candidate_hash(&cand);
+
+    let landed_fn = FunctionDecl {
+        name: "test_inc".into(),
+        params: vec![FunctionParam {
+            name: "x".into(),
+            ty: Type::Int,
+        }],
+        return_type: Type::Int,
+        effects: vec![],
+        requires: vec![],
+        ensures: vec![],
+        body: parsed_cand,
+    };
+    let landed_mod = Module {
+        types: vec![],
+        functions: vec![landed_fn.clone()],
+        effects: vec![],
+    };
+    let new_root_hash = compute_module_hash(&landed_mod);
+    let obl_hash = compute_proof_obligation_hash(&landed_fn);
+
+    // V3 收据：无 solver_sha256 (None)
+    let rcpt_v3 = VerificationReceipt {
+        candidate_hash: cand_hash.clone(),
+        proof_level: ProofLevel::Proved,
+        solver: "z3".into(),
+        solver_version: "Z3 4.12.2".into(),
+        solver_sha256: None,
+        obligations_checked: 1,
+        proof_obligation_hash: obl_hash,
+        verification_profile_hash: axiom_db::current_verification_profile_hash(),
+        attested_commit_hash: None,
+        verified_at: 1200,
+    };
+    let rcpt_hash = compute_receipt_hash(&rcpt_v3);
+
+    let payload_v3 = CommitPayload {
+        parent_commit: None,
+        parent_root: Some(root_hash.clone()),
+        new_root: new_root_hash.clone(),
+        envelope_hash: env_hash.clone(),
+        candidate_hash: cand_hash.clone(),
+        receipt_hash: rcpt_hash.clone(),
+        attested_commit_hash: None,
+        timestamp: 1300,
+    };
+    let commit_hash = compute_commit_payload_hash(&payload_v3);
+    let commit = CommitRecord {
+        commit_hash: commit_hash.clone(),
+        payload: payload_v3,
+    };
+
+    let mut modules = BTreeMap::new();
+    modules.insert(root_hash.clone(), initial_mod);
+    modules.insert(new_root_hash.clone(), landed_mod);
+
+    let mut envelopes = BTreeMap::new();
+    envelopes.insert(env_hash.clone(), env);
+
+    let mut candidates = BTreeMap::new();
+    candidates.insert(cand_hash.clone(), cand);
+
+    let mut receipts = BTreeMap::new();
+    receipts.insert(rcpt_hash.clone(), rcpt_v3);
+
+    let mut commits = BTreeMap::new();
+    commits.insert(commit_hash.clone(), commit);
+
+    #[derive(serde::Serialize)]
+    struct V3GoldenDatabase {
+        root_ref: Option<axiom_db::NodeHash>,
+        head_commit: Option<axiom_db::NodeHash>,
+        schema_version: Option<u32>,
+        modules: BTreeMap<axiom_db::NodeHash, Module>,
+        envelopes: BTreeMap<axiom_db::NodeHash, TaskEnvelope>,
+        candidates: BTreeMap<axiom_db::NodeHash, Candidate>,
+        receipts: BTreeMap<axiom_db::NodeHash, VerificationReceipt>,
+        commits: BTreeMap<axiom_db::NodeHash, CommitRecord>,
+    }
+
+    let golden_v3 = V3GoldenDatabase {
+        root_ref: Some(new_root_hash.clone()),
+        head_commit: Some(commit_hash.clone()),
+        schema_version: Some(3), // 历史 Schema V3 标识
+        modules,
+        envelopes,
+        candidates,
+        receipts,
+        commits,
+    };
+
+    let temp_dir = std::env::temp_dir().join(format!("test_v3_golden_{}", std::process::id()));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let db_path = temp_dir.join("v3_golden.json");
+
+    let json_bytes = serde_json::to_vec_pretty(&golden_v3).expect("serialize v3 golden db");
+    std::fs::write(&db_path, json_bytes).expect("write golden v3 db");
+
+    // 打开历史 Schema V3 数据库：验证能够无缝加载、验真历史链并升级到 Schema V4
+    let db = AstDatabase::open(&db_path).expect("open v3 golden db should succeed");
+    assert_eq!(db.head_commit(), Some(&commit_hash));
+    assert_eq!(db.current_root(), Some(new_root_hash));
+
+    // 验证主链深层验真通过
+    let mainline = db.mainline_commits().expect("mainline should validate");
+    assert_eq!(mainline.len(), 1);
+    assert_eq!(mainline[0].commit_hash, commit_hash);
+
+    // 重新从磁盘读取原始文件，断言已被原子升级保存为 Schema 4
+    let upgraded_json = std::fs::read_to_string(&db_path).expect("read upgraded db");
+    let upgraded_state: serde_json::Value =
+        serde_json::from_str(&upgraded_json).expect("parse upgraded db");
+    assert_eq!(
+        upgraded_state["schema_version"],
+        serde_json::json!(CURRENT_SCHEMA_VERSION),
+        "数据库落盘后 schema_version 必须已升级为 CURRENT_SCHEMA_VERSION"
+    );
+
+    let _ = std::fs::remove_file(&db_path);
+    let _ = std::fs::remove_dir_all(&temp_dir);
 }

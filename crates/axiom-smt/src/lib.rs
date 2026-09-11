@@ -136,9 +136,9 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
         if let Ok((smt2_query, num_obligations)) =
             generate_smtlib2_with_module_and_obligations(func, Some(module))
         {
-            // [P1 Spec 3] TOCTOU 防御：在求解前锁定二进制哈希与版本，并贯穿结果
+            // [P1 Spec 3] TOCTOU 防御：在求解前锁定二进制哈希与版本
             let version = get_z3_version(&z3_path);
-            let solver_sha256 = compute_file_sha256(&z3_path);
+            let solver_sha256_pre = compute_file_sha256(&z3_path);
 
             // P0: Precondition Satisfiability Check (Vacuity Prevention)
             if let Err(vacuity_err) =
@@ -149,10 +149,17 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
 
             match run_z3_query(&z3_path, &smt2_query) {
                 Ok(Z3Result::Unsat) => {
+                    // [P1 Spec 3 核心闭环]: Pre- & Post-Execution Double Attestation
+                    let solver_sha256_post = compute_file_sha256(&z3_path);
+                    if solver_sha256_pre.is_none() || solver_sha256_pre != solver_sha256_post {
+                        return SmtResult::Unknown(
+                            "TOCTOU integrity check failed: Z3 solver binary modified during verification".into(),
+                        );
+                    }
                     return SmtResult::Proved {
                         solver: "Microsoft Z3 (SMT-LIB2)".into(),
                         solver_path: Some(z3_path.to_string_lossy().to_string()),
-                        solver_sha256,
+                        solver_sha256: solver_sha256_post,
                         version,
                         obligations_checked: num_obligations,
                     };
@@ -178,7 +185,7 @@ pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String>
 
     // [P1 Spec 3] TOCTOU 防御：在求解前锁定二进制哈希与版本
     let version = get_z3_version(&z3_path);
-    let solver_sha256 = compute_file_sha256(&z3_path);
+    let solver_sha256_pre = compute_file_sha256(&z3_path);
 
     // P0: Precondition Satisfiability Check (Vacuity Prevention)
     if let Err(vacuity_err) = check_precondition_vacuity_fail_closed(&z3_path, func, None) {
@@ -188,13 +195,23 @@ pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String>
     let (smt2_query, num_obligations) = generate_smtlib2_and_obligations(func)?;
 
     match run_z3_query(&z3_path, &smt2_query)? {
-        Z3Result::Unsat => Ok(SmtResult::Proved {
-            solver: "Microsoft Z3 (SMT-LIB2)".into(),
-            solver_path: Some(z3_path.to_string_lossy().to_string()),
-            solver_sha256,
-            version,
-            obligations_checked: num_obligations,
-        }),
+        Z3Result::Unsat => {
+            // [P1 Spec 3 核心闭环]: Pre- & Post-Execution Double Attestation
+            let solver_sha256_post = compute_file_sha256(&z3_path);
+            if solver_sha256_pre.is_none() || solver_sha256_pre != solver_sha256_post {
+                return Ok(SmtResult::Unknown(
+                    "TOCTOU integrity check failed: Z3 solver binary modified during verification"
+                        .into(),
+                ));
+            }
+            Ok(SmtResult::Proved {
+                solver: "Microsoft Z3 (SMT-LIB2)".into(),
+                solver_path: Some(z3_path.to_string_lossy().to_string()),
+                solver_sha256: solver_sha256_post,
+                version,
+                obligations_checked: num_obligations,
+            })
+        }
         Z3Result::Sat(ce) => Ok(SmtResult::CounterExample(ce)),
         Z3Result::Unknown(r) => Ok(SmtResult::Unknown(r)),
     }

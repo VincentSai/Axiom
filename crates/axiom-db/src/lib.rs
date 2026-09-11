@@ -221,8 +221,8 @@ impl fmt::Display for ProofLevel {
 /// arithmetic overflow guards, division-by-zero path-condition rules, and solver requirements.
 pub const CURRENT_VERIFICATION_PROFILE: &str = "axiom-smt-v3-truncdiv-residualmatch";
 
-/// Current database schema version (Version 3 incorporates attested_commit_hash in receipts and commit payloads).
-pub const CURRENT_SCHEMA_VERSION: u32 = 3;
+/// Current database schema version (Version 4 incorporates solver_sha256 in receipts with double attestation).
+pub const CURRENT_SCHEMA_VERSION: u32 = 4;
 
 /// Returns the cryptographically secure hash of the current verification profile.
 pub fn current_verification_profile_hash() -> NodeHash {
@@ -241,7 +241,7 @@ pub struct VerificationReceipt {
     pub proof_level: ProofLevel,
     pub solver: String,
     pub solver_version: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub solver_sha256: Option<String>,
     pub obligations_checked: usize,
     pub proof_obligation_hash: NodeHash,
@@ -254,6 +254,27 @@ pub struct VerificationReceipt {
 
 /// Computes content identifier for a verification receipt.
 pub fn compute_receipt_hash(rcpt: &VerificationReceipt) -> NodeHash {
+    compute_hash("rcpt", rcpt)
+}
+
+/// Legacy V3 verification receipt (9 fields, without solver_sha256) used in Schema V3.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct LegacyV3VerificationReceipt {
+    pub(crate) candidate_hash: NodeHash,
+    pub(crate) proof_level: ProofLevel,
+    pub(crate) solver: String,
+    pub(crate) solver_version: String,
+    pub(crate) obligations_checked: usize,
+    pub(crate) proof_obligation_hash: NodeHash,
+    #[serde(default = "legacy_verification_profile_hash")]
+    pub(crate) verification_profile_hash: NodeHash,
+    #[serde(default)]
+    pub(crate) attested_commit_hash: Option<NodeHash>,
+    pub(crate) verified_at: u64,
+}
+
+/// Computes content identifier for a legacy V3 verification receipt.
+pub(crate) fn compute_legacy_v3_receipt_hash(rcpt: &LegacyV3VerificationReceipt) -> NodeHash {
     compute_hash("rcpt", rcpt)
 }
 
@@ -676,6 +697,27 @@ fn require_proved(
             obligations_checked,
             ..
         } => {
+            // [P1 Spec 3 核心闭环]: Fail-Closed 校验求解器版本与 64 位 SHA-256 哈希
+            let trimmed_ver = version.trim();
+            if trimmed_ver.is_empty() || trimmed_ver.eq_ignore_ascii_case("unknown") {
+                return Err(CasError::UnverifiedCandidate(format!(
+                    "SMT solver version for `{target_name}` must be known and non-empty, found: `{version}`"
+                )));
+            }
+            let sha = match &solver_sha256 {
+                Some(s) if s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit()) => s.clone(),
+                Some(invalid_sha) => {
+                    return Err(CasError::UnverifiedCandidate(format!(
+                        "SMT solver sha256 for `{target_name}` is invalid format (must be 64-character hex): `{invalid_sha}`"
+                    )));
+                }
+                None => {
+                    return Err(CasError::UnverifiedCandidate(format!(
+                        "SMT solver sha256 for `{target_name}` is missing, strict provenance attestation required"
+                    )));
+                }
+            };
+
             let proof_obligation_hash = compute_proof_obligation_hash(target_func);
             Ok(CertifiedProofEvidence {
                 envelope_hash,
@@ -683,7 +725,7 @@ fn require_proved(
                 proof_obligation_hash,
                 solver,
                 solver_version: version,
-                solver_sha256,
+                solver_sha256: Some(sha),
                 obligations_checked,
                 _sealed: (),
             })
@@ -849,7 +891,8 @@ impl AstDatabase {
     /// 针对旧版本数据库执行自愈迁移：
     /// 1. V1 数据库（缺少 head_commit）：重建 parent_commit 祖先拓扑链；
     /// 2. V2 数据库（Commit 4492184，缺少 attested_commit_hash）：防洗白验真原始哈希，
-    ///    为 no-op 提交与收据自底向上补齐 landing commit 强绑定，重新计算全链哈希并升级至 Schema V3。
+    ///    为 no-op 提交与收据自底向上补齐 landing commit 强绑定，重新计算全链哈希；
+    /// 3. V3 数据库（无 solver_sha256）：通过 LegacyV3 验真原始收据与提交哈希，自愈迁移升级至 Schema V4。
     pub(crate) fn migrate_legacy_commits_if_needed(
         state: &mut DatabaseState,
     ) -> Result<bool, DbError> {
@@ -867,9 +910,8 @@ impl AstDatabase {
                     CommitGraph::repair_legacy_ancestry(state)?;
                 }
                 CommitGraph::repair_v2_migration(state)?;
-            } else {
-                state.schema_version = Some(CURRENT_SCHEMA_VERSION);
             }
+            state.schema_version = Some(CURRENT_SCHEMA_VERSION);
             mutated = true;
         }
         Ok(mutated)
@@ -2792,5 +2834,92 @@ mod tests {
 
         let _ = std::fs::remove_file(&db_path);
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_require_proved_fail_closed_validation() {
+        let target_func = FunctionDecl {
+            name: "test_func".into(),
+            params: vec![],
+            return_type: Type::Int,
+            effects: vec![],
+            requires: vec![],
+            ensures: vec![],
+            body: Expr::Literal(axiom_ast::Literal::Int(0)),
+        };
+        let env_hash = NodeHash("#env_dummy".into());
+        let cand_hash = NodeHash("#cand_dummy".into());
+
+        // 1. None solver_sha256 必须被拦截
+        let smt_none = axiom_smt::SmtResult::Proved {
+            solver: "z3".into(),
+            solver_path: None,
+            solver_sha256: None,
+            version: "4.12.2".into(),
+            obligations_checked: 1,
+        };
+        let res_none = require_proved(smt_none, env_hash.clone(), cand_hash.clone(), &target_func);
+        assert!(
+            matches!(res_none, Err(CasError::UnverifiedCandidate(ref msg)) if msg.contains("missing")),
+            "缺少 solver_sha256 必须被 require_proved 拒绝，收到: {res_none:?}"
+        );
+
+        // 2. 非法格式 solver_sha256 必须被拦截
+        let smt_bad_sha = axiom_smt::SmtResult::Proved {
+            solver: "z3".into(),
+            solver_path: None,
+            solver_sha256: Some("invalid_short_hash".into()),
+            version: "4.12.2".into(),
+            obligations_checked: 1,
+        };
+        let res_bad = require_proved(
+            smt_bad_sha,
+            env_hash.clone(),
+            cand_hash.clone(),
+            &target_func,
+        );
+        assert!(
+            matches!(res_bad, Err(CasError::UnverifiedCandidate(ref msg)) if msg.contains("invalid format")),
+            "非法格式 solver_sha256 必须被 require_proved 拒绝，收到: {res_bad:?}"
+        );
+
+        // 3. unknown 或空版本必须被拦截
+        let smt_unknown = axiom_smt::SmtResult::Proved {
+            solver: "z3".into(),
+            solver_path: None,
+            solver_sha256: Some(
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".into(),
+            ),
+            version: "unknown".into(),
+            obligations_checked: 1,
+        };
+        let res_unknown = require_proved(
+            smt_unknown,
+            env_hash.clone(),
+            cand_hash.clone(),
+            &target_func,
+        );
+        assert!(
+            matches!(res_unknown, Err(CasError::UnverifiedCandidate(ref msg)) if msg.contains("must be known")),
+            "unknown 求解器版本必须被 require_proved 拒绝，收到: {res_unknown:?}"
+        );
+
+        // 4. 合法 64 位 SHA-256 和明确版本必须通过
+        let smt_valid = axiom_smt::SmtResult::Proved {
+            solver: "z3".into(),
+            solver_path: None,
+            solver_sha256: Some(
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".into(),
+            ),
+            version: "4.13.0".into(),
+            obligations_checked: 1,
+        };
+        let res_valid = require_proved(smt_valid, env_hash, cand_hash, &target_func);
+        assert!(res_valid.is_ok(), "合法的证明结果与求解器哈希必须成功通过");
+        let ev = res_valid.unwrap();
+        assert_eq!(
+            ev.solver_sha256(),
+            Some("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+        );
     }
 }

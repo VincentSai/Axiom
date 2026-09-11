@@ -7,10 +7,11 @@ use axiom_ast::Module;
 use crate::{
     compute_candidate_hash, compute_commit_payload_hash, compute_envelope_hash, compute_expr_hash,
     compute_legacy_commit_payload_hash, compute_legacy_v2_commit_payload_hash,
-    compute_legacy_v2_receipt_hash, compute_module_hash, compute_proof_obligation_hash,
-    compute_receipt_hash, derive_candidate_module, CommitRecord, DatabaseState, DbError,
-    LegacyCommitPayload, LegacyV2CommitPayload, LegacyV2VerificationReceipt, NodeHash,
-    VerificationReceipt, CURRENT_SCHEMA_VERSION,
+    compute_legacy_v2_receipt_hash, compute_legacy_v3_receipt_hash, compute_module_hash,
+    compute_proof_obligation_hash, compute_receipt_hash, derive_candidate_module, CommitRecord,
+    DatabaseState, DbError, LegacyCommitPayload, LegacyV2CommitPayload,
+    LegacyV2VerificationReceipt, LegacyV3VerificationReceipt, NodeHash, VerificationReceipt,
+    CURRENT_SCHEMA_VERSION,
 };
 
 /// Topology and integrity auditor for AST database commits.
@@ -591,7 +592,21 @@ impl CommitGraph {
         // 步骤 1: 预验真 (防洗白)
         // 1.1 校验 receipts
         for (map_key, rcpt) in &state.receipts {
-            let is_v3_valid = compute_receipt_hash(rcpt) == *map_key;
+            let is_v4_or_v3_valid = compute_receipt_hash(rcpt) == *map_key;
+            let is_legacy_v3_valid = {
+                let leg_v3 = LegacyV3VerificationReceipt {
+                    candidate_hash: rcpt.candidate_hash.clone(),
+                    proof_level: rcpt.proof_level,
+                    solver: rcpt.solver.clone(),
+                    solver_version: rcpt.solver_version.clone(),
+                    obligations_checked: rcpt.obligations_checked,
+                    proof_obligation_hash: rcpt.proof_obligation_hash.clone(),
+                    verification_profile_hash: rcpt.verification_profile_hash.clone(),
+                    attested_commit_hash: rcpt.attested_commit_hash.clone(),
+                    verified_at: rcpt.verified_at,
+                };
+                compute_legacy_v3_receipt_hash(&leg_v3) == *map_key
+            };
             let is_v2_valid = {
                 let legacy_rcpt = LegacyV2VerificationReceipt {
                     candidate_hash: rcpt.candidate_hash.clone(),
@@ -605,9 +620,9 @@ impl CommitGraph {
                 };
                 compute_legacy_v2_receipt_hash(&legacy_rcpt) == *map_key
             };
-            if !is_v3_valid && !is_v2_valid {
+            if !is_v4_or_v3_valid && !is_legacy_v3_valid && !is_v2_valid {
                 return Err(DbError::CorruptedCommitChain(format!(
-                    "legacy receipt hash mismatch for `{map_key}`: neither valid V3 nor valid V2"
+                    "legacy receipt hash mismatch for `{map_key}`: neither valid V4/V3 nor valid V2"
                 )));
             }
         }

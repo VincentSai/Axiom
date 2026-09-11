@@ -402,6 +402,11 @@ impl Drop for ProcessSupervisor {
     }
 }
 
+enum StreamDrainResult<T> {
+    Completed(Result<T, String>),
+    TimedOut,
+}
+
 struct StreamReaderComm {
     rx: std::sync::mpsc::Receiver<std::io::Result<Vec<u8>>>,
     handle: Option<std::thread::JoinHandle<()>>,
@@ -409,27 +414,58 @@ struct StreamReaderComm {
 }
 
 impl StreamReaderComm {
-    /// 在指定超时内回收 reader 线程结果，并必须 join 回收线程句柄，杜绝线程挂起或泄漏
-    fn reap_with_timeout(mut self, timeout: Duration) -> Result<Vec<u8>, String> {
-        let res = match self.rx.recv_timeout(timeout) {
-            Ok(Ok(bytes)) => Ok(bytes),
-            Ok(Err(e)) => Err(format!("I/O stream read error: {e}")),
-            Err(_) => {
-                self.cancelled.store(true, Ordering::SeqCst);
-                Err("timed out draining process stream (incomplete stream)".into())
+    /// 尝试在指定超时内回收 reader 线程结果。
+    /// 若超时，绝不在 terminate 前无界 join，而是返回 TimedOut 保留 handle 供进程树强杀后有界回收。
+    fn try_reap(&mut self, timeout: Duration) -> StreamDrainResult<Vec<u8>> {
+        match self.rx.recv_timeout(timeout) {
+            Ok(Ok(bytes)) => {
+                if let Some(h) = self.handle.take() {
+                    let _ = h.join();
+                }
+                StreamDrainResult::Completed(Ok(bytes))
             }
-        };
-        if let Some(h) = self.handle.take() {
-            let _ = h.join();
+            Ok(Err(e)) => {
+                if let Some(h) = self.handle.take() {
+                    let _ = h.join();
+                }
+                StreamDrainResult::Completed(Err(format!("I/O stream read error: {e}")))
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                self.cancelled.store(true, Ordering::SeqCst);
+                StreamDrainResult::TimedOut
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                if let Some(h) = self.handle.take() {
+                    let _ = h.join();
+                }
+                StreamDrainResult::Completed(Err("stream channel disconnected unexpectedly".into()))
+            }
         }
-        res
     }
 
-    /// 取消读取并强制回收线程句柄
-    fn cancel_and_join(mut self) {
+    /// 在进程树强杀（supervisor.terminate()）后执行有界回收，严禁无界 join 挂死主线程。
+    fn bounded_join_after_kill(mut self, grace: Duration) {
         self.cancelled.store(true, Ordering::SeqCst);
         if let Some(h) = self.handle.take() {
-            let _ = h.join();
+            match self.rx.recv_timeout(grace) {
+                Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    let _ = h.join();
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    eprintln!("axiom: reader thread did not exit within grace period after process termination; handle detached to avoid deadlock");
+                }
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn reap_with_timeout(mut self, timeout: Duration) -> Result<Vec<u8>, String> {
+        match self.try_reap(timeout) {
+            StreamDrainResult::Completed(res) => res,
+            StreamDrainResult::TimedOut => {
+                self.bounded_join_after_kill(Duration::from_millis(100));
+                Err("timed out draining process stream".into())
+            }
         }
     }
 }
@@ -484,27 +520,62 @@ struct StdinWriterComm {
 }
 
 impl StdinWriterComm {
-    /// 在指定超时内回收 writer 线程结果，并必须 join 回收线程句柄，杜绝线程挂起或泄漏
-    fn reap_with_timeout(mut self, timeout: Duration) -> Result<(), String> {
-        let res = match self.rx.recv_timeout(timeout) {
-            Ok(Ok(())) => Ok(()),
-            Ok(Err(io_err)) => Err(format!("failed to write data to process stdin: {io_err}")),
-            Err(_) => {
-                self.cancelled.store(true, Ordering::SeqCst);
-                Err("timed out writing data to process stdin (child or orphan holding pipe)".into())
+    /// 尝试在指定超时内回收 writer 线程结果。
+    /// 若超时，绝不在 terminate 前无界 join，而是返回 TimedOut 保留 handle 供进程树强杀后有界回收。
+    fn try_reap(&mut self, timeout: Duration) -> StreamDrainResult<()> {
+        match self.rx.recv_timeout(timeout) {
+            Ok(Ok(())) => {
+                if let Some(h) = self.handle.take() {
+                    let _ = h.join();
+                }
+                StreamDrainResult::Completed(Ok(()))
             }
-        };
-        if let Some(h) = self.handle.take() {
-            let _ = h.join();
+            Ok(Err(io_err)) => {
+                if let Some(h) = self.handle.take() {
+                    let _ = h.join();
+                }
+                StreamDrainResult::Completed(Err(format!(
+                    "failed to write data to process stdin: {io_err}"
+                )))
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                self.cancelled.store(true, Ordering::SeqCst);
+                StreamDrainResult::TimedOut
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                if let Some(h) = self.handle.take() {
+                    let _ = h.join();
+                }
+                StreamDrainResult::Completed(Err(
+                    "stdin writer channel disconnected unexpectedly".into()
+                ))
+            }
         }
-        res
     }
 
-    /// 取消写入并强制回收线程句柄
-    fn cancel_and_join(mut self) {
+    /// 在进程树强杀（supervisor.terminate()）后执行有界回收，严禁无界 join 挂死主线程。
+    fn bounded_join_after_kill(mut self, grace: Duration) {
         self.cancelled.store(true, Ordering::SeqCst);
         if let Some(h) = self.handle.take() {
-            let _ = h.join();
+            match self.rx.recv_timeout(grace) {
+                Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    let _ = h.join();
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    eprintln!("axiom: stdin writer thread did not exit within grace period after process termination; handle detached to avoid deadlock");
+                }
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn reap_with_timeout(mut self, timeout: Duration) -> Result<(), String> {
+        match self.try_reap(timeout) {
+            StreamDrainResult::Completed(res) => res,
+            StreamDrainResult::TimedOut => {
+                self.bounded_join_after_kill(Duration::from_millis(100));
+                Err("timed out writing data to process stdin".into())
+            }
         }
     }
 }
@@ -563,7 +634,7 @@ pub(crate) fn execute_process_until_deadline(
 
     let mut supervisor = ProcessSupervisor::spawn(cmd)?;
 
-    let stdin_comm = if let Some(data) = stdin_data {
+    let mut stdin_comm = if let Some(data) = stdin_data {
         if let Some(stdin) = supervisor.child_mut().stdin.take() {
             let bytes = data.to_vec();
             Some(spawn_stdin_writer(stdin, bytes))
@@ -585,8 +656,8 @@ pub(crate) fn execute_process_until_deadline(
         .take()
         .ok_or("failed to capture stderr pipe")?;
 
-    let stdout_comm = spawn_stream_reader(stdout_pipe);
-    let stderr_comm = spawn_stream_reader(stderr_pipe);
+    let mut stdout_comm = spawn_stream_reader(stdout_pipe);
+    let mut stderr_comm = spawn_stream_reader(stderr_pipe);
 
     // 循环轮询子进程退出状态直至截止时间
     let mut exit_status: Option<ExitStatus> = None;
@@ -598,12 +669,14 @@ pub(crate) fn execute_process_until_deadline(
             }
             Ok(None) => std::thread::sleep(poll_interval),
             Err(e) => {
+                // 等待出错：第一动作立即强杀整个进程树，随后有界回收句柄
                 supervisor.terminate();
+                let grace = Duration::from_millis(100);
                 if let Some(comm) = stdin_comm {
-                    comm.cancel_and_join();
+                    comm.bounded_join_after_kill(grace);
                 }
-                stdout_comm.cancel_and_join();
-                stderr_comm.cancel_and_join();
+                stdout_comm.bounded_join_after_kill(grace);
+                stderr_comm.bounded_join_after_kill(grace);
                 return Err(format!("error waiting on child process: {e}"));
             }
         }
@@ -611,47 +684,77 @@ pub(crate) fn execute_process_until_deadline(
 
     // 检查是否超时
     if exit_status.is_none() {
+        // 超时：第一动作立即强杀整个进程树，随后有界回收句柄
         supervisor.terminate();
+        let grace = Duration::from_millis(100);
         if let Some(comm) = stdin_comm {
-            comm.cancel_and_join();
+            comm.bounded_join_after_kill(grace);
         }
-        stdout_comm.cancel_and_join();
-        stderr_comm.cancel_and_join();
+        stdout_comm.bounded_join_after_kill(grace);
+        stderr_comm.bounded_join_after_kill(grace);
         return Err("timed out waiting for process execution and I/O completion".into());
     }
 
     let status = exit_status.unwrap();
 
-    // 检查 stdin 写入结果（严格有界等待并回收句柄）
-    if let Some(comm) = stdin_comm {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        let writer_timeout = remaining.min(Duration::from_millis(150));
-        if let Err(err_msg) = comm.reap_with_timeout(writer_timeout) {
-            supervisor.terminate();
-            stdout_comm.cancel_and_join();
-            stderr_comm.cancel_and_join();
-            return Err(err_msg);
-        }
-    }
-
-    // 严格以 Fail-Closed 方式回收 stdout 和 stderr，任一流未成功完整结束必须报错并强杀进程
+    // 子进程已退出，进入 I/O 回收期
     let remaining = deadline.saturating_duration_since(Instant::now());
     let reader_timeout = remaining.min(Duration::from_millis(150));
 
-    let stdout = match stdout_comm.reap_with_timeout(reader_timeout) {
-        Ok(buf) => buf,
-        Err(e) => {
+    // 1. 检查并回收 stdin 写入结果
+    if let Some(mut comm) = stdin_comm.take() {
+        match comm.try_reap(reader_timeout) {
+            StreamDrainResult::Completed(Ok(())) => {}
+            StreamDrainResult::Completed(Err(err_msg)) => {
+                supervisor.terminate();
+                let grace = Duration::from_millis(100);
+                stdout_comm.bounded_join_after_kill(grace);
+                stderr_comm.bounded_join_after_kill(grace);
+                return Err(err_msg);
+            }
+            StreamDrainResult::TimedOut => {
+                supervisor.terminate();
+                let grace = Duration::from_millis(100);
+                comm.bounded_join_after_kill(grace);
+                stdout_comm.bounded_join_after_kill(grace);
+                stderr_comm.bounded_join_after_kill(grace);
+                return Err(
+                    "timed out writing data to process stdin (child or orphan holding pipe)".into(),
+                );
+            }
+        }
+    }
+
+    // 2. 严格以 Fail-Closed 方式回收 stdout
+    let stdout = match stdout_comm.try_reap(reader_timeout) {
+        StreamDrainResult::Completed(Ok(buf)) => buf,
+        StreamDrainResult::Completed(Err(e)) => {
             supervisor.terminate();
-            stderr_comm.cancel_and_join();
+            let grace = Duration::from_millis(100);
+            stderr_comm.bounded_join_after_kill(grace);
             return Err(format!("failed to drain process stdout: {e}"));
+        }
+        StreamDrainResult::TimedOut => {
+            supervisor.terminate();
+            let grace = Duration::from_millis(100);
+            stdout_comm.bounded_join_after_kill(grace);
+            stderr_comm.bounded_join_after_kill(grace);
+            return Err("timed out draining process stdout (orphan holding pipe)".into());
         }
     };
 
-    let stderr = match stderr_comm.reap_with_timeout(reader_timeout) {
-        Ok(buf) => buf,
-        Err(e) => {
+    // 3. 严格以 Fail-Closed 方式回收 stderr
+    let stderr = match stderr_comm.try_reap(reader_timeout) {
+        StreamDrainResult::Completed(Ok(buf)) => buf,
+        StreamDrainResult::Completed(Err(e)) => {
             supervisor.terminate();
             return Err(format!("failed to drain process stderr: {e}"));
+        }
+        StreamDrainResult::TimedOut => {
+            supervisor.terminate();
+            let grace = Duration::from_millis(100);
+            stderr_comm.bounded_join_after_kill(grace);
+            return Err("timed out draining process stderr (orphan holding pipe)".into());
         }
     };
 

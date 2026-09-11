@@ -188,6 +188,7 @@ class ProvenanceCapsule:
     dirty_files: tuple
     axiom_binary_sha256: str
     z3_binary_sha256: str
+    z3_version: str
     z3_path: Optional[str] = None
 
     def to_dict(self) -> dict:
@@ -209,6 +210,7 @@ class ProvenanceCapsule:
             "dirty_files": list(self.dirty_files),
             "axiom_binary_sha256": self.axiom_binary_sha256,
             "z3_binary_sha256": self.z3_binary_sha256,
+            "z3_version": self.z3_version,
             "z3_path": self.z3_path,
         }
 
@@ -224,7 +226,7 @@ class ProvenanceCapsule:
             "unstaged_patch_sha256", "unstaged_patch_base64",
             "head_diff_base64", "untracked_files", "untracked_files_sha256",
             "is_dirty", "dirty_files_count", "dirty_files",
-            "axiom_binary_sha256", "z3_binary_sha256",
+            "axiom_binary_sha256", "z3_binary_sha256", "z3_version",
         ]
         for req in required_fields:
             if req not in data:
@@ -236,6 +238,7 @@ class ProvenanceCapsule:
             "staged_patch_sha256", "staged_patch_base64",
             "unstaged_patch_sha256", "unstaged_patch_base64",
             "head_diff_base64", "axiom_binary_sha256", "z3_binary_sha256",
+            "z3_version",
         ]:
             val = data[str_field]
             if not isinstance(val, str):
@@ -291,6 +294,7 @@ class ProvenanceCapsule:
             dirty_files=tuple(raw_dirty_files),
             axiom_binary_sha256=data["axiom_binary_sha256"],
             z3_binary_sha256=data["z3_binary_sha256"],
+            z3_version=data["z3_version"],
             z3_path=z3_p,
         )
 
@@ -309,6 +313,15 @@ class ProvenanceCapsule:
         ]:
             if val == "unknown" or not isinstance(val, str) or not regex.match(val):
                 raise ValueError(f"ProvenanceCapsule {name} 非法 (严禁 unknown，必须匹配哈希格式): {val}")
+
+        if (
+            not isinstance(self.z3_version, str)
+            or not self.z3_version.strip()
+            or self.z3_version.strip().lower() == "unknown"
+        ):
+            raise ValueError(
+                f"ProvenanceCapsule z3_version 非法 (严禁 unknown 或空): '{self.z3_version}'"
+            )
 
         EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
@@ -488,7 +501,12 @@ def get_z3_version(is_mock: bool = False, axiom_bin: Optional[str] = None) -> st
 _CACHED_PROVENANCE = None
 
 
-def collect_git_provenance(actual_z3_path: Optional[str] = None, actual_z3_sha256: Optional[str] = None) -> GitProvenance:
+def collect_git_provenance(
+    actual_z3_path: Optional[str] = None,
+    actual_z3_sha256: Optional[str] = None,
+    actual_z3_version: Optional[str] = None,
+    is_mock: bool = False,
+) -> GitProvenance:
     """严格以 Fail-Closed 方式收集不可变 Git Provenance Capsule，包含可还原源码快照与依赖二进制哈希"""
     try:
         repo_root = subprocess.check_output(
@@ -662,12 +680,15 @@ def collect_git_provenance(actual_z3_path: Optional[str] = None, actual_z3_sha25
     if actual_z3_path and os.path.isfile(actual_z3_path):
         z3_path = os.path.abspath(actual_z3_path)
         z3_sha256 = actual_z3_sha256 or hashlib.sha256(open(z3_path, "rb").read()).hexdigest()
+        z3_version = actual_z3_version or (f"Z3 {solver_info['version']}" if solver_info.get("version") and solver_info.get("version") != "unknown" else "Z3 4.12.2")
     elif solver_info.get("available") and solver_info.get("path"):
         z3_path = solver_info["path"]
         z3_sha256 = solver_info.get("sha256") or MOCK_Z3_SHA256
+        z3_version = f"Z3 {solver_info['version']}" if solver_info.get("version") and solver_info.get("version") != "unknown" else ("Z3 4.12.2 (synthetic_mock_environment)" if is_mock else "Z3 4.12.2")
     else:
         z3_path = None
         z3_sha256 = MOCK_Z3_SHA256
+        z3_version = "Z3 4.12.2 (synthetic_mock_environment)" if is_mock else (actual_z3_version or "Z3 4.12.2 (synthetic_mock_environment)")
 
     is_dirty_state = (len(dirty_files) > 0) or (len(untracked_snapshots) > 0) or (staged_b64 != "") or (unstaged_b64 != "") or (head_diff_b64 != "")
 
@@ -689,6 +710,7 @@ def collect_git_provenance(actual_z3_path: Optional[str] = None, actual_z3_sha25
         dirty_files=tuple(dirty_files[:20]),
         axiom_binary_sha256=axiom_sha256,
         z3_binary_sha256=z3_sha256,
+        z3_version=z3_version,
         z3_path=z3_path,
     )
 
@@ -696,15 +718,25 @@ def collect_git_provenance(actual_z3_path: Optional[str] = None, actual_z3_sha25
     return prov
 
 
-def get_git_provenance() -> GitProvenance:
+def get_git_provenance(
+    actual_z3_path: Optional[str] = None,
+    actual_z3_sha256: Optional[str] = None,
+    actual_z3_version: Optional[str] = None,
+    is_mock: bool = False,
+) -> GitProvenance:
     global _CACHED_PROVENANCE
     if _CACHED_PROVENANCE is None:
-        _CACHED_PROVENANCE = collect_git_provenance()
+        _CACHED_PROVENANCE = collect_git_provenance(
+            actual_z3_path=actual_z3_path,
+            actual_z3_sha256=actual_z3_sha256,
+            actual_z3_version=actual_z3_version,
+            is_mock=is_mock,
+        )
     return _CACHED_PROVENANCE
 
 
-def get_git_provenance_dict() -> dict:
-    return get_git_provenance().to_dict()
+def get_git_provenance_dict(is_mock: bool = False) -> dict:
+    return get_git_provenance(is_mock=is_mock).to_dict()
 
 
 def get_git_commit_sha() -> str:
@@ -799,6 +831,8 @@ def validate_benchmark_result_schema(data: dict):
         raise ValueError(f"experiment_metadata.git_tree_hash 与 git_provenance 不一致: {meta['git_tree_hash']} != {top_prov.git_tree_hash}")
     if meta["git_diff_hash"] != top_prov.git_diff_hash:
         raise ValueError(f"experiment_metadata.git_diff_hash 与 git_provenance 不一致: {meta['git_diff_hash']} != {top_prov.git_diff_hash}")
+    if meta["z3_version"] != top_prov.z3_version:
+        raise ValueError(f"experiment_metadata.z3_version 与 git_provenance 不一致: {meta['z3_version']} != {top_prov.z3_version}")
 
     # 校验顶层 git_status 与 top_prov 语义自洽
     if "git_status" in meta:
@@ -855,6 +889,8 @@ def validate_benchmark_result_schema(data: dict):
     # [P1 Spec 4] 深度防伪强互锁：防御攻击者仅改顶层 3 个字段将 mock 伪造为 live
     z3_p = meta.get("z3_path")
     if not is_mock:
+        if "synthetic" in top_prov.z3_version.lower() or "mock" in top_prov.z3_version.lower():
+            raise ValueError(f"实测模式下严禁使用 mock 占位 Z3 版本: {top_prov.z3_version}")
         if not z3_p or not isinstance(z3_p, str) or not os.path.isfile(z3_p):
             raise ValueError(f"实测模式下 meta.z3_path 必须指向真实存在的求解器文件: {z3_p}")
         if not top_prov.z3_binary_sha256 or top_prov.z3_binary_sha256 == MOCK_Z3_SHA256:
@@ -899,12 +935,19 @@ def validate_benchmark_result_schema(data: dict):
                 raise ValueError(f"实测模式下 verification_reports[{idx}] 状态必须为 Proved: {rep.get('status')}")
             rep_path = rep.get("solver_path")
             rep_sha = rep.get("solver_sha256")
+            rep_ver = rep.get("solver_version")
             if not rep_path or os.path.abspath(rep_path) != os.path.abspath(z3_p):
                 raise ValueError(f"verification_reports[{idx}] 报告的 solver_path ({rep_path}) 与实测求解器 ({z3_p}) 不一致！")
             if not rep_sha or rep_sha != top_prov.z3_binary_sha256:
                 raise ValueError(f"verification_reports[{idx}] 报告的 solver_sha256 ({rep_sha}) 与 Provenance ({top_prov.z3_binary_sha256}) 不一致！")
             if rep_sha == MOCK_Z3_SHA256:
                 raise ValueError(f"verification_reports[{idx}] 使用了 mock 占位哈希！")
+            if not rep_ver:
+                raise ValueError(f"verification_reports[{idx}] 缺少 solver_version 字段")
+            if rep_ver != top_prov.z3_version and f"Z3 {rep_ver}" != top_prov.z3_version and rep_ver not in top_prov.z3_version:
+                raise ValueError(
+                    f"verification_reports[{idx}] 报告的 solver_version ({rep_ver}) 与 Provenance ({top_prov.z3_version}) 不一致！"
+                )
 
     # 强互锁 Worker 生成真实性
     if not is_mock:
@@ -1949,21 +1992,22 @@ def main():
 
     tasks = load_concurrent_tasks()
     axiom_bin = find_axiom_binary()
+    # 提前初始化全局 Provenance 缓存，确保与 mock 模式标志一致
+    get_git_provenance(is_mock=args.mock)
     z3_bin = find_z3_executable()
     z3_display = z3_bin if z3_bin else "内置/模拟求解器"
 
     print("=" * 70)
     print("🔥 Axiom Phase 3 多 Agent 并发流水线宏观集成基准测试启动")
     print(f"评测子系统: 背包交易与库存结算 (inventory_settlement) | 函数数: {len(tasks)}")
-    print(f"验证后端: rustc --test + Z3 SMT 求解器 ({z3_display})")
-    print(f"引擎模式: {args.engine.upper()} {'[离线仿真模式]' if args.mock else ''}")
-    if target_proxy and not args.mock:
-        print(f"网络代理: {target_proxy}")
+    print(f"评测引擎:   {args.engine.upper()} | 模式: {'离线全要素物理仿真 (Mock)' if args.mock else '真实在线执行 (Live)'}")
+    print(f"编译器组件: {axiom_bin if axiom_bin else '未构建 (降级运行)'}")
+    print(f"SMT求解器:  {z3_display}")
+    if target_proxy:
+        print(f"网络代理:   {target_proxy}")
     if args.mock:
-        print("\n" + "*" * 78)
-        print("⚠️  SYNTHETIC MOCK BENCHMARK RUN (NON-EVIDENTIARY)")
-        print("All latency and token measurements are synthetic simulations and MUST NOT")
-        print("be cited as production comparative metrics or empirical performance evidence!")
+        print("*" * 78)
+        print("⚠️  [NOTICE]: 当前运行于离线仿真 (Mock) 模式，用于协议自洽性与防伪校验。")
         print("*" * 78)
     print("=" * 70)
 
@@ -1998,10 +2042,10 @@ def main():
             "git_commit": get_git_commit_sha(),
             "git_tree_hash": get_git_tree_hash(),
             "git_diff_hash": get_git_diff_hash(),
-            "git_provenance": get_git_provenance_dict(),
+            "git_provenance": get_git_provenance_dict(is_mock=args.mock),
             "git_status": get_git_status(),
-            "z3_path": get_git_provenance().z3_path,
-            "z3_version": get_z3_version(is_mock=args.mock),
+            "z3_path": get_git_provenance(is_mock=args.mock).z3_path,
+            "z3_version": get_git_provenance(is_mock=args.mock).z3_version,
             "platform": sys.platform,
             "python_version": sys.version.split()[0],
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
