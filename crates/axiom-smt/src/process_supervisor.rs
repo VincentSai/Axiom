@@ -454,11 +454,13 @@ impl StreamReaderComm {
     }
 
     /// 在进程树强杀（supervisor.terminate()）后执行有界回收，严禁无界 join 挂死主线程。
-    /// 若线程在初始 grace 内未退出，借助平台级机制（如 Windows CancelSynchronousIo）强制中止阻塞 I/O，
-    /// 确保 100% 回收线程句柄，杜绝 detach 孤儿线程泄漏。
+    /// 仅在通过 channel 明确确认工作线程退出（Ok 或 Disconnected）时才执行 h.join()。
+    /// 若线程在初始 grace 内未退出，Windows 分支尝试 CancelSynchronousIo 中止阻塞 I/O，
+    /// 若二次等待仍超时或处于非 Windows 平台，坚决放弃 join 并不再阻塞主线程，确保绝对 deadline 强约束。
     fn bounded_join_after_kill(mut self, grace: Duration) {
         self.cancelled.store(true, Ordering::SeqCst);
         if let Some(h) = self.handle.take() {
+            let start = Instant::now();
             match self.rx.recv_timeout(grace) {
                 Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                     let _ = h.join();
@@ -469,12 +471,21 @@ impl StreamReaderComm {
                         use std::os::windows::io::AsRawHandle;
                         let thread_raw = h.as_raw_handle() as win32_job::HANDLE;
                         win32_job::cancel_thread_synchronous_io(thread_raw);
-                        let _ = self.rx.recv_timeout(grace);
-                        let _ = h.join();
+                        let elapsed = start.elapsed();
+                        let remaining_grace =
+                            grace.saturating_sub(elapsed).max(Duration::from_millis(10));
+                        match self.rx.recv_timeout(remaining_grace) {
+                            Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                                let _ = h.join();
+                            }
+                            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                                eprintln!("WARN: process stream reader thread did not terminate within bounded grace; abandoning join to prevent hang");
+                            }
+                        }
                     }
                     #[cfg(not(windows))]
                     {
-                        let _ = h.join();
+                        eprintln!("WARN: process stream reader thread did not terminate within bounded grace; abandoning join to prevent hang");
                     }
                 }
             }
@@ -577,11 +588,13 @@ impl StdinWriterComm {
     }
 
     /// 在进程树强杀（supervisor.terminate()）后执行有界回收，严禁无界 join 挂死主线程。
-    /// 若线程在初始 grace 内未退出，借助平台级机制（如 Windows CancelSynchronousIo）强制中止阻塞 I/O，
-    /// 确保 100% 回收线程句柄，杜绝 detach 孤儿线程泄漏。
+    /// 仅在通过 channel 明确确认工作线程退出（Ok 或 Disconnected）时才执行 h.join()。
+    /// 若线程在初始 grace 内未退出，Windows 分支尝试 CancelSynchronousIo 中止阻塞 I/O，
+    /// 若二次等待仍超时或处于非 Windows 平台，坚决放弃 join 并不再阻塞主线程，确保绝对 deadline 强约束。
     fn bounded_join_after_kill(mut self, grace: Duration) {
         self.cancelled.store(true, Ordering::SeqCst);
         if let Some(h) = self.handle.take() {
+            let start = Instant::now();
             match self.rx.recv_timeout(grace) {
                 Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                     let _ = h.join();
@@ -592,12 +605,21 @@ impl StdinWriterComm {
                         use std::os::windows::io::AsRawHandle;
                         let thread_raw = h.as_raw_handle() as win32_job::HANDLE;
                         win32_job::cancel_thread_synchronous_io(thread_raw);
-                        let _ = self.rx.recv_timeout(grace);
-                        let _ = h.join();
+                        let elapsed = start.elapsed();
+                        let remaining_grace =
+                            grace.saturating_sub(elapsed).max(Duration::from_millis(10));
+                        match self.rx.recv_timeout(remaining_grace) {
+                            Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                                let _ = h.join();
+                            }
+                            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                                eprintln!("WARN: process stdin writer thread did not terminate within bounded grace; abandoning join to prevent hang");
+                            }
+                        }
                     }
                     #[cfg(not(windows))]
                     {
-                        let _ = h.join();
+                        eprintln!("WARN: process stdin writer thread did not terminate within bounded grace; abandoning join to prevent hang");
                     }
                 }
             }
@@ -733,24 +755,32 @@ pub(crate) fn execute_process_until_deadline(
 
     let status = exit_status.unwrap();
 
-    // 子进程已退出，进入 I/O 回收期
-    let remaining = deadline.saturating_duration_since(Instant::now());
-    let reader_timeout = remaining.min(Duration::from_millis(150));
+    // 子进程已退出，进入 I/O 回收期（所有流共享同一个单调绝对 deadline）
+    let get_io_timeout = |dl: Instant| {
+        dl.saturating_duration_since(Instant::now())
+            .min(Duration::from_millis(150))
+    };
+    let calc_grace = |dl: Instant| {
+        dl.saturating_duration_since(Instant::now())
+            .min(Duration::from_millis(100))
+            .max(Duration::from_millis(20))
+    };
 
     // 1. 检查并回收 stdin 写入结果
     if let Some(mut comm) = stdin_comm.take() {
-        match comm.try_reap(reader_timeout) {
+        let stdin_timeout = get_io_timeout(deadline);
+        match comm.try_reap(stdin_timeout) {
             StreamDrainResult::Completed(Ok(())) => {}
             StreamDrainResult::Completed(Err(err_msg)) => {
                 supervisor.terminate();
-                let grace = Duration::from_millis(100);
+                let grace = calc_grace(deadline);
                 stdout_comm.bounded_join_after_kill(grace);
                 stderr_comm.bounded_join_after_kill(grace);
                 return Err(err_msg);
             }
             StreamDrainResult::TimedOut => {
                 supervisor.terminate();
-                let grace = Duration::from_millis(100);
+                let grace = calc_grace(deadline);
                 comm.bounded_join_after_kill(grace);
                 stdout_comm.bounded_join_after_kill(grace);
                 stderr_comm.bounded_join_after_kill(grace);
@@ -762,17 +792,18 @@ pub(crate) fn execute_process_until_deadline(
     }
 
     // 2. 严格以 Fail-Closed 方式回收 stdout
-    let stdout = match stdout_comm.try_reap(reader_timeout) {
+    let stdout_timeout = get_io_timeout(deadline);
+    let stdout = match stdout_comm.try_reap(stdout_timeout) {
         StreamDrainResult::Completed(Ok(buf)) => buf,
         StreamDrainResult::Completed(Err(e)) => {
             supervisor.terminate();
-            let grace = Duration::from_millis(100);
+            let grace = calc_grace(deadline);
             stderr_comm.bounded_join_after_kill(grace);
             return Err(format!("failed to drain process stdout: {e}"));
         }
         StreamDrainResult::TimedOut => {
             supervisor.terminate();
-            let grace = Duration::from_millis(100);
+            let grace = calc_grace(deadline);
             stdout_comm.bounded_join_after_kill(grace);
             stderr_comm.bounded_join_after_kill(grace);
             return Err("timed out draining process stdout (orphan holding pipe)".into());
@@ -780,7 +811,8 @@ pub(crate) fn execute_process_until_deadline(
     };
 
     // 3. 严格以 Fail-Closed 方式回收 stderr
-    let stderr = match stderr_comm.try_reap(reader_timeout) {
+    let stderr_timeout = get_io_timeout(deadline);
+    let stderr = match stderr_comm.try_reap(stderr_timeout) {
         StreamDrainResult::Completed(Ok(buf)) => buf,
         StreamDrainResult::Completed(Err(e)) => {
             supervisor.terminate();
@@ -788,7 +820,7 @@ pub(crate) fn execute_process_until_deadline(
         }
         StreamDrainResult::TimedOut => {
             supervisor.terminate();
-            let grace = Duration::from_millis(100);
+            let grace = calc_grace(deadline);
             stderr_comm.bounded_join_after_kill(grace);
             return Err("timed out draining process stderr (orphan holding pipe)".into());
         }

@@ -345,9 +345,15 @@ pub struct SealedSolverBinary {
     pub version: String,
 }
 
+static SEAL_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 impl SealedSolverBinary {
-    /// Seals a solver executable from the given path into a content-addressed read-only location.
+    /// Copies and seals a solver executable into an immutable, SHA-256-verified sandbox directory.
+    /// Employs a process-wide mutex, high-entropy unique temporary files, and an "AlreadyExists
+    /// verify-and-reuse winner" atomic protocol to ensure multi-threaded and multi-process concurrency safety.
     pub fn seal_from_path(source_path: &Path) -> Result<Self, String> {
+        let _guard = SEAL_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
         let bytes = std::fs::read(source_path).map_err(|e| {
             format!(
                 "failed to read solver binary at {}: {e}",
@@ -395,7 +401,18 @@ impl SealedSolverBinary {
                 let _ = std::fs::remove_file(&sealed_path);
             }
 
-            let temp_write_path = sandbox_dir.join(format!("tmp_{}.bin", std::process::id()));
+            let thread_id = format!("{:?}", std::thread::current().id());
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos();
+            let temp_write_path = sandbox_dir.join(format!(
+                "tmp_{}_{}_{}.bin",
+                std::process::id(),
+                thread_id.replace(|c: char| !c.is_alphanumeric(), "_"),
+                nanos
+            ));
+
             std::fs::write(&temp_write_path, &bytes)
                 .map_err(|e| format!("failed to write sealed solver binary: {e}"))?;
 
@@ -411,8 +428,17 @@ impl SealedSolverBinary {
             }
             let _ = std::fs::set_permissions(&temp_write_path, perms);
 
-            std::fs::rename(&temp_write_path, &sealed_path)
-                .map_err(|e| format!("failed to commit sealed solver binary: {e}"))?;
+            if let Err(e) = std::fs::rename(&temp_write_path, &sealed_path) {
+                let _ = std::fs::remove_file(&temp_write_path);
+                // 检查是否已被并发竞争赢家成功发布且 SHA-256 完全匹配
+                if sealed_path.is_file()
+                    && compute_file_sha256(&sealed_path).as_deref() == Some(&sha256)
+                {
+                    // 并发发布赢家校验通过，优雅复用
+                } else {
+                    return Err(format!("failed to commit sealed solver binary: {e}"));
+                }
+            }
         }
 
         let verified_sha = compute_file_sha256(&sealed_path)
@@ -544,6 +570,32 @@ mod tests {
                 .expect("re-sealing cached z3 should succeed");
             assert_eq!(sealed_cached.sha256, original_sha);
             assert_eq!(sealed_cached.sealed_path, sealed.sealed_path);
+        }
+    }
+
+    #[test]
+    fn test_sealed_solver_concurrent_seal() {
+        if let Some(z3_path) = find_z3_executable() {
+            let mut handles = Vec::new();
+            for _ in 0..8 {
+                let p = z3_path.clone();
+                handles.push(std::thread::spawn(move || {
+                    SealedSolverBinary::seal_from_path(&p)
+                }));
+            }
+
+            let mut sealed_paths = Vec::new();
+            for h in handles {
+                let res = h.join().expect("thread should not panic");
+                let sealed = res.expect("concurrent seal must succeed");
+                assert!(sealed.verify_post_integrity());
+                sealed_paths.push(sealed.sealed_path);
+            }
+
+            // 所有线程获得的 sealed_path 应当完全相同
+            for p in &sealed_paths[1..] {
+                assert_eq!(p, &sealed_paths[0]);
+            }
         }
     }
 }

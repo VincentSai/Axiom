@@ -732,42 +732,80 @@ def collect_git_provenance(
     return prov
 
 
+@dataclass(frozen=True)
+class BenchmarkRunContext:
+    is_mock: bool
+    solver_identity: Optional[SolverIdentity]
+    provenance: GitProvenance
+
+
+_CURRENT_RUN_CONTEXT: Optional[BenchmarkRunContext] = None
+
+
+def init_run_context(
+    is_mock: bool,
+    solver_identity: Optional[SolverIdentity] = None,
+) -> BenchmarkRunContext:
+    """在 benchmark 启动时唯一初始化不可变的权威运行上下文"""
+    global _CURRENT_RUN_CONTEXT
+    prov = collect_git_provenance(solver_identity=solver_identity, is_mock=is_mock)
+    _CURRENT_RUN_CONTEXT = BenchmarkRunContext(
+        is_mock=is_mock,
+        solver_identity=solver_identity,
+        provenance=prov,
+    )
+    return _CURRENT_RUN_CONTEXT
+
+
+def get_run_context() -> BenchmarkRunContext:
+    """获取当次运行的全局不可变权威上下文（未初始化时安全自举默认上下文）"""
+    global _CURRENT_RUN_CONTEXT
+    if _CURRENT_RUN_CONTEXT is None:
+        _CURRENT_RUN_CONTEXT = BenchmarkRunContext(
+            is_mock=False,
+            solver_identity=None,
+            provenance=collect_git_provenance(solver_identity=None, is_mock=False),
+        )
+    return _CURRENT_RUN_CONTEXT
+
+
 def get_git_provenance(
     solver_identity: Optional[SolverIdentity] = None,
-    is_mock: bool = False,
+    is_mock: Optional[bool] = None,
 ) -> GitProvenance:
-    """按 (is_mock, solver_identity) 严格分键缓存，杜绝无键全局缓存静默忽略后续传参"""
-    global _CACHED_PROVENANCES
-    cache_key = (is_mock, solver_identity)
-    if cache_key not in _CACHED_PROVENANCES:
-        _CACHED_PROVENANCES[cache_key] = collect_git_provenance(
+    """获取权威 Provenance。若指定了与当前 Context 不同的入参，仅用于外部单独探测，默认统一返回全局单例"""
+    ctx = get_run_context()
+    if (solver_identity is not None and solver_identity != ctx.solver_identity) or (
+        is_mock is not None and is_mock != ctx.is_mock
+    ):
+        return collect_git_provenance(
             solver_identity=solver_identity,
-            is_mock=is_mock,
+            is_mock=is_mock if is_mock is not None else ctx.is_mock,
         )
-    return _CACHED_PROVENANCES[cache_key]
+    return ctx.provenance
 
 
 def get_git_provenance_dict(
     solver_identity: Optional[SolverIdentity] = None,
-    is_mock: bool = False,
+    is_mock: Optional[bool] = None,
 ) -> dict:
     return get_git_provenance(solver_identity=solver_identity, is_mock=is_mock).to_dict()
 
 
 def get_git_commit_sha() -> str:
-    return get_git_provenance().git_commit
+    return get_run_context().provenance.git_commit
 
 
 def get_git_tree_hash() -> str:
-    return get_git_provenance().git_tree_hash
+    return get_run_context().provenance.git_tree_hash
 
 
 def get_git_diff_hash() -> str:
-    return get_git_provenance().git_diff_hash
+    return get_run_context().provenance.git_diff_hash
 
 
 def get_git_status() -> dict:
-    prov = get_git_provenance()
+    prov = get_run_context().provenance
     return {
         "is_dirty": prov.is_dirty,
         "dirty_files_count": prov.dirty_files_count,
@@ -966,7 +1004,7 @@ def validate_benchmark_result_schema(data: dict):
                     f"verification_reports[{idx}] 报告的 solver_version ({rep_ver}) 与 Provenance ({top_prov.z3_version}) 不一致！"
                 )
 
-    # 强互锁 Worker 生成真实性 (双向兼容 worker_results 与 workers_details)
+    # 强互锁 Worker 生成真实性 (双向兼容平铺结构、worker_results 与 workers_details)
     if not is_mock:
         for g_data, g_name in [(g2, "Group 2"), (g3, "Group 3")]:
             workers = g_data.get("worker_results")
@@ -975,12 +1013,32 @@ def validate_benchmark_result_schema(data: dict):
             if not workers or not isinstance(workers, list):
                 raise ValueError(f"实测模式下 {g_name} 必须包含 worker_results 列表")
             for w in workers:
-                raw_res = w.get("raw_result", {})
-                billed = raw_res.get("raw_billed", {})
-                if billed.get("total_tokens", 0) <= 0:
+                raw_res = w.get("raw_result") if isinstance(w.get("raw_result"), dict) else w
+                billed = (
+                    w.get("raw_billed")
+                    or raw_res.get("raw_billed")
+                    or {}
+                )
+                if not isinstance(billed, dict) or billed.get("total_tokens", 0) <= 0:
                     raise ValueError(f"实测模式下 {g_name} Worker 真实 billed tokens 必须大于 0")
-                if "synthetic_mock_generated" in str(raw_res):
+                if "synthetic_mock_generated" in str(raw_res) or "synthetic_mock" in str(raw_res):
                     raise ValueError(f"实测模式下 {g_name} Worker 结果中检测到 mock 生成标记！")
+
+                # 严格断言真实 API 来源与非估算属性
+                usage_src = w.get("usage_source") or raw_res.get("usage_source")
+                is_est = (
+                    w.get("is_estimated")
+                    if "is_estimated" in w
+                    else raw_res.get("is_estimated")
+                )
+                if usage_src != "api_event":
+                    raise ValueError(
+                        f"实测模式下 {g_name} Worker usage_source 必须为 'api_event'，实际为 '{usage_src}'"
+                    )
+                if is_est is not False:
+                    raise ValueError(
+                        f"实测模式下 {g_name} Worker is_estimated 必须为 False，实际为 {is_est}"
+                    )
 
     # 递归 Fail-Closed 严查所有字段，绝不能有字符串 "unknown"
     def check_no_unknown(obj, path=""):
@@ -1131,12 +1189,17 @@ def call_codex_generate(prompt: str, model: str = None, proxy: str = None, timeo
             visible_code_tokens = count_exact_tokens(ans_text)
         total_payload = task_prompt_tokens + visible_code_tokens
         raw_total = raw_input + raw_output
-        if raw_total == 0:
-            raw_total = total_payload
+        if raw_total <= 0:
+            raise RuntimeError(
+                "codex exec 未能从执行输出中捕获到有效的 turn.completed usage 事件！"
+                "在实测模式下严禁使用本地 payload 估算伪造 API billed tokens。"
+            )
 
         return {
             "text": ans_text,
             "latency_sec": round(t_elapsed, 2),
+            "usage_source": "api_event",
+            "is_estimated": False,
             "task_payload": {
                 "prompt_tokens": task_prompt_tokens,
                 "candidates_tokens": visible_code_tokens,
@@ -1181,6 +1244,8 @@ def mock_generate_worker(task: dict, group: int, capsule: "ContextCapsule" = Non
     return {
         "text": code,
         "latency_sec": 0.15,
+        "usage_source": "synthetic_mock",
+        "is_estimated": True,
         "task_payload": {
             "prompt_tokens": p_tok,
             "candidates_tokens": c_tok,
@@ -1206,6 +1271,8 @@ def mock_generate_resolver(conflict_content: str, incoming_fname: str) -> dict:
     return {
         "text": resolved,
         "latency_sec": 0.25,
+        "usage_source": "synthetic_mock",
+        "is_estimated": True,
         "task_payload": {
             "prompt_tokens": 450,
             "candidates_tokens": 320,
@@ -1716,7 +1783,10 @@ def run_group2_rust_pipeline(tasks: list, args, proxy: str) -> dict:
                     "function_name": w["function_name"],
                     "latency_sec": w["raw_result"]["latency_sec"],
                     "payload": w["raw_result"]["task_payload"],
-                    "raw_billed": w["raw_result"]["raw_billed"]
+                    "raw_billed": w["raw_result"]["raw_billed"],
+                    "usage_source": w["raw_result"].get("usage_source", "api_event"),
+                    "is_estimated": w["raw_result"].get("is_estimated", False),
+                    "raw_result": w["raw_result"],
                 }
                 for w in worker_results
             ],
@@ -1726,7 +1796,10 @@ def run_group2_rust_pipeline(tasks: list, args, proxy: str) -> dict:
                     "function_name": w["function_name"],
                     "latency_sec": w["raw_result"]["latency_sec"],
                     "payload": w["raw_result"]["task_payload"],
-                    "raw_billed": w["raw_result"]["raw_billed"]
+                    "raw_billed": w["raw_result"]["raw_billed"],
+                    "usage_source": w["raw_result"].get("usage_source", "api_event"),
+                    "is_estimated": w["raw_result"].get("is_estimated", False),
+                    "raw_result": w["raw_result"],
                 }
                 for w in worker_results
             ]
@@ -1836,7 +1909,7 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
 
         out_path = os.path.join(tmpdir, "assembled.ax")
         cmd = [axiom_bin, "pool", "assemble", skel_path, "--solutions", sol_path, "--output", out_path]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         t_combine_elapsed = round((time.time() - t_combine_start) * 1000, 2)
 
         if res.returncode != 0:
@@ -1932,7 +2005,10 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
                 "latency_sec": w["raw_result"]["latency_sec"],
                 "payload": w["raw_result"]["task_payload"],
                 "raw_billed": w["raw_result"]["raw_billed"],
-                "capsule": w["capsule"]
+                "usage_source": w["raw_result"].get("usage_source", "api_event"),
+                "is_estimated": w["raw_result"].get("is_estimated", False),
+                "capsule": w["capsule"],
+                "raw_result": w["raw_result"],
             }
             for w in worker_results
         ],
@@ -1943,7 +2019,10 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
                 "latency_sec": w["raw_result"]["latency_sec"],
                 "payload": w["raw_result"]["task_payload"],
                 "raw_billed": w["raw_result"]["raw_billed"],
-                "capsule": w["capsule"]
+                "usage_source": w["raw_result"].get("usage_source", "api_event"),
+                "is_estimated": w["raw_result"].get("is_estimated", False),
+                "capsule": w["capsule"],
+                "raw_result": w["raw_result"],
             }
             for w in worker_results
         ]
@@ -2045,8 +2124,8 @@ def main():
         sha256=solver_info.get("sha256") or MOCK_Z3_SHA256,
         available=solver_info.get("available", False),
     )
-    # [Round 20 P2 Standards 1]: 提前用单一权威不可变 SolverIdentity 初始化全局 Provenance 缓存
-    get_git_provenance(solver_identity=solver_ident, is_mock=args.mock)
+    # [Round 21 P1 Standards 2]: 唯一初始化不可变的权威运行上下文 BenchmarkRunContext
+    init_run_context(is_mock=args.mock, solver_identity=solver_ident)
     z3_bin = solver_ident.path or find_z3_executable()
     z3_display = z3_bin if z3_bin else "内置/模拟求解器"
 
@@ -2095,10 +2174,10 @@ def main():
             "git_commit": get_git_commit_sha(),
             "git_tree_hash": get_git_tree_hash(),
             "git_diff_hash": get_git_diff_hash(),
-            "git_provenance": get_git_provenance_dict(is_mock=args.mock),
+            "git_provenance": get_git_provenance_dict(),
             "git_status": get_git_status(),
-            "z3_path": get_git_provenance(is_mock=args.mock).z3_path,
-            "z3_version": get_git_provenance(is_mock=args.mock).z3_version,
+            "z3_path": get_git_provenance().z3_path,
+            "z3_version": get_git_provenance().z3_version,
             "platform": sys.platform,
             "python_version": sys.version.split()[0],
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
