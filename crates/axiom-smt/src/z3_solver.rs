@@ -18,28 +18,82 @@ pub enum Z3Result {
     Unknown(String),
 }
 
+fn clean_canonicalize(path: &Path) -> PathBuf {
+    if let Ok(canon) = std::fs::canonicalize(path) {
+        let s = canon.to_string_lossy();
+        if let Some(stripped) = s.strip_prefix(r"\\?\") {
+            PathBuf::from(stripped)
+        } else {
+            canon
+        }
+    } else {
+        path.to_path_buf()
+    }
+}
+
+fn resolve_executable_in_path(name: &str) -> Option<PathBuf> {
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            #[cfg(windows)]
+            {
+                let cand1 = dir.join(format!("{name}.exe"));
+                if cand1.is_file() {
+                    return Some(cand1);
+                }
+                let cand2 = dir.join(name);
+                if cand2.is_file() {
+                    return Some(cand2);
+                }
+            }
+            #[cfg(not(windows))]
+            {
+                let cand = dir.join(name);
+                if cand.is_file() {
+                    return Some(cand);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// 计算指定二进制文件的密码学 SHA-256 哈希
+pub fn compute_file_sha256(path: &Path) -> Option<String> {
+    use sha2::{Digest, Sha256};
+    if let Ok(bytes) = std::fs::read(path) {
+        let mut hasher = Sha256::new();
+        hasher.update(&bytes);
+        Some(format!("{:x}", hasher.finalize()))
+    } else {
+        None
+    }
+}
+
 /// Locates the Z3 executable on the system.
 /// Checks `AXIOM_Z3_PATH`, system `PATH` (with strict 2s timeout watchdog), and default user install paths.
+/// Returns canonicalized absolute path to prevent provenance drift.
 pub fn find_z3_executable() -> Option<PathBuf> {
     if let Ok(env_path) = std::env::var("AXIOM_Z3_PATH") {
         let p = PathBuf::from(env_path);
         if p.is_file() {
-            return Some(p);
+            return Some(clean_canonicalize(&p));
         }
     }
 
     // [Spec 4] Check system PATH with hard deadline watchdog (prevents permanent hang on frozen z3)
-    let mut probe_cmd = Command::new("z3");
-    probe_cmd.arg("--version");
-    let probe_deadline = std::time::Instant::now() + std::time::Duration::from_millis(2000);
-    if let Ok(out) = execute_process_until_deadline(
-        probe_cmd,
-        None,
-        probe_deadline,
-        std::time::Duration::from_millis(10),
-    ) {
-        if out.status.success() {
-            return Some(PathBuf::from("z3"));
+    if let Some(path_in_env) = resolve_executable_in_path("z3") {
+        let mut probe_cmd = Command::new(&path_in_env);
+        probe_cmd.arg("--version");
+        let probe_deadline = std::time::Instant::now() + std::time::Duration::from_millis(2000);
+        if let Ok(out) = execute_process_until_deadline(
+            probe_cmd,
+            None,
+            probe_deadline,
+            std::time::Duration::from_millis(10),
+        ) {
+            if out.status.success() {
+                return Some(clean_canonicalize(&path_in_env));
+            }
         }
     }
 
@@ -61,7 +115,7 @@ pub fn find_z3_executable() -> Option<PathBuf> {
 
     for path in &candidates {
         if path.is_file() {
-            return Some(path.clone());
+            return Some(clean_canonicalize(path));
         }
     }
 

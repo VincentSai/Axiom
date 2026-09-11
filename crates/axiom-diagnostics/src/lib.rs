@@ -42,6 +42,10 @@ pub struct DiagnosticReport {
     pub obligations_checked: usize,
     #[serde(default)]
     pub solver_version: Option<String>,
+    #[serde(default)]
+    pub solver_path: Option<String>,
+    #[serde(default)]
+    pub solver_sha256: Option<String>,
 }
 
 impl Default for DiagnosticReport {
@@ -57,6 +61,8 @@ impl Default for DiagnosticReport {
             has_contracts: false,
             obligations_checked: 0,
             solver_version: None,
+            solver_path: None,
+            solver_sha256: None,
         }
     }
 }
@@ -142,6 +148,8 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
             match verify_function_in_module(function, module) {
                 SmtResult::Proved {
                     solver,
+                    solver_path,
+                    solver_sha256,
                     version,
                     obligations_checked,
                 } => DiagnosticReport {
@@ -158,6 +166,8 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
                     has_contracts,
                     obligations_checked,
                     solver_version: Some(version),
+                    solver_path,
+                    solver_sha256,
                 },
                 SmtResult::VacuousContract { reason } => DiagnosticReport {
                     status: DiagnosticStatus::VacuousContract,
@@ -170,6 +180,8 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
                     has_contracts,
                     obligations_checked: 0,
                     solver_version: None,
+                    solver_path: None,
+                    solver_sha256: None,
                 },
                 SmtResult::Sampled { points_checked } => DiagnosticReport {
                     status: DiagnosticStatus::Sampled,
@@ -185,6 +197,8 @@ pub fn diagnose_module(module: &Module) -> Vec<DiagnosticReport> {
                     has_contracts,
                     obligations_checked: points_checked,
                     solver_version: None,
+                    solver_path: None,
+                    solver_sha256: None,
                 },
                 SmtResult::CounterExample(counter_example) => DiagnosticReport {
                     status: DiagnosticStatus::ContractViolation,
@@ -364,5 +378,34 @@ fn format_expr(expression: &Expr) -> String {
         ),
         Expr::Match { .. } => "match expression".into(),
         Expr::Raw(source) => source.clone(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_diagnostics_proved_includes_solver_identity() {
+        let source = r#"
+            fn add(x: Int, y: Int) -> Int
+                requires { x > 0, y > 0, x < 1000, y < 1000 }
+                ensures { result > 0 }
+            {
+                x + y
+            }
+        "#;
+        let reports = diagnose_source(source);
+        assert_eq!(reports.len(), 1);
+        let r = &reports[0];
+        if r.status == DiagnosticStatus::Proved {
+            assert!(r.solver_version.is_some());
+            assert!(r.solver_path.is_some());
+            let path_str = r.solver_path.as_ref().unwrap();
+            assert!(!path_str.is_empty());
+            assert!(r.solver_sha256.is_some());
+            let sha = r.solver_sha256.as_ref().unwrap();
+            assert_eq!(sha.len(), 64);
+        }
     }
 }

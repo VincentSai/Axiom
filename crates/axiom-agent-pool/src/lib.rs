@@ -70,6 +70,7 @@ impl SubmitOutcome {
                     solver,
                     version,
                     obligations_checked,
+                    ..
                 } => (
                     SubmitStatus::Accepted,
                     true,

@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 axiom-ast = { path = "../axiom-ast" }
+sha2 = "0.10"
 
 [dev-dependencies]
 axiom-parser = { path = "../axiom-parser" }

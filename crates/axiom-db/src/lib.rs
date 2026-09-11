@@ -667,6 +667,7 @@ fn require_proved(
             solver,
             version,
             obligations_checked,
+            ..
         } => {
             let proof_obligation_hash = compute_proof_obligation_hash(target_func);
             Ok(CertifiedProofEvidence {
@@ -866,22 +867,22 @@ impl AstDatabase {
         Ok(mutated)
     }
 
+    /// 统一的反序列化、版本兼容性检查、自愈迁移升级与主链因果验真入口。
+    /// 保证首次打开（open）与跨进程并发同步（lock_and_sync）使用完全一致的状态加载与版本协商规范。
+    pub(crate) fn load_validate_and_migrate_state(
+        bytes: &[u8],
+    ) -> Result<(DatabaseState, bool), DbError> {
+        let mut state: DatabaseState = serde_json::from_slice(bytes)?;
+        let migrated = Self::migrate_legacy_commits_if_needed(&mut state)?;
+        CommitGraph::validate_mainline(&state)?;
+        Ok((state, migrated))
+    }
+
     /// Opens an existing database file or creates an empty one at `path`.
     pub fn open(path: &Path) -> Result<Self, DbError> {
         if path.exists() {
             let bytes = fs::read(path)?;
-            let mut state: DatabaseState = serde_json::from_slice(&bytes)?;
-            if let Some(ver) = state.schema_version {
-                if ver > CURRENT_SCHEMA_VERSION {
-                    return Err(DbError::IncompatibleSchemaVersion {
-                        found: ver,
-                        current: CURRENT_SCHEMA_VERSION,
-                    });
-                }
-            }
-            let migrated = Self::migrate_legacy_commits_if_needed(&mut state)?;
-            // 语义完整性全面核验（先核验再决定落盘，防写脏盘）
-            CommitGraph::validate_mainline(&state)?;
+            let (state, migrated) = Self::load_validate_and_migrate_state(&bytes)?;
             let database = Self {
                 path: Some(path.to_path_buf()),
                 state,
@@ -949,17 +950,7 @@ impl AstDatabase {
         if let Some(path) = &self.path {
             if path.exists() {
                 let bytes = fs::read(path)?;
-                let mut disk_state: DatabaseState = serde_json::from_slice(&bytes)?;
-                if let Some(ver) = disk_state.schema_version {
-                    if ver > CURRENT_SCHEMA_VERSION {
-                        return Err(DbError::IncompatibleSchemaVersion {
-                            found: ver,
-                            current: CURRENT_SCHEMA_VERSION,
-                        });
-                    }
-                }
-                let migrated = Self::migrate_legacy_commits_if_needed(&mut disk_state)?;
-                CommitGraph::validate_mainline(&disk_state)?;
+                let (disk_state, migrated) = Self::load_validate_and_migrate_state(&bytes)?;
                 if migrated {
                     self.persist(&disk_state)?;
                 }

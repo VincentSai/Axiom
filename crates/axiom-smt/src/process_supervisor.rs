@@ -413,20 +413,85 @@ fn spawn_stream_reader<R: Read + Send + 'static>(mut reader: R) -> Receiver<Vec<
     rx
 }
 
-fn spawn_stdin_writer(
-    mut stdin: std::process::ChildStdin,
-    bytes: Vec<u8>,
-) -> (
-    std::sync::mpsc::Receiver<Result<(), std::io::Error>>,
-    std::thread::JoinHandle<()>,
-) {
+struct StdinWriterComm {
+    rx: std::sync::mpsc::Receiver<Result<(), std::io::Error>>,
+    handle: Option<std::thread::JoinHandle<()>>,
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl StdinWriterComm {
+    /// 尝试在指定期限内回收 writer 线程。如果无法回收（由于管道写阻塞且未能被系统关闭），
+    /// 则显式 detach 线程放弃等待，绝对不在主线程发生无界挂死。
+    fn reap_with_deadline(mut self, deadline: Instant) -> Result<(), String> {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        match self.rx.recv_timeout(remaining) {
+            Ok(Ok(())) => {
+                if let Some(h) = self.handle.take() {
+                    let _ = h.join();
+                }
+                Ok(())
+            }
+            Ok(Err(io_err)) => {
+                if let Some(h) = self.handle.take() {
+                    let _ = h.join();
+                }
+                Err(format!("failed to write data to process stdin: {io_err}"))
+            }
+            Err(_) => {
+                // 超时未完成，通知取消分块写入
+                self.cancelled
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+                // 给予至多 30ms 短暂宽限让已被强杀切断管道的线程退出
+                if self.rx.recv_timeout(Duration::from_millis(30)).is_ok() {
+                    if let Some(h) = self.handle.take() {
+                        let _ = h.join();
+                    }
+                } else {
+                    // 若依然未返回（后代逃逸或底层句柄未释放），直接 detach 放弃，主线程绝不阻塞！
+                    drop(self.handle.take());
+                }
+                Err("timed out writing data to process stdin (child or orphan holding pipe)".into())
+            }
+        }
+    }
+}
+
+fn spawn_stdin_writer(mut stdin: std::process::ChildStdin, bytes: Vec<u8>) -> StdinWriterComm {
+    let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let cancelled_clone = cancelled.clone();
     let (tx, rx) = std::sync::mpsc::sync_channel(1);
+
     let handle = std::thread::spawn(move || {
-        let res = stdin.write_all(&bytes);
+        let chunk_size = 64 * 1024;
+        let mut offset = 0;
+        let mut result = Ok(());
+
+        while offset < bytes.len() {
+            if cancelled_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                result = Err(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "stdin write cancelled by deadline supervisor",
+                ));
+                break;
+            }
+            let end = (offset + chunk_size).min(bytes.len());
+            match stdin.write_all(&bytes[offset..end]) {
+                Ok(()) => offset = end,
+                Err(e) => {
+                    result = Err(e);
+                    break;
+                }
+            }
+        }
         drop(stdin);
-        let _ = tx.send(res);
+        let _ = tx.send(result);
     });
-    (rx, handle)
+
+    StdinWriterComm {
+        rx,
+        handle: Some(handle),
+        cancelled,
+    }
 }
 
 /// 以绝对单调时钟截止时间监管执行子进程，并进行多通道有界 I/O 回收与看门狗强杀。
@@ -480,7 +545,14 @@ pub(crate) fn execute_process_until_deadline(
             }
             Ok(None) => std::thread::sleep(poll_interval),
             Err(e) => {
-                supervisor.terminate();
+                if let Some(comm) = stdin_comm {
+                    comm.cancelled
+                        .store(true, std::sync::atomic::Ordering::SeqCst);
+                    supervisor.terminate();
+                    let _ = comm.reap_with_deadline(Instant::now() + Duration::from_millis(30));
+                } else {
+                    supervisor.terminate();
+                }
                 return Err(format!("error waiting on child process: {e}"));
             }
         }
@@ -488,45 +560,34 @@ pub(crate) fn execute_process_until_deadline(
 
     // 检查是否超时
     if exit_status.is_none() {
-        supervisor.terminate();
+        if let Some(comm) = stdin_comm {
+            comm.cancelled
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            supervisor.terminate();
+            // 在超时路径上，给予至多 30ms 的有界宽限尝试回收，若超时仍未退出则直接 detach 放弃，主线程绝不挂死
+            let _ = comm.reap_with_deadline(Instant::now() + Duration::from_millis(30));
+        } else {
+            supervisor.terminate();
+        }
         return Err("timed out waiting for process execution and I/O completion".into());
     }
 
     let status = exit_status.unwrap();
 
-    // 检查 stdin 写入结果（有界等待，防止子进程退出但后代长持 stdin 导致永久阻塞）
-    if let Some((stdin_rx, stdin_handle)) = stdin_comm {
+    // 检查 stdin 写入结果（严格有界等待，防止子进程退出但后代长持 stdin 导致永久阻塞）
+    if let Some(comm) = stdin_comm {
         let remaining = deadline.saturating_duration_since(Instant::now());
-        let writer_timeout = remaining.min(Duration::from_millis(200));
-
-        let write_ok = match stdin_rx.recv_timeout(writer_timeout) {
-            Ok(Ok(())) => true,
-            Ok(Err(io_err)) => {
-                supervisor.terminate();
-                let _ = stdin_handle.join();
-                return Err(format!("failed to write data to process stdin: {io_err}"));
-            }
-            Err(_) => {
-                // 超时未收到写入完成，说明后代长持 stdin 导致管道阻塞；立即强杀进程树
-                supervisor.terminate();
-                false
-            }
-        };
-
-        if !write_ok {
-            // terminate 触发内核关闭管道写端后，writer 线程迅速返回，有界回收线程句柄
-            let _ = stdin_handle.join();
-            return Err(
-                "timed out writing data to process stdin (child or orphan holding pipe)".into(),
-            );
-        } else {
-            let _ = stdin_handle.join();
+        let writer_timeout = remaining.min(Duration::from_millis(150));
+        let writer_deadline = Instant::now() + writer_timeout;
+        if let Err(err_msg) = comm.reap_with_deadline(writer_deadline) {
+            supervisor.terminate();
+            return Err(err_msg);
         }
     }
 
-    // 有界接收 stdout 和 stderr，绝对不超过剩余 deadline（或最多 200ms）
+    // 有界接收 stdout 和 stderr，绝对不超过剩余 deadline（或最多 150ms）
     let remaining = deadline.saturating_duration_since(Instant::now());
-    let reader_timeout = remaining.min(Duration::from_millis(200));
+    let reader_timeout = remaining.min(Duration::from_millis(150));
 
     let stdout = match stdout_rx.recv_timeout(reader_timeout) {
         Ok(buf) => buf,
@@ -657,11 +718,40 @@ mod tests {
         );
 
         let elapsed = start.elapsed();
-        // 必须在有界时间内返回，绝对不能因为无界 join 而挂起
+        // 必须在严格有界时间内返回（deadline 300ms + 最多 300ms 宽限），绝对不能由于无界 join 延宕至数秒
         assert!(
-            elapsed < Duration::from_millis(2500),
-            "orphan holding stdin should not hang writer thread beyond bounded deadline, took {elapsed:?}"
+            elapsed < Duration::from_millis(600),
+            "orphan holding stdin should not hang writer thread beyond bounded deadline, expected < 600ms, took {elapsed:?}"
         );
         let _ = res;
+    }
+
+    #[test]
+    fn test_stdin_writer_comm_cancelled_detaches_without_hanging() {
+        // 验证 StdinWriterComm 在超时无法回收时能够立即 detach 放弃并返回 Err，绝不发生永久阻塞
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        // 创建一个故意不退出的后台线程模拟逃逸阻塞
+        let handle = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_secs(60));
+            let _ = tx.send(Ok(()));
+        });
+
+        let comm = StdinWriterComm {
+            rx,
+            handle: Some(handle),
+            cancelled,
+        };
+
+        let start = Instant::now();
+        // 设置 50ms 截止期
+        let res = comm.reap_with_deadline(start + Duration::from_millis(50));
+        let elapsed = start.elapsed();
+
+        assert!(res.is_err(), "应返回超时错误");
+        assert!(
+            elapsed < Duration::from_millis(150),
+            "reap_with_deadline 必须在短暂宽限后立即 detach 并返回，实际耗时 {elapsed:?}"
+        );
     }
 }

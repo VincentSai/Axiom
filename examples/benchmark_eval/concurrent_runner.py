@@ -20,6 +20,7 @@ import os
 import re
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -45,11 +46,14 @@ HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 
 @dataclass(frozen=True)
 class UntrackedFileSnapshot:
-    """未跟踪代码文件不可变快照，支持 100% 源码可重建性与密码学校验"""
+    """未跟踪代码文件不可变快照，支持 100% 源码可重建性与密码学校验，防 symlink 穿透"""
     path: str
     size_bytes: int
     sha256: str
     content_base64: str
+    file_type: str = "regular"  # "regular" | "symlink"
+    file_mode: int = 0
+    symlink_target: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -57,32 +61,86 @@ class UntrackedFileSnapshot:
             "size_bytes": self.size_bytes,
             "sha256": self.sha256,
             "content_base64": self.content_base64,
+            "file_type": self.file_type,
+            "file_mode": self.file_mode,
+            "symlink_target": self.symlink_target,
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "UntrackedFileSnapshot":
+    def from_dict(cls, data: dict, schema_version: str = "3.1") -> "UntrackedFileSnapshot":
         if not isinstance(data, dict):
             raise ValueError(f"UntrackedFileSnapshot 必须为字典对象，收到: {type(data)}")
         for req in ["path", "size_bytes", "sha256", "content_base64"]:
             if req not in data:
                 raise ValueError(f"UntrackedFileSnapshot 缺少字段: {req}")
+
+        path_val = data["path"]
+        if not isinstance(path_val, str) or not path_val.strip():
+            raise ValueError(f"UntrackedFileSnapshot path 非法: {path_val}")
+
+        size_val = data["size_bytes"]
+        if not isinstance(size_val, int) or isinstance(size_val, bool) or size_val < 0:
+            raise ValueError(f"UntrackedFileSnapshot [{path_val}] size_bytes 非法: {size_val}")
+
+        sha_val = data["sha256"]
+        if not isinstance(sha_val, str) or not HEX64_RE.match(sha_val):
+            raise ValueError(f"UntrackedFileSnapshot [{path_val}] sha256 格式非法: {sha_val}")
+
+        b64_val = data["content_base64"]
+        if not isinstance(b64_val, str):
+            raise ValueError(f"UntrackedFileSnapshot [{path_val}] content_base64 必须为字符串")
+
+        # 3.1 字段与 3.0 向后兼容支持
+        if "file_type" in data or schema_version >= "3.1":
+            file_type = data.get("file_type", "regular")
+            if not isinstance(file_type, str) or file_type not in ("regular", "symlink"):
+                raise ValueError(f"UntrackedFileSnapshot [{path_val}] file_type 非法: {file_type}")
+            file_mode = data.get("file_mode", 0)
+            if not isinstance(file_mode, int) or isinstance(file_mode, bool) or file_mode < 0:
+                raise ValueError(f"UntrackedFileSnapshot [{path_val}] file_mode 非法: {file_mode}")
+            symlink_target = data.get("symlink_target")
+            if file_type == "symlink":
+                if not isinstance(symlink_target, str) or not symlink_target:
+                    raise ValueError(f"UntrackedFileSnapshot [{path_val}] symlink 类型的 symlink_target 必须为非空字符串")
+            else:
+                if symlink_target is not None:
+                    raise ValueError(f"UntrackedFileSnapshot [{path_val}] regular 类型的 symlink_target 必须为 None")
+        else:
+            file_type = "regular"
+            file_mode = 0
+            symlink_target = None
+
         return cls(
-            path=str(data["path"]),
-            size_bytes=int(data["size_bytes"]),
-            sha256=str(data["sha256"]),
-            content_base64=str(data["content_base64"]),
+            path=path_val,
+            size_bytes=size_val,
+            sha256=sha_val,
+            content_base64=b64_val,
+            file_type=file_type,
+            file_mode=file_mode,
+            symlink_target=symlink_target,
         )
 
     def validate(self):
         """严格以 Fail-Closed 方式校验未跟踪文件的元数据格式、Base64 解码、大小与 SHA-256 密码学自洽性"""
         if not isinstance(self.path, str) or not self.path.strip():
             raise ValueError(f"UntrackedFileSnapshot path 非法: {self.path}")
-        if not isinstance(self.size_bytes, int) or self.size_bytes < 0:
+        if not isinstance(self.size_bytes, int) or isinstance(self.size_bytes, bool) or self.size_bytes < 0:
             raise ValueError(f"UntrackedFileSnapshot [{self.path}] size_bytes 非法: {self.size_bytes}")
         if not isinstance(self.sha256, str) or not HEX64_RE.match(self.sha256):
             raise ValueError(f"UntrackedFileSnapshot [{self.path}] sha256 格式非法: {self.sha256}")
         if not isinstance(self.content_base64, str):
             raise ValueError(f"UntrackedFileSnapshot [{self.path}] content_base64 必须为字符串")
+
+        if not isinstance(self.file_type, str) or self.file_type not in ("regular", "symlink"):
+            raise ValueError(f"UntrackedFileSnapshot [{self.path}] file_type 非法: {self.file_type}")
+        if not isinstance(self.file_mode, int) or isinstance(self.file_mode, bool) or self.file_mode < 0:
+            raise ValueError(f"UntrackedFileSnapshot [{self.path}] file_mode 非法: {self.file_mode}")
+        if self.file_type == "symlink":
+            if not isinstance(self.symlink_target, str) or not self.symlink_target:
+                raise ValueError(f"UntrackedFileSnapshot [{self.path}] symlink 类型的 symlink_target 必须为非空字符串")
+        else:
+            if self.symlink_target is not None:
+                raise ValueError(f"UntrackedFileSnapshot [{self.path}] regular 类型的 symlink_target 必须为 None")
 
         try:
             raw = base64.b64decode(self.content_base64.encode("ascii"), validate=True)
@@ -99,6 +157,12 @@ class UntrackedFileSnapshot:
             raise ValueError(
                 f"UntrackedFileSnapshot [{self.path}] SHA256 密码学自洽校验失败: 复算哈希 {computed} != 声明哈希 {self.sha256}"
             )
+
+        if self.file_type == "symlink":
+            if raw.decode("utf-8", errors="replace") != self.symlink_target:
+                raise ValueError(
+                    f"UntrackedFileSnapshot [{self.path}] symlink target 与内容不一致"
+                )
 
 
 @dataclass(frozen=True)
@@ -146,7 +210,7 @@ class ProvenanceCapsule:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "ProvenanceCapsule":
+    def from_dict(cls, data: dict, schema_version: str = "3.1") -> "ProvenanceCapsule":
         if not isinstance(data, dict):
             raise ValueError(f"ProvenanceCapsule 必须为字典对象，收到: {type(data)}")
 
@@ -163,43 +227,72 @@ class ProvenanceCapsule:
             if req not in data:
                 raise ValueError(f"ProvenanceCapsule 缺少必填字段: {req}")
 
-        raw_untracked = data.get("untracked_files", [])
+        for str_field in [
+            "git_commit", "git_tree_hash", "git_diff_hash",
+            "runner_script_sha256", "tasks_payload_sha256",
+            "staged_patch_sha256", "staged_patch_base64",
+            "unstaged_patch_sha256", "unstaged_patch_base64",
+            "head_diff_base64", "axiom_binary_sha256", "z3_binary_sha256",
+        ]:
+            val = data[str_field]
+            if not isinstance(val, str):
+                raise ValueError(f"ProvenanceCapsule 字段 {str_field} 必须为字符串，收到: {type(val)}")
+
+        is_dirty_raw = data["is_dirty"]
+        if not isinstance(is_dirty_raw, bool):
+            raise ValueError(f"ProvenanceCapsule is_dirty 必须为原生布尔类型，严禁隐式转换，收到: {type(is_dirty_raw)}")
+
+        dirty_count_raw = data["dirty_files_count"]
+        if not isinstance(dirty_count_raw, int) or isinstance(dirty_count_raw, bool) or dirty_count_raw < 0:
+            raise ValueError(f"ProvenanceCapsule dirty_files_count 必须为非负整数，收到: {dirty_count_raw}")
+
+        raw_untracked = data["untracked_files"]
         if not isinstance(raw_untracked, list):
             raise ValueError(f"untracked_files 必须为列表，收到: {type(raw_untracked)}")
-        snapshots = tuple(UntrackedFileSnapshot.from_dict(item) for item in raw_untracked)
+        snapshots = tuple(UntrackedFileSnapshot.from_dict(item, schema_version=schema_version) for item in raw_untracked)
 
-        raw_untracked_sha = data.get("untracked_files_sha256", {})
+        raw_untracked_sha = data["untracked_files_sha256"]
         if not isinstance(raw_untracked_sha, dict):
             raise ValueError(f"untracked_files_sha256 必须为字典，收到: {type(raw_untracked_sha)}")
+        for k, v in raw_untracked_sha.items():
+            if not isinstance(k, str) or not isinstance(v, str):
+                raise ValueError(f"untracked_files_sha256 键值必须均为字符串: {k}: {v}")
         sha_items = tuple(sorted(raw_untracked_sha.items()))
 
-        raw_dirty_files = data.get("dirty_files", [])
+        raw_dirty_files = data["dirty_files"]
         if not isinstance(raw_dirty_files, list):
             raise ValueError(f"dirty_files 必须为列表，收到: {type(raw_dirty_files)}")
+        for df in raw_dirty_files:
+            if not isinstance(df, str):
+                raise ValueError(f"dirty_files 元素必须为字符串，收到: {type(df)}")
+
+        z3_p = data.get("z3_path")
+        if z3_p is not None and not isinstance(z3_p, str):
+            raise ValueError(f"z3_path 必须为字符串或 None，收到: {type(z3_p)}")
 
         return cls(
-            git_commit=str(data["git_commit"]),
-            git_tree_hash=str(data["git_tree_hash"]),
-            git_diff_hash=str(data["git_diff_hash"]),
-            runner_script_sha256=str(data["runner_script_sha256"]),
-            tasks_payload_sha256=str(data["tasks_payload_sha256"]),
-            staged_patch_sha256=str(data["staged_patch_sha256"]),
-            staged_patch_base64=str(data["staged_patch_base64"]),
-            unstaged_patch_sha256=str(data["unstaged_patch_sha256"]),
-            unstaged_patch_base64=str(data["unstaged_patch_base64"]),
-            head_diff_base64=str(data["head_diff_base64"]),
+            git_commit=data["git_commit"],
+            git_tree_hash=data["git_tree_hash"],
+            git_diff_hash=data["git_diff_hash"],
+            runner_script_sha256=data["runner_script_sha256"],
+            tasks_payload_sha256=data["tasks_payload_sha256"],
+            staged_patch_sha256=data["staged_patch_sha256"],
+            staged_patch_base64=data["staged_patch_base64"],
+            unstaged_patch_sha256=data["unstaged_patch_sha256"],
+            unstaged_patch_base64=data["unstaged_patch_base64"],
+            head_diff_base64=data["head_diff_base64"],
             untracked_files=snapshots,
             untracked_files_sha256=sha_items,
-            is_dirty=bool(data["is_dirty"]),
-            dirty_files_count=int(data["dirty_files_count"]),
-            dirty_files=tuple(str(f) for f in raw_dirty_files),
-            axiom_binary_sha256=str(data["axiom_binary_sha256"]),
-            z3_binary_sha256=str(data["z3_binary_sha256"]),
-            z3_path=data.get("z3_path"),
+            is_dirty=is_dirty_raw,
+            dirty_files_count=dirty_count_raw,
+            dirty_files=tuple(raw_dirty_files),
+            axiom_binary_sha256=data["axiom_binary_sha256"],
+            z3_binary_sha256=data["z3_binary_sha256"],
+            z3_path=z3_p,
         )
 
     def validate(self):
-        """严格以 Fail-Closed 方式校验全字段哈希正则格式、Base64 解码复算与类型完整性，严禁 unknown"""
+        """严格以 Fail-Closed 方式校验全字段哈希正则格式、Base64 解码复算、整体语义自洽性与类型完整性"""
         for name, val, regex in [
             ("git_commit", self.git_commit, HEX40_RE),
             ("git_tree_hash", self.git_tree_hash, HEX40_RE),
@@ -213,6 +306,8 @@ class ProvenanceCapsule:
         ]:
             if val == "unknown" or not isinstance(val, str) or not regex.match(val):
                 raise ValueError(f"ProvenanceCapsule {name} 非法 (严禁 unknown，必须匹配哈希格式): {val}")
+
+        EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
         # 密码学验真 1: staged_patch_base64 解码与复算 SHA256 比对
         if not isinstance(self.staged_patch_base64, str):
@@ -274,9 +369,45 @@ class ProvenanceCapsule:
                 raise ValueError(f"未跟踪文件 {path} 在快照与哈希表中不一致: {snapshot_map[path]} != {h}")
 
         if not isinstance(self.is_dirty, bool):
-            raise ValueError("is_dirty 必须为布尔值")
-        if not isinstance(self.dirty_files_count, int) or self.dirty_files_count < 0:
+            raise ValueError("is_dirty 必须为原生布尔值")
+        if not isinstance(self.dirty_files_count, int) or isinstance(self.dirty_files_count, bool) or self.dirty_files_count < 0:
             raise ValueError("dirty_files_count 必须为非负整数")
+
+        # 整体语义强自洽性约束 (P1 Spec 3)
+        if not self.is_dirty:
+            # Clean 状态：严禁存在任何脏文件、未跟踪文件或非空 patch
+            if self.dirty_files_count != 0:
+                raise ValueError(f"is_dirty=False 时 dirty_files_count 必须为 0，收到: {self.dirty_files_count}")
+            if len(self.dirty_files) != 0:
+                raise ValueError(f"is_dirty=False 时 dirty_files 必须为空，收到: {self.dirty_files}")
+            if len(self.untracked_files) != 0:
+                raise ValueError(f"is_dirty=False 时 untracked_files 必须为空，收到 {len(self.untracked_files)} 项")
+            if len(self.untracked_files_sha256) != 0:
+                raise ValueError("is_dirty=False 时 untracked_files_sha256 必须为空")
+            if self.staged_patch_base64 != "" or self.staged_patch_sha256 != EMPTY_SHA256:
+                raise ValueError("is_dirty=False 时 staged_patch 必须为空")
+            if self.unstaged_patch_base64 != "" or self.unstaged_patch_sha256 != EMPTY_SHA256:
+                raise ValueError("is_dirty=False 时 unstaged_patch 必须为空")
+            if self.head_diff_base64 != "" or self.git_diff_hash != EMPTY_SHA256:
+                raise ValueError("is_dirty=False 时 head_diff 必须为空")
+        else:
+            # Dirty 状态：必须存在确凿证据表明工作树不干净
+            if self.dirty_files_count <= 0:
+                raise ValueError(f"is_dirty=True 时 dirty_files_count 必须大于 0，收到: {self.dirty_files_count}")
+            if len(self.dirty_files) == 0:
+                raise ValueError("is_dirty=True 时 dirty_files 列表不能为空")
+            if self.dirty_files_count < len(self.dirty_files):
+                raise ValueError(f"dirty_files_count ({self.dirty_files_count}) 不能小于采样列表长度 ({len(self.dirty_files)})")
+            has_patch = bool(self.staged_patch_base64) or bool(self.unstaged_patch_base64) or bool(self.head_diff_base64)
+            has_untracked = len(self.untracked_files) > 0
+            if not has_patch and not has_untracked:
+                raise ValueError("is_dirty=True 但未提供任何 patch 或未跟踪文件证据，语义矛盾")
+            if not bool(self.staged_patch_base64) and not bool(self.unstaged_patch_base64):
+                if bool(self.head_diff_base64):
+                    raise ValueError("staged 和 unstaged patch 均为空时，head_diff 也必须为空")
+            else:
+                if not bool(self.head_diff_base64):
+                    raise ValueError("staged 或 unstaged patch 非空时，head_diff 不能为空")
 
 
 # 向后兼容别名
@@ -316,14 +447,26 @@ def find_axiom_binary() -> Optional[str]:
 
 
 def find_z3_executable() -> Optional[str]:
-    """定位 Z3 SMT 求解器可执行文件路径"""
-    candidates = [
-        r"C:\Users\Administrator\.axiom\bin\z3.exe",
-        shutil.which("z3")
-    ]
+    """定位 Z3 SMT 求解器可执行文件路径，与 Rust 内核搜索顺序严格对齐 (AXIOM_Z3_PATH -> PATH -> ~/.axiom/bin)"""
+    candidates = []
+    # 1. 优先读取环境变量
+    env_z3 = os.environ.get("AXIOM_Z3_PATH")
+    if env_z3:
+        candidates.append(env_z3)
+    # 2. 从 PATH 查找
+    which_z3 = shutil.which("z3")
+    if which_z3:
+        candidates.append(which_z3)
+    # 3. 默认位置 ~/.axiom/bin/z3(.exe)
+    home_z3 = os.path.expanduser(os.path.join("~", ".axiom", "bin", "z3.exe" if sys.platform == "win32" else "z3"))
+    candidates.append(home_z3)
+    # 4. Windows 备选路径
+    if sys.platform == "win32":
+        candidates.append(r"C:\Users\Administrator\.axiom\bin\z3.exe")
+
     for p in candidates:
         if p and os.path.isfile(p):
-            return p
+            return os.path.abspath(p)
     return None
 
 
@@ -346,7 +489,7 @@ def get_z3_version(is_mock: bool = False) -> str:
 _CACHED_PROVENANCE = None
 
 
-def collect_git_provenance() -> GitProvenance:
+def collect_git_provenance(actual_z3_path: Optional[str] = None, actual_z3_sha256: Optional[str] = None) -> GitProvenance:
     """严格以 Fail-Closed 方式收集不可变 Git Provenance Capsule，包含可还原源码快照与依赖二进制哈希"""
     try:
         repo_root = subprocess.check_output(
@@ -428,40 +571,85 @@ def collect_git_provenance() -> GitProvenance:
     with open(tasks_path, "rb") as f:
         tasks_sha256 = hashlib.sha256(f.read()).hexdigest()
 
+    # 1. 采集未跟踪文件快照：使用 git ls-files -z 规避文件名转义与截断，并用 lstat 杜绝 symlink 穿透 (P1 Spec 4)
+    untracked_snapshots = []
+    untracked_items = []
     try:
-        out = subprocess.check_output(
-            ["git", "status", "--porcelain", "--untracked-files=all"],
+        ls_out = subprocess.check_output(
+            ["git", "ls-files", "--others", "--exclude-standard", "-z"],
             cwd=repo_root,
             stderr=subprocess.PIPE,
             timeout=5
         )
-        lines = [line.strip() for line in out.decode("utf-8").splitlines() if line.strip()]
-        dirty_files = [
-            l for l in lines
-            if "graphify-out" not in l and "examples/benchmark_eval/data" not in l and "examples\\benchmark_eval\\data" not in l
-        ]
+        raw_paths = [p.decode("utf-8", errors="replace") for p in ls_out.split(b"\x00") if p]
+        for rel_p in raw_paths:
+            # 过滤不需要的目录与产物
+            if (rel_p.startswith("graphify-out")
+                or rel_p.startswith("examples/benchmark_eval/data")
+                or rel_p.startswith("examples\\benchmark_eval\\data")):
+                continue
 
-        untracked_snapshots = []
-        untracked_items = []
-        for line in dirty_files:
-            if line.startswith("??"):
-                rel_path = line[3:].strip().strip('"')
-                full_path = os.path.join(repo_root, rel_path)
-                if os.path.isfile(full_path):
-                    with open(full_path, "rb") as uf:
-                        raw_bytes = uf.read()
-                    f_hash = hashlib.sha256(raw_bytes).hexdigest()
-                    f_b64 = base64.b64encode(raw_bytes).decode("ascii")
-                    snap = UntrackedFileSnapshot(
-                        path=rel_path,
-                        size_bytes=len(raw_bytes),
-                        sha256=f_hash,
-                        content_base64=f_b64,
-                    )
-                    untracked_snapshots.append(snap)
-                    untracked_items.append((rel_path, f_hash))
+            full_path = os.path.join(repo_root, rel_p)
+            try:
+                st = os.lstat(full_path)
+            except OSError:
+                continue
+
+            mode = st.st_mode
+            if stat.S_ISLNK(mode):
+                file_type = "symlink"
+                target = os.readlink(full_path)
+                raw_bytes = target.encode("utf-8", errors="replace")
+                symlink_target = target
+            elif stat.S_ISREG(mode):
+                file_type = "regular"
+                symlink_target = None
+                with open(full_path, "rb") as uf:
+                    raw_bytes = uf.read()
+            else:
+                continue
+
+            f_hash = hashlib.sha256(raw_bytes).hexdigest()
+            f_b64 = base64.b64encode(raw_bytes).decode("ascii")
+            snap = UntrackedFileSnapshot(
+                path=rel_p,
+                size_bytes=len(raw_bytes),
+                sha256=f_hash,
+                content_base64=f_b64,
+                file_type=file_type,
+                file_mode=stat.S_IMODE(mode),
+                symlink_target=symlink_target,
+            )
+            untracked_snapshots.append(snap)
+            untracked_items.append((rel_p, f_hash))
     except Exception as e:
-        raise RuntimeError(f"GitProvenance 采集失败 (git status): {e}")
+        raise RuntimeError(f"GitProvenance 采集未跟踪文件失败 (git ls-files -z): {e}")
+
+    # 2. 采集 dirty_files 清单：使用 git status --porcelain=v1 -z
+    dirty_files = []
+    try:
+        status_out = subprocess.check_output(
+            ["git", "status", "--porcelain=v1", "-z"],
+            cwd=repo_root,
+            stderr=subprocess.PIPE,
+            timeout=5
+        )
+        status_items = [p.decode("utf-8", errors="replace") for p in status_out.split(b"\x00") if p]
+        idx = 0
+        while idx < len(status_items):
+            item = status_items[idx]
+            code = item[:2]
+            path_part = item[3:] if len(item) > 3 else ""
+            if "R" in code or "C" in code:
+                idx += 1  # 跳过重命名/复制的旧路径
+            if path_part:
+                if (not path_part.startswith("graphify-out")
+                    and not path_part.startswith("examples/benchmark_eval/data")
+                    and not path_part.startswith("examples\\benchmark_eval\\data")):
+                    dirty_files.append(f"{code} {path_part}")
+            idx += 1
+    except Exception as e:
+        raise RuntimeError(f"GitProvenance 采集 dirty 状态失败 (git status -z): {e}")
 
     axiom_bin = find_axiom_binary()
     if axiom_bin and os.path.isfile(axiom_bin):
@@ -470,12 +658,21 @@ def collect_git_provenance() -> GitProvenance:
     else:
         axiom_sha256 = hashlib.sha256(b"axiom-compiler-debug-binary-mock-hash").hexdigest()
 
-    z3_path = find_z3_executable()
-    if z3_path and os.path.isfile(z3_path):
+    # P1 Spec 2: 绑定 Z3 绝对路径与二进制 SHA-256，优先采信实测中内核报告的真实求解器
+    if actual_z3_path and os.path.isfile(actual_z3_path):
+        z3_path = os.path.abspath(actual_z3_path)
+    else:
+        z3_path = find_z3_executable()
+
+    if actual_z3_sha256:
+        z3_sha256 = actual_z3_sha256
+    elif z3_path and os.path.isfile(z3_path):
         with open(z3_path, "rb") as f:
             z3_sha256 = hashlib.sha256(f.read()).hexdigest()
     else:
         z3_sha256 = hashlib.sha256(b"z3-solver-executable-mock-hash").hexdigest()
+
+    is_dirty_state = (len(dirty_files) > 0) or (len(untracked_snapshots) > 0) or (staged_b64 != "") or (unstaged_b64 != "") or (head_diff_b64 != "")
 
     prov = ProvenanceCapsule(
         git_commit=commit,
@@ -490,7 +687,7 @@ def collect_git_provenance() -> GitProvenance:
         head_diff_base64=head_diff_b64,
         untracked_files=tuple(untracked_snapshots),
         untracked_files_sha256=tuple(untracked_items),
-        is_dirty=len(dirty_files) > 0,
+        is_dirty=is_dirty_state,
         dirty_files_count=len(dirty_files),
         dirty_files=tuple(dirty_files[:20]),
         axiom_binary_sha256=axiom_sha256,
@@ -562,18 +759,26 @@ def validate_task_envelope_schema(envelope: dict, expected_hole: str, expected_f
 
 
 def validate_benchmark_result_schema(data: dict):
-    """校验评测结果输出 JSON 顶层与各子系统的 Schema 规范，Fail-Closed 严禁 unknown，统一由 ProvenanceCapsule 验真"""
+    """校验评测结果输出 JSON 顶层与各子系统的 Schema 规范，Fail-Closed 严禁 unknown，显式向前兼容 3.0 并严格校验 3.1"""
     required_top_keys = ["version", "subsystem", "experiment_metadata", "summary", "detailed_runs"]
     for key in required_top_keys:
         if key not in data:
             raise ValueError(f"Benchmark 输出结果缺少必填顶层字段: {key}")
 
+    version = data["version"]
+    if version not in ("3.0", "3.1"):
+        raise ValueError(f"不支持的 Schema 版本: {version} (当前仅支持 3.0 与 3.1 规范)")
+
     meta = data["experiment_metadata"]
-    for req in [
+    required_meta = [
         "engine", "eval_mode", "is_mock", "evidence_grade",
         "git_commit", "git_tree_hash", "git_diff_hash", "git_provenance",
         "z3_version"
-    ]:
+    ]
+    if version >= "3.1":
+        required_meta.append("z3_path")
+
+    for req in required_meta:
         if req not in meta:
             raise ValueError(f"experiment_metadata 缺少字段: {req}")
 
@@ -584,10 +789,10 @@ def validate_benchmark_result_schema(data: dict):
         if meta.get("evidence_grade") != "live_empirical":
             raise ValueError(f"当 is_mock 为 False 时，evidence_grade 必须为 live_empirical，收到: {meta.get('evidence_grade')}")
     else:
-        raise ValueError(f"is_mock 必须为布尔值，收到: {meta.get('is_mock')}")
+        raise ValueError(f"is_mock 必须为原生布尔值，收到: {meta.get('is_mock')}")
 
     # 使用单一真相源 ProvenanceCapsule.from_dict 严格校验顶层 Provenance 并深度复算密码学 SHA-256
-    top_prov = ProvenanceCapsule.from_dict(meta["git_provenance"])
+    top_prov = ProvenanceCapsule.from_dict(meta["git_provenance"], schema_version=version)
     top_prov.validate()
 
     # 顶层冗余字段必须与顶层 ProvenanceCapsule 严格一致
@@ -597,6 +802,18 @@ def validate_benchmark_result_schema(data: dict):
         raise ValueError(f"experiment_metadata.git_tree_hash 与 git_provenance 不一致: {meta['git_tree_hash']} != {top_prov.git_tree_hash}")
     if meta["git_diff_hash"] != top_prov.git_diff_hash:
         raise ValueError(f"experiment_metadata.git_diff_hash 与 git_provenance 不一致: {meta['git_diff_hash']} != {top_prov.git_diff_hash}")
+
+    # 校验顶层 git_status 与 top_prov 语义自洽
+    if "git_status" in meta:
+        gstatus = meta["git_status"]
+        if not isinstance(gstatus, dict):
+            raise ValueError("experiment_metadata.git_status 必须为字典")
+        if gstatus.get("is_dirty") != top_prov.is_dirty:
+            raise ValueError(f"git_status.is_dirty 与 git_provenance 不一致: {gstatus.get('is_dirty')} != {top_prov.is_dirty}")
+        if gstatus.get("dirty_files_count") != top_prov.dirty_files_count:
+            raise ValueError(f"git_status.dirty_files_count 与 git_provenance 不一致: {gstatus.get('dirty_files_count')} != {top_prov.dirty_files_count}")
+        if gstatus.get("dirty_files") != list(top_prov.dirty_files):
+            raise ValueError("git_status.dirty_files 与 git_provenance 不一致")
 
     summary = data.get("summary", {})
     axiom_summary = summary.get("axiom_group", {})
@@ -618,7 +835,7 @@ def validate_benchmark_result_schema(data: dict):
                 raise ValueError(f"{g_name} 缺少必要 provenance 字段: {req}")
 
         # 使用单一真相源 ProvenanceCapsule.from_dict 解析并校验子系统 Provenance
-        sub_prov = ProvenanceCapsule.from_dict(g_data["git_provenance"])
+        sub_prov = ProvenanceCapsule.from_dict(g_data["git_provenance"], schema_version=version)
         sub_prov.validate()
 
         # 严格断言子系统 Provenance 与顶层 ProvenanceCapsule 全等，杜绝规则与数据漂移
@@ -1497,6 +1714,21 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
     if not v_ok:
         print(f"  诊断详情: {v_msg}")
 
+    # P1 Spec 2: 绑定与交叉核验内核实际使用的求解器身份
+    if v_ok and reports:
+        actual_solvers = {r.get("solver_path") for r in reports if r.get("status") == "Proved" and r.get("solver_path")}
+        actual_hashes = {r.get("solver_sha256") for r in reports if r.get("status") == "Proved" and r.get("solver_sha256")}
+        if not args.mock:
+            if len(actual_solvers) != 1 or len(actual_hashes) != 1:
+                raise RuntimeError(f"实测模式下未能从内核报告中提取到唯一的求解器身份: paths={actual_solvers}, hashes={actual_hashes}")
+            act_path = list(actual_solvers)[0]
+            act_hash = list(actual_hashes)[0]
+            curr_prov = get_git_provenance()
+            if curr_prov.z3_path and os.path.abspath(curr_prov.z3_path) != os.path.abspath(act_path):
+                raise RuntimeError(f"Provenance z3_path ({curr_prov.z3_path}) 与内核实测调用的 Z3 ({act_path}) 不一致！")
+            if curr_prov.z3_binary_sha256 != act_hash:
+                raise RuntimeError(f"Provenance z3_binary_sha256 ({curr_prov.z3_binary_sha256}) 与内核实测调用的 Z3 哈希 ({act_hash}) 不一致！")
+
     # 5. 真实 CAS 并发竞争与排他文件锁压力测试
     print("⏳ 执行 AgentTaskPool 真实 CAS 并发竞争与排他文件锁压测...", end="", flush=True)
     cas_bench_data = benchmark_cas_concurrency_and_stale_root(axiom_bin, is_mock=args.mock)
@@ -1684,7 +1916,7 @@ def main():
     g2_billed = g2_res["tokens"]["total_raw_billed"]
     g3_billed = g3_res["tokens"]["total_raw_billed"]
     output_payload = {
-        "version": "3.0",
+        "version": "3.1",
         "subsystem": "inventory_settlement",
         "experiment_metadata": {
             "engine": args.engine,
@@ -1697,7 +1929,7 @@ def main():
             "git_diff_hash": get_git_diff_hash(),
             "git_provenance": get_git_provenance_dict(),
             "git_status": get_git_status(),
-            "z3_path": z3_bin,
+            "z3_path": get_git_provenance().z3_path,
             "z3_version": get_z3_version(is_mock=args.mock),
             "platform": sys.platform,
             "python_version": sys.version.split()[0],
