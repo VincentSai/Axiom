@@ -413,8 +413,23 @@ fn spawn_stream_reader<R: Read + Send + 'static>(mut reader: R) -> Receiver<Vec<
     rx
 }
 
-/// Unified process execution engine with asynchronous I/O and strict absolute deadline enforcement.
-/// Kills process tree and all descendants immediately upon deadline expiry.
+fn spawn_stdin_writer(
+    mut stdin: std::process::ChildStdin,
+    bytes: Vec<u8>,
+) -> (
+    std::sync::mpsc::Receiver<Result<(), std::io::Error>>,
+    std::thread::JoinHandle<()>,
+) {
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    let handle = std::thread::spawn(move || {
+        let res = stdin.write_all(&bytes);
+        drop(stdin);
+        let _ = tx.send(res);
+    });
+    (rx, handle)
+}
+
+/// 以绝对单调时钟截止时间监管执行子进程，并进行多通道有界 I/O 回收与看门狗强杀。
 pub(crate) fn execute_process_until_deadline(
     mut cmd: Command,
     stdin_data: Option<&[u8]>,
@@ -430,14 +445,10 @@ pub(crate) fn execute_process_until_deadline(
 
     let mut supervisor = ProcessSupervisor::spawn(cmd)?;
 
-    let stdin_join = if let Some(data) = stdin_data {
-        if let Some(mut stdin) = supervisor.child_mut().stdin.take() {
+    let stdin_comm = if let Some(data) = stdin_data {
+        if let Some(stdin) = supervisor.child_mut().stdin.take() {
             let bytes = data.to_vec();
-            Some(std::thread::spawn(move || {
-                let res = stdin.write_all(&bytes);
-                drop(stdin);
-                res
-            }))
+            Some(spawn_stdin_writer(stdin, bytes))
         } else {
             None
         }
@@ -483,18 +494,33 @@ pub(crate) fn execute_process_until_deadline(
 
     let status = exit_status.unwrap();
 
-    // 检查 stdin 写入结果
-    if let Some(stdin_handle) = stdin_join {
-        match stdin_handle.join() {
-            Ok(Ok(())) => {}
+    // 检查 stdin 写入结果（有界等待，防止子进程退出但后代长持 stdin 导致永久阻塞）
+    if let Some((stdin_rx, stdin_handle)) = stdin_comm {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        let writer_timeout = remaining.min(Duration::from_millis(200));
+
+        let write_ok = match stdin_rx.recv_timeout(writer_timeout) {
+            Ok(Ok(())) => true,
             Ok(Err(io_err)) => {
                 supervisor.terminate();
+                let _ = stdin_handle.join();
                 return Err(format!("failed to write data to process stdin: {io_err}"));
             }
             Err(_) => {
+                // 超时未收到写入完成，说明后代长持 stdin 导致管道阻塞；立即强杀进程树
                 supervisor.terminate();
-                return Err("stdin writer thread panicked".into());
+                false
             }
+        };
+
+        if !write_ok {
+            // terminate 触发内核关闭管道写端后，writer 线程迅速返回，有界回收线程句柄
+            let _ = stdin_handle.join();
+            return Err(
+                "timed out writing data to process stdin (child or orphan holding pipe)".into(),
+            );
+        } else {
+            let _ = stdin_handle.join();
         }
     }
 
@@ -600,5 +626,42 @@ mod tests {
             elapsed < Duration::from_millis(2000),
             "orphan holding pipe should not hang reader thread, took {elapsed:?}"
         );
+    }
+
+    #[test]
+    fn test_process_supervisor_kills_orphan_holding_stdin_writer_without_hanging() {
+        // 模拟父进程退出而后代进程长持 stdin 管道，且传入大于管道缓冲区的海量数据
+        #[cfg(windows)]
+        let mut cmd = Command::new("cmd");
+        #[cfg(windows)]
+        cmd.args([
+            "/C",
+            "start /b powershell -NoProfile -Command \"Start-Sleep -Seconds 60\" & exit 0",
+        ]);
+
+        #[cfg(not(windows))]
+        let mut cmd = Command::new("sh");
+        #[cfg(not(windows))]
+        cmd.args(["-c", "(sleep 60 &) ; exit 0"]);
+
+        // 生成 2MB 超过通常 4KB~64KB 操作系统管道缓冲区的数据
+        let large_payload = vec![b'x'; 2 * 1024 * 1024];
+
+        let start = Instant::now();
+        let deadline = start + Duration::from_millis(300);
+        let res = execute_process_until_deadline(
+            cmd,
+            Some(&large_payload),
+            deadline,
+            Duration::from_millis(10),
+        );
+
+        let elapsed = start.elapsed();
+        // 必须在有界时间内返回，绝对不能因为无界 join 而挂起
+        assert!(
+            elapsed < Duration::from_millis(2500),
+            "orphan holding stdin should not hang writer thread beyond bounded deadline, took {elapsed:?}"
+        );
+        let _ = res;
     }
 }

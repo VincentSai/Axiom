@@ -472,6 +472,7 @@ pub enum DbError {
     Io(std::io::Error),
     Serialization(serde_json::Error),
     CorruptedCommitChain(String),
+    IncompatibleSchemaVersion { found: u32, current: u32 },
 }
 
 impl fmt::Display for DbError {
@@ -484,6 +485,12 @@ impl fmt::Display for DbError {
             Self::CorruptedCommitChain(msg) => {
                 write!(formatter, "AST database commit chain corrupted: {msg}")
             }
+            Self::IncompatibleSchemaVersion { found, current } => {
+                write!(
+                    formatter,
+                    "incompatible AST database schema version {found}, current supported maximum version is {current}"
+                )
+            }
         }
     }
 }
@@ -494,6 +501,7 @@ impl std::error::Error for DbError {
             Self::Io(error) => Some(error),
             Self::Serialization(error) => Some(error),
             Self::CorruptedCommitChain(_) => None,
+            Self::IncompatibleSchemaVersion { .. } => None,
         }
     }
 }
@@ -837,15 +845,22 @@ impl AstDatabase {
         state: &mut DatabaseState,
     ) -> Result<bool, DbError> {
         let mut mutated = false;
-        if state.head_commit.is_none() && !state.commits.is_empty() {
-            CommitGraph::repair_legacy_ancestry(state)?;
-            mutated = true;
+        let ver = state.schema_version.unwrap_or(0);
+        if ver > CURRENT_SCHEMA_VERSION {
+            return Err(DbError::IncompatibleSchemaVersion {
+                found: ver,
+                current: CURRENT_SCHEMA_VERSION,
+            });
         }
-        if state.schema_version.unwrap_or(0) < CURRENT_SCHEMA_VERSION && !state.commits.is_empty() {
-            CommitGraph::repair_v2_migration(state)?;
-            mutated = true;
-        } else if state.schema_version.is_none() {
-            state.schema_version = Some(CURRENT_SCHEMA_VERSION);
+        if ver < CURRENT_SCHEMA_VERSION {
+            if !state.commits.is_empty() {
+                if state.head_commit.is_none() {
+                    CommitGraph::repair_legacy_ancestry(state)?;
+                }
+                CommitGraph::repair_v2_migration(state)?;
+            } else {
+                state.schema_version = Some(CURRENT_SCHEMA_VERSION);
+            }
             mutated = true;
         }
         Ok(mutated)
@@ -856,6 +871,14 @@ impl AstDatabase {
         if path.exists() {
             let bytes = fs::read(path)?;
             let mut state: DatabaseState = serde_json::from_slice(&bytes)?;
+            if let Some(ver) = state.schema_version {
+                if ver > CURRENT_SCHEMA_VERSION {
+                    return Err(DbError::IncompatibleSchemaVersion {
+                        found: ver,
+                        current: CURRENT_SCHEMA_VERSION,
+                    });
+                }
+            }
             let migrated = Self::migrate_legacy_commits_if_needed(&mut state)?;
             // 语义完整性全面核验（先核验再决定落盘，防写脏盘）
             CommitGraph::validate_mainline(&state)?;
@@ -926,7 +949,20 @@ impl AstDatabase {
         if let Some(path) = &self.path {
             if path.exists() {
                 let bytes = fs::read(path)?;
-                let disk_state: DatabaseState = serde_json::from_slice(&bytes)?;
+                let mut disk_state: DatabaseState = serde_json::from_slice(&bytes)?;
+                if let Some(ver) = disk_state.schema_version {
+                    if ver > CURRENT_SCHEMA_VERSION {
+                        return Err(DbError::IncompatibleSchemaVersion {
+                            found: ver,
+                            current: CURRENT_SCHEMA_VERSION,
+                        });
+                    }
+                }
+                let migrated = Self::migrate_legacy_commits_if_needed(&mut disk_state)?;
+                CommitGraph::validate_mainline(&disk_state)?;
+                if migrated {
+                    self.persist(&disk_state)?;
+                }
                 self.state = disk_state;
             }
         }
@@ -2624,5 +2660,134 @@ mod tests {
             "historical profile receipts must be validated without corrupting the commit chain: {:?}",
             res.err()
         );
+    }
+
+    #[test]
+    fn test_future_schema_version_is_rejected_fail_closed() {
+        let temp_dir = std::env::temp_dir().join(format!("future_schema_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let db_path = temp_dir.join("future_schema.json");
+
+        // 构造未来版本 (schema_version = 999) 数据库
+        let future_state = DatabaseState {
+            schema_version: Some(999),
+            ..Default::default()
+        };
+        fs::write(&db_path, serde_json::to_vec_pretty(&future_state).unwrap()).unwrap();
+
+        // 尝试打开未来版本的数据库，必须 Fail-Closed 拒绝
+        let res = AstDatabase::open(&db_path);
+        match res {
+            Err(DbError::IncompatibleSchemaVersion { found, current }) => {
+                assert_eq!(found, 999);
+                assert_eq!(current, CURRENT_SCHEMA_VERSION);
+            }
+            other => panic!("expected IncompatibleSchemaVersion error, got {other:?}"),
+        }
+
+        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_empty_v2_database_is_upgraded_to_current_schema() {
+        let temp_dir = std::env::temp_dir().join(format!("empty_v2_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let db_path = temp_dir.join("empty_v2.json");
+
+        // 构造空的 V2 版本数据库 (schema_version = 2)
+        let empty_v2 = DatabaseState {
+            schema_version: Some(2),
+            ..Default::default()
+        };
+        fs::write(&db_path, serde_json::to_vec_pretty(&empty_v2).unwrap()).unwrap();
+
+        // 打开空旧库，必须无条件升级为 Schema 3 并落盘
+        let db = AstDatabase::open(&db_path).expect("opening empty v2 database should succeed");
+        assert_eq!(db.state.schema_version, Some(CURRENT_SCHEMA_VERSION));
+
+        // 重新从磁盘读取，验证落盘数据也已升级
+        let disk_bytes = fs::read(&db_path).unwrap();
+        let disk_state: DatabaseState = serde_json::from_slice(&disk_bytes).unwrap();
+        assert_eq!(disk_state.schema_version, Some(CURRENT_SCHEMA_VERSION));
+
+        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_migrated_v2_database_has_no_orphan_receipts() {
+        let temp_dir = std::env::temp_dir().join(format!("migration_clean_{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let db_path = temp_dir.join("clean_receipts.json");
+
+        let mut db = AstDatabase::open(&db_path).unwrap();
+        let mod0 = axiom_parser::parse_module(
+            r#"
+            fn inc(x: Int) -> Int
+                requires { x > 0 && x < 1000 }
+                ensures { result > x }
+            {
+                ?h_inc
+            }
+            "#,
+        )
+        .unwrap();
+        let mod_rec = db.insert_module(&mod0).unwrap();
+        let root0 = mod_rec.module_hash;
+        db.initialize_root(root0.clone()).unwrap();
+
+        let env = TaskEnvelope {
+            base_root_hash: Some(root0.clone()),
+            target_hole_id: "h_inc".into(),
+            target_function: "inc".into(),
+            contract_hash: compute_contract_hash(&mod0.functions[0]),
+            dependency_hashes: vec![],
+        };
+        let env_hash = compute_envelope_hash(&env);
+
+        let parsed_cand = axiom_parser::parse_expr("x + 1").unwrap();
+        let cand = Candidate {
+            envelope_hash: env_hash.clone(),
+            expression_source: "x + 1".into(),
+            expression_hash: compute_expr_hash(&parsed_cand),
+            author_agent_id: "agent_a".into(),
+            timestamp: 1000,
+        };
+        let cand_hash = compute_candidate_hash(&cand);
+
+        let _landing = db
+            .try_commit_candidate(&Some(root0), env, cand, None)
+            .unwrap();
+        let tip = db.commit_tip();
+        let cert = db
+            .certify_reattestation_offline(&tip, "h_inc", &env_hash, &cand_hash)
+            .unwrap();
+        let _noop = db.try_commit_reattestation(cert).unwrap();
+
+        // 降级构造 V2 格式数据
+        let mut v2_state = db.state.clone();
+        v2_state.schema_version = None;
+
+        // 迁移执行
+        let mut migrated_state = v2_state;
+        CommitGraph::repair_v2_migration(&mut migrated_state).unwrap();
+
+        // 强断言：所有收据严格满足 compute_receipt_hash(rcpt) == key，没有任何旧哈希孤儿收据
+        assert_eq!(
+            migrated_state.receipts.len(),
+            2,
+            "migrated state should only contain the 2 valid active receipts"
+        );
+        for (k, v) in &migrated_state.receipts {
+            let computed = compute_receipt_hash(v);
+            assert_eq!(
+                &computed, k,
+                "receipt map key must strictly equal its content hash"
+            );
+        }
+
+        let _ = std::fs::remove_file(&db_path);
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }

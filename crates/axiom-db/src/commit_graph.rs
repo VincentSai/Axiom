@@ -10,7 +10,7 @@ use crate::{
     compute_legacy_v2_receipt_hash, compute_module_hash, compute_proof_obligation_hash,
     compute_receipt_hash, derive_candidate_module, CommitRecord, DatabaseState, DbError,
     LegacyCommitPayload, LegacyV2CommitPayload, LegacyV2VerificationReceipt, NodeHash,
-    CURRENT_SCHEMA_VERSION,
+    VerificationReceipt, CURRENT_SCHEMA_VERSION,
 };
 
 /// Topology and integrity auditor for AST database commits.
@@ -674,7 +674,7 @@ impl CommitGraph {
         // 步骤 3 & 4: 自底向上重构收据、补齐 landing 绑定与重算全链 commit hash
         let mut latest_landing: std::collections::HashMap<(NodeHash, NodeHash), NodeHash> =
             std::collections::HashMap::new();
-        let mut new_receipts = state.receipts.clone();
+        let mut new_receipts: BTreeMap<NodeHash, VerificationReceipt> = BTreeMap::new();
         let mut new_commits = BTreeMap::new();
         let mut prev_commit_hash: Option<NodeHash> = None;
 
@@ -736,6 +736,26 @@ impl CommitGraph {
 
             prev_commit_hash = Some(commit.commit_hash.clone());
             new_commits.insert(commit.commit_hash.clone(), commit);
+        }
+
+        // 强不变式：校验重建后的所有 receipt 严格满足内容寻址
+        for (k, v) in &new_receipts {
+            let actual_hash = compute_receipt_hash(v);
+            if actual_hash != *k {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "migrated receipt map key `{k}` does not match content hash `{actual_hash}`"
+                )));
+            }
+        }
+
+        // 强不变式：校验重建后的所有 commit 严格满足内容寻址
+        for (k, v) in &new_commits {
+            let actual_hash = compute_commit_payload_hash(&v.payload);
+            if actual_hash != *k || v.commit_hash != *k {
+                return Err(DbError::CorruptedCommitChain(format!(
+                    "migrated commit map key `{k}` does not match payload hash `{actual_hash}`"
+                )));
+            }
         }
 
         state.receipts = new_receipts;
