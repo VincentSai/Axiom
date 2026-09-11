@@ -668,6 +668,7 @@ fn receipt_binds_verification_profile_hash_and_invalidates_on_profile_mismatch()
         proof_level: ProofLevel::Proved,
         solver: "z3".into(),
         solver_version: "4.12.0".into(),
+        solver_sha256: None,
         obligations_checked: 5,
         proof_obligation_hash:
             "#obl_1111111111111111111111111111111111111111111111111111111111111111"
@@ -1051,6 +1052,7 @@ fn test_forged_noop_receipt_without_landing_commit_is_rejected() {
         proof_level: ProofLevel::Proved,
         solver: "z3".into(),
         solver_version: "4.12.0".into(),
+        solver_sha256: None,
         obligations_checked: 1,
         proof_obligation_hash: compute_proof_obligation_hash(&initial_mod.functions[0]),
         verification_profile_hash: current_verification_profile_hash(),
@@ -1193,6 +1195,7 @@ fn test_reattestation_deterministic_replay_rejects_mismatch() {
         proof_level: ProofLevel::Proved,
         solver: "z3".into(),
         solver_version: "4.12.0".into(),
+        solver_sha256: None,
         obligations_checked: 3,
         proof_obligation_hash: commit.receipt_hash().clone(),
         verification_profile_hash: current_verification_profile_hash(),
@@ -1533,6 +1536,7 @@ fn test_noop_receipt_with_invalid_attested_commit_is_rejected() {
         proof_level: ProofLevel::Proved,
         solver: "z3".into(),
         solver_version: "4.12.0".into(),
+        solver_sha256: None,
         obligations_checked: 1,
         proof_obligation_hash: compute_proof_obligation_hash(&initial_mod.functions[0]),
         verification_profile_hash: current_verification_profile_hash(),
@@ -1671,4 +1675,58 @@ fn test_mainline_semantic_invariants_reject_tampered_expressions() {
 
     let _ = std::fs::remove_file(&db_path);
     let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_receipt_hash_includes_solver_sha256_and_backward_compatible() {
+    use axiom_db::{
+        compute_receipt_hash, current_verification_profile_hash, ProofLevel, VerificationReceipt,
+    };
+
+    let rcpt_base = VerificationReceipt {
+        candidate_hash: "#cand_1111111111111111111111111111111111111111111111111111111111111111"
+            .parse()
+            .unwrap(),
+        proof_level: ProofLevel::Proved,
+        solver: "Microsoft Z3 (SMT-LIB2)".into(),
+        solver_version: "4.13.0".into(),
+        solver_sha256: None,
+        obligations_checked: 2,
+        proof_obligation_hash:
+            "#obl_1111111111111111111111111111111111111111111111111111111111111111"
+                .parse()
+                .unwrap(),
+        verification_profile_hash: current_verification_profile_hash(),
+        attested_commit_hash: None,
+        verified_at: 5000,
+    };
+
+    let mut rcpt_with_sha = rcpt_base.clone();
+    rcpt_with_sha.solver_sha256 =
+        Some("d486350238477489eebcac6165cb56e83e7b2dd6c0b4347ada0be2ba9ae215e6".into());
+
+    let h_base = compute_receipt_hash(&rcpt_base);
+    let h_with_sha = compute_receipt_hash(&rcpt_with_sha);
+
+    assert_ne!(
+        h_base, h_with_sha,
+        "solver_sha256 must be integrated into compute_receipt_hash cryptographic envelope"
+    );
+
+    // 验证向后兼容：反序列化不带 solver_sha256 的历史 JSON
+    let legacy_json = r##"{
+        "candidate_hash": "#cand_1111111111111111111111111111111111111111111111111111111111111111",
+        "proof_level": "Proved",
+        "solver": "z3",
+        "solver_version": "4.12.0",
+        "obligations_checked": 2,
+        "proof_obligation_hash": "#obl_1111111111111111111111111111111111111111111111111111111111111111",
+        "verification_profile_hash": "#vprof_0000000000000000000000000000000000000000000000000000000000000000",
+        "attested_commit_hash": null,
+        "verified_at": 5000
+    }"##;
+
+    let deserialized: VerificationReceipt = serde_json::from_str(legacy_json).unwrap();
+    assert_eq!(deserialized.solver_sha256, None);
+    assert_eq!(deserialized.solver, "z3");
 }

@@ -25,7 +25,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import Optional
+from typing import Any, Dict, Optional, Tuple
 import urllib.error
 import urllib.request
 
@@ -42,6 +42,9 @@ OUTPUT_DATA_PATH = os.path.join(SCRIPT_DIR, "data", "concurrent_eval_data.json")
 
 HEX40_RE = re.compile(r"^[0-9a-f]{40}$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
+
+MOCK_AXIOM_SHA256 = hashlib.sha256(b"axiom-compiler-debug-binary-mock-hash").hexdigest()
+MOCK_Z3_SHA256 = hashlib.sha256(b"z3-solver-executable-mock-hash").hexdigest()
 
 
 @dataclass(frozen=True)
@@ -446,41 +449,37 @@ def find_axiom_binary() -> Optional[str]:
     return target_debug
 
 
-def find_z3_executable() -> Optional[str]:
-    """定位 Z3 SMT 求解器可执行文件路径，与 Rust 内核搜索顺序严格对齐 (AXIOM_Z3_PATH -> PATH -> ~/.axiom/bin)"""
-    candidates = []
-    # 1. 优先读取环境变量
-    env_z3 = os.environ.get("AXIOM_Z3_PATH")
-    if env_z3:
-        candidates.append(env_z3)
-    # 2. 从 PATH 查找
-    which_z3 = shutil.which("z3")
-    if which_z3:
-        candidates.append(which_z3)
-    # 3. 默认位置 ~/.axiom/bin/z3(.exe)
-    home_z3 = os.path.expanduser(os.path.join("~", ".axiom", "bin", "z3.exe" if sys.platform == "win32" else "z3"))
-    candidates.append(home_z3)
-    # 4. Windows 备选路径
-    if sys.platform == "win32":
-        candidates.append(r"C:\Users\Administrator\.axiom\bin\z3.exe")
-
-    for p in candidates:
-        if p and os.path.isfile(p):
-            return os.path.abspath(p)
-    return None
-
-
-def get_z3_version(is_mock: bool = False) -> str:
-    """探测系统或 Axiom 内置 Z3 SMT 求解器版本，Fail-Closed 严禁未知 unknown"""
-    z3_p = find_z3_executable()
-    if z3_p:
+def get_authoritative_solver_info(axiom_bin: Optional[str] = None) -> Dict[str, Any]:
+    """通过 Axiom CLI 获取内核权威不可变的求解器身份（路径、版本、SHA-256），杜绝 Python 端自作主张的重复探测与路径漂移"""
+    bin_p = axiom_bin or find_axiom_binary()
+    if bin_p and os.path.isfile(bin_p):
         try:
-            out = subprocess.check_output([z3_p, "--version"], stderr=subprocess.DEVNULL, timeout=5)
-            v = out.decode("utf-8").strip()
-            if v:
-                return v
+            out = subprocess.check_output([bin_p, "solver-info", "--json"], stderr=subprocess.PIPE, timeout=5)
+            data = json.loads(out.decode("utf-8"))
+            if isinstance(data, dict) and "backend" in data:
+                return data
         except Exception:
             pass
+    return {
+        "backend": "internal_symbolic",
+        "path": None,
+        "version": "unknown",
+        "sha256": None,
+        "available": False,
+    }
+
+
+def find_z3_executable(axiom_bin: Optional[str] = None) -> Optional[str]:
+    """获取内核权威求解器路径，消除独立重复探测"""
+    info = get_authoritative_solver_info(axiom_bin)
+    return info.get("path")
+
+
+def get_z3_version(is_mock: bool = False, axiom_bin: Optional[str] = None) -> str:
+    """获取权威 Z3 SMT 求解器版本，统一来自 Axiom 内核/CLI，Fail-Closed 严禁未知 unknown"""
+    info = get_authoritative_solver_info(axiom_bin)
+    if info.get("available") and info.get("version") and info.get("version") != "unknown":
+        return f"Z3 {info['version']}"
     if is_mock:
         return "Z3 4.12.2 (synthetic_mock_environment)"
     raise RuntimeError("未检测到 Z3 求解器可执行文件，实测模式下严禁缺少 Z3 或使用未知版本")
@@ -656,21 +655,19 @@ def collect_git_provenance(actual_z3_path: Optional[str] = None, actual_z3_sha25
         with open(axiom_bin, "rb") as f:
             axiom_sha256 = hashlib.sha256(f.read()).hexdigest()
     else:
-        axiom_sha256 = hashlib.sha256(b"axiom-compiler-debug-binary-mock-hash").hexdigest()
+        axiom_sha256 = MOCK_AXIOM_SHA256
 
-    # P1 Spec 2: 绑定 Z3 绝对路径与二进制 SHA-256，优先采信实测中内核报告的真实求解器
+    # [P2 Standards 1] 从 Axiom CLI 权威获取单一真相源求解器身份，杜绝漂移
+    solver_info = get_authoritative_solver_info(axiom_bin)
     if actual_z3_path and os.path.isfile(actual_z3_path):
         z3_path = os.path.abspath(actual_z3_path)
+        z3_sha256 = actual_z3_sha256 or hashlib.sha256(open(z3_path, "rb").read()).hexdigest()
+    elif solver_info.get("available") and solver_info.get("path"):
+        z3_path = solver_info["path"]
+        z3_sha256 = solver_info.get("sha256") or MOCK_Z3_SHA256
     else:
-        z3_path = find_z3_executable()
-
-    if actual_z3_sha256:
-        z3_sha256 = actual_z3_sha256
-    elif z3_path and os.path.isfile(z3_path):
-        with open(z3_path, "rb") as f:
-            z3_sha256 = hashlib.sha256(f.read()).hexdigest()
-    else:
-        z3_sha256 = hashlib.sha256(b"z3-solver-executable-mock-hash").hexdigest()
+        z3_path = None
+        z3_sha256 = MOCK_Z3_SHA256
 
     is_dirty_state = (len(dirty_files) > 0) or (len(untracked_snapshots) > 0) or (staged_b64 != "") or (unstaged_b64 != "") or (head_diff_b64 != "")
 
@@ -817,15 +814,21 @@ def validate_benchmark_result_schema(data: dict):
 
     summary = data.get("summary", {})
     axiom_summary = summary.get("axiom_group", {})
-    if meta.get("is_mock"):
+    is_mock = meta.get("is_mock")
+    if is_mock:
         if axiom_summary.get("speedup_vs_rust") is not None:
             raise ValueError("在 mock 模式下，summary.axiom_group.speedup_vs_rust 必须为 None")
+        if axiom_summary.get("token_savings_pct") is not None:
+            raise ValueError("在 mock 模式下，summary.axiom_group.token_savings_pct 必须为 None，严禁外推未经验证的 Token 节省指标")
         if not axiom_summary.get("synthetic_note"):
             raise ValueError("在 mock 模式下，summary.axiom_group 必须包含 synthetic_note 说明")
     else:
         speedup = axiom_summary.get("speedup_vs_rust")
         if not isinstance(speedup, (int, float)) or speedup <= 0:
             raise ValueError(f"在实测模式下，summary.axiom_group.speedup_vs_rust 必须为正数，收到: {speedup}")
+        savings = axiom_summary.get("token_savings_pct")
+        if not isinstance(savings, (int, float)):
+            raise ValueError(f"在实测模式下，summary.axiom_group.token_savings_pct 必须为数值，收到: {savings}")
 
     g2 = data["detailed_runs"].get("group2_rust", {})
     g3 = data["detailed_runs"].get("group3_axiom", {})
@@ -848,6 +851,74 @@ def validate_benchmark_result_schema(data: dict):
             raise ValueError(f"{g_name} git_diff_hash 与顶层不一致: {g_data['git_diff_hash']} != {top_prov.git_diff_hash}")
         if "git_commit_sha" in g_data and g_data["git_commit_sha"] != top_prov.git_commit:
             raise ValueError(f"{g_name} git_commit_sha 与顶层不一致: {g_data['git_commit_sha']} != {top_prov.git_commit}")
+
+    # [P1 Spec 4] 深度防伪强互锁：防御攻击者仅改顶层 3 个字段将 mock 伪造为 live
+    z3_p = meta.get("z3_path")
+    if not is_mock:
+        if not z3_p or not isinstance(z3_p, str) or not os.path.isfile(z3_p):
+            raise ValueError(f"实测模式下 meta.z3_path 必须指向真实存在的求解器文件: {z3_p}")
+        if not top_prov.z3_binary_sha256 or top_prov.z3_binary_sha256 == MOCK_Z3_SHA256:
+            raise ValueError("实测模式下严禁使用 mock 占位 Z3 二进制哈希！")
+        with open(z3_p, "rb") as zf:
+            computed_z3_hash = hashlib.sha256(zf.read()).hexdigest()
+        if computed_z3_hash != top_prov.z3_binary_sha256:
+            raise ValueError(f"实测模式下 z3_path 文件真实 SHA-256 ({computed_z3_hash}) 与 Provenance 记录 ({top_prov.z3_binary_sha256}) 不匹配！")
+        if top_prov.z3_path and os.path.abspath(top_prov.z3_path) != os.path.abspath(z3_p):
+            raise ValueError(f"Provenance.z3_path ({top_prov.z3_path}) 与 meta.z3_path ({z3_p}) 路径不一致！")
+
+    # 强互锁 CAS 压测真实性与模式一致性
+    cas_bench = g3.get("cas_concurrency_benchmark")
+    if not isinstance(cas_bench, dict):
+        raise ValueError("Group 3 必须包含 cas_concurrency_benchmark 压测报告")
+    if cas_bench.get("is_mock") != is_mock:
+        raise ValueError(f"跨层模式伪造拦截：顶层 is_mock ({is_mock}) 与 cas_concurrency_benchmark.is_mock ({cas_bench.get('is_mock')}) 互锁不一致！")
+    expected_mode = "mock" if is_mock else "live"
+    if cas_bench.get("eval_mode") != expected_mode:
+        raise ValueError(f"跨层模式伪造拦截：cas_concurrency_benchmark.eval_mode ({cas_bench.get('eval_mode')}) 与预期 ({expected_mode}) 不一致！")
+    if cas_bench.get("git_commit_sha") != top_prov.git_commit:
+        raise ValueError("cas_concurrency_benchmark.git_commit_sha 与顶层 Provenance 不一致！")
+    if cas_bench.get("git_tree_hash") != top_prov.git_tree_hash:
+        raise ValueError("cas_concurrency_benchmark.git_tree_hash 与顶层 Provenance 不一致！")
+
+    if not is_mock:
+        c_elapsed = cas_bench.get("concurrency_elapsed_sec", 0)
+        if not isinstance(c_elapsed, (int, float)) or c_elapsed <= 0:
+            raise ValueError("实测模式下 cas_concurrency_benchmark.concurrency_elapsed_sec 必须大于 0")
+        init_root = cas_bench.get("initial_root", "")
+        fin_root = cas_bench.get("final_root", "")
+        if not init_root.startswith("#") or not fin_root.startswith("#") or "mock" in init_root.lower() or "mock" in fin_root.lower():
+            raise ValueError(f"实测模式下 CAS 根哈希必须为真实节点哈希，不能包含 mock 占位: {init_root}, {fin_root}")
+
+    # 强互锁 SMT 证明报告中的真实求解器摘要
+    verify_reports = g3.get("verification_reports")
+    if not is_mock:
+        if not isinstance(verify_reports, list) or len(verify_reports) == 0:
+            raise ValueError("实测模式下必须包含实际 SMT 证明报告 verification_reports")
+        for idx, rep in enumerate(verify_reports):
+            if rep.get("status") != "Proved":
+                raise ValueError(f"实测模式下 verification_reports[{idx}] 状态必须为 Proved: {rep.get('status')}")
+            rep_path = rep.get("solver_path")
+            rep_sha = rep.get("solver_sha256")
+            if not rep_path or os.path.abspath(rep_path) != os.path.abspath(z3_p):
+                raise ValueError(f"verification_reports[{idx}] 报告的 solver_path ({rep_path}) 与实测求解器 ({z3_p}) 不一致！")
+            if not rep_sha or rep_sha != top_prov.z3_binary_sha256:
+                raise ValueError(f"verification_reports[{idx}] 报告的 solver_sha256 ({rep_sha}) 与 Provenance ({top_prov.z3_binary_sha256}) 不一致！")
+            if rep_sha == MOCK_Z3_SHA256:
+                raise ValueError(f"verification_reports[{idx}] 使用了 mock 占位哈希！")
+
+    # 强互锁 Worker 生成真实性
+    if not is_mock:
+        for g_data, g_name in [(g2, "Group 2"), (g3, "Group 3")]:
+            workers = g_data.get("worker_results", [])
+            if not workers or not isinstance(workers, list):
+                raise ValueError(f"实测模式下 {g_name} 必须包含 worker_results 列表")
+            for w in workers:
+                raw_res = w.get("raw_result", {})
+                billed = raw_res.get("raw_billed", {})
+                if billed.get("total_tokens", 0) <= 0:
+                    raise ValueError(f"实测模式下 {g_name} Worker 真实 billed tokens 必须大于 0")
+                if "synthetic_mock_generated" in str(raw_res):
+                    raise ValueError(f"实测模式下 {g_name} Worker 结果中检测到 mock 生成标记！")
 
     # 递归 Fail-Closed 严查所有字段，绝不能有字符串 "unknown"
     def check_no_unknown(obj, path=""):
@@ -1956,7 +2027,8 @@ def main():
                 "total_billed_tokens": g3_billed,
                 "formal_proved": g3_res["formal_proved"],
                 "speedup_vs_rust": None if args.mock else speedup,
-                "synthetic_note": "Comparative speedup is omitted in synthetic mock mode" if args.mock else None
+                "token_savings_pct": None if args.mock else round((g2_billed - g3_billed) / g2_billed * 100, 1) if g2_billed > 0 else 0.0,
+                "synthetic_note": "Comparative speedup and empirical token savings are omitted in synthetic mock mode (non-evidentiary protocol self-consistency benchmark only)" if args.mock else None
             }
         },
         "detailed_runs": {

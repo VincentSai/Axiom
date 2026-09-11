@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 axiom-ast = { path = "../axiom-ast" }
+serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 
 [dev-dependencies]

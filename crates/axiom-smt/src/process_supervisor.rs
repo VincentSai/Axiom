@@ -12,7 +12,7 @@
 use std::io::{Read, Write};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{self, Receiver};
+use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -402,15 +402,79 @@ impl Drop for ProcessSupervisor {
     }
 }
 
-/// Helper to read a stream into a channel with bounded timeout support.
-fn spawn_stream_reader<R: Read + Send + 'static>(mut reader: R) -> Receiver<Vec<u8>> {
-    let (tx, rx) = mpsc::channel();
-    std::thread::spawn(move || {
+struct StreamReaderComm {
+    rx: std::sync::mpsc::Receiver<std::io::Result<Vec<u8>>>,
+    handle: Option<std::thread::JoinHandle<()>>,
+    cancelled: Arc<AtomicBool>,
+}
+
+impl StreamReaderComm {
+    /// 在指定超时内回收 reader 线程结果，并必须 join 回收线程句柄，杜绝线程挂起或泄漏
+    fn reap_with_timeout(mut self, timeout: Duration) -> Result<Vec<u8>, String> {
+        let res = match self.rx.recv_timeout(timeout) {
+            Ok(Ok(bytes)) => Ok(bytes),
+            Ok(Err(e)) => Err(format!("I/O stream read error: {e}")),
+            Err(_) => {
+                self.cancelled.store(true, Ordering::SeqCst);
+                Err("timed out draining process stream (incomplete stream)".into())
+            }
+        };
+        if let Some(h) = self.handle.take() {
+            let _ = h.join();
+        }
+        res
+    }
+
+    /// 取消读取并强制回收线程句柄
+    fn cancel_and_join(mut self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+        if let Some(h) = self.handle.take() {
+            let _ = h.join();
+        }
+    }
+}
+
+/// Helper to read a stream into a channel with bounded timeout support and strict JoinHandle tracking.
+fn spawn_stream_reader<R: Read + Send + 'static>(mut reader: R) -> StreamReaderComm {
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let cancelled_clone = cancelled.clone();
+    let (tx, rx) = mpsc::sync_channel(1);
+
+    let handle = std::thread::spawn(move || {
         let mut buf = Vec::new();
-        let _ = reader.read_to_end(&mut buf);
-        let _ = tx.send(buf);
+        let mut chunk = [0u8; 8192];
+        let mut result = Ok(());
+
+        loop {
+            if cancelled_clone.load(Ordering::Relaxed) {
+                result = Err(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "stream read cancelled by deadline supervisor",
+                ));
+                break;
+            }
+            match reader.read(&mut chunk) {
+                Ok(0) => break, // EOF
+                Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(e) => {
+                    result = Err(e);
+                    break;
+                }
+            }
+        }
+        let final_res = match result {
+            Ok(()) => Ok(buf),
+            Err(e) => Err(e),
+        };
+        let _ = tx.send(final_res);
     });
-    rx
+
+    StreamReaderComm {
+        rx,
+        handle: Some(handle),
+        cancelled,
+    }
 }
 
 struct StdinWriterComm {
@@ -420,38 +484,27 @@ struct StdinWriterComm {
 }
 
 impl StdinWriterComm {
-    /// 尝试在指定期限内回收 writer 线程。如果无法回收（由于管道写阻塞且未能被系统关闭），
-    /// 则显式 detach 线程放弃等待，绝对不在主线程发生无界挂死。
-    fn reap_with_deadline(mut self, deadline: Instant) -> Result<(), String> {
-        let remaining = deadline.saturating_duration_since(Instant::now());
-        match self.rx.recv_timeout(remaining) {
-            Ok(Ok(())) => {
-                if let Some(h) = self.handle.take() {
-                    let _ = h.join();
-                }
-                Ok(())
-            }
-            Ok(Err(io_err)) => {
-                if let Some(h) = self.handle.take() {
-                    let _ = h.join();
-                }
-                Err(format!("failed to write data to process stdin: {io_err}"))
-            }
+    /// 在指定超时内回收 writer 线程结果，并必须 join 回收线程句柄，杜绝线程挂起或泄漏
+    fn reap_with_timeout(mut self, timeout: Duration) -> Result<(), String> {
+        let res = match self.rx.recv_timeout(timeout) {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(io_err)) => Err(format!("failed to write data to process stdin: {io_err}")),
             Err(_) => {
-                // 超时未完成，通知取消分块写入
-                self.cancelled
-                    .store(true, std::sync::atomic::Ordering::SeqCst);
-                // 给予至多 30ms 短暂宽限让已被强杀切断管道的线程退出
-                if self.rx.recv_timeout(Duration::from_millis(30)).is_ok() {
-                    if let Some(h) = self.handle.take() {
-                        let _ = h.join();
-                    }
-                } else {
-                    // 若依然未返回（后代逃逸或底层句柄未释放），直接 detach 放弃，主线程绝不阻塞！
-                    drop(self.handle.take());
-                }
+                self.cancelled.store(true, Ordering::SeqCst);
                 Err("timed out writing data to process stdin (child or orphan holding pipe)".into())
             }
+        };
+        if let Some(h) = self.handle.take() {
+            let _ = h.join();
+        }
+        res
+    }
+
+    /// 取消写入并强制回收线程句柄
+    fn cancel_and_join(mut self) {
+        self.cancelled.store(true, Ordering::SeqCst);
+        if let Some(h) = self.handle.take() {
+            let _ = h.join();
         }
     }
 }
@@ -532,8 +585,8 @@ pub(crate) fn execute_process_until_deadline(
         .take()
         .ok_or("failed to capture stderr pipe")?;
 
-    let stdout_rx = spawn_stream_reader(stdout_pipe);
-    let stderr_rx = spawn_stream_reader(stderr_pipe);
+    let stdout_comm = spawn_stream_reader(stdout_pipe);
+    let stderr_comm = spawn_stream_reader(stderr_pipe);
 
     // 循环轮询子进程退出状态直至截止时间
     let mut exit_status: Option<ExitStatus> = None;
@@ -545,14 +598,12 @@ pub(crate) fn execute_process_until_deadline(
             }
             Ok(None) => std::thread::sleep(poll_interval),
             Err(e) => {
+                supervisor.terminate();
                 if let Some(comm) = stdin_comm {
-                    comm.cancelled
-                        .store(true, std::sync::atomic::Ordering::SeqCst);
-                    supervisor.terminate();
-                    let _ = comm.reap_with_deadline(Instant::now() + Duration::from_millis(30));
-                } else {
-                    supervisor.terminate();
+                    comm.cancel_and_join();
                 }
+                stdout_comm.cancel_and_join();
+                stderr_comm.cancel_and_join();
                 return Err(format!("error waiting on child process: {e}"));
             }
         }
@@ -560,48 +611,47 @@ pub(crate) fn execute_process_until_deadline(
 
     // 检查是否超时
     if exit_status.is_none() {
+        supervisor.terminate();
         if let Some(comm) = stdin_comm {
-            comm.cancelled
-                .store(true, std::sync::atomic::Ordering::SeqCst);
-            supervisor.terminate();
-            // 在超时路径上，给予至多 30ms 的有界宽限尝试回收，若超时仍未退出则直接 detach 放弃，主线程绝不挂死
-            let _ = comm.reap_with_deadline(Instant::now() + Duration::from_millis(30));
-        } else {
-            supervisor.terminate();
+            comm.cancel_and_join();
         }
+        stdout_comm.cancel_and_join();
+        stderr_comm.cancel_and_join();
         return Err("timed out waiting for process execution and I/O completion".into());
     }
 
     let status = exit_status.unwrap();
 
-    // 检查 stdin 写入结果（严格有界等待，防止子进程退出但后代长持 stdin 导致永久阻塞）
+    // 检查 stdin 写入结果（严格有界等待并回收句柄）
     if let Some(comm) = stdin_comm {
         let remaining = deadline.saturating_duration_since(Instant::now());
         let writer_timeout = remaining.min(Duration::from_millis(150));
-        let writer_deadline = Instant::now() + writer_timeout;
-        if let Err(err_msg) = comm.reap_with_deadline(writer_deadline) {
+        if let Err(err_msg) = comm.reap_with_timeout(writer_timeout) {
             supervisor.terminate();
+            stdout_comm.cancel_and_join();
+            stderr_comm.cancel_and_join();
             return Err(err_msg);
         }
     }
 
-    // 有界接收 stdout 和 stderr，绝对不超过剩余 deadline（或最多 150ms）
+    // 严格以 Fail-Closed 方式回收 stdout 和 stderr，任一流未成功完整结束必须报错并强杀进程
     let remaining = deadline.saturating_duration_since(Instant::now());
     let reader_timeout = remaining.min(Duration::from_millis(150));
 
-    let stdout = match stdout_rx.recv_timeout(reader_timeout) {
+    let stdout = match stdout_comm.reap_with_timeout(reader_timeout) {
         Ok(buf) => buf,
-        Err(_) => {
+        Err(e) => {
             supervisor.terminate();
-            Vec::new()
+            stderr_comm.cancel_and_join();
+            return Err(format!("failed to drain process stdout: {e}"));
         }
     };
 
-    let stderr = match stderr_rx.recv_timeout(reader_timeout) {
+    let stderr = match stderr_comm.reap_with_timeout(reader_timeout) {
         Ok(buf) => buf,
-        Err(_) => {
+        Err(e) => {
             supervisor.terminate();
-            Vec::new()
+            return Err(format!("failed to drain process stderr: {e}"));
         }
     };
 
@@ -727,14 +777,20 @@ mod tests {
     }
 
     #[test]
-    fn test_stdin_writer_comm_cancelled_detaches_without_hanging() {
-        // 验证 StdinWriterComm 在超时无法回收时能够立即 detach 放弃并返回 Err，绝不发生永久阻塞
+    fn test_stdin_writer_comm_cancelled_exits_cleanly() {
+        // 验证 StdinWriterComm 在超时取消时能够协同唤醒、安全回收 JoinHandle，绝不发生永久阻塞或线程泄漏
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
         let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        // 创建一个故意不退出的后台线程模拟逃逸阻塞
+        let cancelled_clone = cancelled.clone();
+
         let handle = std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_secs(60));
-            let _ = tx.send(Ok(()));
+            while !cancelled_clone.load(Ordering::Relaxed) {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            let _ = tx.send(Err(std::io::Error::new(
+                std::io::ErrorKind::Interrupted,
+                "stdin write cancelled by deadline supervisor",
+            )));
         });
 
         let comm = StdinWriterComm {
@@ -744,14 +800,43 @@ mod tests {
         };
 
         let start = Instant::now();
-        // 设置 50ms 截止期
-        let res = comm.reap_with_deadline(start + Duration::from_millis(50));
+        let res = comm.reap_with_timeout(Duration::from_millis(50));
         let elapsed = start.elapsed();
 
-        assert!(res.is_err(), "应返回超时错误");
+        assert!(res.is_err(), "应返回取消/超时错误");
         assert!(
-            elapsed < Duration::from_millis(150),
-            "reap_with_deadline 必须在短暂宽限后立即 detach 并返回，实际耗时 {elapsed:?}"
+            elapsed < Duration::from_millis(200),
+            "reap_with_timeout 必须在短暂期限内完整 join 回收线程并返回，实际耗时 {elapsed:?}"
+        );
+    }
+
+    #[test]
+    fn test_reader_stream_drain_timeout_fails_closed() {
+        // 验证当流读取中断或取消时，StreamReaderComm 能够 Fail-Closed 报错且安全回收 JoinHandle
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let cancelled_clone = cancelled.clone();
+
+        let handle = std::thread::spawn(move || {
+            while !cancelled_clone.load(Ordering::Relaxed) {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            let _ = tx.send(Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "read timed out",
+            )));
+        });
+
+        let comm = StreamReaderComm {
+            rx,
+            handle: Some(handle),
+            cancelled,
+        };
+
+        let res = comm.reap_with_timeout(Duration::from_millis(50));
+        assert!(
+            res.is_err(),
+            "未完成的流读取必须 Fail-Closed 返回错误，严禁静默返回空字节"
         );
     }
 }

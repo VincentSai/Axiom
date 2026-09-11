@@ -17,7 +17,8 @@ pub use smtlib2::{
     generate_smtlib2_with_module, generate_smtlib2_with_module_and_obligations,
 };
 pub use z3_solver::{
-    compute_file_sha256, find_z3_executable, get_z3_version, run_z3_query, Z3Result,
+    compute_file_sha256, find_z3_executable, get_z3_version, resolve_solver_identity, run_z3_query,
+    SolverIdentity, Z3Result,
 };
 
 /// Concrete numeric parameter assignments that demonstrate a contract violation.
@@ -135,6 +136,10 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
         if let Ok((smt2_query, num_obligations)) =
             generate_smtlib2_with_module_and_obligations(func, Some(module))
         {
+            // [P1 Spec 3] TOCTOU 防御：在求解前锁定二进制哈希与版本，并贯穿结果
+            let version = get_z3_version(&z3_path);
+            let solver_sha256 = compute_file_sha256(&z3_path);
+
             // P0: Precondition Satisfiability Check (Vacuity Prevention)
             if let Err(vacuity_err) =
                 check_precondition_vacuity_fail_closed(&z3_path, func, Some(module))
@@ -144,8 +149,6 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
 
             match run_z3_query(&z3_path, &smt2_query) {
                 Ok(Z3Result::Unsat) => {
-                    let version = get_z3_version(&z3_path);
-                    let solver_sha256 = compute_file_sha256(&z3_path);
                     return SmtResult::Proved {
                         solver: "Microsoft Z3 (SMT-LIB2)".into(),
                         solver_path: Some(z3_path.to_string_lossy().to_string()),
@@ -173,6 +176,10 @@ pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String>
         "Z3 executable not found in PATH or standard install directories".to_string()
     })?;
 
+    // [P1 Spec 3] TOCTOU 防御：在求解前锁定二进制哈希与版本
+    let version = get_z3_version(&z3_path);
+    let solver_sha256 = compute_file_sha256(&z3_path);
+
     // P0: Precondition Satisfiability Check (Vacuity Prevention)
     if let Err(vacuity_err) = check_precondition_vacuity_fail_closed(&z3_path, func, None) {
         return Ok(vacuity_err);
@@ -181,17 +188,13 @@ pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String>
     let (smt2_query, num_obligations) = generate_smtlib2_and_obligations(func)?;
 
     match run_z3_query(&z3_path, &smt2_query)? {
-        Z3Result::Unsat => {
-            let version = get_z3_version(&z3_path);
-            let solver_sha256 = compute_file_sha256(&z3_path);
-            Ok(SmtResult::Proved {
-                solver: "Microsoft Z3 (SMT-LIB2)".into(),
-                solver_path: Some(z3_path.to_string_lossy().to_string()),
-                solver_sha256,
-                version,
-                obligations_checked: num_obligations,
-            })
-        }
+        Z3Result::Unsat => Ok(SmtResult::Proved {
+            solver: "Microsoft Z3 (SMT-LIB2)".into(),
+            solver_path: Some(z3_path.to_string_lossy().to_string()),
+            solver_sha256,
+            version,
+            obligations_checked: num_obligations,
+        }),
         Z3Result::Sat(ce) => Ok(SmtResult::CounterExample(ce)),
         Z3Result::Unknown(r) => Ok(SmtResult::Unknown(r)),
     }

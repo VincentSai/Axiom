@@ -241,6 +241,8 @@ pub struct VerificationReceipt {
     pub proof_level: ProofLevel,
     pub solver: String,
     pub solver_version: String,
+    #[serde(default)]
+    pub solver_sha256: Option<String>,
     pub obligations_checked: usize,
     pub proof_obligation_hash: NodeHash,
     #[serde(default = "legacy_verification_profile_hash")]
@@ -629,6 +631,7 @@ pub struct CertifiedProofEvidence {
     pub(crate) proof_obligation_hash: NodeHash,
     pub(crate) solver: String,
     pub(crate) solver_version: String,
+    pub(crate) solver_sha256: Option<String>,
     pub(crate) obligations_checked: usize,
     pub(crate) _sealed: (),
 }
@@ -649,6 +652,9 @@ impl CertifiedProofEvidence {
     pub fn solver_version(&self) -> &str {
         &self.solver_version
     }
+    pub fn solver_sha256(&self) -> Option<&str> {
+        self.solver_sha256.as_deref()
+    }
     pub fn obligations_checked(&self) -> usize {
         self.obligations_checked
     }
@@ -666,6 +672,7 @@ fn require_proved(
         axiom_smt::SmtResult::Proved {
             solver,
             version,
+            solver_sha256,
             obligations_checked,
             ..
         } => {
@@ -676,6 +683,7 @@ fn require_proved(
                 proof_obligation_hash,
                 solver,
                 solver_version: version,
+                solver_sha256,
                 obligations_checked,
                 _sealed: (),
             })
@@ -1473,6 +1481,7 @@ impl AstDatabase {
             proof_level: ProofLevel::Proved,
             solver: certified.evidence.solver,
             solver_version: certified.evidence.solver_version,
+            solver_sha256: certified.evidence.solver_sha256,
             obligations_checked: certified.evidence.obligations_checked,
             proof_obligation_hash: certified.evidence.proof_obligation_hash,
             verification_profile_hash: current_verification_profile_hash(),
@@ -1557,6 +1566,7 @@ impl AstDatabase {
             proof_level: ProofLevel::Proved,
             solver: certified.evidence.solver,
             solver_version: certified.evidence.solver_version,
+            solver_sha256: certified.evidence.solver_sha256,
             obligations_checked: certified.evidence.obligations_checked,
             proof_obligation_hash: certified.evidence.proof_obligation_hash,
             verification_profile_hash: current_verification_profile_hash(),
@@ -2094,6 +2104,7 @@ mod tests {
                     proof_level: ProofLevel::Proved,
                     solver: "z3".into(),
                     solver_version: "4.12.0".into(),
+                    solver_sha256: None,
                     obligations_checked: 1,
                     proof_obligation_hash: compute_proof_obligation_hash(&mod0.functions[0]),
                     verification_profile_hash: current_verification_profile_hash(),
@@ -2229,6 +2240,7 @@ mod tests {
             proof_level: ProofLevel::Proved,
             solver: "z3".into(),
             solver_version: "4.12.0".into(),
+            solver_sha256: None,
             obligations_checked: 1,
             proof_obligation_hash: compute_proof_obligation_hash(&mod0.functions[0]),
             verification_profile_hash: current_verification_profile_hash(),

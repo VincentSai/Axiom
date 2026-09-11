@@ -19,7 +19,7 @@ use axiom_ffi_gen::{
 };
 use axiom_hole_extractor::{extract_holes, HoleTask};
 use axiom_parser::{parse_module, ParseError};
-use axiom_smt::{find_z3_executable, generate_smtlib2_with_module};
+use axiom_smt::{find_z3_executable, generate_smtlib2_with_module, resolve_solver_identity};
 use axiom_transpiler::{transpile_source_to_rust, TranspileError};
 use axiom_vfs::{
     export_database_module, export_module_to_source, sync_source_to_database, VfsError,
@@ -154,6 +154,13 @@ pub enum Commands {
     Pool {
         #[command(subcommand)]
         action: PoolAction,
+    },
+
+    /// Display canonical identity, version, and cryptographic hash of the verification solver.
+    SolverInfo {
+        /// Output solver identity as structured JSON.
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -427,7 +434,27 @@ pub fn run(cli: Cli) -> Result<(), CliError> {
             }
         },
         Commands::Pool { action } => handle_pool_action(action),
+        Commands::SolverInfo { json } => solver_info(json),
     }
+}
+
+fn solver_info(json: bool) -> Result<(), CliError> {
+    let identity = resolve_solver_identity();
+    if json {
+        let serialized = serde_json::to_string_pretty(&identity).map_err(CliError::Serialize)?;
+        println!("{serialized}");
+    } else {
+        println!("Backend:   {}", identity.backend);
+        println!("Available: {}", identity.available);
+        println!("Version:   {}", identity.version);
+        if let Some(path) = &identity.path {
+            println!("Path:      {}", path);
+        }
+        if let Some(sha256) = &identity.sha256 {
+            println!("SHA-256:   {}", sha256);
+        }
+    }
+    Ok(())
 }
 
 fn generate_bridge(
@@ -1249,5 +1276,19 @@ fn render_submit_outcome(
                 .clone()
                 .unwrap_or_else(|| "verification rejected".to_string()),
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_solver_info_cli_json_and_plain() {
+        let cli_json = Cli::try_parse_from(["axiom", "solver-info", "--json"]).unwrap();
+        assert!(run(cli_json).is_ok());
+
+        let cli_plain = Cli::try_parse_from(["axiom", "solver-info"]).unwrap();
+        assert!(run(cli_plain).is_ok());
     }
 }

@@ -4,8 +4,25 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use serde::{Deserialize, Serialize};
+
 use crate::process_supervisor::{execute_process_until_deadline, TimeoutPolicy};
 use crate::CounterExample;
+
+/// Authoritative identity and cryptographic fingerprint of the verification solver backend.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SolverIdentity {
+    /// Solver backend descriptor (e.g. "Microsoft Z3 (SMT-LIB2)" or "internal_symbolic")
+    pub backend: String,
+    /// Absolute canonical path to the solver binary, if an external executable is used.
+    pub path: Option<String>,
+    /// Semantic version string returned by the solver.
+    pub version: String,
+    /// Cryptographic SHA-256 digest of the solver binary file.
+    pub sha256: Option<String>,
+    /// Whether the solver binary was located and is ready for execution.
+    pub available: bool,
+}
 
 /// Result from invoking an external Z3 solver.
 #[derive(Debug, Clone, PartialEq)]
@@ -145,6 +162,30 @@ pub fn get_z3_version(z3_path: &Path) -> String {
     "unknown".to_string()
 }
 
+/// Queries and returns the canonical identity and cryptographic fingerprint of the system solver.
+pub fn resolve_solver_identity() -> SolverIdentity {
+    if let Some(z3_path) = find_z3_executable() {
+        let version = get_z3_version(&z3_path);
+        let sha256 = compute_file_sha256(&z3_path);
+        let path_str = z3_path.to_string_lossy().to_string();
+        SolverIdentity {
+            backend: "Microsoft Z3 (SMT-LIB2)".to_string(),
+            path: Some(path_str),
+            version,
+            sha256,
+            available: true,
+        }
+    } else {
+        SolverIdentity {
+            backend: "internal_symbolic".to_string(),
+            path: None,
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            sha256: None,
+            available: false,
+        }
+    }
+}
+
 /// Executes a verification query using the Z3 solver via standard input with a 10s timeout.
 pub fn run_z3_query(z3_path: &Path, smt2_query: &str) -> Result<Z3Result, String> {
     run_z3_query_with_timeout(z3_path, smt2_query, 10000)
@@ -163,13 +204,38 @@ pub fn run_z3_query_with_timeout(
     let mut cmd = Command::new(z3_path);
     cmd.arg("-in")
         .arg("-smt2")
+        .arg("-model")
         .arg(format!("-t:{}", timeout_ms));
 
-    let out =
-        execute_process_until_deadline(cmd, Some(smt2_query.as_bytes()), deadline, poll_interval)?;
+    // 移除脚本中手写的 `(get-model)`。
+    // 在 SMT-LIB2 标准中，若证明不可满足 (unsat)，显式执行 (get-model) 会触发
+    // "model is not available" 错误并使 Z3 进程以非零状态码退出。
+    // 配合命令行参数 `-model`，Z3 会在满足 (sat) 时自动输出模型，
+    // 而在证明成立 (unsat) 时干净地以状态码 0 退出，从而支持严格 fail-closed 校验 out.status.success()。
+    let cleaned_query = smt2_query.replace("(get-model)", "");
+
+    let out = execute_process_until_deadline(
+        cmd,
+        Some(cleaned_query.as_bytes()),
+        deadline,
+        poll_interval,
+    )?;
 
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
+
+    // [P1 Spec 1] 强制 fail-closed 退出状态校验：任何非 0 退出（SIGSEGV、OOM、崩溃等）直接拒识为 Err
+    if !out.status.success() {
+        let code_str = match out.status.code() {
+            Some(c) => format!("exit code {}", c),
+            None => "terminated by signal".to_string(),
+        };
+        return Err(format!(
+            "z3 process failed with {}: {}",
+            code_str,
+            stderr.trim()
+        ));
+    }
 
     if !stderr.is_empty() && stderr.contains("error") {
         return Err(format!("z3 error: {}", stderr.trim()));
@@ -302,6 +368,48 @@ mod tests {
             elapsed < std::time::Duration::from_secs(3),
             "process watchdog must kill process promptly without hanging, elapsed: {:?}",
             elapsed
+        );
+    }
+
+    #[test]
+    fn test_solver_identity_resolution() {
+        let id = resolve_solver_identity();
+        assert!(!id.backend.is_empty());
+        assert!(!id.version.is_empty());
+        if id.available {
+            assert!(id.path.is_some());
+            assert!(id.sha256.is_some());
+        }
+    }
+
+    #[test]
+    fn test_run_z3_query_non_zero_exit_fails_closed() {
+        let temp_dir = std::env::temp_dir();
+        #[cfg(windows)]
+        let script_path = temp_dir.join("axiom_test_fail_solver.cmd");
+        #[cfg(not(windows))]
+        let script_path = temp_dir.join("axiom_test_fail_solver.sh");
+
+        #[cfg(windows)]
+        std::fs::write(&script_path, "@exit 42\r\n").unwrap();
+        #[cfg(not(windows))]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::write(&script_path, "#!/bin/sh\nexit 42\n").unwrap();
+            let mut perms = std::fs::metadata(&script_path).unwrap().permissions();
+            perms.set_mode(0o755);
+            std::fs::set_permissions(&script_path, perms).unwrap();
+        }
+
+        let res = run_z3_query_with_timeout(&script_path, "(check-sat)", 2000);
+        let _ = std::fs::remove_file(&script_path);
+
+        assert!(res.is_err(), "Non-zero exit code must fail-closed");
+        let err = res.unwrap_err();
+        assert!(
+            err.contains("42"),
+            "Error message must report exit code 42, got: {}",
+            err
         );
     }
 }
