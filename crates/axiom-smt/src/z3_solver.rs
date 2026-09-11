@@ -334,6 +334,120 @@ fn extract_numeric_value(text: &str) -> Option<f64> {
     None
 }
 
+/// A sealed, read-only solver binary stored in a content-addressed sandbox path.
+/// Eliminates TOCTOU completely by ensuring that version probe, vacuity checks,
+/// and SMT-LIB2 queries all execute against this immutable, byte-verified sandbox file.
+#[derive(Debug, Clone)]
+pub struct SealedSolverBinary {
+    pub source_path: PathBuf,
+    pub sealed_path: PathBuf,
+    pub sha256: String,
+    pub version: String,
+}
+
+impl SealedSolverBinary {
+    /// Seals a solver executable from the given path into a content-addressed read-only location.
+    pub fn seal_from_path(source_path: &Path) -> Result<Self, String> {
+        let bytes = std::fs::read(source_path).map_err(|e| {
+            format!(
+                "failed to read solver binary at {}: {e}",
+                source_path.display()
+            )
+        })?;
+
+        use sha2::{Digest, Sha256};
+        let mut hasher = Sha256::new();
+        hasher.update(&bytes);
+        let sha256 = format!("{:x}", hasher.finalize());
+
+        let filename = source_path
+            .file_name()
+            .unwrap_or_else(|| std::ffi::OsStr::new("z3.exe"));
+        let sandbox_dir = std::env::temp_dir()
+            .join("axiom_sealed_solvers")
+            .join(&sha256);
+        std::fs::create_dir_all(&sandbox_dir)
+            .map_err(|e| format!("failed to create sealed solver directory: {e}"))?;
+
+        let sealed_path = sandbox_dir.join(filename);
+
+        let needs_write = if sealed_path.is_file() {
+            compute_file_sha256(&sealed_path).as_deref() != Some(&sha256)
+        } else {
+            true
+        };
+
+        if needs_write {
+            if sealed_path.exists() {
+                let mut perms = std::fs::metadata(&sealed_path)
+                    .map(|m| m.permissions())
+                    .ok();
+                if let Some(ref mut p) = perms {
+                    #[cfg(windows)]
+                    p.set_readonly(false);
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        p.set_mode(0o700);
+                    }
+                    let _ = std::fs::set_permissions(&sealed_path, p.clone());
+                }
+                let _ = std::fs::remove_file(&sealed_path);
+            }
+
+            let temp_write_path = sandbox_dir.join(format!("tmp_{}.bin", std::process::id()));
+            std::fs::write(&temp_write_path, &bytes)
+                .map_err(|e| format!("failed to write sealed solver binary: {e}"))?;
+
+            let mut perms = std::fs::metadata(&temp_write_path)
+                .map_err(|e| e.to_string())?
+                .permissions();
+            #[cfg(windows)]
+            perms.set_readonly(true);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                perms.set_mode(0o500);
+            }
+            let _ = std::fs::set_permissions(&temp_write_path, perms);
+
+            std::fs::rename(&temp_write_path, &sealed_path)
+                .map_err(|e| format!("failed to commit sealed solver binary: {e}"))?;
+        }
+
+        let verified_sha = compute_file_sha256(&sealed_path)
+            .ok_or_else(|| "failed to hash sealed solver binary".to_string())?;
+        if verified_sha != sha256 {
+            return Err(format!(
+                "sealed solver binary hash mismatch: expected {sha256}, got {verified_sha}"
+            ));
+        }
+
+        let version = get_z3_version(&sealed_path);
+        if version.is_empty() || version.eq_ignore_ascii_case("unknown") {
+            return Err(format!(
+                "sealed solver binary at {} failed version probe or reported unknown",
+                sealed_path.display()
+            ));
+        }
+
+        Ok(Self {
+            source_path: source_path.to_path_buf(),
+            sealed_path,
+            sha256,
+            version,
+        })
+    }
+
+    /// Verifies post-execution cryptographic integrity of the sealed binary file.
+    pub fn verify_post_integrity(&self) -> bool {
+        match compute_file_sha256(&self.sealed_path) {
+            Some(ref h) => h == &self.sha256,
+            None => false,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -411,5 +525,25 @@ mod tests {
             "Error message must report exit code 42, got: {}",
             err
         );
+    }
+
+    #[test]
+    fn test_sealed_solver_binary_sandbox() {
+        if let Some(z3_path) = find_z3_executable() {
+            let original_sha = compute_file_sha256(&z3_path).expect("hash original z3");
+            let sealed = SealedSolverBinary::seal_from_path(&z3_path)
+                .expect("seal z3 executable should succeed");
+
+            assert_eq!(sealed.sha256, original_sha);
+            assert!(sealed.sealed_path.is_file());
+            assert!(!sealed.version.is_empty() && !sealed.version.eq_ignore_ascii_case("unknown"));
+            assert!(sealed.verify_post_integrity());
+
+            // 再次密封同一文件验证幂等性与重用
+            let sealed_cached = SealedSolverBinary::seal_from_path(&z3_path)
+                .expect("re-sealing cached z3 should succeed");
+            assert_eq!(sealed_cached.sha256, original_sha);
+            assert_eq!(sealed_cached.sealed_path, sealed.sealed_path);
+        }
     }
 }

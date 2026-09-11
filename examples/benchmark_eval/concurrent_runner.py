@@ -498,13 +498,22 @@ def get_z3_version(is_mock: bool = False, axiom_bin: Optional[str] = None) -> st
     raise RuntimeError("未检测到 Z3 求解器可执行文件，实测模式下严禁缺少 Z3 或使用未知版本")
 
 
-_CACHED_PROVENANCE = None
+
+@dataclass(frozen=True)
+class SolverIdentity:
+    """不可变求解器身份凭据对象，彻底消除散落参数数据簇 (Data Clump)"""
+    backend: str
+    path: Optional[str]
+    version: str
+    sha256: str
+    available: bool
+
+
+_CACHED_PROVENANCES: Dict[Tuple[bool, Optional[SolverIdentity]], GitProvenance] = {}
 
 
 def collect_git_provenance(
-    actual_z3_path: Optional[str] = None,
-    actual_z3_sha256: Optional[str] = None,
-    actual_z3_version: Optional[str] = None,
+    solver_identity: Optional[SolverIdentity] = None,
     is_mock: bool = False,
 ) -> GitProvenance:
     """严格以 Fail-Closed 方式收集不可变 Git Provenance Capsule，包含可还原源码快照与依赖二进制哈希"""
@@ -675,20 +684,25 @@ def collect_git_provenance(
     else:
         axiom_sha256 = MOCK_AXIOM_SHA256
 
-    # [P2 Standards 1] 从 Axiom CLI 权威获取单一真相源求解器身份，杜绝漂移
-    solver_info = get_authoritative_solver_info(axiom_bin)
-    if actual_z3_path and os.path.isfile(actual_z3_path):
-        z3_path = os.path.abspath(actual_z3_path)
-        z3_sha256 = actual_z3_sha256 or hashlib.sha256(open(z3_path, "rb").read()).hexdigest()
-        z3_version = actual_z3_version or (f"Z3 {solver_info['version']}" if solver_info.get("version") and solver_info.get("version") != "unknown" else "Z3 4.12.2")
-    elif solver_info.get("available") and solver_info.get("path"):
-        z3_path = solver_info["path"]
-        z3_sha256 = solver_info.get("sha256") or MOCK_Z3_SHA256
-        z3_version = f"Z3 {solver_info['version']}" if solver_info.get("version") and solver_info.get("version") != "unknown" else ("Z3 4.12.2 (synthetic_mock_environment)" if is_mock else "Z3 4.12.2")
+    # [Round 20 P2 Standards 1]: 使用单一权威不可变 SolverIdentity，彻底消除 Data Clump 与漂移
+    if solver_identity is not None:
+        z3_path = solver_identity.path
+        z3_sha256 = solver_identity.sha256
+        z3_version = solver_identity.version
     else:
-        z3_path = None
-        z3_sha256 = MOCK_Z3_SHA256
-        z3_version = "Z3 4.12.2 (synthetic_mock_environment)" if is_mock else (actual_z3_version or "Z3 4.12.2 (synthetic_mock_environment)")
+        solver_info = get_authoritative_solver_info(axiom_bin)
+        if solver_info.get("available") and solver_info.get("path"):
+            z3_path = solver_info["path"]
+            z3_sha256 = solver_info.get("sha256") or MOCK_Z3_SHA256
+            z3_version = (
+                f"Z3 {solver_info['version']}"
+                if solver_info.get("version") and solver_info.get("version") != "unknown"
+                else ("Z3 4.12.2 (synthetic_mock_environment)" if is_mock else "Z3 4.12.2")
+            )
+        else:
+            z3_path = None
+            z3_sha256 = MOCK_Z3_SHA256
+            z3_version = "Z3 4.12.2 (synthetic_mock_environment)" if is_mock else "Z3 4.12.2"
 
     is_dirty_state = (len(dirty_files) > 0) or (len(untracked_snapshots) > 0) or (staged_b64 != "") or (unstaged_b64 != "") or (head_diff_b64 != "")
 
@@ -719,24 +733,25 @@ def collect_git_provenance(
 
 
 def get_git_provenance(
-    actual_z3_path: Optional[str] = None,
-    actual_z3_sha256: Optional[str] = None,
-    actual_z3_version: Optional[str] = None,
+    solver_identity: Optional[SolverIdentity] = None,
     is_mock: bool = False,
 ) -> GitProvenance:
-    global _CACHED_PROVENANCE
-    if _CACHED_PROVENANCE is None:
-        _CACHED_PROVENANCE = collect_git_provenance(
-            actual_z3_path=actual_z3_path,
-            actual_z3_sha256=actual_z3_sha256,
-            actual_z3_version=actual_z3_version,
+    """按 (is_mock, solver_identity) 严格分键缓存，杜绝无键全局缓存静默忽略后续传参"""
+    global _CACHED_PROVENANCES
+    cache_key = (is_mock, solver_identity)
+    if cache_key not in _CACHED_PROVENANCES:
+        _CACHED_PROVENANCES[cache_key] = collect_git_provenance(
+            solver_identity=solver_identity,
             is_mock=is_mock,
         )
-    return _CACHED_PROVENANCE
+    return _CACHED_PROVENANCES[cache_key]
 
 
-def get_git_provenance_dict(is_mock: bool = False) -> dict:
-    return get_git_provenance(is_mock=is_mock).to_dict()
+def get_git_provenance_dict(
+    solver_identity: Optional[SolverIdentity] = None,
+    is_mock: bool = False,
+) -> dict:
+    return get_git_provenance(solver_identity=solver_identity, is_mock=is_mock).to_dict()
 
 
 def get_git_commit_sha() -> str:
@@ -925,11 +940,13 @@ def validate_benchmark_result_schema(data: dict):
         if not init_root.startswith("#") or not fin_root.startswith("#") or "mock" in init_root.lower() or "mock" in fin_root.lower():
             raise ValueError(f"实测模式下 CAS 根哈希必须为真实节点哈希，不能包含 mock 占位: {init_root}, {fin_root}")
 
-    # 强互锁 SMT 证明报告中的真实求解器摘要
+    # 强互锁 SMT 证明报告中的真实求解器摘要 (双向兼容 verification_reports 与 smt_reports)
     verify_reports = g3.get("verification_reports")
+    if verify_reports is None:
+        verify_reports = g3.get("smt_reports")
     if not is_mock:
         if not isinstance(verify_reports, list) or len(verify_reports) == 0:
-            raise ValueError("实测模式下必须包含实际 SMT 证明报告 verification_reports")
+            raise ValueError("实测模式下必须包含实际 SMT 证明报告 verification_reports (或 smt_reports)")
         for idx, rep in enumerate(verify_reports):
             if rep.get("status") != "Proved":
                 raise ValueError(f"实测模式下 verification_reports[{idx}] 状态必须为 Proved: {rep.get('status')}")
@@ -949,10 +966,12 @@ def validate_benchmark_result_schema(data: dict):
                     f"verification_reports[{idx}] 报告的 solver_version ({rep_ver}) 与 Provenance ({top_prov.z3_version}) 不一致！"
                 )
 
-    # 强互锁 Worker 生成真实性
+    # 强互锁 Worker 生成真实性 (双向兼容 worker_results 与 workers_details)
     if not is_mock:
         for g_data, g_name in [(g2, "Group 2"), (g3, "Group 3")]:
-            workers = g_data.get("worker_results", [])
+            workers = g_data.get("worker_results")
+            if workers is None:
+                workers = g_data.get("workers_details")
             if not workers or not isinstance(workers, list):
                 raise ValueError(f"实测模式下 {g_name} 必须包含 worker_results 列表")
             for w in workers:
@@ -1691,6 +1710,16 @@ def run_group2_rust_pipeline(tasks: list, args, proxy: str) -> dict:
             "git_provenance": get_git_provenance_dict(),
             "git_status": get_git_status(),
             "resolver_details": resolver_calls,
+            "worker_results": [
+                {
+                    "task_id": w["task_id"],
+                    "function_name": w["function_name"],
+                    "latency_sec": w["raw_result"]["latency_sec"],
+                    "payload": w["raw_result"]["task_payload"],
+                    "raw_billed": w["raw_result"]["raw_billed"]
+                }
+                for w in worker_results
+            ],
             "workers_details": [
                 {
                     "task_id": w["task_id"],
@@ -1892,9 +1921,21 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
         "git_provenance": get_git_provenance_dict(),
         "git_status": get_git_status(),
         "smt_message": v_msg,
+        "verification_reports": reports,
         "smt_reports": reports,
         "assembled_source": assembled_code,
         "cas_concurrency_benchmark": cas_bench_data,
+        "worker_results": [
+            {
+                "task_id": w["task_id"],
+                "function_name": w["function_name"],
+                "latency_sec": w["raw_result"]["latency_sec"],
+                "payload": w["raw_result"]["task_payload"],
+                "raw_billed": w["raw_result"]["raw_billed"],
+                "capsule": w["capsule"]
+            }
+            for w in worker_results
+        ],
         "workers_details": [
             {
                 "task_id": w["task_id"],
@@ -1992,9 +2033,21 @@ def main():
 
     tasks = load_concurrent_tasks()
     axiom_bin = find_axiom_binary()
-    # 提前初始化全局 Provenance 缓存，确保与 mock 模式标志一致
-    get_git_provenance(is_mock=args.mock)
-    z3_bin = find_z3_executable()
+    solver_info = get_authoritative_solver_info(axiom_bin)
+    solver_ident = SolverIdentity(
+        backend=solver_info.get("backend", "Microsoft Z3 (SMT-LIB2)"),
+        path=solver_info.get("path"),
+        version=(
+            f"Z3 {solver_info['version']}"
+            if solver_info.get("version") and solver_info.get("version") != "unknown"
+            else ("Z3 4.12.2 (synthetic_mock_environment)" if args.mock else "Z3 4.12.2")
+        ),
+        sha256=solver_info.get("sha256") or MOCK_Z3_SHA256,
+        available=solver_info.get("available", False),
+    )
+    # [Round 20 P2 Standards 1]: 提前用单一权威不可变 SolverIdentity 初始化全局 Provenance 缓存
+    get_git_provenance(solver_identity=solver_ident, is_mock=args.mock)
+    z3_bin = solver_ident.path or find_z3_executable()
     z3_display = z3_bin if z3_bin else "内置/模拟求解器"
 
     print("=" * 70)

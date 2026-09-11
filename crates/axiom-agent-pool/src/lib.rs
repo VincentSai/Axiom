@@ -323,9 +323,11 @@ impl AgentTaskPool {
                     ))
                 })?;
 
-            // [Spec 2] 校验 Profile Hash 是否一致；如果不一致，旧收据失效，降级为 Unverified
-            if receipt.verification_profile_hash == current_profile_hash {
-                hole_evidence.insert(env.target_hole_id.clone(), receipt.proof_level);
+            // [Spec 2 & Round 20 P1 Spec 1] 校验证明收据在当前规则下是否属于有效证明：
+            // 必须满足：Profile Hash 一致、具备合法 64 位 solver_sha256、且 solver_version 已知。
+            // 任何不满足项（包括从旧版本迁移来的无哈希收据）均视为旧收据失效，降级为 Unverified 触发重新验证。
+            if receipt.is_currently_valid_proved(&current_profile_hash) {
+                hole_evidence.insert(env.target_hole_id.clone(), ProofLevel::Proved);
             } else {
                 hole_evidence.insert(env.target_hole_id.clone(), ProofLevel::Unverified);
             }

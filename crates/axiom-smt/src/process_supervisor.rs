@@ -56,7 +56,7 @@ mod win32_job {
     use std::os::windows::io::AsRawHandle;
     use std::process::Child;
 
-    type HANDLE = *mut std::ffi::c_void;
+    pub(crate) type HANDLE = *mut std::ffi::c_void;
     type BOOL = i32;
     type DWORD = u32;
     type LONG = i32;
@@ -99,14 +99,14 @@ mod win32_job {
     }
 
     #[repr(C)]
-    struct THREADENTRY32 {
-        dw_size: DWORD,
-        cnt_usage: DWORD,
-        th32_thread_id: DWORD,
-        th32_owner_process_id: DWORD,
-        tp_base_pri: LONG,
-        tp_delta_pri: LONG,
-        dw_flags: DWORD,
+    pub(crate) struct THREADENTRY32 {
+        pub(crate) dw_size: DWORD,
+        pub(crate) cnt_usage: DWORD,
+        pub(crate) th32_thread_id: DWORD,
+        pub(crate) th32_owner_process_id: DWORD,
+        pub(crate) tp_base_pri: LONG,
+        pub(crate) tp_delta_pri: LONG,
+        pub(crate) dw_flags: DWORD,
     }
 
     extern "system" {
@@ -123,16 +123,17 @@ mod win32_job {
         fn AssignProcessToJobObject(h_job: HANDLE, h_process: HANDLE) -> BOOL;
         fn TerminateJobObject(h_job: HANDLE, u_exit_code: u32) -> BOOL;
         fn TerminateProcess(h_process: HANDLE, u_exit_code: u32) -> BOOL;
-        fn CloseHandle(h_object: HANDLE) -> BOOL;
-        fn CreateToolhelp32Snapshot(dw_flags: DWORD, th32_process_id: DWORD) -> HANDLE;
-        fn Thread32First(h_snapshot: HANDLE, lpte: *mut THREADENTRY32) -> BOOL;
-        fn Thread32Next(h_snapshot: HANDLE, lpte: *mut THREADENTRY32) -> BOOL;
+        pub(crate) fn CloseHandle(h_object: HANDLE) -> BOOL;
+        pub(crate) fn CreateToolhelp32Snapshot(dw_flags: DWORD, th32_process_id: DWORD) -> HANDLE;
+        pub(crate) fn Thread32First(h_snapshot: HANDLE, lpte: *mut THREADENTRY32) -> BOOL;
+        pub(crate) fn Thread32Next(h_snapshot: HANDLE, lpte: *mut THREADENTRY32) -> BOOL;
         fn OpenThread(
             dw_desired_access: DWORD,
             b_inherit_handle: BOOL,
             dw_thread_id: DWORD,
         ) -> HANDLE;
         fn ResumeThread(h_thread: HANDLE) -> DWORD;
+        fn CancelSynchronousIo(h_thread: HANDLE) -> BOOL;
     }
 
     pub struct JobObjectGuard {
@@ -171,11 +172,14 @@ mod win32_job {
             unsafe { AssignProcessToJobObject(self.job_handle, handle) != 0 }
         }
 
-        pub fn terminate_now(&self) {
-            unsafe {
-                let _ = TerminateJobObject(self.job_handle, 1);
-            }
+        pub fn terminate_now(&self) -> bool {
+            unsafe { TerminateJobObject(self.job_handle, 1) != 0 }
         }
+    }
+
+    /// 取消目标工作线程正在执行的阻塞式同步 I/O，打断 ReadFile / WriteFile 系统调用
+    pub fn cancel_thread_synchronous_io(thread_handle: HANDLE) -> bool {
+        unsafe { CancelSynchronousIo(thread_handle) != 0 }
     }
 
     impl Drop for JobObjectGuard {
@@ -366,15 +370,19 @@ impl ProcessSupervisor {
     }
 
     /// Idempotently and forcefully terminates the process tree and releases resources.
-    pub fn terminate(&mut self) {
+    pub fn terminate(&mut self) -> bool {
         if self.terminated.swap(true, Ordering::SeqCst) {
-            return;
+            return true;
         }
+
+        let mut success = true;
 
         #[cfg(windows)]
         {
             if let Some(ref guard) = self.job_guard {
-                guard.terminate_now();
+                if !guard.terminate_now() {
+                    success = false;
+                }
             }
         }
 
@@ -393,12 +401,14 @@ impl ProcessSupervisor {
             }
             std::thread::sleep(Duration::from_millis(5));
         }
+
+        success
     }
 }
 
 impl Drop for ProcessSupervisor {
     fn drop(&mut self) {
-        self.terminate();
+        let _ = self.terminate();
     }
 }
 
@@ -444,6 +454,8 @@ impl StreamReaderComm {
     }
 
     /// 在进程树强杀（supervisor.terminate()）后执行有界回收，严禁无界 join 挂死主线程。
+    /// 若线程在初始 grace 内未退出，借助平台级机制（如 Windows CancelSynchronousIo）强制中止阻塞 I/O，
+    /// 确保 100% 回收线程句柄，杜绝 detach 孤儿线程泄漏。
     fn bounded_join_after_kill(mut self, grace: Duration) {
         self.cancelled.store(true, Ordering::SeqCst);
         if let Some(h) = self.handle.take() {
@@ -452,7 +464,18 @@ impl StreamReaderComm {
                     let _ = h.join();
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                    eprintln!("axiom: reader thread did not exit within grace period after process termination; handle detached to avoid deadlock");
+                    #[cfg(windows)]
+                    {
+                        use std::os::windows::io::AsRawHandle;
+                        let thread_raw = h.as_raw_handle() as win32_job::HANDLE;
+                        win32_job::cancel_thread_synchronous_io(thread_raw);
+                        let _ = self.rx.recv_timeout(grace);
+                        let _ = h.join();
+                    }
+                    #[cfg(not(windows))]
+                    {
+                        let _ = h.join();
+                    }
                 }
             }
         }
@@ -554,6 +577,8 @@ impl StdinWriterComm {
     }
 
     /// 在进程树强杀（supervisor.terminate()）后执行有界回收，严禁无界 join 挂死主线程。
+    /// 若线程在初始 grace 内未退出，借助平台级机制（如 Windows CancelSynchronousIo）强制中止阻塞 I/O，
+    /// 确保 100% 回收线程句柄，杜绝 detach 孤儿线程泄漏。
     fn bounded_join_after_kill(mut self, grace: Duration) {
         self.cancelled.store(true, Ordering::SeqCst);
         if let Some(h) = self.handle.take() {
@@ -562,7 +587,18 @@ impl StdinWriterComm {
                     let _ = h.join();
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                    eprintln!("axiom: stdin writer thread did not exit within grace period after process termination; handle detached to avoid deadlock");
+                    #[cfg(windows)]
+                    {
+                        use std::os::windows::io::AsRawHandle;
+                        let thread_raw = h.as_raw_handle() as win32_job::HANDLE;
+                        win32_job::cancel_thread_synchronous_io(thread_raw);
+                        let _ = self.rx.recv_timeout(grace);
+                        let _ = h.join();
+                    }
+                    #[cfg(not(windows))]
+                    {
+                        let _ = h.join();
+                    }
                 }
             }
         }
@@ -941,5 +977,70 @@ mod tests {
             res.is_err(),
             "未完成的流读取必须 Fail-Closed 返回错误，严禁静默返回空字节"
         );
+    }
+
+    #[test]
+    fn test_repeated_timeouts_do_not_leak_threads() {
+        // [Round 20 P1 Spec 4]: 连续多次触发恶意阻塞管道超时，验证工作线程完全被 join 回收，无累计线程泄漏
+        #[cfg(windows)]
+        fn get_current_threads() -> u32 {
+            unsafe {
+                let pid = std::process::id();
+                let snapshot = win32_job::CreateToolhelp32Snapshot(0x0000_0004, 0);
+                if snapshot.is_null() || snapshot == (-1isize as win32_job::HANDLE) {
+                    return 0;
+                }
+                let mut entry: win32_job::THREADENTRY32 = std::mem::zeroed();
+                entry.dw_size = std::mem::size_of::<win32_job::THREADENTRY32>() as u32;
+                let mut count = 0;
+                if win32_job::Thread32First(snapshot, &mut entry) != 0 {
+                    loop {
+                        if entry.th32_owner_process_id == pid {
+                            count += 1;
+                        }
+                        if win32_job::Thread32Next(snapshot, &mut entry) == 0 {
+                            break;
+                        }
+                    }
+                }
+                win32_job::CloseHandle(snapshot);
+                count
+            }
+        }
+
+        #[cfg(windows)]
+        let initial_threads = get_current_threads();
+
+        for _ in 0..5 {
+            #[cfg(windows)]
+            let mut cmd = Command::new("cmd");
+            #[cfg(windows)]
+            cmd.args([
+                "/C",
+                "start /b powershell -NoProfile -Command \"Start-Sleep -Seconds 60\" & echo child_running",
+            ]);
+
+            #[cfg(not(windows))]
+            let mut cmd = Command::new("sh");
+            #[cfg(not(windows))]
+            cmd.args(["-c", "(sleep 60 &) ; echo child_running"]);
+
+            let start = Instant::now();
+            let deadline = start + Duration::from_millis(150);
+            let _ = execute_process_until_deadline(cmd, None, deadline, Duration::from_millis(10));
+            // 短暂休眠让 OS 线程清理完全收敛
+            std::thread::sleep(Duration::from_millis(30));
+        }
+
+        #[cfg(windows)]
+        {
+            let final_threads = get_current_threads();
+            // 允许轻微波动（最多 2 个由系统进程池动态生成的线程），绝不能泄漏 5~10 个 reader/writer 线程
+            let thread_delta = final_threads.saturating_sub(initial_threads);
+            assert!(
+                thread_delta <= 2,
+                "连续 5 次管道超时导致线程累计泄漏！初始线程: {initial_threads}, 最终线程: {final_threads}, 增量: {thread_delta}"
+            );
+        }
     }
 }

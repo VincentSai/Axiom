@@ -1901,6 +1901,17 @@ fn test_v3_database_golden_fixture_migration_to_v4() {
     assert_eq!(mainline.len(), 1);
     assert_eq!(mainline[0].commit_hash, commit_hash);
 
+    // [Round 20 P1 Spec 1]: 验证旧收据在当前 v4 规则下不属于当前有效证明（缺少 solver_sha256 且 profile 已升级）
+    let rcpt_loaded = db
+        .get_receipt(&rcpt_hash)
+        .expect("get receipt")
+        .expect("receipt must exist");
+    let current_profile = axiom_db::current_verification_profile_hash();
+    assert!(
+        !rcpt_loaded.is_currently_valid_proved(&current_profile),
+        "历史 V3 收据缺少合法 solver_sha256，在当前规则下必须被判定为非当前有效证明并触发重验"
+    );
+
     // 重新从磁盘读取原始文件，断言已被原子升级保存为 Schema 4
     let upgraded_json = std::fs::read_to_string(&db_path).expect("read upgraded db");
     let upgraded_state: serde_json::Value =

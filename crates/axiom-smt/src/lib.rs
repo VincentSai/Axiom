@@ -18,7 +18,7 @@ pub use smtlib2::{
 };
 pub use z3_solver::{
     compute_file_sha256, find_z3_executable, get_z3_version, resolve_solver_identity, run_z3_query,
-    SolverIdentity, Z3Result,
+    SealedSolverBinary, SolverIdentity, Z3Result,
 };
 
 /// Concrete numeric parameter assignments that demonstrate a contract violation.
@@ -117,50 +117,51 @@ pub fn to_smtlib2(func: &FunctionDecl) -> Result<String, String> {
     generate_smtlib2(func)
 }
 
-/// Verifies that a function body satisfies every `ensures` clause whenever all `requires` clauses hold.
-/// Automatically probes for external Z3 executable; falls back to internal symbolic engine if Z3 is absent.
+/// Verifies a single function in isolation without module context.
 pub fn verify_function(func: &FunctionDecl) -> SmtResult {
-    verify_function_in_module(
-        func,
-        &Module {
-            types: vec![],
-            functions: vec![func.clone()],
-            effects: vec![],
-        },
-    )
+    let dummy_module = Module {
+        types: vec![],
+        functions: vec![func.clone()],
+        effects: vec![],
+    };
+    verify_function_in_module(func, &dummy_module)
 }
 
 /// Verifies a function using full module context for record flattening and pure function calls.
 pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtResult {
     if let Some(z3_path) = find_z3_executable() {
+        // [Round 20 P1 Spec 3]: 构造只读内容寻址密封沙箱副本，彻底消除 TOCTOU
+        let sealed_solver = match SealedSolverBinary::seal_from_path(&z3_path) {
+            Ok(sealed) => sealed,
+            Err(e) => return SmtResult::Unknown(format!("failed to seal solver binary: {e}")),
+        };
+
         if let Ok((smt2_query, num_obligations)) =
             generate_smtlib2_with_module_and_obligations(func, Some(module))
         {
-            // [P1 Spec 3] TOCTOU 防御：在求解前锁定二进制哈希与版本
-            let version = get_z3_version(&z3_path);
-            let solver_sha256_pre = compute_file_sha256(&z3_path);
-
             // P0: Precondition Satisfiability Check (Vacuity Prevention)
-            if let Err(vacuity_err) =
-                check_precondition_vacuity_fail_closed(&z3_path, func, Some(module))
-            {
+            // 绑定密封沙箱副本执行
+            if let Err(vacuity_err) = check_precondition_vacuity_fail_closed(
+                &sealed_solver.sealed_path,
+                func,
+                Some(module),
+            ) {
                 return vacuity_err;
             }
 
-            match run_z3_query(&z3_path, &smt2_query) {
+            match run_z3_query(&sealed_solver.sealed_path, &smt2_query) {
                 Ok(Z3Result::Unsat) => {
-                    // [P1 Spec 3 核心闭环]: Pre- & Post-Execution Double Attestation
-                    let solver_sha256_post = compute_file_sha256(&z3_path);
-                    if solver_sha256_pre.is_none() || solver_sha256_pre != solver_sha256_post {
+                    // 复核密封沙箱副本完整性
+                    if !sealed_solver.verify_post_integrity() {
                         return SmtResult::Unknown(
-                            "TOCTOU integrity check failed: Z3 solver binary modified during verification".into(),
+                            "TOCTOU integrity check failed: sealed solver binary modified during verification".into(),
                         );
                     }
                     return SmtResult::Proved {
                         solver: "Microsoft Z3 (SMT-LIB2)".into(),
-                        solver_path: Some(z3_path.to_string_lossy().to_string()),
-                        solver_sha256: solver_sha256_post,
-                        version,
+                        solver_path: Some(sealed_solver.source_path.to_string_lossy().to_string()),
+                        solver_sha256: Some(sealed_solver.sha256),
+                        version: sealed_solver.version,
                         obligations_checked: num_obligations,
                     };
                 }
@@ -183,32 +184,32 @@ pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String>
         "Z3 executable not found in PATH or standard install directories".to_string()
     })?;
 
-    // [P1 Spec 3] TOCTOU 防御：在求解前锁定二进制哈希与版本
-    let version = get_z3_version(&z3_path);
-    let solver_sha256_pre = compute_file_sha256(&z3_path);
+    // [Round 20 P1 Spec 3]: 构造只读内容寻址密封沙箱副本，彻底消除 TOCTOU
+    let sealed_solver = SealedSolverBinary::seal_from_path(&z3_path)
+        .map_err(|e| format!("failed to seal solver binary: {e}"))?;
 
     // P0: Precondition Satisfiability Check (Vacuity Prevention)
-    if let Err(vacuity_err) = check_precondition_vacuity_fail_closed(&z3_path, func, None) {
+    if let Err(vacuity_err) =
+        check_precondition_vacuity_fail_closed(&sealed_solver.sealed_path, func, None)
+    {
         return Ok(vacuity_err);
     }
 
     let (smt2_query, num_obligations) = generate_smtlib2_and_obligations(func)?;
 
-    match run_z3_query(&z3_path, &smt2_query)? {
+    match run_z3_query(&sealed_solver.sealed_path, &smt2_query)? {
         Z3Result::Unsat => {
-            // [P1 Spec 3 核心闭环]: Pre- & Post-Execution Double Attestation
-            let solver_sha256_post = compute_file_sha256(&z3_path);
-            if solver_sha256_pre.is_none() || solver_sha256_pre != solver_sha256_post {
+            if !sealed_solver.verify_post_integrity() {
                 return Ok(SmtResult::Unknown(
-                    "TOCTOU integrity check failed: Z3 solver binary modified during verification"
+                    "TOCTOU integrity check failed: sealed solver binary modified during verification"
                         .into(),
                 ));
             }
             Ok(SmtResult::Proved {
                 solver: "Microsoft Z3 (SMT-LIB2)".into(),
-                solver_path: Some(z3_path.to_string_lossy().to_string()),
-                solver_sha256: solver_sha256_post,
-                version,
+                solver_path: Some(sealed_solver.source_path.to_string_lossy().to_string()),
+                solver_sha256: Some(sealed_solver.sha256),
+                version: sealed_solver.version,
                 obligations_checked: num_obligations,
             })
         }

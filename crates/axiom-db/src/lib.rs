@@ -219,7 +219,7 @@ impl fmt::Display for ProofLevel {
 
 /// Current verification profile specification identifying SMT encoding rules,
 /// arithmetic overflow guards, division-by-zero path-condition rules, and solver requirements.
-pub const CURRENT_VERIFICATION_PROFILE: &str = "axiom-smt-v3-truncdiv-residualmatch";
+pub const CURRENT_VERIFICATION_PROFILE: &str = "axiom-smt-v4-sha256sealed-truncdiv-residualmatch";
 
 /// Current database schema version (Version 4 incorporates solver_sha256 in receipts with double attestation).
 pub const CURRENT_SCHEMA_VERSION: u32 = 4;
@@ -250,6 +250,29 @@ pub struct VerificationReceipt {
     #[serde(default)]
     pub attested_commit_hash: Option<NodeHash>,
     pub verified_at: u64,
+}
+
+impl VerificationReceipt {
+    /// 检查该证明收据在当前规则下是否属于有效证明：
+    /// 1. 证明等级必须为 Proved；
+    /// 2. 证明规范 Profile 哈希必须与当前最新系统 current_profile_hash 严格一致；
+    /// 3. 必须包含合法的 solver_sha256（64位小写十六进制字符）；
+    /// 4. 求解器版本 solver_version 必须已知（非空且非 unknown）。
+    pub fn is_currently_valid_proved(&self, current_profile_hash: &NodeHash) -> bool {
+        if self.proof_level != ProofLevel::Proved {
+            return false;
+        }
+        if self.verification_profile_hash != *current_profile_hash {
+            return false;
+        }
+        let has_valid_sha = match &self.solver_sha256 {
+            Some(sha) => sha.len() == 64 && sha.chars().all(|c| c.is_ascii_hexdigit()),
+            None => false,
+        };
+        let has_known_version = !self.solver_version.trim().is_empty()
+            && !self.solver_version.trim().eq_ignore_ascii_case("unknown");
+        has_valid_sha && has_known_version
+    }
 }
 
 /// Computes content identifier for a verification receipt.
