@@ -346,14 +346,25 @@ pub struct SealedSolverBinary {
 }
 
 static SEAL_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static SEALED_CACHE: std::sync::OnceLock<std::sync::RwLock<HashMap<String, SealedSolverBinary>>> =
+    std::sync::OnceLock::new();
+
+fn get_sealed_cache() -> &'static std::sync::RwLock<HashMap<String, SealedSolverBinary>> {
+    SEALED_CACHE.get_or_init(|| std::sync::RwLock::new(HashMap::new()))
+}
+
+struct CrossProcessDirLock(PathBuf);
+impl Drop for CrossProcessDirLock {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir(&self.0);
+    }
+}
 
 impl SealedSolverBinary {
     /// Copies and seals a solver executable into an immutable, SHA-256-verified sandbox directory.
     /// Employs a process-wide mutex, high-entropy unique temporary files, and an "AlreadyExists
     /// verify-and-reuse winner" atomic protocol to ensure multi-threaded and multi-process concurrency safety.
     pub fn seal_from_path(source_path: &Path) -> Result<Self, String> {
-        let _guard = SEAL_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-
         let bytes = std::fs::read(source_path).map_err(|e| {
             format!(
                 "failed to read solver binary at {}: {e}",
@@ -366,6 +377,29 @@ impl SealedSolverBinary {
         hasher.update(&bytes);
         let sha256 = format!("{:x}", hasher.finalize());
 
+        // 1. 快路径：先查进程内读写锁只读缓存，命中且物理文件有效直接零锁竞争返回
+        if let Ok(cache) = get_sealed_cache().read() {
+            if let Some(sealed) = cache.get(&sha256) {
+                if sealed.sealed_path.is_file()
+                    && compute_file_sha256(&sealed.sealed_path).as_deref() == Some(&sha256)
+                {
+                    return Ok(sealed.clone());
+                }
+            }
+        }
+
+        // 2. 慢路径：获取进程内互斥锁进行二次检测
+        let _guard = SEAL_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        if let Ok(cache) = get_sealed_cache().read() {
+            if let Some(sealed) = cache.get(&sha256) {
+                if sealed.sealed_path.is_file()
+                    && compute_file_sha256(&sealed.sealed_path).as_deref() == Some(&sha256)
+                {
+                    return Ok(sealed.clone());
+                }
+            }
+        }
+
         let filename = source_path
             .file_name()
             .unwrap_or_else(|| std::ffi::OsStr::new("z3.exe"));
@@ -377,13 +411,37 @@ impl SealedSolverBinary {
 
         let sealed_path = sandbox_dir.join(filename);
 
-        let needs_write = if sealed_path.is_file() {
-            compute_file_sha256(&sealed_path).as_deref() != Some(&sha256)
-        } else {
-            true
-        };
+        // 3. 跨进程排他锁协议 (基于原子目录创建，含超时兜底与过期清理)
+        let lock_dir = sandbox_dir.join(".seal.lock.d");
+        let lock_deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut _dir_guard = None;
+        while std::time::Instant::now() < lock_deadline {
+            match std::fs::create_dir(&lock_dir) {
+                Ok(()) => {
+                    _dir_guard = Some(CrossProcessDirLock(lock_dir.clone()));
+                    break;
+                }
+                Err(_) => {
+                    if let Ok(meta) = std::fs::metadata(&lock_dir) {
+                        if let Ok(mtime) = meta.modified() {
+                            if let Ok(age) = mtime.elapsed() {
+                                if age > std::time::Duration::from_secs(10) {
+                                    let _ = std::fs::remove_dir(&lock_dir);
+                                }
+                            }
+                        }
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+            }
+        }
 
-        if needs_write {
+        // 4. “绝不破坏赢家”协议：锁内首先检查目标文件是否已存在且 SHA-256 完全吻合
+        let already_valid =
+            sealed_path.is_file() && compute_file_sha256(&sealed_path).as_deref() == Some(&sha256);
+
+        if !already_valid {
+            // 仅在目标文件不存在或内容已损坏时，清理并原子发布新文件
             if sealed_path.exists() {
                 let mut perms = std::fs::metadata(&sealed_path)
                     .map(|m| m.permissions())
@@ -457,12 +515,19 @@ impl SealedSolverBinary {
             ));
         }
 
-        Ok(Self {
+        let sealed = Self {
             source_path: source_path.to_path_buf(),
             sealed_path,
-            sha256,
+            sha256: sha256.clone(),
             version,
-        })
+        };
+
+        // 5. 写入进程内只读缓存，后续调用完全免锁
+        if let Ok(mut cache) = get_sealed_cache().write() {
+            cache.insert(sha256, sealed.clone());
+        }
+
+        Ok(sealed)
     }
 
     /// Verifies post-execution cryptographic integrity of the sealed binary file.

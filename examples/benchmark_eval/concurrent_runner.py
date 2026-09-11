@@ -1005,39 +1005,58 @@ def validate_benchmark_result_schema(data: dict):
                 )
 
     # 强互锁 Worker 生成真实性 (双向兼容平铺结构、worker_results 与 workers_details)
-    if not is_mock:
-        for g_data, g_name in [(g2, "Group 2"), (g3, "Group 3")]:
-            workers = g_data.get("worker_results")
-            if workers is None:
-                workers = g_data.get("workers_details")
-            if not workers or not isinstance(workers, list):
+    for g_data, g_name in [(g2, "Group 2"), (g3, "Group 3")]:
+        workers = g_data.get("worker_results")
+        if workers is None:
+            workers = g_data.get("workers_details")
+        if not workers or not isinstance(workers, list):
+            if not is_mock:
                 raise ValueError(f"实测模式下 {g_name} 必须包含 worker_results 列表")
-            for w in workers:
-                raw_res = w.get("raw_result") if isinstance(w.get("raw_result"), dict) else w
-                billed = (
-                    w.get("raw_billed")
-                    or raw_res.get("raw_billed")
-                    or {}
-                )
+            continue
+        for w in workers:
+            if not isinstance(w, dict):
+                raise ValueError(f"{g_name} Worker 必须为字典对象")
+            if "raw_result" not in w or not isinstance(w["raw_result"], dict):
+                if not is_mock:
+                    raise ValueError(f"实测模式下 {g_name} Worker 必须包含底层 raw_result 证据字典！")
+                continue
+            raw_res = w["raw_result"]
+
+            # 严格全等断言：平铺值与底层证据必须 100% 一致
+            if "usage_source" in raw_res:
+                if "usage_source" not in w:
+                    raise ValueError(f"{g_name} Worker 顶层缺失 usage_source！")
+                if w["usage_source"] != raw_res["usage_source"]:
+                    raise ValueError(
+                        f"{g_name} Worker 平铺 usage_source ('{w['usage_source']}') 与底层 raw_result ('{raw_res['usage_source']}') 不全等！"
+                    )
+            if "is_estimated" in raw_res:
+                if "is_estimated" not in w:
+                    raise ValueError(f"{g_name} Worker 顶层缺失 is_estimated！")
+                if w["is_estimated"] != raw_res["is_estimated"]:
+                    raise ValueError(
+                        f"{g_name} Worker 平铺 is_estimated ({w['is_estimated']}) 与底层 raw_result ({raw_res['is_estimated']}) 不全等！"
+                    )
+
+            if not is_mock:
+                billed = raw_res.get("raw_billed") or {}
                 if not isinstance(billed, dict) or billed.get("total_tokens", 0) <= 0:
                     raise ValueError(f"实测模式下 {g_name} Worker 真实 billed tokens 必须大于 0")
                 if "synthetic_mock_generated" in str(raw_res) or "synthetic_mock" in str(raw_res):
                     raise ValueError(f"实测模式下 {g_name} Worker 结果中检测到 mock 生成标记！")
 
+                # 实测模式下强锁必填底层证据
+                if "usage_source" not in raw_res or "is_estimated" not in raw_res:
+                    raise ValueError(f"实测模式下 {g_name} Worker raw_result 缺失 usage_source 或 is_estimated 底层证据！")
+
                 # 严格断言真实 API 来源与非估算属性
-                usage_src = w.get("usage_source") or raw_res.get("usage_source")
-                is_est = (
-                    w.get("is_estimated")
-                    if "is_estimated" in w
-                    else raw_res.get("is_estimated")
-                )
-                if usage_src != "api_event":
+                if w["usage_source"] != "api_event":
                     raise ValueError(
-                        f"实测模式下 {g_name} Worker usage_source 必须为 'api_event'，实际为 '{usage_src}'"
+                        f"实测模式下 {g_name} Worker usage_source 必须为 'api_event'，实际为 '{w['usage_source']}'"
                     )
-                if is_est is not False:
+                if w["is_estimated"] is not False:
                     raise ValueError(
-                        f"实测模式下 {g_name} Worker is_estimated 必须为 False，实际为 {is_est}"
+                        f"实测模式下 {g_name} Worker is_estimated 必须为 False，实际为 {w['is_estimated']}"
                     )
 
     # 递归 Fail-Closed 严查所有字段，绝不能有字符串 "unknown"
@@ -1784,8 +1803,8 @@ def run_group2_rust_pipeline(tasks: list, args, proxy: str) -> dict:
                     "latency_sec": w["raw_result"]["latency_sec"],
                     "payload": w["raw_result"]["task_payload"],
                     "raw_billed": w["raw_result"]["raw_billed"],
-                    "usage_source": w["raw_result"].get("usage_source", "api_event"),
-                    "is_estimated": w["raw_result"].get("is_estimated", False),
+                    "usage_source": w["raw_result"]["usage_source"],
+                    "is_estimated": w["raw_result"]["is_estimated"],
                     "raw_result": w["raw_result"],
                 }
                 for w in worker_results
@@ -1797,8 +1816,8 @@ def run_group2_rust_pipeline(tasks: list, args, proxy: str) -> dict:
                     "latency_sec": w["raw_result"]["latency_sec"],
                     "payload": w["raw_result"]["task_payload"],
                     "raw_billed": w["raw_result"]["raw_billed"],
-                    "usage_source": w["raw_result"].get("usage_source", "api_event"),
-                    "is_estimated": w["raw_result"].get("is_estimated", False),
+                    "usage_source": w["raw_result"]["usage_source"],
+                    "is_estimated": w["raw_result"]["is_estimated"],
                     "raw_result": w["raw_result"],
                 }
                 for w in worker_results
@@ -2005,8 +2024,8 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
                 "latency_sec": w["raw_result"]["latency_sec"],
                 "payload": w["raw_result"]["task_payload"],
                 "raw_billed": w["raw_result"]["raw_billed"],
-                "usage_source": w["raw_result"].get("usage_source", "api_event"),
-                "is_estimated": w["raw_result"].get("is_estimated", False),
+                "usage_source": w["raw_result"]["usage_source"],
+                "is_estimated": w["raw_result"]["is_estimated"],
                 "capsule": w["capsule"],
                 "raw_result": w["raw_result"],
             }
@@ -2019,8 +2038,8 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
                 "latency_sec": w["raw_result"]["latency_sec"],
                 "payload": w["raw_result"]["task_payload"],
                 "raw_billed": w["raw_result"]["raw_billed"],
-                "usage_source": w["raw_result"].get("usage_source", "api_event"),
-                "is_estimated": w["raw_result"].get("is_estimated", False),
+                "usage_source": w["raw_result"]["usage_source"],
+                "is_estimated": w["raw_result"]["is_estimated"],
                 "capsule": w["capsule"],
                 "raw_result": w["raw_result"],
             }
