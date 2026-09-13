@@ -337,6 +337,17 @@ fn extract_numeric_value(text: &str) -> Option<f64> {
 /// A sealed, read-only solver binary stored in a content-addressed sandbox path.
 /// Eliminates TOCTOU completely by ensuring that version probe, vacuity checks,
 /// and SMT-LIB2 queries all execute against this immutable, byte-verified sandbox file.
+/// 不可变的沙箱求解器密封产物（仅包含内容寻址的字段，解耦调用方来源路径）。
+#[derive(Debug, Clone)]
+pub struct SealedSolverArtifact {
+    pub sealed_path: PathBuf,
+    pub sha256: String,
+    pub version: String,
+}
+
+/// A sealed, read-only solver binary stored in a content-addressed sandbox path.
+/// Eliminates TOCTOU completely by ensuring that version probe, vacuity checks,
+/// and SMT-LIB2 queries all execute against this immutable, byte-verified sandbox file.
 #[derive(Debug, Clone)]
 pub struct SealedSolverBinary {
     pub source_path: PathBuf,
@@ -346,17 +357,27 @@ pub struct SealedSolverBinary {
 }
 
 static SEAL_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-static SEALED_CACHE: std::sync::OnceLock<std::sync::RwLock<HashMap<String, SealedSolverBinary>>> =
+static SEALED_CACHE: std::sync::OnceLock<std::sync::RwLock<HashMap<String, SealedSolverArtifact>>> =
     std::sync::OnceLock::new();
 
-fn get_sealed_cache() -> &'static std::sync::RwLock<HashMap<String, SealedSolverBinary>> {
+fn get_sealed_cache() -> &'static std::sync::RwLock<HashMap<String, SealedSolverArtifact>> {
     SEALED_CACHE.get_or_init(|| std::sync::RwLock::new(HashMap::new()))
 }
 
-struct CrossProcessDirLock(PathBuf);
+struct CrossProcessDirLock {
+    lock_dir: PathBuf,
+    owner_token: String,
+}
+
 impl Drop for CrossProcessDirLock {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir(&self.0);
+        let token_path = self.lock_dir.join("owner.token");
+        if let Ok(content) = std::fs::read_to_string(&token_path) {
+            if content.trim() == self.owner_token {
+                let _ = std::fs::remove_file(&token_path);
+                let _ = std::fs::remove_dir(&self.lock_dir);
+            }
+        }
     }
 }
 
@@ -377,13 +398,18 @@ impl SealedSolverBinary {
         hasher.update(&bytes);
         let sha256 = format!("{:x}", hasher.finalize());
 
-        // 1. 快路径：先查进程内读写锁只读缓存，命中且物理文件有效直接零锁竞争返回
+        // 1. 快路径：先查进程内读写锁只读缓存，命中且物理文件有效直接现场组装传入的 source_path 返回
         if let Ok(cache) = get_sealed_cache().read() {
-            if let Some(sealed) = cache.get(&sha256) {
-                if sealed.sealed_path.is_file()
-                    && compute_file_sha256(&sealed.sealed_path).as_deref() == Some(&sha256)
+            if let Some(artifact) = cache.get(&sha256) {
+                if artifact.sealed_path.is_file()
+                    && compute_file_sha256(&artifact.sealed_path).as_deref() == Some(&sha256)
                 {
-                    return Ok(sealed.clone());
+                    return Ok(Self {
+                        source_path: source_path.to_path_buf(),
+                        sealed_path: artifact.sealed_path.clone(),
+                        sha256: artifact.sha256.clone(),
+                        version: artifact.version.clone(),
+                    });
                 }
             }
         }
@@ -391,11 +417,16 @@ impl SealedSolverBinary {
         // 2. 慢路径：获取进程内互斥锁进行二次检测
         let _guard = SEAL_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         if let Ok(cache) = get_sealed_cache().read() {
-            if let Some(sealed) = cache.get(&sha256) {
-                if sealed.sealed_path.is_file()
-                    && compute_file_sha256(&sealed.sealed_path).as_deref() == Some(&sha256)
+            if let Some(artifact) = cache.get(&sha256) {
+                if artifact.sealed_path.is_file()
+                    && compute_file_sha256(&artifact.sealed_path).as_deref() == Some(&sha256)
                 {
-                    return Ok(sealed.clone());
+                    return Ok(Self {
+                        source_path: source_path.to_path_buf(),
+                        sealed_path: artifact.sealed_path.clone(),
+                        sha256: artifact.sha256.clone(),
+                        version: artifact.version.clone(),
+                    });
                 }
             }
         }
@@ -411,21 +442,41 @@ impl SealedSolverBinary {
 
         let sealed_path = sandbox_dir.join(filename);
 
-        // 3. 跨进程排他锁协议 (基于原子目录创建，含超时兜底与过期清理)
+        // 3. 跨进程排他锁协议 (基于原子目录创建 + owner.token 防 ABA 机制，含超时 Fail-Closed)
         let lock_dir = sandbox_dir.join(".seal.lock.d");
+        let token_path = lock_dir.join("owner.token");
         let lock_deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         let mut _dir_guard = None;
         while std::time::Instant::now() < lock_deadline {
             match std::fs::create_dir(&lock_dir) {
                 Ok(()) => {
-                    _dir_guard = Some(CrossProcessDirLock(lock_dir.clone()));
-                    break;
+                    let thread_id = format!("{:?}", std::thread::current().id());
+                    let nanos = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_nanos();
+                    let owner_token = format!(
+                        "{}_{}_{}",
+                        std::process::id(),
+                        thread_id.replace(|c: char| !c.is_alphanumeric(), "_"),
+                        nanos
+                    );
+                    if std::fs::write(&token_path, &owner_token).is_ok() {
+                        _dir_guard = Some(CrossProcessDirLock {
+                            lock_dir: lock_dir.clone(),
+                            owner_token,
+                        });
+                        break;
+                    } else {
+                        let _ = std::fs::remove_dir(&lock_dir);
+                    }
                 }
                 Err(_) => {
                     if let Ok(meta) = std::fs::metadata(&lock_dir) {
                         if let Ok(mtime) = meta.modified() {
                             if let Ok(age) = mtime.elapsed() {
                                 if age > std::time::Duration::from_secs(10) {
+                                    let _ = std::fs::remove_file(&token_path);
                                     let _ = std::fs::remove_dir(&lock_dir);
                                 }
                             }
@@ -434,6 +485,14 @@ impl SealedSolverBinary {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
             }
+        }
+
+        // 强锁保障：若超时未拿到跨进程锁，绝不无锁进入临界区，必须 Fail-Closed 返回错误
+        if _dir_guard.is_none() {
+            return Err(format!(
+                "failed to acquire cross-process lock for sealed solver at {} within deadline",
+                lock_dir.display()
+            ));
         }
 
         // 4. “绝不破坏赢家”协议：锁内首先检查目标文件是否已存在且 SHA-256 完全吻合
@@ -515,17 +574,23 @@ impl SealedSolverBinary {
             ));
         }
 
+        // 5. 写入进程内只读内容缓存（解耦 source_path）
+        let artifact = SealedSolverArtifact {
+            sealed_path: sealed_path.clone(),
+            sha256: sha256.clone(),
+            version: version.clone(),
+        };
+
+        if let Ok(mut cache) = get_sealed_cache().write() {
+            cache.insert(sha256.clone(), artifact);
+        }
+
         let sealed = Self {
             source_path: source_path.to_path_buf(),
             sealed_path,
-            sha256: sha256.clone(),
+            sha256,
             version,
         };
-
-        // 5. 写入进程内只读缓存，后续调用完全免锁
-        if let Ok(mut cache) = get_sealed_cache().write() {
-            cache.insert(sha256, sealed.clone());
-        }
 
         Ok(sealed)
     }
@@ -661,6 +726,35 @@ mod tests {
             for p in &sealed_paths[1..] {
                 assert_eq!(p, &sealed_paths[0]);
             }
+        }
+    }
+
+    #[test]
+    fn test_sealed_solver_provenance_decoupling() {
+        if let Some(z3_path) = find_z3_executable() {
+            let temp_dir = std::env::temp_dir();
+            let copy_a = temp_dir.join("axiom_test_solver_a.exe");
+            let copy_b = temp_dir.join("axiom_test_solver_b.exe");
+
+            let _ = std::fs::copy(&z3_path, &copy_a);
+            let _ = std::fs::copy(&z3_path, &copy_b);
+
+            let sealed_a =
+                SealedSolverBinary::seal_from_path(&copy_a).expect("seal copy a should succeed");
+            let sealed_b =
+                SealedSolverBinary::seal_from_path(&copy_b).expect("seal copy b should succeed");
+
+            let _ = std::fs::remove_file(&copy_a);
+            let _ = std::fs::remove_file(&copy_b);
+
+            // 无论缓存是否命中，source_path 必须严格对应各自传入的真实来源路径，绝不可跨调用污染
+            assert_eq!(sealed_a.source_path, copy_a);
+            assert_eq!(sealed_b.source_path, copy_b);
+            assert_ne!(sealed_a.source_path, sealed_b.source_path);
+
+            // 但内容寻址的密封沙箱路径和哈希应当完全一致
+            assert_eq!(sealed_a.sealed_path, sealed_b.sealed_path);
+            assert_eq!(sealed_a.sha256, sealed_b.sha256);
         }
     }
 }

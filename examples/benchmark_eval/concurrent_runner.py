@@ -1006,6 +1006,10 @@ def validate_benchmark_result_schema(data: dict):
 
     # 强互锁 Worker 生成真实性 (双向兼容平铺结构、worker_results 与 workers_details)
     for g_data, g_name in [(g2, "Group 2"), (g3, "Group 3")]:
+        if "worker_results" in g_data and "workers_details" in g_data:
+            if g_data["worker_results"] != g_data["workers_details"]:
+                raise ValueError(f"{g_name} 中 worker_results 与 workers_details 别名列表内容不全等！")
+
         workers = g_data.get("worker_results")
         if workers is None:
             workers = g_data.get("workers_details")
@@ -1058,6 +1062,96 @@ def validate_benchmark_result_schema(data: dict):
                     raise ValueError(
                         f"实测模式下 {g_name} Worker is_estimated 必须为 False，实际为 {w['is_estimated']}"
                     )
+
+    # 强互锁 Resolver 生成真实性
+    resolver_calls = g2.get("resolver_details") or []
+    for idx, r in enumerate(resolver_calls):
+        if not isinstance(r, dict):
+            raise ValueError(f"Group 2 resolver_details[{idx}] 必须为字典对象")
+        if "raw_result" in r and isinstance(r["raw_result"], dict):
+            raw_r = r["raw_result"]
+            if "usage_source" in raw_r and r.get("usage_source") != raw_r["usage_source"]:
+                raise ValueError(f"Group 2 Resolver 平铺 usage_source 与底层 raw_result 不全等！")
+            if "is_estimated" in raw_r and r.get("is_estimated") != raw_r["is_estimated"]:
+                raise ValueError(f"Group 2 Resolver 平铺 is_estimated 与底层 raw_result 不全等！")
+
+        if not is_mock:
+            if "raw_result" not in r or not isinstance(r["raw_result"], dict):
+                raise ValueError(f"实测模式下 Group 2 resolver_details[{idx}] 必须包含底层 raw_result 证据字典！")
+            raw_r = r["raw_result"]
+            if "usage_source" not in raw_r or "is_estimated" not in raw_r:
+                raise ValueError(f"实测模式下 Group 2 resolver_details[{idx}] raw_result 缺失 usage_source 或 is_estimated 底层证据！")
+            if r.get("usage_source") != "api_event":
+                raise ValueError(f"实测模式下 Group 2 resolver_details[{idx}] usage_source 必须为 'api_event'")
+            if r.get("is_estimated") is not False:
+                raise ValueError(f"实测模式下 Group 2 resolver_details[{idx}] is_estimated 必须为 False")
+            r_billed = raw_r.get("raw_billed") or {}
+            if not isinstance(r_billed, dict) or r_billed.get("total_tokens", 0) <= 0:
+                raise ValueError(f"实测模式下 Group 2 resolver_details[{idx}] 真实 billed tokens 必须大于 0")
+            if "synthetic_mock_generated" in str(raw_r) or "synthetic_mock" in str(raw_r):
+                raise ValueError(f"实测模式下 Group 2 resolver_details[{idx}] 结果中检测到 mock 生成标记！")
+
+    # 强制从明细重新计算所有 token 账单，并断言与 Group 内部 tokens 及顶层 summary 完全一致
+    g2_workers = g2.get("worker_results") or g2.get("workers_details") or []
+    g3_workers = g3.get("worker_results") or g3.get("workers_details") or []
+
+    calc_g2_w_payload = sum(w["raw_result"]["task_payload"]["total_tokens"] for w in g2_workers if isinstance(w, dict) and "raw_result" in w and isinstance(w["raw_result"], dict))
+    calc_g2_w_billed = sum(w["raw_result"]["raw_billed"]["total_tokens"] for w in g2_workers if isinstance(w, dict) and "raw_result" in w and isinstance(w["raw_result"], dict))
+    calc_g2_r_payload = sum(r["raw_result"]["task_payload"]["total_tokens"] for r in resolver_calls if isinstance(r, dict) and "raw_result" in r and isinstance(r["raw_result"], dict))
+    calc_g2_r_billed = sum(r["raw_result"]["raw_billed"]["total_tokens"] for r in resolver_calls if isinstance(r, dict) and "raw_result" in r and isinstance(r["raw_result"], dict))
+    calc_g2_total_payload = calc_g2_w_payload + calc_g2_r_payload
+    calc_g2_total_billed = calc_g2_w_billed + calc_g2_r_billed
+
+    calc_g3_w_payload = sum(w["raw_result"]["task_payload"]["total_tokens"] for w in g3_workers if isinstance(w, dict) and "raw_result" in w and isinstance(w["raw_result"], dict))
+    calc_g3_w_billed = sum(w["raw_result"]["raw_billed"]["total_tokens"] for w in g3_workers if isinstance(w, dict) and "raw_result" in w and isinstance(w["raw_result"], dict))
+    calc_g3_total_payload = calc_g3_w_payload
+    calc_g3_total_billed = calc_g3_w_billed
+
+    g2_tokens = g2.get("tokens", {})
+    if g2_tokens.get("workers_payload") != calc_g2_w_payload:
+        raise ValueError(f"Group 2 workers_payload 重算不一致: {g2_tokens.get('workers_payload')} != {calc_g2_w_payload}")
+    if g2_tokens.get("resolver_payload_tax") != calc_g2_r_payload:
+        raise ValueError(f"Group 2 resolver_payload_tax 重算不一致: {g2_tokens.get('resolver_payload_tax')} != {calc_g2_r_payload}")
+    if g2_tokens.get("total_payload") != calc_g2_total_payload:
+        raise ValueError(f"Group 2 total_payload 重算不一致: {g2_tokens.get('total_payload')} != {calc_g2_total_payload}")
+    if g2_tokens.get("workers_raw_billed") != calc_g2_w_billed:
+        raise ValueError(f"Group 2 workers_raw_billed 重算不一致: {g2_tokens.get('workers_raw_billed')} != {calc_g2_w_billed}")
+    if g2_tokens.get("resolver_billed_tax") != calc_g2_r_billed:
+        raise ValueError(f"Group 2 resolver_billed_tax 重算不一致: {g2_tokens.get('resolver_billed_tax')} != {calc_g2_r_billed}")
+    if g2_tokens.get("total_raw_billed") != calc_g2_total_billed:
+        raise ValueError(f"Group 2 total_raw_billed 重算不一致: {g2_tokens.get('total_raw_billed')} != {calc_g2_total_billed}")
+
+    g3_tokens = g3.get("tokens", {})
+    if g3_tokens.get("workers_payload") != calc_g3_w_payload:
+        raise ValueError(f"Group 3 workers_payload 重算不一致: {g3_tokens.get('workers_payload')} != {calc_g3_w_payload}")
+    if g3_tokens.get("total_payload") != calc_g3_total_payload:
+        raise ValueError(f"Group 3 total_payload 重算不一致: {g3_tokens.get('total_payload')} != {calc_g3_total_payload}")
+    if g3_tokens.get("workers_raw_billed") != calc_g3_w_billed:
+        raise ValueError(f"Group 3 workers_raw_billed 重算不一致: {g3_tokens.get('workers_raw_billed')} != {calc_g3_w_billed}")
+    if g3_tokens.get("total_raw_billed") != calc_g3_total_billed:
+        raise ValueError(f"Group 3 total_raw_billed 重算不一致: {g3_tokens.get('total_raw_billed')} != {calc_g3_total_billed}")
+
+    # 顶层 summary 强核验
+    rust_summary = summary.get("rust_group", {})
+    axiom_summary = summary.get("axiom_group", {})
+    if rust_summary.get("workers_billed_tokens") != calc_g2_w_billed:
+        raise ValueError(f"summary.rust_group.workers_billed_tokens 对账失败: {rust_summary.get('workers_billed_tokens')} != {calc_g2_w_billed}")
+    if rust_summary.get("resolver_tax_billed_tokens") != calc_g2_r_billed:
+        raise ValueError(f"summary.rust_group.resolver_tax_billed_tokens 对账失败: {rust_summary.get('resolver_tax_billed_tokens')} != {calc_g2_r_billed}")
+    if rust_summary.get("total_billed_tokens") != calc_g2_total_billed:
+        raise ValueError(f"summary.rust_group.total_billed_tokens 对账失败: {rust_summary.get('total_billed_tokens')} != {calc_g2_total_billed}")
+
+    if axiom_summary.get("workers_billed_tokens") != calc_g3_w_billed:
+        raise ValueError(f"summary.axiom_group.workers_billed_tokens 对账失败: {axiom_summary.get('workers_billed_tokens')} != {calc_g3_w_billed}")
+    if axiom_summary.get("resolver_tax_billed_tokens") != 0:
+        raise ValueError(f"summary.axiom_group.resolver_tax_billed_tokens 必须为 0")
+    if axiom_summary.get("total_billed_tokens") != calc_g3_total_billed:
+        raise ValueError(f"summary.axiom_group.total_billed_tokens 对账失败: {axiom_summary.get('total_billed_tokens')} != {calc_g3_total_billed}")
+
+    if not is_mock:
+        expected_savings = round((calc_g2_total_billed - calc_g3_total_billed) / calc_g2_total_billed * 100, 1) if calc_g2_total_billed > 0 else 0.0
+        if axiom_summary.get("token_savings_pct") != expected_savings:
+            raise ValueError(f"summary.axiom_group.token_savings_pct 重新计算不一致: {axiom_summary.get('token_savings_pct')} != {expected_savings}")
 
     # 递归 Fail-Closed 严查所有字段，绝不能有字符串 "unknown"
     def check_no_unknown(obj, path=""):
@@ -1749,7 +1843,10 @@ def run_group2_rust_pipeline(tasks: list, args, proxy: str) -> dict:
                     "function_name": fname,
                     "latency_sec": round(t_r_elapsed, 2),
                     "task_payload": r_res["task_payload"],
-                    "raw_billed": r_res["raw_billed"]
+                    "raw_billed": r_res["raw_billed"],
+                    "usage_source": r_res["usage_source"],
+                    "is_estimated": r_res["is_estimated"],
+                    "raw_result": r_res,
                 })
                 print(f" 冲突修复完毕 ✅ (耗时: {round(t_r_elapsed, 2)}s, 消耗: {r_res['raw_billed']['total_tokens']}t)")
 
