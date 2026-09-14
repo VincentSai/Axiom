@@ -365,7 +365,7 @@ fn get_sealed_cache() -> &'static std::sync::RwLock<HashMap<String, SealedSolver
 }
 
 #[cfg(windows)]
-pub mod os_file_lock {
+mod os_file_lock {
     use std::fs::File;
     use std::os::windows::io::AsRawHandle;
 
@@ -373,12 +373,13 @@ pub mod os_file_lock {
     const LOCKFILE_FAIL_IMMEDIATELY: u32 = 0x00000001;
 
     #[repr(C)]
-    pub struct OVERLAPPED {
-        pub internal: usize,
-        pub internal_high: usize,
-        pub offset: u32,
-        pub offset_high: u32,
-        pub h_event: *mut std::ffi::c_void,
+    #[allow(clippy::upper_case_acronyms)]
+    struct OVERLAPPED {
+        internal: usize,
+        internal_high: usize,
+        offset: u32,
+        offset_high: u32,
+        h_event: *mut std::ffi::c_void,
     }
 
     extern "system" {
@@ -399,7 +400,7 @@ pub mod os_file_lock {
         ) -> i32;
     }
 
-    pub fn try_lock_exclusive(file: &File) -> bool {
+    pub(super) fn try_lock_exclusive(file: &File) -> bool {
         let handle = file.as_raw_handle();
         let mut overlapped: OVERLAPPED = unsafe { std::mem::zeroed() };
         let res = unsafe {
@@ -415,7 +416,7 @@ pub mod os_file_lock {
         res != 0
     }
 
-    pub fn unlock(file: &File) {
+    pub(super) fn unlock(file: &File) {
         let handle = file.as_raw_handle();
         let mut overlapped: OVERLAPPED = unsafe { std::mem::zeroed() };
         unsafe {
@@ -425,16 +426,16 @@ pub mod os_file_lock {
 }
 
 #[cfg(unix)]
-pub mod os_file_lock {
+mod os_file_lock {
     use std::fs::File;
     use std::os::unix::io::AsRawFd;
 
-    pub fn try_lock_exclusive(file: &File) -> bool {
+    pub(super) fn try_lock_exclusive(file: &File) -> bool {
         let fd = file.as_raw_fd();
         unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) == 0 }
     }
 
-    pub fn unlock(file: &File) {
+    pub(super) fn unlock(file: &File) {
         let fd = file.as_raw_fd();
         unsafe {
             let _ = libc::flock(fd, libc::LOCK_UN);
@@ -839,44 +840,51 @@ mod tests {
                 .expect("create test lock file");
         }
 
-        // 启动独立的真实子进程持有该文件的排他锁并睡眠
-        let py_script = r#"
-import sys, time
-lock_path = sys.argv[1]
-f = open(lock_path, "r+")
-if sys.platform == "win32":
-    import msvcrt
-    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
-else:
-    import fcntl
-    fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-sys.stdout.write("LOCKED\n")
-sys.stdout.flush()
-time.sleep(60)
-"#;
-        let mut child = match std::process::Command::new("python")
-            .args(["-c", py_script, test_lock_file.to_str().unwrap()])
+        // 启动当前测试二进制自身作为独立的真实子进程持有该文件的排他锁
+        let current_exe = std::env::current_exe().expect("current test exe");
+        let mut child = std::process::Command::new(current_exe)
+            .args([
+                "--exact",
+                "z3_solver::tests::helper_lock_holder",
+                "--nocapture",
+            ])
+            .env("AXIOM_TEST_LOCK_HOLDER_PATH", &test_lock_file)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()
-        {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("Skipping cross process lock test because python is unavailable: {e}");
-                let _ = std::fs::remove_file(&test_lock_file);
-                return;
-            }
-        };
+            .expect("spawn current test binary helper subprocess");
 
-        // 等待子进程输出 "LOCKED"
-        use std::io::BufRead;
-        let mut reader = std::io::BufReader::new(child.stdout.take().unwrap());
-        let mut line = String::new();
-        let read_res = reader.read_line(&mut line);
-        assert!(
-            read_res.is_ok() && line.trim() == "LOCKED",
-            "child process should lock and output LOCKED, got: {line}"
-        );
+        // 使用带 5 秒超时保护的有界通道等待子进程握手 "LOCKED"
+        let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+        let stdout = child.stdout.take().expect("child stdout");
+        let reader_thread = std::thread::spawn(move || {
+            use std::io::BufRead;
+            let mut reader = std::io::BufReader::new(stdout);
+            let mut line = String::new();
+            while let Ok(n) = reader.read_line(&mut line) {
+                if n == 0 {
+                    break;
+                }
+                if line.trim() == "LOCKED" {
+                    let _ = tx.send(Ok(()));
+                    return;
+                }
+                line.clear();
+            }
+            let _ = tx.send(Err("EOF without LOCKED".into()));
+        });
+
+        match rx.recv_timeout(std::time::Duration::from_secs(5)) {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                let _ = child.kill();
+                panic!("helper child process failed to lock: {e}");
+            }
+            Err(_) => {
+                let _ = child.kill();
+                panic!("timed out waiting for helper child process to lock file");
+            }
+        }
 
         // 1. 此时子进程正持有排他锁，主进程尝试通过 os_file_lock::try_lock_exclusive 获取，必须失败（返回 false）
         let local_file = std::fs::OpenOptions::new()
@@ -890,14 +898,27 @@ time.sleep(60)
             "exclusive lock must fail while held by another process"
         );
 
-        // 2. 模拟子进程异常崩溃/被强杀：向子进程发送 kill 信号并等待内核回收
+        // 2. 模拟子进程异常崩溃/被强杀：向子进程发送 kill 信号并在 5 秒 deadline 内有界等待回收
         let kill_res = child.kill();
         assert!(
             kill_res.is_ok(),
             "killing lock holder child process should succeed"
         );
-        let wait_res = child.wait();
-        assert!(wait_res.is_ok(), "child should exit after kill");
+        let wait_deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut child_exited = false;
+        while std::time::Instant::now() < wait_deadline {
+            if let Ok(Some(_)) = child.try_wait() {
+                child_exited = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert!(
+            child_exited,
+            "child should exit within 5s deadline after kill"
+        );
+        let _ = child.wait();
+        let _ = reader_thread.join();
 
         // 3. 子进程终止后，操作系统内核应自动释放该文件句柄持有的排他锁；主进程重试必须成功
         let mut acquired = false;
@@ -917,5 +938,24 @@ time.sleep(60)
         os_file_lock::unlock(&local_file);
         drop(local_file);
         let _ = std::fs::remove_file(&test_lock_file);
+    }
+
+    #[test]
+    fn helper_lock_holder() {
+        if let Ok(lock_path) = std::env::var("AXIOM_TEST_LOCK_HOLDER_PATH") {
+            let file = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(&lock_path)
+                .expect("helper open lock file");
+            let locked = os_file_lock::try_lock_exclusive(&file);
+            assert!(locked, "helper must acquire exclusive lock");
+            use std::io::Write;
+            println!("LOCKED");
+            let _ = std::io::stdout().flush();
+            // 保持持锁，休眠等待主进程强杀
+            std::thread::sleep(std::time::Duration::from_secs(60));
+            std::process::exit(0);
+        }
     }
 }

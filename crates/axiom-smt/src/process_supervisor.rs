@@ -11,7 +11,7 @@
 
 use std::io::{Read, Write};
 use std::process::{Child, Command, ExitStatus, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -297,14 +297,47 @@ mod unix_supervisor {
         cmd.process_group(0);
     }
 
-    pub fn kill_process_tree(pid: u32) {
+    /// 仅向进程组发送 SIGKILL，清理孤儿后代，绝不触碰特定正数 PID
+    pub fn kill_process_group(pgid: u32) {
         extern "C" {
             fn kill(pid: i32, sig: i32) -> i32;
         }
         unsafe {
-            // SIGKILL = 9 to entire process group
-            let _ = kill(-(pid as i32), 9);
+            let _ = kill(-(pgid as i32), 9);
+        }
+    }
+
+    /// 向尚未回收的主进程 PID 发送 SIGKILL
+    pub fn kill_process_pid(pid: u32) {
+        extern "C" {
+            fn kill(pid: i32, sig: i32) -> i32;
+        }
+        unsafe {
             let _ = kill(pid as i32, 9);
+        }
+    }
+}
+
+/// 单一状态枚举，显式表达父子进程与后代进程树的受控生命周期，杜绝矛盾状态组合。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcessLifecycle {
+    /// 进程正在运行，未被 reap，后代树未被终止
+    Running = 0,
+    /// 主子进程已被操作系统 reap 收割，但后代孤儿进程树尚未保证终止
+    ParentReaped = 1,
+    /// 后代孤儿进程树已被终止，但主子进程尚未被操作系统 reap 收割
+    TreeTerminated = 2,
+    /// 主子进程已 reap 且后代树已被完全终止（完全清理完毕）
+    FullyTerminated = 3,
+}
+
+impl ProcessLifecycle {
+    fn from_u8(val: u8) -> Self {
+        match val {
+            0 => Self::Running,
+            1 => Self::ParentReaped,
+            2 => Self::TreeTerminated,
+            _ => Self::FullyTerminated,
         }
     }
 }
@@ -315,12 +348,81 @@ pub struct ProcessSupervisor {
     child: Child,
     #[cfg(windows)]
     job_guard: Option<win32_job::JobObjectGuard>,
-    parent_exited: Arc<AtomicBool>,
-    parent_reaped: Arc<AtomicBool>,
-    tree_terminated: Arc<AtomicBool>,
+    lifecycle: Arc<AtomicU8>,
 }
 
 impl ProcessSupervisor {
+    fn current_lifecycle(&self) -> ProcessLifecycle {
+        ProcessLifecycle::from_u8(self.lifecycle.load(Ordering::SeqCst))
+    }
+
+    /// 查询主子进程是否已确认被操作系统 reap 回收
+    pub fn is_reaped(&self) -> bool {
+        matches!(
+            self.current_lifecycle(),
+            ProcessLifecycle::ParentReaped | ProcessLifecycle::FullyTerminated
+        )
+    }
+
+    /// 查询后代进程树是否已被物理终止
+    pub fn is_tree_terminated(&self) -> bool {
+        matches!(
+            self.current_lifecycle(),
+            ProcessLifecycle::TreeTerminated | ProcessLifecycle::FullyTerminated
+        )
+    }
+
+    /// 查询是否已实现主进程回收且后代树完全终止的双重闭环
+    pub fn is_fully_terminated(&self) -> bool {
+        self.current_lifecycle() == ProcessLifecycle::FullyTerminated
+    }
+
+    /// 原子跃迁记录主进程已 reap
+    fn mark_parent_reaped(&self) {
+        let mut curr = self.lifecycle.load(Ordering::SeqCst);
+        loop {
+            let next = match ProcessLifecycle::from_u8(curr) {
+                ProcessLifecycle::Running => ProcessLifecycle::ParentReaped as u8,
+                ProcessLifecycle::TreeTerminated => ProcessLifecycle::FullyTerminated as u8,
+                already @ (ProcessLifecycle::ParentReaped | ProcessLifecycle::FullyTerminated) => {
+                    already as u8
+                }
+            };
+            match self.lifecycle.compare_exchange_weak(
+                curr,
+                next,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => break,
+                Err(actual) => curr = actual,
+            }
+        }
+    }
+
+    /// 原子跃迁记录后代树已被物理终止
+    fn mark_tree_terminated(&self) {
+        let mut curr = self.lifecycle.load(Ordering::SeqCst);
+        loop {
+            let next =
+                match ProcessLifecycle::from_u8(curr) {
+                    ProcessLifecycle::Running => ProcessLifecycle::TreeTerminated as u8,
+                    ProcessLifecycle::ParentReaped => ProcessLifecycle::FullyTerminated as u8,
+                    already @ (ProcessLifecycle::TreeTerminated
+                    | ProcessLifecycle::FullyTerminated) => already as u8,
+                };
+            match self.lifecycle.compare_exchange_weak(
+                curr,
+                next,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            ) {
+                Ok(_) => break,
+                Err(actual) => curr = actual,
+            }
+        }
+    }
+
     /// Spawns a child process with race-free tree-containment guarantees.
     pub fn spawn(mut cmd: Command) -> Result<Self, String> {
         #[cfg(windows)]
@@ -368,9 +470,7 @@ impl ProcessSupervisor {
             Ok(Self {
                 child,
                 job_guard: Some(job_guard),
-                parent_exited: Arc::new(AtomicBool::new(false)),
-                parent_reaped: Arc::new(AtomicBool::new(false)),
-                tree_terminated: Arc::new(AtomicBool::new(false)),
+                lifecycle: Arc::new(AtomicU8::new(ProcessLifecycle::Running as u8)),
             })
         }
 
@@ -382,9 +482,7 @@ impl ProcessSupervisor {
                 .map_err(|e| format!("failed to spawn process group: {e}"))?;
             Ok(Self {
                 child,
-                parent_exited: Arc::new(AtomicBool::new(false)),
-                parent_reaped: Arc::new(AtomicBool::new(false)),
-                tree_terminated: Arc::new(AtomicBool::new(false)),
+                lifecycle: Arc::new(AtomicU8::new(ProcessLifecycle::Running as u8)),
             })
         }
 
@@ -395,9 +493,7 @@ impl ProcessSupervisor {
                 .map_err(|e| format!("failed to spawn process: {e}"))?;
             Ok(Self {
                 child,
-                parent_exited: Arc::new(AtomicBool::new(false)),
-                parent_reaped: Arc::new(AtomicBool::new(false)),
-                tree_terminated: Arc::new(AtomicBool::new(false)),
+                lifecycle: Arc::new(AtomicU8::new(ProcessLifecycle::Running as u8)),
             })
         }
     }
@@ -422,25 +518,14 @@ impl ProcessSupervisor {
         self.child.id()
     }
 
-    /// Query whether the parent process has been confirmed reaped by OS.
-    pub fn is_reaped(&self) -> bool {
-        self.parent_reaped.load(Ordering::SeqCst)
-    }
-
-    /// Query whether the process tree destruction signal has been dispatched.
-    pub fn is_tree_terminated(&self) -> bool {
-        self.tree_terminated.load(Ordering::SeqCst)
-    }
-
     /// Controlled, stateful try_wait that atomically records reap status.
     pub fn try_wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
-        if self.parent_reaped.load(Ordering::SeqCst) {
+        if self.is_reaped() {
             return self.child.try_wait();
         }
         match self.child.try_wait() {
             Ok(Some(status)) => {
-                self.parent_exited.store(true, Ordering::SeqCst);
-                self.parent_reaped.store(true, Ordering::SeqCst);
+                self.mark_parent_reaped();
                 Ok(Some(status))
             }
             other => other,
@@ -457,13 +542,12 @@ impl ProcessSupervisor {
     /// 坚决不再次向其主 PID 发送 kill 信号（防止击中已被操作系统复用的新进程 PID）；
     /// 仅在底层子进程被实际 reap 确认退出后才报告清理成功。
     pub fn terminate_until(&mut self, deadline: Option<Instant>) -> bool {
-        if self.parent_reaped.load(Ordering::SeqCst) && self.tree_terminated.load(Ordering::SeqCst)
-        {
+        if self.is_fully_terminated() {
             return true;
         }
 
         // 1. 若尚未清理后代树，先终止整棵后代进程树（针对孤儿后代进程）
-        if !self.tree_terminated.swap(true, Ordering::SeqCst) {
+        if !self.is_tree_terminated() {
             #[cfg(windows)]
             {
                 if let Some(ref guard) = self.job_guard {
@@ -473,13 +557,24 @@ impl ProcessSupervisor {
 
             #[cfg(unix)]
             {
-                unix_supervisor::kill_process_tree(self.child.id());
+                // 仅向进程组发信号，绝不触碰特定正数 PID，彻底杜绝 PID 复用误杀
+                unix_supervisor::kill_process_group(self.child.id());
             }
+
+            // 在物理下发终止操作之后，记录后代树终止状态
+            self.mark_tree_terminated();
         }
 
-        // 2. 仅在主子进程尚未 reaped 时，才尝试强杀主子进程（杜绝 PID 复用误杀已回收主进程）
-        if !self.parent_reaped.load(Ordering::SeqCst) {
-            let _ = self.child.kill();
+        // 2. 仅在主子进程尚未 reaped 时，才尝试强杀主子进程正数 PID（杜绝 PID 复用误杀已回收主进程）
+        if !self.is_reaped() {
+            #[cfg(unix)]
+            {
+                unix_supervisor::kill_process_pid(self.child.id());
+            }
+            #[cfg(not(unix))]
+            {
+                let _ = self.child.kill();
+            }
         }
 
         // 3. 优先执行立即非阻塞 try_wait 确认回收
@@ -512,9 +607,7 @@ impl ProcessSupervisor {
 
 impl Drop for ProcessSupervisor {
     fn drop(&mut self) {
-        if !self.parent_reaped.load(Ordering::SeqCst)
-            || !self.tree_terminated.load(Ordering::SeqCst)
-        {
+        if !self.is_fully_terminated() {
             let _ = self.terminate_until(Some(Instant::now() + Duration::from_millis(50)));
         }
     }
@@ -525,24 +618,25 @@ enum StreamDrainResult<T> {
     TimedOut,
 }
 
-/// 统合 reader 与 writer 线程的通用限时回收与打断状态机，消除重复实现与语义漂移。
-fn bounded_join_thread_after_kill<T>(
+/// 统合 reader 与 writer 线程的通用限时回收与打断状态机，严格受共享单调绝对截止时间守护。
+fn bounded_join_thread_until<T>(
     cancelled: &AtomicBool,
     rx: &mpsc::Receiver<T>,
     handle: &mut Option<std::thread::JoinHandle<()>>,
-    grace: Duration,
+    cleanup_deadline: Instant,
     thread_name: &str,
 ) -> Result<(), String> {
     cancelled.store(true, Ordering::SeqCst);
     if let Some(h) = handle.take() {
-        let initial_exited = if grace.is_zero() {
+        let remaining = cleanup_deadline.saturating_duration_since(Instant::now());
+        let initial_exited = if remaining.is_zero() {
             matches!(
                 rx.try_recv(),
                 Ok(_) | Err(std::sync::mpsc::TryRecvError::Disconnected)
             )
         } else {
             matches!(
-                rx.recv_timeout(grace),
+                rx.recv_timeout(remaining.min(Duration::from_millis(10))),
                 Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected)
             )
         };
@@ -557,10 +651,18 @@ fn bounded_join_thread_after_kill<T>(
             use std::os::windows::io::AsRawHandle;
             let thread_raw = h.as_raw_handle() as win32_job::HANDLE;
             win32_job::cancel_thread_synchronous_io(thread_raw);
-            let cancel_grace = Duration::from_millis(50);
-            if matches!(
-                rx.recv_timeout(cancel_grace),
-                Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected)
+            let remaining_cancel = cleanup_deadline.saturating_duration_since(Instant::now());
+            if !remaining_cancel.is_zero() {
+                if matches!(
+                    rx.recv_timeout(remaining_cancel.min(Duration::from_millis(15))),
+                    Ok(_) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected)
+                ) {
+                    let _ = h.join();
+                    return Ok(());
+                }
+            } else if matches!(
+                rx.try_recv(),
+                Ok(_) | Err(std::sync::mpsc::TryRecvError::Disconnected)
             ) {
                 let _ = h.join();
                 return Ok(());
@@ -568,10 +670,10 @@ fn bounded_join_thread_after_kill<T>(
         }
 
         eprintln!(
-            "WARN: process {thread_name} thread did not terminate within bounded grace; abandoning join to prevent hang"
+            "WARN: process {thread_name} thread did not terminate within bounded cleanup deadline; abandoning join to prevent hang"
         );
         return Err(format!(
-            "cleanup failure: process {thread_name} thread did not terminate within bounded grace"
+            "cleanup failure: process {thread_name} thread did not terminate within bounded cleanup deadline"
         ));
     }
     Ok(())
@@ -613,15 +715,19 @@ impl StreamReaderComm {
         }
     }
 
-    /// 在进程树强杀后执行有界回收，委托给通用状态机，严禁无界 join 挂死主线程。
-    fn bounded_join_after_kill(mut self, grace: Duration) -> Result<(), String> {
-        bounded_join_thread_after_kill(
+    /// 在进程树强杀后执行有界回收，严格受单调绝对截止时间预算守护。
+    fn bounded_join_until(mut self, cleanup_deadline: Instant) -> Result<(), String> {
+        bounded_join_thread_until(
             &self.cancelled,
             &self.rx,
             &mut self.handle,
-            grace,
+            cleanup_deadline,
             "stream reader",
         )
+    }
+
+    fn bounded_join_after_kill(self, grace: Duration) -> Result<(), String> {
+        self.bounded_join_until(Instant::now() + grace)
     }
 
     #[cfg(test)]
@@ -747,15 +853,19 @@ impl StdinWriterComm {
         }
     }
 
-    /// 在进程树强杀后执行有界回收，委托给通用状态机，严禁无界 join 挂死主线程。
-    fn bounded_join_after_kill(mut self, grace: Duration) -> Result<(), String> {
-        bounded_join_thread_after_kill(
+    /// 在进程树强杀后执行有界回收，严格受单调绝对截止时间预算守护。
+    fn bounded_join_until(mut self, cleanup_deadline: Instant) -> Result<(), String> {
+        bounded_join_thread_until(
             &self.cancelled,
             &self.rx,
             &mut self.handle,
-            grace,
+            cleanup_deadline,
             "stdin writer",
         )
+    }
+
+    fn bounded_join_after_kill(self, grace: Duration) -> Result<(), String> {
+        self.bounded_join_until(Instant::now() + grace)
     }
 
     #[cfg(test)]
@@ -890,17 +1000,16 @@ pub(crate) fn execute_process_until_deadline(
                 let cleanup_budget = Duration::from_millis(150);
                 let cleanup_deadline = Instant::now() + cleanup_budget;
                 let term_ok = supervisor.terminate_until(Some(cleanup_deadline));
-                let grace = Duration::ZERO;
                 let mut cleanup_errs = Vec::new();
                 if let Some(comm) = stdin_comm {
-                    if let Err(err) = comm.bounded_join_after_kill(grace) {
+                    if let Err(err) = comm.bounded_join_until(cleanup_deadline) {
                         cleanup_errs.push(err);
                     }
                 }
-                if let Err(err) = stdout_comm.bounded_join_after_kill(grace) {
+                if let Err(err) = stdout_comm.bounded_join_until(cleanup_deadline) {
                     cleanup_errs.push(err);
                 }
-                if let Err(err) = stderr_comm.bounded_join_after_kill(grace) {
+                if let Err(err) = stderr_comm.bounded_join_until(cleanup_deadline) {
                     cleanup_errs.push(err);
                 }
                 let cleanup_msg = format_cleanup(term_ok, &cleanup_errs);
@@ -915,17 +1024,16 @@ pub(crate) fn execute_process_until_deadline(
         let cleanup_budget = Duration::from_millis(150);
         let cleanup_deadline = Instant::now() + cleanup_budget;
         let term_ok = supervisor.terminate_until(Some(cleanup_deadline));
-        let grace = Duration::ZERO;
         let mut cleanup_errs = Vec::new();
         if let Some(comm) = stdin_comm {
-            if let Err(err) = comm.bounded_join_after_kill(grace) {
+            if let Err(err) = comm.bounded_join_until(cleanup_deadline) {
                 cleanup_errs.push(err);
             }
         }
-        if let Err(err) = stdout_comm.bounded_join_after_kill(grace) {
+        if let Err(err) = stdout_comm.bounded_join_until(cleanup_deadline) {
             cleanup_errs.push(err);
         }
-        if let Err(err) = stderr_comm.bounded_join_after_kill(grace) {
+        if let Err(err) = stderr_comm.bounded_join_until(cleanup_deadline) {
             cleanup_errs.push(err);
         }
         let cleanup_msg = format_cleanup(term_ok, &cleanup_errs);
