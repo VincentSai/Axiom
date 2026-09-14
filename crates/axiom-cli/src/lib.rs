@@ -20,7 +20,7 @@ use axiom_ffi_gen::{
 use axiom_hole_extractor::{extract_holes, HoleTask};
 use axiom_parser::{parse_module, ParseError};
 use axiom_smt::{find_z3_executable, generate_smtlib2_with_module, resolve_solver_identity};
-use axiom_transpiler::{transpile_source_to_rust, TranspileError};
+use axiom_transpiler::{transpile_to_rust, TranspileError};
 use axiom_vfs::{
     export_database_module, export_module_to_source, sync_source_to_database, VfsError,
 };
@@ -78,10 +78,20 @@ pub enum Commands {
         /// Write generated Rust to a file instead of stdout.
         #[arg(short, long)]
         output: Option<PathBuf>,
+
+        /// Bypass formal verification gate (DANGEROUS: emits unverified code with warning).
+        #[arg(long)]
+        unsafe_unverified: bool,
     },
 
     /// Transpile, compile, and execute a hole-free Axiom program.
-    Run { file: PathBuf },
+    Run {
+        file: PathBuf,
+
+        /// Bypass formal verification gate (DANGEROUS: runs unverified code with warning).
+        #[arg(long)]
+        unsafe_unverified: bool,
+    },
 
     /// Generate a WebAssembly Component Model interface.
     ExportWit {
@@ -297,6 +307,9 @@ pub enum CliError {
     InvalidBridgeTarget(String),
     Pool(PoolError),
     HoleVerificationRejected(String),
+    UnverifiedContracts {
+        message: String,
+    },
 }
 
 impl fmt::Display for CliError {
@@ -367,6 +380,9 @@ impl fmt::Display for CliError {
             Self::HoleVerificationRejected(reason) => {
                 write!(formatter, "hole verification rejected: {reason}")
             }
+            Self::UnverifiedContracts { message } => {
+                write!(formatter, "formal verification gate failed: {message}")
+            }
         }
     }
 }
@@ -392,7 +408,8 @@ impl Error for CliError {
             | Self::RustCompilationFailed(_)
             | Self::ProgramFailed(_)
             | Self::VerificationFailed
-            | Self::HoleVerificationRejected(_) => None,
+            | Self::HoleVerificationRejected(_)
+            | Self::UnverifiedContracts { .. } => None,
         }
     }
 }
@@ -403,8 +420,15 @@ pub fn run(cli: Cli) -> Result<(), CliError> {
         Commands::Verify { file, json, strict } => verify(&file, json, strict),
         Commands::ExportSmt2 { file, output } => export_smt2(&file, output.as_deref()),
         Commands::ExtractHoles { file, out_dir } => extract(&file, out_dir.as_deref()),
-        Commands::EmitRust { file, output } => emit_rust(&file, output.as_deref()),
-        Commands::Run { file } => compile_and_run(&file),
+        Commands::EmitRust {
+            file,
+            output,
+            unsafe_unverified,
+        } => emit_rust(&file, output.as_deref(), unsafe_unverified),
+        Commands::Run {
+            file,
+            unsafe_unverified,
+        } => compile_and_run(&file, unsafe_unverified),
         Commands::ExportWit {
             file,
             output,
@@ -892,12 +916,77 @@ fn write_hole_tasks(out_dir: &Path, tasks: &[HoleTask]) -> Result<(), CliError> 
     Ok(())
 }
 
-fn emit_rust(file: &Path, output: Option<&Path>) -> Result<(), CliError> {
-    let source = read_source(file)?;
-    let rust = transpile_source_to_rust(&source).map_err(|source| CliError::Transpile {
+fn verify_and_transpile_source(
+    file: &Path,
+    source: &str,
+    unsafe_unverified: bool,
+) -> Result<String, CliError> {
+    let module = parse_module(source).map_err(|source| CliError::Parse {
         path: file.to_owned(),
         source,
     })?;
+
+    let has_contracted = module.functions.iter().any(|f| f.has_contracts());
+
+    if !unsafe_unverified && has_contracted {
+        let smt_results = axiom_smt::verify_module(&module);
+        for f in &module.functions {
+            if f.has_contracts() {
+                match smt_results.get(&f.name) {
+                    Some(axiom_smt::SmtResult::Proved { .. }) => {}
+                    other => {
+                        let reason = match other {
+                            Some(axiom_smt::SmtResult::CounterExample(ce)) => {
+                                format!("counter-example found: {ce:?}")
+                            }
+                            Some(axiom_smt::SmtResult::VacuousContract { reason }) => {
+                                format!("vacuous contract: {reason}")
+                            }
+                            Some(axiom_smt::SmtResult::Skipped(reason)) => {
+                                format!("verification skipped: {reason}")
+                            }
+                            Some(axiom_smt::SmtResult::Unknown(reason)) => {
+                                format!("solver unknown: {reason}")
+                            }
+                            Some(axiom_smt::SmtResult::Sampled { .. }) => {
+                                "only discretely sampled, not mathematically proved".into()
+                            }
+                            None => "no verification result".into(),
+                            _ => unreachable!(),
+                        };
+                        return Err(CliError::UnverifiedContracts {
+                            message: format!(
+                                "function `{}` has formal contracts that are NOT proved ({reason}). Pass `--unsafe-unverified` to override.",
+                                f.name
+                            ),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    let mut rust = transpile_to_rust(&module).map_err(|source| CliError::Transpile {
+        path: file.to_owned(),
+        source,
+    })?;
+
+    if unsafe_unverified {
+        rust = format!(
+            "// WARNING: Generated with --unsafe-unverified, contracts are NOT formally proved.\n{rust}"
+        );
+    } else if has_contracted {
+        rust = format!(
+            "// [Axiom Verification Receipt] All formal contracts proved by SMT solver.\n{rust}"
+        );
+    }
+
+    Ok(rust)
+}
+
+fn emit_rust(file: &Path, output: Option<&Path>, unsafe_unverified: bool) -> Result<(), CliError> {
+    let source = read_source(file)?;
+    let rust = verify_and_transpile_source(file, &source, unsafe_unverified)?;
 
     if let Some(output) = output {
         fs::write(output, rust).map_err(|source| CliError::WriteFile {
@@ -915,12 +1004,9 @@ fn emit_rust(file: &Path, output: Option<&Path>) -> Result<(), CliError> {
     Ok(())
 }
 
-fn compile_and_run(file: &Path) -> Result<(), CliError> {
+fn compile_and_run(file: &Path, unsafe_unverified: bool) -> Result<(), CliError> {
     let source = read_source(file)?;
-    let rust = transpile_source_to_rust(&source).map_err(|source| CliError::Transpile {
-        path: file.to_owned(),
-        source,
-    })?;
+    let rust = verify_and_transpile_source(file, &source, unsafe_unverified)?;
     let build_dir = TemporaryBuildDirectory::create()?;
     let rust_path = build_dir.path.join("main.rs");
     let executable_path = build_dir
