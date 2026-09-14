@@ -226,11 +226,11 @@ fn flatten_type_to_smt(
         return Err("type nesting depth exceeded in SMT flattening".into());
     }
     match ty {
-        Type::Int => {
+        Type::Int | Type::Decimal => {
             out.push((prefix.replace('.', "_"), "Int"));
             Ok(())
         }
-        Type::Float | Type::Decimal => {
+        Type::Float => {
             out.push((prefix.replace('.', "_"), "Real"));
             Ok(())
         }
@@ -562,6 +562,15 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
                 Ok(n.to_string())
             }
         }
+        Expr::Literal(Literal::Decimal(n)) => {
+            if *n == I64_MIN {
+                Ok("(- 9223372036854775808)".into())
+            } else if *n < 0 {
+                Ok(format!("(- {})", n.abs()))
+            } else {
+                Ok(n.to_string())
+            }
+        }
         Expr::Literal(Literal::Float(f)) => {
             if !f.is_finite() {
                 return Err("non-finite float in SMT query".into());
@@ -589,8 +598,40 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
             }
         }
         Expr::BinaryOp { left, op, right } => {
-            let l = expr_to_smt(left, var_types)?;
-            let r = expr_to_smt(right, var_types)?;
+            let empty_subs = HashMap::new();
+            let lt = infer_expr_type(left, var_types, &empty_subs);
+            let rt = infer_expr_type(right, var_types, &empty_subs);
+
+            let l = if rt == "Int" && matches!(left.as_ref(), Expr::Literal(Literal::Float(_))) {
+                if let Expr::Literal(Literal::Float(f)) = left.as_ref() {
+                    let micros = axiom_ast::float_to_decimal_micros(*f);
+                    if micros < 0 {
+                        format!("(- {})", micros.abs())
+                    } else {
+                        micros.to_string()
+                    }
+                } else {
+                    expr_to_smt(left, var_types)?
+                }
+            } else {
+                expr_to_smt(left, var_types)?
+            };
+
+            let r = if lt == "Int" && matches!(right.as_ref(), Expr::Literal(Literal::Float(_))) {
+                if let Expr::Literal(Literal::Float(f)) = right.as_ref() {
+                    let micros = axiom_ast::float_to_decimal_micros(*f);
+                    if micros < 0 {
+                        format!("(- {})", micros.abs())
+                    } else {
+                        micros.to_string()
+                    }
+                } else {
+                    expr_to_smt(right, var_types)?
+                }
+            } else {
+                expr_to_smt(right, var_types)?
+            };
+
             match op {
                 BinaryOperator::Divide => {
                     let empty_subs = HashMap::new();
@@ -751,7 +792,7 @@ fn pattern_condition_smt(
             Some(format!("(not {})", target_smt)),
             Some(target_smt.to_string()),
         )),
-        Pattern::Literal(Literal::Int(n)) => {
+        Pattern::Literal(Literal::Int(n)) | Pattern::Literal(Literal::Decimal(n)) => {
             let n_smt = if *n == I64_MIN {
                 "(- 9223372036854775808)".to_string()
             } else if *n < 0 {
@@ -900,7 +941,7 @@ fn infer_expr_type(
 ) -> &'static str {
     match expr {
         Expr::Literal(Literal::Float(_)) => "Real",
-        Expr::Literal(Literal::Int(_)) => "Int",
+        Expr::Literal(Literal::Int(_)) | Expr::Literal(Literal::Decimal(_)) => "Int",
         Expr::Literal(Literal::Bool(_)) => "Bool",
         Expr::Literal(Literal::String(_)) => "String",
         Expr::Ident(name) => {

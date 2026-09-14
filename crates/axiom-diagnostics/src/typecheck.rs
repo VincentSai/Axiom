@@ -181,6 +181,7 @@ fn infer_expr_type(
     match expr {
         Expr::Literal(Literal::Int(_)) => Ok(Type::Int),
         Expr::Literal(Literal::Float(_)) => Ok(Type::Float),
+        Expr::Literal(Literal::Decimal(_)) => Ok(Type::Decimal),
         Expr::Literal(Literal::Bool(_)) => Ok(Type::Bool),
         Expr::Literal(Literal::String(_)) => Ok(Type::String),
         Expr::Literal(Literal::Unit) => Ok(Type::Unit),
@@ -293,8 +294,26 @@ fn infer_expr_type(
                 return Ok(Type::Bool);
             }
 
-            let l = infer_expr_type(left, env, ctx)?;
-            let r = infer_expr_type(right, env, ctx)?;
+            let mut l = infer_expr_type(left, env, ctx)?;
+            let mut r = infer_expr_type(right, env, ctx)?;
+
+            // Contextual literal refinement for Decimal
+            if l == Type::Decimal && matches!(right.as_ref(), Expr::Literal(Literal::Float(_))) {
+                r = Type::Decimal;
+            } else if r == Type::Decimal
+                && matches!(left.as_ref(), Expr::Literal(Literal::Float(_)))
+            {
+                l = Type::Decimal;
+            }
+
+            // Strictly forbid mixing Decimal with Float
+            if (l == Type::Decimal && r == Type::Float) || (l == Type::Float && r == Type::Decimal)
+            {
+                return Err(format!(
+                    "cannot operate between incompatible types `{:?}` and `{:?}`: Decimal (fixed-point) cannot be mixed with Float (IEEE-754)",
+                    l, r
+                ));
+            }
 
             match op {
                 BinaryOperator::Add => {
@@ -309,6 +328,8 @@ fn infer_expr_type(
                     }
                     if l == r {
                         Ok(l)
+                    } else if l == Type::Decimal || r == Type::Decimal {
+                        Ok(Type::Decimal)
                     } else if is_type_compatible(&Type::Float, &l)
                         && is_type_compatible(&Type::Float, &r)
                     {
@@ -329,6 +350,8 @@ fn infer_expr_type(
                     }
                     if l == r {
                         Ok(l)
+                    } else if l == Type::Decimal || r == Type::Decimal {
+                        Ok(Type::Decimal)
                     } else if is_type_compatible(&Type::Float, &l)
                         && is_type_compatible(&Type::Float, &r)
                     {
@@ -601,6 +624,7 @@ fn bind_pattern_types(
             let lit_ty = match lit {
                 Literal::Int(_) => Type::Int,
                 Literal::Float(_) => Type::Float,
+                Literal::Decimal(_) => Type::Decimal,
                 Literal::Bool(_) => Type::Bool,
                 Literal::String(_) => Type::String,
                 Literal::Unit => Type::Unit,
@@ -703,9 +727,7 @@ fn is_type_compatible(expected: &Type, actual: &Type) -> bool {
         return true;
     }
     match (expected, actual) {
-        (Type::Float, Type::Int) | (Type::Decimal, Type::Int) | (Type::Decimal, Type::Float) => {
-            true
-        }
+        (Type::Float, Type::Int) | (Type::Decimal, Type::Int) => true,
         (Type::Custom(e), Type::Custom(a)) => {
             if e == a {
                 return true;
@@ -756,6 +778,42 @@ mod tests {
             err.message
                 .contains("Expr::Raw is forbidden in contracted functions"),
             "expected error message about Expr::Raw forbidden, got: {}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn decimal_and_float_mixing_is_rejected() {
+        let func = FunctionDecl {
+            name: "mix_decimal_float".into(),
+            params: vec![
+                FunctionParam {
+                    name: "amount".into(),
+                    ty: Type::Decimal,
+                },
+                FunctionParam {
+                    name: "rate".into(),
+                    ty: Type::Float,
+                },
+            ],
+            return_type: Type::Decimal,
+            effects: vec![],
+            requires: vec![],
+            ensures: vec![],
+            body: Expr::BinaryOp {
+                op: BinaryOperator::Multiply,
+                left: Box::new(Expr::Ident("amount".into())),
+                right: Box::new(Expr::Ident("rate".into())),
+            },
+        };
+        let ctx = ModuleContext::default();
+        let res = check_function_types_with_ctx(&func, &ctx);
+        assert!(res.is_err(), "mixing Decimal and Float must fail typecheck");
+        let err = res.unwrap_err();
+        assert!(
+            err.message
+                .contains("Decimal (fixed-point) cannot be mixed with Float (IEEE-754)"),
+            "unexpected error message: {}",
             err.message
         );
     }

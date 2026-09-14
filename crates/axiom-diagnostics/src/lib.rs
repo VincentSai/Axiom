@@ -309,6 +309,11 @@ fn format_expr(expression: &Expr) -> String {
             Literal::Int(value) => value.to_string(),
             Literal::Float(value) if value.fract() == 0.0 => format!("{value:.1}"),
             Literal::Float(value) => value.to_string(),
+            Literal::Decimal(micros) => {
+                let whole = micros / 1_000_000;
+                let frac = (micros % 1_000_000).abs();
+                format!("{whole}.{frac:06}d")
+            }
             Literal::Bool(value) => value.to_string(),
             Literal::String(value) => {
                 serde_json::to_string(value).expect("string literal serialization cannot fail")

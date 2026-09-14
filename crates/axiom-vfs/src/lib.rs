@@ -444,6 +444,11 @@ fn format_literal(literal: &Literal) -> String {
             }
             value
         }
+        Literal::Decimal(micros) => {
+            let whole = micros / 1_000_000;
+            let frac = (micros % 1_000_000).abs();
+            format!("{whole}.{frac:06}d")
+        }
         Literal::Bool(value) => value.to_string(),
         Literal::String(value) => format!("\"{}\"", escape_string(value)),
         Literal::Unit => "()".into(),

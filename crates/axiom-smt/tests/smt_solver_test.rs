@@ -5,7 +5,7 @@ use axiom_smt::{verify_function, verify_module, SmtResult};
 fn verifies_safe_division_with_precondition() {
     let module = parse_module(
         r#"
-        fn safe_div(a: Decimal, b: Decimal) -> Decimal
+        fn safe_div(a: Float, b: Float) -> Float
             requires { b != 0.0 }
             ensures { result * b == a }
         {
@@ -783,5 +783,30 @@ fn smtlib2_rejects_function_containing_expr_raw() {
         err.contains("contains Expr::Raw which cannot be verified with SMT"),
         "unexpected error message: {}",
         err
+    );
+}
+
+#[test]
+fn decimal_fixed_point_exact_addition_proves_without_float_error() {
+    let module = parse_module(
+        r#"
+        fn add_exact(a: Decimal, b: Decimal) -> Decimal
+            requires { a == 0.1d, b == 0.2d }
+            ensures { result == 0.3d }
+        {
+            a + b
+        }
+        "#,
+    )
+    .expect("add_exact should parse");
+
+    let result = verify_function(&module.functions[0]);
+    assert!(
+        matches!(
+            result,
+            SmtResult::Proved { .. } | SmtResult::Sampled { .. }
+        ),
+        "0.1d + 0.2d == 0.3d must be proved exact under fixed-point integer SMT without float error! Got: {:?}",
+        result
     );
 }

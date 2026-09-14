@@ -37,10 +37,21 @@ pub enum TypeDef {
     },
 }
 
+pub const DECIMAL_SCALE: i64 = 1_000_000;
+
+pub fn float_to_decimal_micros(f: f64) -> i64 {
+    (f * (DECIMAL_SCALE as f64)).round() as i64
+}
+
+pub fn decimal_micros_to_float(micros: i64) -> f64 {
+    (micros as f64) / (DECIMAL_SCALE as f64)
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Literal {
     Int(i64),
     Float(f64),
+    Decimal(i64),
     Bool(bool),
     String(String),
     Unit,

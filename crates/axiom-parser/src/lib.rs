@@ -780,16 +780,24 @@ impl<'a> Parser<'a> {
                 self.bump_char();
             }
         }
-        let text = &self.source[start..self.offset];
+        let num_text = &self.source[start..self.offset];
+        let is_decimal_suffix = matches!(self.peek_char(), Some('d' | 'D' | 'm' | 'M'));
+        if is_decimal_suffix {
+            self.bump_char();
+            let micros = parse_decimal_str_to_micros(num_text)
+                .map_err(|_| self.error(format!("invalid decimal `{num_text}`")))?;
+            return Ok(Expr::Literal(Literal::Decimal(micros)));
+        }
+
         if has_decimal_point {
-            let value = text
+            let value = num_text
                 .parse::<f64>()
-                .map_err(|_| self.error(format!("invalid number `{text}`")))?;
+                .map_err(|_| self.error(format!("invalid number `{num_text}`")))?;
             Ok(Expr::Literal(Literal::Float(value)))
         } else {
-            let value = text
+            let value = num_text
                 .parse::<i64>()
-                .map_err(|_| self.error(format!("invalid number `{text}`")))?;
+                .map_err(|_| self.error(format!("invalid number `{num_text}`")))?;
             Ok(Expr::Literal(Literal::Int(value)))
         }
     }
@@ -964,5 +972,30 @@ impl<'a> Parser<'a> {
             column,
             message: message.into(),
         }
+    }
+}
+
+fn parse_decimal_str_to_micros(s: &str) -> Result<i64, ()> {
+    let mut parts = s.split('.');
+    let whole_str = parts.next().unwrap_or("0");
+    let frac_str = parts.next().unwrap_or("");
+    let whole: i64 = whole_str.parse().map_err(|_| ())?;
+    let mut frac_padded = String::from(frac_str);
+    if frac_padded.len() > 6 {
+        frac_padded.truncate(6);
+    } else {
+        while frac_padded.len() < 6 {
+            frac_padded.push('0');
+        }
+    }
+    let frac: i64 = if frac_padded.is_empty() {
+        0
+    } else {
+        frac_padded.parse().map_err(|_| ())?
+    };
+    if whole < 0 {
+        Ok(whole * 1_000_000 - frac)
+    } else {
+        Ok(whole * 1_000_000 + frac)
     }
 }

@@ -12,8 +12,9 @@ fn transpiles_primitive_function_signatures_and_expressions() {
     )
     .expect("valid Axiom should transpile");
 
+    assert!(rust.contains("pub type Decimal = i64;"));
     assert!(rust.contains(
-        "pub fn compute(count: i64, ratio: f64, amount: f64, enabled: bool, label: String) -> ()"
+        "pub fn compute(count: i64, ratio: f64, amount: Decimal, enabled: bool, label: String) -> ()"
     ));
     assert!(rust.contains("let total = (count + 1);"));
 }
@@ -180,4 +181,25 @@ fn contracted_function_with_expr_raw_fails_transpilation() {
         "unexpected error message: {}",
         err
     );
+}
+
+#[test]
+fn transpiles_decimal_fixed_point_exact_arithmetic() {
+    let rust = transpile_source_to_rust(
+        r#"
+        fn add_exact(a: Decimal, b: Decimal) -> Decimal
+            requires { a > 0.0, b > 0.0 }
+            ensures { result == a + b }
+        {
+            a + b
+        }
+        "#,
+    )
+    .expect("Decimal addition should transpile");
+
+    assert!(rust.contains("pub type Decimal = i64;"));
+    assert!(rust.contains("pub fn add_exact(a: Decimal, b: Decimal) -> Decimal"));
+    assert!(rust.contains("(a > 0_i64)"));
+    assert!(rust.contains("(b > 0_i64)"));
+    assert!(rust.contains("(a + b)"));
 }

@@ -361,6 +361,9 @@ fn extract_constants(expr: &Expr, list: &mut Vec<f64>) {
         Expr::Literal(Literal::Int(n)) => {
             list.push(*n as f64);
         }
+        Expr::Literal(Literal::Decimal(micros)) => {
+            list.push(*micros as f64);
+        }
         Expr::Literal(Literal::Float(f)) if f.is_finite() => {
             list.push(*f);
         }
@@ -483,6 +486,7 @@ fn eval_expr_internal(
 ) -> Result<Value, String> {
     match expr {
         Expr::Literal(Literal::Int(n)) => Ok(Value::int(*n)),
+        Expr::Literal(Literal::Decimal(micros)) => Ok(Value::int(*micros)),
         Expr::Literal(Literal::Float(f)) => Ok(Value::num(*f)),
         Expr::Literal(Literal::Bool(b)) => Ok(Value::Bool(*b)),
         Expr::Literal(Literal::Unit) => Ok(Value::num(0.0)),
@@ -542,7 +546,7 @@ fn eval_expr_internal(
                             }
                         }
                     }
-                    Pattern::Literal(Literal::Int(pi)) => {
+                    Pattern::Literal(Literal::Int(pi)) | Pattern::Literal(Literal::Decimal(pi)) => {
                         if let Value::Num { val: vn, .. } = target_val {
                             if (*pi as f64 - vn).abs() < 1e-9 {
                                 matched = true;

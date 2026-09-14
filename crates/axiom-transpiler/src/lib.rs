@@ -47,6 +47,19 @@ impl From<ParseError> for TranspileError {
 
 pub fn transpile_to_rust(module: &Module) -> Result<String, TranspileError> {
     let mut output = String::new();
+
+    let has_decimal = module.types.iter().any(|t| match t {
+        TypeDef::Record { fields, .. } => fields.iter().any(|f| f.ty == Type::Decimal),
+        _ => false,
+    }) || module
+        .functions
+        .iter()
+        .any(|f| f.return_type == Type::Decimal || f.params.iter().any(|p| p.ty == Type::Decimal));
+
+    if has_decimal {
+        output.push_str("pub type Decimal = i64;\n\n");
+    }
+
     for definition in &module.types {
         output.push_str(&transpile_type_definition(definition));
         output.push('\n');
@@ -260,7 +273,8 @@ fn transpile_function(
 fn rust_type(ty: &Type) -> String {
     match ty {
         Type::Int => "i64".into(),
-        Type::Float | Type::Decimal => "f64".into(),
+        Type::Float => "f64".into(),
+        Type::Decimal => "Decimal".into(),
         Type::Bool => "bool".into(),
         Type::String => "String".into(),
         Type::Unit => "()".into(),
@@ -272,8 +286,10 @@ fn rust_type_str(s: &str) -> String {
     let s = s.trim();
     if s == "Int" {
         "i64".into()
-    } else if s == "Float" || s == "Decimal" {
+    } else if s == "Float" {
         "f64".into()
+    } else if s == "Decimal" {
+        "Decimal".into()
     } else if s == "Bool" {
         "bool".into()
     } else if s == "String" {
@@ -318,12 +334,24 @@ fn transpile_expr(expr: &Expr, ctx: &TranspileContext) -> Result<String, Transpi
         Expr::Literal(literal) => Ok(transpile_literal(literal)),
         Expr::Ident(name) => Ok(name.clone()),
         Expr::Hole(name) => Err(TranspileError::ContainsHole(name.clone())),
-        Expr::BinaryOp { left, op, right } => Ok(format!(
-            "({} {} {})",
-            transpile_expr(left, ctx)?,
-            binary_operator(op),
-            transpile_expr(right, ctx)?
-        )),
+        Expr::BinaryOp { left, op, right } => {
+            let mut left_str = transpile_expr(left, ctx)?;
+            let mut right_str = transpile_expr(right, ctx)?;
+            let left_is_decimal = is_expr_decimal(left, ctx);
+            let right_is_decimal = is_expr_decimal(right, ctx);
+            if left_is_decimal {
+                if let Expr::Literal(Literal::Float(f)) = right.as_ref() {
+                    let micros = axiom_ast::float_to_decimal_micros(*f);
+                    right_str = format!("{micros}_i64");
+                }
+            } else if right_is_decimal {
+                if let Expr::Literal(Literal::Float(f)) = left.as_ref() {
+                    let micros = axiom_ast::float_to_decimal_micros(*f);
+                    left_str = format!("{micros}_i64");
+                }
+            }
+            Ok(format!("({left_str} {} {right_str})", binary_operator(op)))
+        }
         Expr::UnaryOp { op, operand } => Ok(format!(
             "({}{})",
             match op {
@@ -573,9 +601,42 @@ fn transpile_literal(literal: &Literal) -> String {
     match literal {
         Literal::Int(value) => value.to_string(),
         Literal::Float(value) => format!("{value:?}"),
+        Literal::Decimal(value) => format!("{value}_i64"),
         Literal::Bool(value) => value.to_string(),
         Literal::String(value) => format!("String::from({value:?})"),
         Literal::Unit => "()".into(),
+    }
+}
+
+fn is_expr_decimal(expr: &Expr, ctx: &TranspileContext) -> bool {
+    match expr {
+        Expr::Literal(Literal::Decimal(_)) => true,
+        Expr::Ident(name) => {
+            for func in &ctx.module.functions {
+                for p in &func.params {
+                    if &p.name == name && p.ty == Type::Decimal {
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+        Expr::FieldAccess { field, .. } => {
+            for ty in &ctx.module.types {
+                if let TypeDef::Record { fields, .. } = ty {
+                    for f in fields {
+                        if &f.name == field && f.ty == Type::Decimal {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        }
+        Expr::BinaryOp { left, right, .. } => {
+            is_expr_decimal(left, ctx) || is_expr_decimal(right, ctx)
+        }
+        _ => false,
     }
 }
 
