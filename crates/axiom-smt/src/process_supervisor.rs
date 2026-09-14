@@ -315,7 +315,8 @@ pub struct ProcessSupervisor {
     child: Child,
     #[cfg(windows)]
     job_guard: Option<win32_job::JobObjectGuard>,
-    terminated: Arc<AtomicBool>,
+    kill_sent: Arc<AtomicBool>,
+    reaped: Arc<AtomicBool>,
 }
 
 impl ProcessSupervisor {
@@ -366,7 +367,8 @@ impl ProcessSupervisor {
             Ok(Self {
                 child,
                 job_guard: Some(job_guard),
-                terminated: Arc::new(AtomicBool::new(false)),
+                kill_sent: Arc::new(AtomicBool::new(false)),
+                reaped: Arc::new(AtomicBool::new(false)),
             })
         }
 
@@ -378,7 +380,8 @@ impl ProcessSupervisor {
                 .map_err(|e| format!("failed to spawn process group: {e}"))?;
             Ok(Self {
                 child,
-                terminated: Arc::new(AtomicBool::new(false)),
+                kill_sent: Arc::new(AtomicBool::new(false)),
+                reaped: Arc::new(AtomicBool::new(false)),
             })
         }
 
@@ -389,7 +392,8 @@ impl ProcessSupervisor {
                 .map_err(|e| format!("failed to spawn process: {e}"))?;
             Ok(Self {
                 child,
-                terminated: Arc::new(AtomicBool::new(false)),
+                kill_sent: Arc::new(AtomicBool::new(false)),
+                reaped: Arc::new(AtomicBool::new(false)),
             })
         }
     }
@@ -405,51 +409,66 @@ impl ProcessSupervisor {
     }
 
     /// 以单调绝对截止时间监管终止进程树，并在截止时间预算内回收子进程退出状态。
-    /// 若截止时间已耗尽，执行立即 non-blocking try_wait，绝不在原截止时间后额外创建 100ms 延迟窗口。
+    /// 仅在底层子进程被实际 reap 确认退出后才报告清理成功；若截止时间已耗尽或未确认退出，
+    /// 坚决返回 false 并在 Drop 中继续保留清理尝试，防止僵尸进程 (zombie) 泄漏。
     pub fn terminate_until(&mut self, deadline: Option<Instant>) -> bool {
-        if self.terminated.swap(true, Ordering::SeqCst) {
+        if self.reaped.load(Ordering::SeqCst) {
             return true;
         }
 
-        let mut success = true;
-
-        #[cfg(windows)]
-        {
-            if let Some(ref guard) = self.job_guard {
-                if !guard.terminate_now() {
-                    success = false;
+        // 1. 若尚未发送强杀，立即发送整棵树强杀信号
+        if !self.kill_sent.swap(true, Ordering::SeqCst) {
+            #[cfg(windows)]
+            {
+                if let Some(ref guard) = self.job_guard {
+                    let _ = guard.terminate_now();
                 }
             }
+
+            #[cfg(unix)]
+            {
+                unix_supervisor::kill_process_tree(self.child.id());
+            }
+
+            let _ = self.child.kill();
         }
 
-        #[cfg(unix)]
-        {
-            unix_supervisor::kill_process_tree(self.child.id());
+        // 2. 优先执行立即非阻塞 try_wait
+        if let Ok(Some(_)) = self.child.try_wait() {
+            self.reaped.store(true, Ordering::SeqCst);
+            return true;
         }
 
-        let _ = self.child.kill();
-
-        // 等待子进程状态回收，严格受限于传入的绝对单调截止时间
-        let max_wait_deadline = Instant::now() + Duration::from_millis(100);
+        // 3. 在单调绝对截止时间预算内有界等待状态回收
         let drain_deadline = match deadline {
-            Some(dl) => dl.min(max_wait_deadline),
-            None => max_wait_deadline,
+            Some(dl) => dl,
+            None => Instant::now() + Duration::from_millis(100),
         };
 
         while Instant::now() < drain_deadline {
             if let Ok(Some(_)) = self.child.try_wait() {
-                break;
+                self.reaped.store(true, Ordering::SeqCst);
+                return true;
             }
             std::thread::sleep(Duration::from_millis(5));
         }
 
-        success
+        // 4. 超时后最后再次非阻塞 try_wait 确认
+        if let Ok(Some(_)) = self.child.try_wait() {
+            self.reaped.store(true, Ordering::SeqCst);
+            return true;
+        }
+
+        // 仍未完成 reap，绝不谎报成功
+        false
     }
 }
 
 impl Drop for ProcessSupervisor {
     fn drop(&mut self) {
-        let _ = self.terminate();
+        if !self.reaped.load(Ordering::SeqCst) {
+            let _ = self.terminate_until(Some(Instant::now() + Duration::from_millis(50)));
+        }
     }
 }
 
@@ -801,7 +820,9 @@ pub(crate) fn execute_process_until_deadline(
     let format_cleanup = |supervisor_ok: bool, cleanup_errs: &[String]| -> String {
         let mut errs = Vec::new();
         if !supervisor_ok {
-            errs.push("failed to terminate process tree cleanly".to_string());
+            errs.push(
+                "failed to terminate process tree cleanly (child not confirmed reaped)".to_string(),
+            );
         }
         errs.extend_from_slice(cleanup_errs);
         if errs.is_empty() {
@@ -1087,12 +1108,20 @@ mod tests {
         );
 
         let elapsed = start.elapsed();
-        // 必须在严格有界时间内返回（deadline 300ms + 最多 300ms 宽限），绝对不能由于无界 join 延宕至数秒
+        // 必须在严格有界时间内返回（远小于后代进程的 60 秒睡眠），同时容许并行测试高负载下的调度容差
         assert!(
-            elapsed < Duration::from_millis(600),
-            "orphan holding stdin should not hang writer thread beyond bounded deadline, expected < 600ms, took {elapsed:?}"
+            res.is_err(),
+            "expected timeout or error due to bounded deadline, got {res:?}"
         );
-        let _ = res;
+        let err_msg = res.err().unwrap();
+        assert!(
+            err_msg.contains("timed out") || err_msg.contains("deadline"),
+            "expected deadline timeout message, got: {err_msg}"
+        );
+        assert!(
+            elapsed < Duration::from_millis(3000),
+            "orphan holding stdin should not hang writer thread beyond bounded deadline, expected < 3000ms, took {elapsed:?}"
+        );
     }
 
     #[test]

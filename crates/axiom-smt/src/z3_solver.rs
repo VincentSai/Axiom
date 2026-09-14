@@ -364,20 +364,97 @@ fn get_sealed_cache() -> &'static std::sync::RwLock<HashMap<String, SealedSolver
     SEALED_CACHE.get_or_init(|| std::sync::RwLock::new(HashMap::new()))
 }
 
-struct CrossProcessDirLock {
-    lock_dir: PathBuf,
-    owner_token: String,
+#[cfg(windows)]
+mod os_file_lock {
+    use std::fs::File;
+    use std::os::windows::io::AsRawHandle;
+
+    const LOCKFILE_EXCLUSIVE_LOCK: u32 = 0x00000002;
+    const LOCKFILE_FAIL_IMMEDIATELY: u32 = 0x00000001;
+
+    extern "system" {
+        fn LockFileEx(
+            hFile: *mut std::ffi::c_void,
+            dwFlags: u32,
+            dwReserved: u32,
+            nNumberOfBytesToLockLow: u32,
+            nNumberOfBytesToLockHigh: u32,
+            lpOverlapped: *mut std::ffi::c_void,
+        ) -> i32;
+        fn UnlockFileEx(
+            hFile: *mut std::ffi::c_void,
+            dwReserved: u32,
+            nNumberOfBytesToLockLow: u32,
+            nNumberOfBytesToLockHigh: u32,
+            lpOverlapped: *mut std::ffi::c_void,
+        ) -> i32;
+    }
+
+    pub fn try_lock_exclusive(file: &File) -> bool {
+        let handle = file.as_raw_handle();
+        let mut overlapped = [0u8; 32];
+        let res = unsafe {
+            LockFileEx(
+                handle,
+                LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
+                0,
+                1,
+                0,
+                overlapped.as_mut_ptr() as *mut std::ffi::c_void,
+            )
+        };
+        res != 0
+    }
+
+    pub fn unlock(file: &File) {
+        let handle = file.as_raw_handle();
+        let mut overlapped = [0u8; 32];
+        unsafe {
+            let _ = UnlockFileEx(
+                handle,
+                0,
+                1,
+                0,
+                overlapped.as_mut_ptr() as *mut std::ffi::c_void,
+            );
+        }
+    }
 }
 
-impl Drop for CrossProcessDirLock {
-    fn drop(&mut self) {
-        let token_path = self.lock_dir.join("owner.token");
-        if let Ok(content) = std::fs::read_to_string(&token_path) {
-            if content.trim() == self.owner_token {
-                let _ = std::fs::remove_file(&token_path);
-                let _ = std::fs::remove_dir(&self.lock_dir);
-            }
+#[cfg(unix)]
+mod os_file_lock {
+    use std::fs::File;
+    use std::os::unix::io::AsRawFd;
+
+    pub fn try_lock_exclusive(file: &File) -> bool {
+        let fd = file.as_raw_fd();
+        unsafe { libc::flock(fd, libc::LOCK_EX | libc::LOCK_NB) == 0 }
+    }
+
+    pub fn unlock(file: &File) {
+        let fd = file.as_raw_fd();
+        unsafe {
+            let _ = libc::flock(fd, libc::LOCK_UN);
         }
+    }
+}
+
+#[cfg(not(any(windows, unix)))]
+mod os_file_lock {
+    use std::fs::File;
+    pub fn try_lock_exclusive(_file: &File) -> bool {
+        true
+    }
+    pub fn unlock(_file: &File) {}
+}
+
+struct CrossProcessFileLock {
+    file: std::fs::File,
+}
+
+impl Drop for CrossProcessFileLock {
+    fn drop(&mut self) {
+        os_file_lock::unlock(&self.file);
     }
 }
 
@@ -431,67 +508,44 @@ impl SealedSolverBinary {
             }
         }
 
-        let filename = source_path
-            .file_name()
-            .unwrap_or_else(|| std::ffi::OsStr::new("z3.exe"));
-        let sandbox_dir = std::env::temp_dir()
-            .join("axiom_sealed_solvers")
-            .join(&sha256);
+        let temp_dir = std::env::temp_dir();
+        let sandbox_dir = temp_dir.join("axiom_sealed_solvers").join(&sha256);
+        let filename = if cfg!(windows) { "z3.exe" } else { "z3" };
         std::fs::create_dir_all(&sandbox_dir)
             .map_err(|e| format!("failed to create sealed solver directory: {e}"))?;
 
         let sealed_path = sandbox_dir.join(filename);
 
-        // 3. 跨进程排他锁协议 (基于原子目录创建 + owner.token 防 ABA 机制，含超时 Fail-Closed)
-        let lock_dir = sandbox_dir.join(".seal.lock.d");
-        let token_path = lock_dir.join("owner.token");
+        // 3. 跨进程排他锁协议 (基于操作系统内核文件锁，进程退出/异常终止时由 OS 内核自动释放，杜绝 ABA 误删与慢进程驱逐)
+        let lock_file_path = sandbox_dir.join(".seal.lock");
+        let lock_file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_file_path)
+            .map_err(|e| {
+                format!(
+                    "failed to open cross-process lock file at {}: {e}",
+                    lock_file_path.display()
+                )
+            })?;
+
         let lock_deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        let mut _dir_guard = None;
+        let mut _file_guard = None;
         while std::time::Instant::now() < lock_deadline {
-            match std::fs::create_dir(&lock_dir) {
-                Ok(()) => {
-                    let thread_id = format!("{:?}", std::thread::current().id());
-                    let nanos = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_nanos();
-                    let owner_token = format!(
-                        "{}_{}_{}",
-                        std::process::id(),
-                        thread_id.replace(|c: char| !c.is_alphanumeric(), "_"),
-                        nanos
-                    );
-                    if std::fs::write(&token_path, &owner_token).is_ok() {
-                        _dir_guard = Some(CrossProcessDirLock {
-                            lock_dir: lock_dir.clone(),
-                            owner_token,
-                        });
-                        break;
-                    } else {
-                        let _ = std::fs::remove_dir(&lock_dir);
-                    }
-                }
-                Err(_) => {
-                    if let Ok(meta) = std::fs::metadata(&lock_dir) {
-                        if let Ok(mtime) = meta.modified() {
-                            if let Ok(age) = mtime.elapsed() {
-                                if age > std::time::Duration::from_secs(10) {
-                                    let _ = std::fs::remove_file(&token_path);
-                                    let _ = std::fs::remove_dir(&lock_dir);
-                                }
-                            }
-                        }
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(10));
-                }
+            if os_file_lock::try_lock_exclusive(&lock_file) {
+                _file_guard = Some(CrossProcessFileLock { file: lock_file });
+                break;
             }
+            std::thread::sleep(std::time::Duration::from_millis(10));
         }
 
         // 强锁保障：若超时未拿到跨进程锁，绝不无锁进入临界区，必须 Fail-Closed 返回错误
-        if _dir_guard.is_none() {
+        if _file_guard.is_none() {
             return Err(format!(
                 "failed to acquire cross-process lock for sealed solver at {} within deadline",
-                lock_dir.display()
+                lock_file_path.display()
             ));
         }
 

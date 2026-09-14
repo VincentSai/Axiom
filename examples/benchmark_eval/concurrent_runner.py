@@ -25,7 +25,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import urllib.error
 import urllib.request
 
@@ -840,6 +840,149 @@ def validate_task_envelope_schema(envelope: dict, expected_hole: str, expected_f
             raise ValueError(f"TaskEnvelope 依赖项哈希非法: {dep}")
 
 
+@dataclass(frozen=True)
+class RawUsageEvent:
+    event_id: str
+    event_type: str
+    input_tokens: int
+    output_tokens: int
+    reasoning_tokens: int
+    total_tokens: int
+    event_sha256: str
+    raw_payload: dict
+
+    @classmethod
+    def from_turn_completed(cls, data: dict, event_index: int = 0) -> "RawUsageEvent":
+        u = data.get("usage") or {}
+        in_t = int(u.get("input_tokens", 0))
+        out_t = int(u.get("output_tokens", 0))
+        reason_t = int(u.get("reasoning_output_tokens", 0))
+        tot_t = in_t + out_t
+        raw_json_bytes = json.dumps(data, sort_keys=True).encode("utf-8")
+        event_hash = hashlib.sha256(raw_json_bytes).hexdigest()
+        event_id = str(data.get("id") or f"turn_{event_index}_{event_hash[:12]}")
+        return cls(
+            event_id=event_id,
+            event_type=str(data.get("type", "turn.completed")),
+            input_tokens=in_t,
+            output_tokens=out_t,
+            reasoning_tokens=reason_t,
+            total_tokens=tot_t,
+            event_sha256=event_hash,
+            raw_payload=data
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "event_id": self.event_id,
+            "event_type": self.event_type,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "reasoning_tokens": self.reasoning_tokens,
+            "total_tokens": self.total_tokens,
+            "event_sha256": self.event_sha256,
+            "raw_payload": self.raw_payload
+        }
+
+
+@dataclass
+class GenerationEvidence:
+    text: str
+    latency_sec: float
+    usage_source: str
+    is_estimated: bool
+    task_payload: dict
+    raw_billed: dict
+    raw_events: List[dict]
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "GenerationEvidence":
+        if not isinstance(d, dict):
+            raise ValueError(f"GenerationEvidence 期望字典对象，收到: {type(d)}")
+        if "usage_source" not in d:
+            raise ValueError("GenerationEvidence 字典缺失 usage_source 必填字段！")
+        if "is_estimated" not in d:
+            raise ValueError("GenerationEvidence 字典缺失 is_estimated 必填字段！")
+        return cls(
+            text=str(d.get("text", "")),
+            latency_sec=float(d.get("latency_sec", 0.0)),
+            usage_source=str(d["usage_source"]),
+            is_estimated=bool(d["is_estimated"]),
+            task_payload=dict(d.get("task_payload") or {}),
+            raw_billed=dict(d.get("raw_billed") or {}),
+            raw_events=list(d.get("raw_events") or [])
+        )
+
+    def validate_invariants(self, is_mock: bool = False):
+        billed = self.raw_billed
+        if not isinstance(billed, dict):
+            raise ValueError(f"raw_billed 必须为字典: {billed}")
+        in_t = int(billed.get("input_tokens", 0))
+        out_t = int(billed.get("output_tokens", 0))
+        reason_t = int(billed.get("reasoning_tokens", 0))
+        tot_t = int(billed.get("total_tokens", 0))
+
+        # 1. 账单算术不变量: total == input + output
+        if tot_t != in_t + out_t:
+            raise ValueError(f"账单算术不变量破坏: total_tokens ({tot_t}) != input ({in_t}) + output ({out_t})")
+        if reason_t > out_t:
+            raise ValueError(f"账单算术不变量破坏: reasoning_tokens ({reason_t}) > output_tokens ({out_t})")
+
+        # 2. task_payload 各分项之和
+        payload = self.task_payload
+        if not isinstance(payload, dict):
+            raise ValueError(f"task_payload 必须为字典: {payload}")
+        p_tok = int(payload.get("prompt_tokens", 0))
+        c_tok = int(payload.get("candidates_tokens", 0))
+        tot_p = int(payload.get("total_tokens", 0))
+        if tot_p != p_tok + c_tok:
+            raise ValueError(f"task_payload 各分项之和不自洽: prompt({p_tok}) + candidates({c_tok}) != total({tot_p})")
+
+        # 3. 原始事件链审计与去重
+        if not is_mock:
+            if not isinstance(self.raw_events, list) or len(self.raw_events) == 0:
+                raise ValueError("实测模式下 raw_events 必须包含规范化的原始 API usage 事件！")
+            seen_ids = set()
+            seen_hashes = set()
+            sum_in = 0
+            sum_out = 0
+            sum_reason = 0
+            for idx, ev in enumerate(self.raw_events):
+                if not isinstance(ev, dict):
+                    raise ValueError(f"raw_events[{idx}] 必须为字典")
+                eid = ev.get("event_id")
+                e_sha = ev.get("event_sha256")
+                if not eid or not e_sha:
+                    raise ValueError(f"raw_events[{idx}] 缺少 event_id 或 event_sha256 审计证据！")
+                if eid in seen_ids:
+                    raise ValueError(f"检测到重复事件 ID 计费: {eid}")
+                if e_sha in seen_hashes:
+                    raise ValueError(f"检测到重复事件内容哈希: {e_sha}")
+                seen_ids.add(eid)
+                seen_hashes.add(e_sha)
+                sum_in += int(ev.get("input_tokens", 0))
+                sum_out += int(ev.get("output_tokens", 0))
+                sum_reason += int(ev.get("reasoning_tokens", 0))
+
+            if in_t != sum_in or out_t != sum_out or reason_t != sum_reason:
+                raise ValueError(
+                    f"raw_billed 与原始事件列表汇总不一致: "
+                    f"billed=({in_t}, {out_t}, {reason_t}), events_sum=({sum_in}, {sum_out}, {sum_reason})"
+                )
+
+    def to_result_dict(self) -> dict:
+        self.validate_invariants(is_mock=(self.usage_source == "synthetic_mock"))
+        return {
+            "text": self.text,
+            "latency_sec": self.latency_sec,
+            "usage_source": self.usage_source,
+            "is_estimated": self.is_estimated,
+            "task_payload": self.task_payload,
+            "raw_billed": self.raw_billed,
+            "raw_events": self.raw_events,
+        }
+
+
 def validate_benchmark_result_schema(data: dict):
     """校验评测结果输出 JSON 顶层与各子系统的 Schema 规范，Fail-Closed 严禁 unknown，显式向前兼容 3.0 并严格校验 3.1"""
     required_top_keys = ["version", "subsystem", "experiment_metadata", "summary", "detailed_runs"]
@@ -978,7 +1121,10 @@ def validate_benchmark_result_schema(data: dict):
         if not init_root.startswith("#") or not fin_root.startswith("#") or "mock" in init_root.lower() or "mock" in fin_root.lower():
             raise ValueError(f"实测模式下 CAS 根哈希必须为真实节点哈希，不能包含 mock 占位: {init_root}, {fin_root}")
 
-    # 强互锁 SMT 证明报告中的真实求解器摘要 (双向兼容 verification_reports 与 smt_reports)
+    # 强互锁 SMT 证明报告中的真实求解器摘要 (双向兼容 verification_reports 与 smt_reports，且别名必须全等)
+    if "verification_reports" in g3 and "smt_reports" in g3:
+        if g3["verification_reports"] != g3["smt_reports"]:
+            raise ValueError("Group 3 中 verification_reports 与 smt_reports 别名列表内容不全等！")
     verify_reports = g3.get("verification_reports")
     if verify_reports is None:
         verify_reports = g3.get("smt_reports")
@@ -1027,6 +1173,16 @@ def validate_benchmark_result_schema(data: dict):
             raw_res = w["raw_result"]
 
             # 严格全等断言：平铺值与底层证据必须 100% 一致
+            if "raw_billed" in raw_res:
+                if "raw_billed" not in w:
+                    raise ValueError(f"{g_name} Worker 顶层缺失 raw_billed！")
+                if w["raw_billed"] != raw_res["raw_billed"]:
+                    raise ValueError(f"{g_name} Worker 平铺 raw_billed 与底层 raw_result 不全等！")
+            if "task_payload" in raw_res:
+                if "payload" in w and w["payload"] != raw_res["task_payload"]:
+                    raise ValueError(f"{g_name} Worker 平铺 payload 与底层 raw_result.task_payload 不全等！")
+                if "task_payload" in w and w["task_payload"] != raw_res["task_payload"]:
+                    raise ValueError(f"{g_name} Worker 平铺 task_payload 与底层 raw_result.task_payload 不全等！")
             if "usage_source" in raw_res:
                 if "usage_source" not in w:
                     raise ValueError(f"{g_name} Worker 顶层缺失 usage_source！")
@@ -1063,6 +1219,13 @@ def validate_benchmark_result_schema(data: dict):
                         f"实测模式下 {g_name} Worker is_estimated 必须为 False，实际为 {w['is_estimated']}"
                     )
 
+            # 通过 GenerationEvidence 领域模型校验算术不变量与事件链审计
+            try:
+                ev_model = GenerationEvidence.from_dict(raw_res)
+                ev_model.validate_invariants(is_mock=is_mock)
+            except Exception as e:
+                raise ValueError(f"{g_name} Worker 领域证据校验失败: {e}") from e
+
     # 强互锁 Resolver 生成真实性
     resolver_calls = g2.get("resolver_details") or []
     for idx, r in enumerate(resolver_calls):
@@ -1070,10 +1233,20 @@ def validate_benchmark_result_schema(data: dict):
             raise ValueError(f"Group 2 resolver_details[{idx}] 必须为字典对象")
         if "raw_result" in r and isinstance(r["raw_result"], dict):
             raw_r = r["raw_result"]
+            if "raw_billed" in raw_r:
+                if "raw_billed" not in r:
+                    raise ValueError("Group 2 Resolver 顶层缺失 raw_billed！")
+                if r["raw_billed"] != raw_r["raw_billed"]:
+                    raise ValueError("Group 2 Resolver 平铺 raw_billed 与底层 raw_result 不全等！")
+            if "task_payload" in raw_r:
+                if "task_payload" not in r:
+                    raise ValueError("Group 2 Resolver 顶层缺失 task_payload！")
+                if r["task_payload"] != raw_r["task_payload"]:
+                    raise ValueError("Group 2 Resolver 平铺 task_payload 与底层 raw_result 不全等！")
             if "usage_source" in raw_r and r.get("usage_source") != raw_r["usage_source"]:
-                raise ValueError(f"Group 2 Resolver 平铺 usage_source 与底层 raw_result 不全等！")
+                raise ValueError("Group 2 Resolver 平铺 usage_source 与底层 raw_result 不全等！")
             if "is_estimated" in raw_r and r.get("is_estimated") != raw_r["is_estimated"]:
-                raise ValueError(f"Group 2 Resolver 平铺 is_estimated 与底层 raw_result 不全等！")
+                raise ValueError("Group 2 Resolver 平铺 is_estimated 与底层 raw_result 不全等！")
 
         if not is_mock:
             if "raw_result" not in r or not isinstance(r["raw_result"], dict):
@@ -1090,6 +1263,14 @@ def validate_benchmark_result_schema(data: dict):
                 raise ValueError(f"实测模式下 Group 2 resolver_details[{idx}] 真实 billed tokens 必须大于 0")
             if "synthetic_mock_generated" in str(raw_r) or "synthetic_mock" in str(raw_r):
                 raise ValueError(f"实测模式下 Group 2 resolver_details[{idx}] 结果中检测到 mock 生成标记！")
+
+        if "raw_result" in r and isinstance(r["raw_result"], dict):
+            # 通过 GenerationEvidence 领域模型校验算术不变量与事件链审计
+            try:
+                r_ev_model = GenerationEvidence.from_dict(r["raw_result"])
+                r_ev_model.validate_invariants(is_mock=is_mock)
+            except Exception as e:
+                raise ValueError(f"Group 2 Resolver[{idx}] 领域证据校验失败: {e}") from e
 
     # 强制从明细重新计算所有 token 账单，并断言与 Group 内部 tokens 及顶层 summary 完全一致
     g2_workers = g2.get("worker_results") or g2.get("workers_details") or []
@@ -1131,9 +1312,37 @@ def validate_benchmark_result_schema(data: dict):
     if g3_tokens.get("total_raw_billed") != calc_g3_total_billed:
         raise ValueError(f"Group 3 total_raw_billed 重算不一致: {g3_tokens.get('total_raw_billed')} != {calc_g3_total_billed}")
 
-    # 顶层 summary 强核验
+    # 核心冲突指标、任务数与耗时全量对账
+    calc_g2_resolver_count = len(resolver_calls)
+    if g2.get("conflict_count") != calc_g2_resolver_count:
+        raise ValueError(f"Group 2 conflict_count ({g2.get('conflict_count')}) 必须严格等于 resolver 调用明细数 ({calc_g2_resolver_count})！")
+    if g2.get("resolver_calls_count") != calc_g2_resolver_count:
+        raise ValueError(f"Group 2 resolver_calls_count ({g2.get('resolver_calls_count')}) 必须严格等于 resolver 调用明细数 ({calc_g2_resolver_count})！")
+    total_g2_tasks = g2.get("total_tasks")
+    if total_g2_tasks is None or total_g2_tasks != len(g2_workers):
+        raise ValueError(f"Group 2 total_tasks ({total_g2_tasks}) 必须等于 worker 结果总数 ({len(g2_workers)})！")
+    expected_g2_conflict_rate = round(calc_g2_resolver_count / total_g2_tasks * 100, 1) if total_g2_tasks > 0 else 0.0
+    if g2.get("conflict_rate_pct") != expected_g2_conflict_rate:
+        raise ValueError(f"Group 2 conflict_rate_pct ({g2.get('conflict_rate_pct')}) 必须严格重算等于 {expected_g2_conflict_rate}！")
+
     rust_summary = summary.get("rust_group", {})
     axiom_summary = summary.get("axiom_group", {})
+    if rust_summary.get("conflict_count") != g2.get("conflict_count"):
+        raise ValueError(f"summary.rust_group.conflict_count 对账失败: {rust_summary.get('conflict_count')} != {g2.get('conflict_count')}")
+    if rust_summary.get("conflict_rate_pct") != g2.get("conflict_rate_pct"):
+        raise ValueError(f"summary.rust_group.conflict_rate_pct 对账失败: {rust_summary.get('conflict_rate_pct')} != {g2.get('conflict_rate_pct')}")
+    if rust_summary.get("resolver_calls_count") != g2.get("resolver_calls_count"):
+        raise ValueError(f"summary.rust_group.resolver_calls_count 对账失败: {rust_summary.get('resolver_calls_count')} != {g2.get('resolver_calls_count')}")
+    if rust_summary.get("wall_clock_sec") != g2.get("wall_clock_sec"):
+        raise ValueError(f"summary.rust_group.wall_clock_sec 对账失败: {rust_summary.get('wall_clock_sec')} != {g2.get('wall_clock_sec')}")
+
+    if g3.get("conflict_count") != 0 or g3.get("conflict_rate_pct") != 0.0 or g3.get("resolver_calls_count") != 0:
+        raise ValueError("Group 3 Axiom 组核心冲突指标必须全为 0！")
+    if axiom_summary.get("conflict_count") != 0 or axiom_summary.get("conflict_rate_pct") != 0.0 or axiom_summary.get("resolver_calls_count") != 0:
+        raise ValueError("summary.axiom_group 核心冲突指标必须全为 0！")
+    if axiom_summary.get("wall_clock_sec") != g3.get("wall_clock_sec"):
+        raise ValueError(f"summary.axiom_group.wall_clock_sec 对账失败: {axiom_summary.get('wall_clock_sec')} != {g3.get('wall_clock_sec')}")
+
     if rust_summary.get("workers_billed_tokens") != calc_g2_w_billed:
         raise ValueError(f"summary.rust_group.workers_billed_tokens 对账失败: {rust_summary.get('workers_billed_tokens')} != {calc_g2_w_billed}")
     if rust_summary.get("resolver_tax_billed_tokens") != calc_g2_r_billed:
@@ -1152,6 +1361,14 @@ def validate_benchmark_result_schema(data: dict):
         expected_savings = round((calc_g2_total_billed - calc_g3_total_billed) / calc_g2_total_billed * 100, 1) if calc_g2_total_billed > 0 else 0.0
         if axiom_summary.get("token_savings_pct") != expected_savings:
             raise ValueError(f"summary.axiom_group.token_savings_pct 重新计算不一致: {axiom_summary.get('token_savings_pct')} != {expected_savings}")
+
+        g2_wall = float(g2.get("wall_clock_sec", 0))
+        g3_wall = float(g3.get("wall_clock_sec", 0))
+        if g2_wall <= 0 or g3_wall <= 0:
+            raise ValueError("实测模式下 wall_clock_sec 必须大于 0！")
+        expected_speedup = round(g2_wall / g3_wall, 2)
+        if axiom_summary.get("speedup_vs_rust") != expected_speedup:
+            raise ValueError(f"summary.axiom_group.speedup_vs_rust 重算不一致: {axiom_summary.get('speedup_vs_rust')} != {expected_speedup} (g2={g2_wall}, g3={g3_wall})")
 
     # 递归 Fail-Closed 严查所有字段，绝不能有字符串 "unknown"
     def check_no_unknown(obj, path=""):
@@ -1268,9 +1485,7 @@ def call_codex_generate(prompt: str, model: str = None, proxy: str = None, timeo
         )
         t_elapsed = time.time() - t_start
 
-        raw_input = 0
-        raw_output = 0
-        raw_reasoning = 0
+        parsed_events = []
         for line in proc.stdout.splitlines():
             line_str = line.strip()
             if not line_str.startswith("{"):
@@ -1278,10 +1493,8 @@ def call_codex_generate(prompt: str, model: str = None, proxy: str = None, timeo
             try:
                 data = json.loads(line_str)
                 if data.get("type") == "turn.completed" and "usage" in data:
-                    u = data["usage"]
-                    raw_input += u.get("input_tokens", 0)
-                    raw_output += u.get("output_tokens", 0)
-                    raw_reasoning += u.get("reasoning_output_tokens", 0)
+                    ev = RawUsageEvent.from_turn_completed(data, len(parsed_events))
+                    parsed_events.append(ev)
             except Exception:
                 pass
 
@@ -1296,35 +1509,42 @@ def call_codex_generate(prompt: str, model: str = None, proxy: str = None, timeo
 
         # 精确 BPE Token 统计，无任何粗暴人工乘数
         task_prompt_tokens = count_exact_tokens(prompt)
+        raw_input = sum(ev.input_tokens for ev in parsed_events)
+        raw_output = sum(ev.output_tokens for ev in parsed_events)
+        raw_reasoning = sum(ev.reasoning_tokens for ev in parsed_events)
+        raw_total = raw_input + raw_output
+
         if raw_output > 0:
             visible_code_tokens = max(1, raw_output - raw_reasoning)
         else:
             visible_code_tokens = count_exact_tokens(ans_text)
         total_payload = task_prompt_tokens + visible_code_tokens
-        raw_total = raw_input + raw_output
-        if raw_total <= 0:
+
+        if raw_total <= 0 or not parsed_events:
             raise RuntimeError(
                 "codex exec 未能从执行输出中捕获到有效的 turn.completed usage 事件！"
                 "在实测模式下严禁使用本地 payload 估算伪造 API billed tokens。"
             )
 
-        return {
-            "text": ans_text,
-            "latency_sec": round(t_elapsed, 2),
-            "usage_source": "api_event",
-            "is_estimated": False,
-            "task_payload": {
+        evidence = GenerationEvidence(
+            text=ans_text,
+            latency_sec=round(t_elapsed, 2),
+            usage_source="api_event",
+            is_estimated=False,
+            task_payload={
                 "prompt_tokens": task_prompt_tokens,
                 "candidates_tokens": visible_code_tokens,
                 "total_tokens": total_payload
             },
-            "raw_billed": {
+            raw_billed={
                 "input_tokens": raw_input,
                 "output_tokens": raw_output,
                 "reasoning_tokens": raw_reasoning,
                 "total_tokens": raw_total
-            }
-        }
+            },
+            raw_events=[ev.to_dict() for ev in parsed_events]
+        )
+        return evidence.to_result_dict()
     finally:
         if os.path.exists(out_path):
             try:
@@ -1354,23 +1574,37 @@ def mock_generate_worker(task: dict, group: int, capsule: "ContextCapsule" = Non
         c_tok = count_exact_tokens(code)
         p_tok = capsule.total_tokens if capsule is not None else 200
 
-    return {
-        "text": code,
-        "latency_sec": 0.15,
-        "usage_source": "synthetic_mock",
-        "is_estimated": True,
-        "task_payload": {
-            "prompt_tokens": p_tok,
-            "candidates_tokens": c_tok,
-            "total_tokens": p_tok + c_tok
-        },
-        "raw_billed": {
-            "input_tokens": 15000,
-            "output_tokens": c_tok,
-            "reasoning_tokens": 0,
-            "total_tokens": 15000 + c_tok
-        }
+    mock_payload = {
+        "prompt_tokens": p_tok,
+        "candidates_tokens": c_tok,
+        "total_tokens": p_tok + c_tok
     }
+    mock_billed = {
+        "input_tokens": 15000,
+        "output_tokens": c_tok,
+        "reasoning_tokens": 0,
+        "total_tokens": 15000 + c_tok
+    }
+    mock_ev = {
+        "event_id": f"mock_evt_{tid}_{group}",
+        "event_type": "turn.completed",
+        "input_tokens": 15000,
+        "output_tokens": c_tok,
+        "reasoning_tokens": 0,
+        "total_tokens": 15000 + c_tok,
+        "event_sha256": hashlib.sha256(f"mock_evt_{tid}_{group}".encode()).hexdigest(),
+        "raw_payload": {"type": "turn.completed", "usage": mock_billed}
+    }
+    evidence = GenerationEvidence(
+        text=code,
+        latency_sec=0.15,
+        usage_source="synthetic_mock",
+        is_estimated=True,
+        task_payload=mock_payload,
+        raw_billed=mock_billed,
+        raw_events=[mock_ev]
+    )
+    return evidence.to_result_dict()
 
 
 def mock_generate_resolver(conflict_content: str, incoming_fname: str) -> dict:
@@ -1381,23 +1615,38 @@ def mock_generate_resolver(conflict_content: str, incoming_fname: str) -> dict:
             continue
         lines.append(line)
     resolved = "\n".join(lines)
-    return {
-        "text": resolved,
-        "latency_sec": 0.25,
-        "usage_source": "synthetic_mock",
-        "is_estimated": True,
-        "task_payload": {
-            "prompt_tokens": 450,
-            "candidates_tokens": 320,
-            "total_tokens": 770
-        },
-        "raw_billed": {
-            "input_tokens": 16500,
-            "output_tokens": 320,
-            "reasoning_tokens": 0,
-            "total_tokens": 16820
-        }
+
+    r_payload = {
+        "prompt_tokens": 450,
+        "candidates_tokens": 320,
+        "total_tokens": 770
     }
+    r_billed = {
+        "input_tokens": 16500,
+        "output_tokens": 320,
+        "reasoning_tokens": 0,
+        "total_tokens": 16820
+    }
+    r_ev = {
+        "event_id": f"mock_res_evt_{incoming_fname}",
+        "event_type": "turn.completed",
+        "input_tokens": 16500,
+        "output_tokens": 320,
+        "reasoning_tokens": 0,
+        "total_tokens": 16820,
+        "event_sha256": hashlib.sha256(f"mock_res_evt_{incoming_fname}".encode()).hexdigest(),
+        "raw_payload": {"type": "turn.completed", "usage": r_billed}
+    }
+    evidence = GenerationEvidence(
+        text=resolved,
+        latency_sec=0.25,
+        usage_source="synthetic_mock",
+        is_estimated=True,
+        task_payload=r_payload,
+        raw_billed=r_billed,
+        raw_events=[r_ev]
+    )
+    return evidence.to_result_dict()
 
 
 def load_concurrent_tasks():
@@ -1899,6 +2148,7 @@ def run_group2_rust_pipeline(tasks: list, args, proxy: str) -> dict:
                     "function_name": w["function_name"],
                     "latency_sec": w["raw_result"]["latency_sec"],
                     "payload": w["raw_result"]["task_payload"],
+                    "task_payload": w["raw_result"]["task_payload"],
                     "raw_billed": w["raw_result"]["raw_billed"],
                     "usage_source": w["raw_result"]["usage_source"],
                     "is_estimated": w["raw_result"]["is_estimated"],
@@ -1912,13 +2162,14 @@ def run_group2_rust_pipeline(tasks: list, args, proxy: str) -> dict:
                     "function_name": w["function_name"],
                     "latency_sec": w["raw_result"]["latency_sec"],
                     "payload": w["raw_result"]["task_payload"],
+                    "task_payload": w["raw_result"]["task_payload"],
                     "raw_billed": w["raw_result"]["raw_billed"],
                     "usage_source": w["raw_result"]["usage_source"],
                     "is_estimated": w["raw_result"]["is_estimated"],
                     "raw_result": w["raw_result"],
                 }
                 for w in worker_results
-            ]
+            ],
         }
     finally:
         shutil.rmtree(repo_dir, ignore_errors=True)
@@ -2120,6 +2371,7 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
                 "function_name": w["function_name"],
                 "latency_sec": w["raw_result"]["latency_sec"],
                 "payload": w["raw_result"]["task_payload"],
+                "task_payload": w["raw_result"]["task_payload"],
                 "raw_billed": w["raw_result"]["raw_billed"],
                 "usage_source": w["raw_result"]["usage_source"],
                 "is_estimated": w["raw_result"]["is_estimated"],
@@ -2134,6 +2386,7 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
                 "function_name": w["function_name"],
                 "latency_sec": w["raw_result"]["latency_sec"],
                 "payload": w["raw_result"]["task_payload"],
+                "task_payload": w["raw_result"]["task_payload"],
                 "raw_billed": w["raw_result"]["raw_billed"],
                 "usage_source": w["raw_result"]["usage_source"],
                 "is_estimated": w["raw_result"]["is_estimated"],
