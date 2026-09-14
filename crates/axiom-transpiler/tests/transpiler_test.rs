@@ -142,3 +142,42 @@ fn transpiles_nested_effect_calls_and_list_types() {
     // Call propagation: log_item automatically passed `log`
     assert!(rust.contains("log_item(Item { id: 1 }, log)"));
 }
+
+#[test]
+fn contracted_function_with_expr_raw_fails_transpilation() {
+    use axiom_ast::{BinaryOperator, Expr, FunctionDecl, FunctionParam, Literal, Module, Type};
+    use axiom_transpiler::transpile_to_rust;
+
+    let module = Module {
+        types: vec![],
+        effects: vec![],
+        functions: vec![FunctionDecl {
+            name: "bypass".into(),
+            params: vec![FunctionParam {
+                name: "x".into(),
+                ty: Type::Int,
+            }],
+            return_type: Type::Int,
+            effects: vec![],
+            requires: vec![Expr::BinaryOp {
+                op: BinaryOperator::GreaterThan,
+                left: Box::new(Expr::Ident("x".into())),
+                right: Box::new(Expr::Literal(Literal::Int(0))),
+            }],
+            ensures: vec![],
+            body: Expr::Raw("x + 100".into()),
+        }],
+    };
+
+    let res = transpile_to_rust(&module);
+    assert!(
+        res.is_err(),
+        "transpiler must reject contracted function containing Expr::Raw"
+    );
+    let err = res.unwrap_err().to_string();
+    assert!(
+        err.contains("Expr::Raw is forbidden in contracted function"),
+        "unexpected error message: {}",
+        err
+    );
+}

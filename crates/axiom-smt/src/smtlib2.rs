@@ -71,6 +71,12 @@ pub fn generate_smtlib2_with_module_and_obligations(
     if func.ensures.is_empty() {
         return Err(format!("function `{}` has no ensures clauses", func.name));
     }
+    if func.contains_raw() {
+        return Err(format!(
+            "function `{}` contains Expr::Raw which cannot be verified with SMT",
+            func.name
+        ));
+    }
 
     let empty_records = HashMap::new();
     let empty_functions = HashMap::new();
@@ -726,6 +732,7 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
 
             Err("complex match pattern translation requires full ADT solver encoding or catch-all default".into())
         }
+        Expr::Raw(_) => Err("Expr::Raw cannot be converted to SMT-LIB2".into()),
         _ => Err("unsupported expression in SMT translation".into()),
     }
 }
@@ -1365,7 +1372,10 @@ fn collect_safety_obligations_recursive(
                 )?;
             }
         }
-        Expr::Literal(_) | Expr::Ident(_) | Expr::Hole(_) | Expr::Raw(_) => {}
+        Expr::Raw(_) => {
+            return Err("Expr::Raw is forbidden in formal safety verification".into());
+        }
+        Expr::Literal(_) | Expr::Ident(_) | Expr::Hole(_) => {}
     }
     Ok(())
 }

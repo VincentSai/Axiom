@@ -751,3 +751,37 @@ fn let_bound_real_division_preserves_real_type() {
     assert!(smt_query.contains("(/ a b)"));
     assert!(!smt_query.contains("div a b"));
 }
+
+#[test]
+fn smtlib2_rejects_function_containing_expr_raw() {
+    use axiom_ast::{BinaryOperator, Expr, FunctionDecl, FunctionParam, Literal, Type};
+
+    let func = FunctionDecl {
+        name: "escape_hatch".into(),
+        params: vec![FunctionParam {
+            name: "x".into(),
+            ty: Type::Int,
+        }],
+        return_type: Type::Int,
+        effects: vec![],
+        requires: vec![],
+        ensures: vec![Expr::BinaryOp {
+            op: BinaryOperator::GreaterThan,
+            left: Box::new(Expr::Ident("result".into())),
+            right: Box::new(Expr::Literal(Literal::Int(0))),
+        }],
+        body: Expr::Raw("x + 1".into()),
+    };
+
+    let res = axiom_smt::generate_smtlib2(&func);
+    assert!(
+        res.is_err(),
+        "generate_smtlib2 must reject functions with Expr::Raw"
+    );
+    let err = res.unwrap_err();
+    assert!(
+        err.contains("contains Expr::Raw which cannot be verified with SMT"),
+        "unexpected error message: {}",
+        err
+    );
+}

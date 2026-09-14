@@ -76,6 +76,16 @@ pub fn check_function_types_with_ctx(
     func: &FunctionDecl,
     ctx: &ModuleContext,
 ) -> Result<(), TypeError> {
+    if func.has_contracts() && func.contains_raw() {
+        return Err(TypeError {
+            function_name: func.name.clone(),
+            message: format!(
+                "Expr::Raw is forbidden in contracted functions to ensure formal verification integrity: `{}`",
+                func.name
+            ),
+        });
+    }
+
     let mut env = HashMap::new();
     for p in &func.params {
         env.insert(p.name.clone(), p.ty.clone());
@@ -133,30 +143,35 @@ pub fn check_function_types_with_ctx(
     }
 
     // 3. Verify function body evaluates to declared return type
-    if !matches!(func.body, Expr::Raw(_)) {
-        match infer_expr_type(&func.body, &mut env, ctx) {
-            Ok(inferred) => {
-                if !is_type_compatible(&func.return_type, &inferred) {
-                    return Err(TypeError {
-                        function_name: func.name.clone(),
-                        message: format!(
-                            "Function `{}` declared return type `{:?}`, but body evaluates to `{:?}`",
-                            func.name, func.return_type, inferred
-                        ),
-                    });
-                }
-            }
-            Err(err_msg) => {
+    if matches!(func.body, Expr::Raw(_)) {
+        // Non-contracted legacy functions with raw body are accepted without formal guarantee
+        return Ok(());
+    }
+
+    match infer_expr_type(&func.body, &mut env, ctx) {
+        Ok(inferred) => {
+            if !is_type_compatible(&func.return_type, &inferred) {
                 return Err(TypeError {
                     function_name: func.name.clone(),
-                    message: format!("Type error in function `{}`: {}", func.name, err_msg),
+                    message: format!(
+                        "Function `{}` declared return type `{:?}`, but body evaluates to `{:?}`",
+                        func.name, func.return_type, inferred
+                    ),
                 });
             }
+        }
+        Err(err_msg) => {
+            return Err(TypeError {
+                function_name: func.name.clone(),
+                message: format!("Type error in function `{}`: {}", func.name, err_msg),
+            });
         }
     }
 
     Ok(())
 }
+
+pub use axiom_ast::expr_contains_raw;
 
 fn infer_expr_type(
     expr: &Expr,
@@ -530,7 +545,7 @@ fn infer_expr_type(
             // If callee is unknown function in external/runtime scope, default to Int
             Ok(Type::Int)
         }
-        Expr::Raw(_) => Ok(Type::Unit),
+        Expr::Raw(_) => Err("Expr::Raw cannot be safely typechecked".into()),
     }
 }
 
@@ -704,5 +719,44 @@ fn is_type_compatible(expected: &Type, actual: &Type) -> bool {
             false
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axiom_ast::{BinaryOperator, Expr, FunctionDecl, FunctionParam, Literal, Type};
+
+    #[test]
+    fn contracted_function_rejects_expr_raw_as_body() {
+        let func = FunctionDecl {
+            name: "transfer".into(),
+            params: vec![FunctionParam {
+                name: "amount".into(),
+                ty: Type::Int,
+            }],
+            return_type: Type::Int,
+            effects: vec![],
+            requires: vec![Expr::BinaryOp {
+                op: BinaryOperator::GreaterThanOrEqual,
+                left: Box::new(Expr::Ident("amount".into())),
+                right: Box::new(Expr::Literal(Literal::Int(0))),
+            }],
+            ensures: vec![],
+            body: Expr::Raw("amount + 10".into()),
+        };
+        let ctx = ModuleContext::default();
+        let res = check_function_types_with_ctx(&func, &ctx);
+        assert!(
+            res.is_err(),
+            "contracted function must reject Expr::Raw body"
+        );
+        let err = res.unwrap_err();
+        assert!(
+            err.message
+                .contains("Expr::Raw is forbidden in contracted functions"),
+            "expected error message about Expr::Raw forbidden, got: {}",
+            err.message
+        );
     }
 }

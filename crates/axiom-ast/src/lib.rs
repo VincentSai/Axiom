@@ -330,3 +330,28 @@ pub fn expr_contains_hole(expr: &Expr) -> bool {
     });
     contains
 }
+
+/// Checks whether an expression contains any raw escape hatch (`Expr::Raw`).
+pub fn expr_contains_raw(expr: &Expr) -> bool {
+    let mut contains = false;
+    visit_expr(expr, &mut |e| {
+        if matches!(e, Expr::Raw(_)) {
+            contains = true;
+        }
+    });
+    contains
+}
+
+impl FunctionDecl {
+    /// Checks whether the function body or any contract clause contains `Expr::Raw`.
+    pub fn contains_raw(&self) -> bool {
+        expr_contains_raw(&self.body)
+            || self.requires.iter().any(expr_contains_raw)
+            || self.ensures.iter().any(expr_contains_raw)
+    }
+
+    /// Checks whether the function has formal verification contracts.
+    pub fn has_contracts(&self) -> bool {
+        !self.requires.is_empty() || !self.ensures.is_empty()
+    }
+}

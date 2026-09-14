@@ -210,6 +210,13 @@ fn transpile_function(
         enum_names,
     };
 
+    if function.has_contracts() && function.contains_raw() {
+        return Err(TranspileError::UnsupportedExpression(format!(
+            "Expr::Raw is forbidden in contracted function `{}` to guarantee formal verification soundness",
+            function.name
+        )));
+    }
+
     let mut body_code = String::new();
 
     // 1. Generate requires preconditions
