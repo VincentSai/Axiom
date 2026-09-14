@@ -365,12 +365,21 @@ fn get_sealed_cache() -> &'static std::sync::RwLock<HashMap<String, SealedSolver
 }
 
 #[cfg(windows)]
-mod os_file_lock {
+pub mod os_file_lock {
     use std::fs::File;
     use std::os::windows::io::AsRawHandle;
 
     const LOCKFILE_EXCLUSIVE_LOCK: u32 = 0x00000002;
     const LOCKFILE_FAIL_IMMEDIATELY: u32 = 0x00000001;
+
+    #[repr(C)]
+    pub struct OVERLAPPED {
+        pub internal: usize,
+        pub internal_high: usize,
+        pub offset: u32,
+        pub offset_high: u32,
+        pub h_event: *mut std::ffi::c_void,
+    }
 
     extern "system" {
         fn LockFileEx(
@@ -379,20 +388,20 @@ mod os_file_lock {
             dwReserved: u32,
             nNumberOfBytesToLockLow: u32,
             nNumberOfBytesToLockHigh: u32,
-            lpOverlapped: *mut std::ffi::c_void,
+            lpOverlapped: *mut OVERLAPPED,
         ) -> i32;
         fn UnlockFileEx(
             hFile: *mut std::ffi::c_void,
             dwReserved: u32,
             nNumberOfBytesToLockLow: u32,
             nNumberOfBytesToLockHigh: u32,
-            lpOverlapped: *mut std::ffi::c_void,
+            lpOverlapped: *mut OVERLAPPED,
         ) -> i32;
     }
 
     pub fn try_lock_exclusive(file: &File) -> bool {
         let handle = file.as_raw_handle();
-        let mut overlapped = [0u8; 32];
+        let mut overlapped: OVERLAPPED = unsafe { std::mem::zeroed() };
         let res = unsafe {
             LockFileEx(
                 handle,
@@ -400,7 +409,7 @@ mod os_file_lock {
                 0,
                 1,
                 0,
-                overlapped.as_mut_ptr() as *mut std::ffi::c_void,
+                &mut overlapped,
             )
         };
         res != 0
@@ -408,21 +417,15 @@ mod os_file_lock {
 
     pub fn unlock(file: &File) {
         let handle = file.as_raw_handle();
-        let mut overlapped = [0u8; 32];
+        let mut overlapped: OVERLAPPED = unsafe { std::mem::zeroed() };
         unsafe {
-            let _ = UnlockFileEx(
-                handle,
-                0,
-                1,
-                0,
-                overlapped.as_mut_ptr() as *mut std::ffi::c_void,
-            );
+            let _ = UnlockFileEx(handle, 0, 1, 0, &mut overlapped);
         }
     }
 }
 
 #[cfg(unix)]
-mod os_file_lock {
+pub mod os_file_lock {
     use std::fs::File;
     use std::os::unix::io::AsRawFd;
 
@@ -810,5 +813,109 @@ mod tests {
             assert_eq!(sealed_a.sealed_path, sealed_b.sealed_path);
             assert_eq!(sealed_a.sha256, sealed_b.sha256);
         }
+    }
+
+    #[test]
+    fn test_cross_process_file_lock_contention_and_crash_release() {
+        let temp_dir = std::env::temp_dir();
+        let unique_id = format!(
+            "axiom_lock_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let test_lock_file = temp_dir.join(format!("{unique_id}.lock"));
+
+        // 预先创建文件
+        {
+            let _ = std::fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(false)
+                .open(&test_lock_file)
+                .expect("create test lock file");
+        }
+
+        // 启动独立的真实子进程持有该文件的排他锁并睡眠
+        let py_script = r#"
+import sys, time
+lock_path = sys.argv[1]
+f = open(lock_path, "r+")
+if sys.platform == "win32":
+    import msvcrt
+    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+else:
+    import fcntl
+    fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+sys.stdout.write("LOCKED\n")
+sys.stdout.flush()
+time.sleep(60)
+"#;
+        let mut child = match std::process::Command::new("python")
+            .args(["-c", py_script, test_lock_file.to_str().unwrap()])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+        {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Skipping cross process lock test because python is unavailable: {e}");
+                let _ = std::fs::remove_file(&test_lock_file);
+                return;
+            }
+        };
+
+        // 等待子进程输出 "LOCKED"
+        use std::io::BufRead;
+        let mut reader = std::io::BufReader::new(child.stdout.take().unwrap());
+        let mut line = String::new();
+        let read_res = reader.read_line(&mut line);
+        assert!(
+            read_res.is_ok() && line.trim() == "LOCKED",
+            "child process should lock and output LOCKED, got: {line}"
+        );
+
+        // 1. 此时子进程正持有排他锁，主进程尝试通过 os_file_lock::try_lock_exclusive 获取，必须失败（返回 false）
+        let local_file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&test_lock_file)
+            .expect("open lock file in main process");
+        let locked_by_main = os_file_lock::try_lock_exclusive(&local_file);
+        assert!(
+            !locked_by_main,
+            "exclusive lock must fail while held by another process"
+        );
+
+        // 2. 模拟子进程异常崩溃/被强杀：向子进程发送 kill 信号并等待内核回收
+        let kill_res = child.kill();
+        assert!(
+            kill_res.is_ok(),
+            "killing lock holder child process should succeed"
+        );
+        let wait_res = child.wait();
+        assert!(wait_res.is_ok(), "child should exit after kill");
+
+        // 3. 子进程终止后，操作系统内核应自动释放该文件句柄持有的排他锁；主进程重试必须成功
+        let mut acquired = false;
+        for _ in 0..50 {
+            if os_file_lock::try_lock_exclusive(&local_file) {
+                acquired = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert!(
+            acquired,
+            "OS kernel must release file lock when holding process dies/is killed"
+        );
+
+        // 清理解锁并删除文件
+        os_file_lock::unlock(&local_file);
+        drop(local_file);
+        let _ = std::fs::remove_file(&test_lock_file);
     }
 }

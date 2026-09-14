@@ -853,17 +853,23 @@ class RawUsageEvent:
 
     @classmethod
     def from_turn_completed(cls, data: dict, event_index: int = 0) -> "RawUsageEvent":
-        u = data.get("usage") or {}
+        if not isinstance(data, dict):
+            raise ValueError(f"from_turn_completed 期望字典对象，收到: {type(data)}")
+        if data.get("type") != "turn.completed":
+            raise ValueError(f"from_turn_completed 仅接受 turn.completed 类型事件，收到: {data.get('type')}")
+        u = data.get("usage")
+        if not isinstance(u, dict):
+            raise ValueError("turn.completed 事件缺失 usage 字典！")
         in_t = int(u.get("input_tokens", 0))
         out_t = int(u.get("output_tokens", 0))
-        reason_t = int(u.get("reasoning_output_tokens", 0))
+        reason_t = int(u.get("reasoning_output_tokens", u.get("reasoning_tokens", 0)))
         tot_t = in_t + out_t
         raw_json_bytes = json.dumps(data, sort_keys=True).encode("utf-8")
         event_hash = hashlib.sha256(raw_json_bytes).hexdigest()
         event_id = str(data.get("id") or f"turn_{event_index}_{event_hash[:12]}")
         return cls(
             event_id=event_id,
-            event_type=str(data.get("type", "turn.completed")),
+            event_type="turn.completed",
             input_tokens=in_t,
             output_tokens=out_t,
             reasoning_tokens=reason_t,
@@ -923,6 +929,8 @@ class GenerationEvidence:
         tot_t = int(billed.get("total_tokens", 0))
 
         # 1. 账单算术不变量: total == input + output
+        if in_t < 0 or out_t < 0 or reason_t < 0 or tot_t < 0:
+            raise ValueError(f"账单数值不能为负数: billed=({in_t}, {out_t}, {reason_t}, {tot_t})")
         if tot_t != in_t + out_t:
             raise ValueError(f"账单算术不变量破坏: total_tokens ({tot_t}) != input ({in_t}) + output ({out_t})")
         if reason_t > out_t:
@@ -935,13 +943,17 @@ class GenerationEvidence:
         p_tok = int(payload.get("prompt_tokens", 0))
         c_tok = int(payload.get("candidates_tokens", 0))
         tot_p = int(payload.get("total_tokens", 0))
+        if p_tok < 0 or c_tok < 0 or tot_p < 0:
+            raise ValueError(f"task_payload 数值不能为负数: payload=({p_tok}, {c_tok}, {tot_p})")
         if tot_p != p_tok + c_tok:
             raise ValueError(f"task_payload 各分项之和不自洽: prompt({p_tok}) + candidates({c_tok}) != total({tot_p})")
 
-        # 3. 原始事件链审计与去重
+        # 3. 原始事件链审计、哈希复算验真与去重
         if not is_mock:
             if not isinstance(self.raw_events, list) or len(self.raw_events) == 0:
                 raise ValueError("实测模式下 raw_events 必须包含规范化的原始 API usage 事件！")
+
+        if isinstance(self.raw_events, list) and len(self.raw_events) > 0:
             seen_ids = set()
             seen_hashes = set()
             sum_in = 0
@@ -952,17 +964,68 @@ class GenerationEvidence:
                     raise ValueError(f"raw_events[{idx}] 必须为字典")
                 eid = ev.get("event_id")
                 e_sha = ev.get("event_sha256")
+                etype = ev.get("event_type")
+                raw_p = ev.get("raw_payload")
+
                 if not eid or not e_sha:
                     raise ValueError(f"raw_events[{idx}] 缺少 event_id 或 event_sha256 审计证据！")
+                if not isinstance(raw_p, dict):
+                    raise ValueError(f"raw_events[{idx}] 必须包含 raw_payload 字典！")
+
+                # a. 规范化复算 SHA-256 并与 event_sha256 严格对齐
+                norm_json = json.dumps(raw_p, sort_keys=True).encode("utf-8")
+                calc_sha = hashlib.sha256(norm_json).hexdigest()
+                if e_sha != calc_sha:
+                    raise ValueError(
+                        f"raw_events[{idx}] event_sha256 ({e_sha}) 与 raw_payload 规范化复算 SHA-256 ({calc_sha}) 不匹配！"
+                    )
+
+                # b. 强锁事件类型为 turn.completed
+                if etype != "turn.completed":
+                    raise ValueError(f"raw_events[{idx}] event_type 必须为 'turn.completed'，实际为 '{etype}'")
+                if raw_p.get("type") != "turn.completed":
+                    raise ValueError(f"raw_events[{idx}] raw_payload.type 必须为 'turn.completed'，实际为 '{raw_p.get('type')}'")
+
+                # c. 逐字段核验扁平 token 与 raw_payload["usage"]
+                p_usage = raw_p.get("usage")
+                if not isinstance(p_usage, dict):
+                    raise ValueError(f"raw_events[{idx}] raw_payload 缺少合法的 usage 字典！")
+
+                ev_in = int(ev.get("input_tokens", 0))
+                ev_out = int(ev.get("output_tokens", 0))
+                ev_reason = int(ev.get("reasoning_tokens", 0))
+                ev_total = int(ev.get("total_tokens", 0))
+
+                pu_in = int(p_usage.get("input_tokens", 0))
+                pu_out = int(p_usage.get("output_tokens", 0))
+                pu_reason = int(p_usage.get("reasoning_output_tokens", p_usage.get("reasoning_tokens", 0)))
+
+                if ev_in != pu_in:
+                    raise ValueError(f"raw_events[{idx}] input_tokens 扁平值 ({ev_in}) 与 raw_payload ({pu_in}) 不一致！")
+                if ev_out != pu_out:
+                    raise ValueError(f"raw_events[{idx}] output_tokens 扁平值 ({ev_out}) 与 raw_payload ({pu_out}) 不一致！")
+                if ev_reason != pu_reason:
+                    raise ValueError(f"raw_events[{idx}] reasoning_tokens 扁平值 ({ev_reason}) 与 raw_payload ({pu_reason}) 不一致！")
+
+                # d. 单事件算术恒等式与非负性
+                if ev_in < 0 or ev_out < 0 or ev_reason < 0 or ev_total < 0:
+                    raise ValueError(f"raw_events[{idx}] token 数值不能为负数！")
+                if ev_total != ev_in + ev_out:
+                    raise ValueError(f"raw_events[{idx}] total_tokens ({ev_total}) != input ({ev_in}) + output ({ev_out})")
+                if ev_reason > ev_out:
+                    raise ValueError(f"raw_events[{idx}] reasoning_tokens ({ev_reason}) > output_tokens ({ev_out})")
+
+                # 去重
                 if eid in seen_ids:
                     raise ValueError(f"检测到重复事件 ID 计费: {eid}")
                 if e_sha in seen_hashes:
                     raise ValueError(f"检测到重复事件内容哈希: {e_sha}")
                 seen_ids.add(eid)
                 seen_hashes.add(e_sha)
-                sum_in += int(ev.get("input_tokens", 0))
-                sum_out += int(ev.get("output_tokens", 0))
-                sum_reason += int(ev.get("reasoning_tokens", 0))
+
+                sum_in += ev_in
+                sum_out += ev_out
+                sum_reason += ev_reason
 
             if in_t != sum_in or out_t != sum_out or reason_t != sum_reason:
                 raise ValueError(
@@ -1120,6 +1183,78 @@ def validate_benchmark_result_schema(data: dict):
         fin_root = cas_bench.get("final_root", "")
         if not init_root.startswith("#") or not fin_root.startswith("#") or "mock" in init_root.lower() or "mock" in fin_root.lower():
             raise ValueError(f"实测模式下 CAS 根哈希必须为真实节点哈希，不能包含 mock 占位: {init_root}, {fin_root}")
+
+    # [Spec 3] CAS 并发指标绑定底层事件账本与三类冲突精确对账
+    worker_events_map = cas_bench.get("cas_events_by_worker")
+    if not isinstance(worker_events_map, dict):
+        raise ValueError("cas_concurrency_benchmark 必须包含 cas_events_by_worker 字典！")
+
+    derived_stale = 0
+    derived_rebases = 0
+    reconstructed_ledger = []
+    for wid in sorted(worker_events_map.keys()):
+        w_ev_list = worker_events_map[wid]
+        if not isinstance(w_ev_list, list):
+            raise ValueError(f"cas_events_by_worker[{wid}] 必须为列表！")
+        for ev_idx, ev in enumerate(w_ev_list):
+            reconstructed_ledger.append({
+                "worker_id": wid,
+                "event_index": ev_idx,
+                "event": ev,
+            })
+            if isinstance(ev, dict):
+                if "StaleRootDetected" in ev:
+                    derived_stale += 1
+                if "RebaseSucceeded" in ev:
+                    derived_rebases += 1
+
+    # 1. 验证 cas_event_ledger（若存在）与 worker 事件重构账本 100% 全等
+    ledger_events = cas_bench.get("cas_event_ledger")
+    if ledger_events is not None:
+        if not isinstance(ledger_events, list):
+            raise ValueError("cas_concurrency_benchmark.cas_event_ledger 必须为列表！")
+        if ledger_events != reconstructed_ledger:
+            raise ValueError("cas_event_ledger 与 cas_events_by_worker 重构账本不一致！")
+
+    # 2. 校验 CAS 乐观并发重试指标与事件账本推导完全一致
+    if cas_bench.get("stale_root_conflicts_observed") != derived_stale:
+        raise ValueError(
+            f"cas_concurrency_benchmark.stale_root_conflicts_observed ({cas_bench.get('stale_root_conflicts_observed')}) "
+            f"与事件账本推导值 ({derived_stale}) 不一致！"
+        )
+    if cas_bench.get("fast_forward_retries_succeeded") != derived_rebases:
+        raise ValueError(
+            f"cas_concurrency_benchmark.fast_forward_retries_succeeded ({cas_bench.get('fast_forward_retries_succeeded')}) "
+            f"与事件账本推导值 ({derived_rebases}) 不一致！"
+        )
+
+    # 3. 校验 worker 退出码推导并发成功数
+    worker_a = cas_bench.get("worker_a") or {}
+    worker_b = cas_bench.get("worker_b") or {}
+    derived_success = 0
+    if worker_a.get("returncode") == 0:
+        derived_success += 1
+    if worker_b.get("returncode") == 0:
+        derived_success += 1
+    if cas_bench.get("success_submissions") != derived_success:
+        raise ValueError(
+            f"cas_concurrency_benchmark.success_submissions ({cas_bench.get('success_submissions')}) "
+            f"与 Worker 实际退出码推导值 ({derived_success}) 不一致！"
+        )
+
+    # 4. 提交链长度验证：必须与成功提交数完全一致
+    chain_len = cas_bench.get("final_commit_chain_length")
+    if not isinstance(chain_len, int) or chain_len != derived_success:
+        raise ValueError(
+            f"cas_concurrency_benchmark.final_commit_chain_length ({chain_len}) "
+            f"必须等于并发成功提交数 ({derived_success})！"
+        )
+
+    # 5. final_db_hash 密码学哈希校验
+    if "final_db_hash" in cas_bench:
+        db_hash = cas_bench["final_db_hash"]
+        if db_hash is not None and (not isinstance(db_hash, str) or len(db_hash) != 64):
+            raise ValueError(f"cas_concurrency_benchmark.final_db_hash 非法: {db_hash}")
 
     # 强互锁 SMT 证明报告中的真实求解器摘要 (双向兼容 verification_reports 与 smt_reports，且别名必须全等)
     if "verification_reports" in g3 and "smt_reports" in g3:
@@ -1488,15 +1623,28 @@ def call_codex_generate(prompt: str, model: str = None, proxy: str = None, timeo
         parsed_events = []
         for line in proc.stdout.splitlines():
             line_str = line.strip()
-            if not line_str.startswith("{"):
+            if not line_str:
                 continue
-            try:
-                data = json.loads(line_str)
-                if data.get("type") == "turn.completed" and "usage" in data:
-                    ev = RawUsageEvent.from_turn_completed(data, len(parsed_events))
-                    parsed_events.append(ev)
-            except Exception:
-                pass
+            if "turn.completed" in line_str:
+                try:
+                    data = json.loads(line_str)
+                except Exception as exc:
+                    raise RuntimeError(f"Fail-Closed: turn.completed 行 JSON 解析失败: {line_str}") from exc
+                if not isinstance(data, dict):
+                    raise RuntimeError(f"Fail-Closed: turn.completed 行必须为 JSON 对象: {line_str}")
+                if data.get("type") == "turn.completed":
+                    if "usage" not in data or not isinstance(data["usage"], dict):
+                        raise RuntimeError(f"Fail-Closed: turn.completed 事件缺失合法的 usage 字典: {line_str}")
+                    try:
+                        ev = RawUsageEvent.from_turn_completed(data, len(parsed_events))
+                        parsed_events.append(ev)
+                    except Exception as exc:
+                        raise RuntimeError(f"Fail-Closed: turn.completed 构建 RawUsageEvent 失败: {exc}") from exc
+            elif line_str.startswith("{"):
+                try:
+                    data = json.loads(line_str)
+                except Exception:
+                    pass
 
         ans_text = ""
         if os.path.exists(out_path):
@@ -1585,6 +1733,17 @@ def mock_generate_worker(task: dict, group: int, capsule: "ContextCapsule" = Non
         "reasoning_tokens": 0,
         "total_tokens": 15000 + c_tok
     }
+    mock_raw_payload = {
+        "id": f"mock_evt_{tid}_{group}",
+        "type": "turn.completed",
+        "usage": {
+            "input_tokens": 15000,
+            "output_tokens": c_tok,
+            "reasoning_output_tokens": 0,
+            "total_tokens": 15000 + c_tok,
+        }
+    }
+    raw_json_bytes = json.dumps(mock_raw_payload, sort_keys=True).encode("utf-8")
     mock_ev = {
         "event_id": f"mock_evt_{tid}_{group}",
         "event_type": "turn.completed",
@@ -1592,8 +1751,8 @@ def mock_generate_worker(task: dict, group: int, capsule: "ContextCapsule" = Non
         "output_tokens": c_tok,
         "reasoning_tokens": 0,
         "total_tokens": 15000 + c_tok,
-        "event_sha256": hashlib.sha256(f"mock_evt_{tid}_{group}".encode()).hexdigest(),
-        "raw_payload": {"type": "turn.completed", "usage": mock_billed}
+        "event_sha256": hashlib.sha256(raw_json_bytes).hexdigest(),
+        "raw_payload": mock_raw_payload
     }
     evidence = GenerationEvidence(
         text=code,
@@ -1627,6 +1786,17 @@ def mock_generate_resolver(conflict_content: str, incoming_fname: str) -> dict:
         "reasoning_tokens": 0,
         "total_tokens": 16820
     }
+    r_raw_payload = {
+        "id": f"mock_res_evt_{incoming_fname}",
+        "type": "turn.completed",
+        "usage": {
+            "input_tokens": 16500,
+            "output_tokens": 320,
+            "reasoning_output_tokens": 0,
+            "total_tokens": 16820,
+        }
+    }
+    r_raw_bytes = json.dumps(r_raw_payload, sort_keys=True).encode("utf-8")
     r_ev = {
         "event_id": f"mock_res_evt_{incoming_fname}",
         "event_type": "turn.completed",
@@ -1634,8 +1804,8 @@ def mock_generate_resolver(conflict_content: str, incoming_fname: str) -> dict:
         "output_tokens": 320,
         "reasoning_tokens": 0,
         "total_tokens": 16820,
-        "event_sha256": hashlib.sha256(f"mock_res_evt_{incoming_fname}".encode()).hexdigest(),
-        "raw_payload": {"type": "turn.completed", "usage": r_billed}
+        "event_sha256": hashlib.sha256(r_raw_bytes).hexdigest(),
+        "raw_payload": r_raw_payload
     }
     evidence = GenerationEvidence(
         text=resolved,
@@ -1941,6 +2111,20 @@ fn task_b(y: Int) -> Int requires { y >= 0, y < 1000000 } ensures { result >= y 
                         rebases_succeeded += 1
             parsed_events[wid] = w_events
 
+        cas_event_ledger = []
+        for wid in sorted(parsed_events.keys()):
+            for ev_idx, ev in enumerate(parsed_events[wid]):
+                cas_event_ledger.append({
+                    "worker_id": wid,
+                    "event_index": ev_idx,
+                    "event": ev,
+                })
+
+        final_db_hash = None
+        if os.path.exists(db_file):
+            with open(db_file, "rb") as f:
+                final_db_hash = hashlib.sha256(f.read()).hexdigest()
+
         return {
             "race_workers": 2,
             "success_submissions": success_count,
@@ -1950,11 +2134,13 @@ fn task_b(y: Int) -> Int requires { y >= 0, y < 1000000 } ensures { result >= y 
             "final_commit_chain_length": commit_chain_len,
             "initial_root": initial_root,
             "final_root": final_root,
+            "final_db_hash": final_db_hash,
             "eval_mode": "mock" if is_mock else "live",
             "is_mock": is_mock,
             "git_commit_sha": get_git_commit_sha(),
             "git_tree_hash": get_git_tree_hash(),
             "cas_events_by_worker": parsed_events,
+            "cas_event_ledger": cas_event_ledger,
             "worker_a": results.get("worker_a", {}),
             "worker_b": results.get("worker_b", {}),
         }

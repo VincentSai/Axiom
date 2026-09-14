@@ -315,8 +315,9 @@ pub struct ProcessSupervisor {
     child: Child,
     #[cfg(windows)]
     job_guard: Option<win32_job::JobObjectGuard>,
-    kill_sent: Arc<AtomicBool>,
-    reaped: Arc<AtomicBool>,
+    parent_exited: Arc<AtomicBool>,
+    parent_reaped: Arc<AtomicBool>,
+    tree_terminated: Arc<AtomicBool>,
 }
 
 impl ProcessSupervisor {
@@ -367,8 +368,9 @@ impl ProcessSupervisor {
             Ok(Self {
                 child,
                 job_guard: Some(job_guard),
-                kill_sent: Arc::new(AtomicBool::new(false)),
-                reaped: Arc::new(AtomicBool::new(false)),
+                parent_exited: Arc::new(AtomicBool::new(false)),
+                parent_reaped: Arc::new(AtomicBool::new(false)),
+                tree_terminated: Arc::new(AtomicBool::new(false)),
             })
         }
 
@@ -380,8 +382,9 @@ impl ProcessSupervisor {
                 .map_err(|e| format!("failed to spawn process group: {e}"))?;
             Ok(Self {
                 child,
-                kill_sent: Arc::new(AtomicBool::new(false)),
-                reaped: Arc::new(AtomicBool::new(false)),
+                parent_exited: Arc::new(AtomicBool::new(false)),
+                parent_reaped: Arc::new(AtomicBool::new(false)),
+                tree_terminated: Arc::new(AtomicBool::new(false)),
             })
         }
 
@@ -392,15 +395,56 @@ impl ProcessSupervisor {
                 .map_err(|e| format!("failed to spawn process: {e}"))?;
             Ok(Self {
                 child,
-                kill_sent: Arc::new(AtomicBool::new(false)),
-                reaped: Arc::new(AtomicBool::new(false)),
+                parent_exited: Arc::new(AtomicBool::new(false)),
+                parent_reaped: Arc::new(AtomicBool::new(false)),
+                tree_terminated: Arc::new(AtomicBool::new(false)),
             })
         }
     }
 
-    /// Access mutable reference to underlying Child.
-    pub fn child_mut(&mut self) -> &mut Child {
-        &mut self.child
+    /// Safely acquire ChildStdin without exposing mutable Child reference.
+    pub fn take_stdin(&mut self) -> Option<std::process::ChildStdin> {
+        self.child.stdin.take()
+    }
+
+    /// Safely acquire ChildStdout without exposing mutable Child reference.
+    pub fn take_stdout(&mut self) -> Option<std::process::ChildStdout> {
+        self.child.stdout.take()
+    }
+
+    /// Safely acquire ChildStderr without exposing mutable Child reference.
+    pub fn take_stderr(&mut self) -> Option<std::process::ChildStderr> {
+        self.child.stderr.take()
+    }
+
+    /// Retrieve OS process id.
+    pub fn id(&self) -> u32 {
+        self.child.id()
+    }
+
+    /// Query whether the parent process has been confirmed reaped by OS.
+    pub fn is_reaped(&self) -> bool {
+        self.parent_reaped.load(Ordering::SeqCst)
+    }
+
+    /// Query whether the process tree destruction signal has been dispatched.
+    pub fn is_tree_terminated(&self) -> bool {
+        self.tree_terminated.load(Ordering::SeqCst)
+    }
+
+    /// Controlled, stateful try_wait that atomically records reap status.
+    pub fn try_wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
+        if self.parent_reaped.load(Ordering::SeqCst) {
+            return self.child.try_wait();
+        }
+        match self.child.try_wait() {
+            Ok(Some(status)) => {
+                self.parent_exited.store(true, Ordering::SeqCst);
+                self.parent_reaped.store(true, Ordering::SeqCst);
+                Ok(Some(status))
+            }
+            other => other,
+        }
     }
 
     /// Idempotently and forcefully terminates the process tree and releases resources.
@@ -409,15 +453,17 @@ impl ProcessSupervisor {
     }
 
     /// 以单调绝对截止时间监管终止进程树，并在截止时间预算内回收子进程退出状态。
-    /// 仅在底层子进程被实际 reap 确认退出后才报告清理成功；若截止时间已耗尽或未确认退出，
-    /// 坚决返回 false 并在 Drop 中继续保留清理尝试，防止僵尸进程 (zombie) 泄漏。
+    /// 严格区分 parent_reaped 与 tree_terminated：若主进程已正常退出并 reap，
+    /// 坚决不再次向其主 PID 发送 kill 信号（防止击中已被操作系统复用的新进程 PID）；
+    /// 仅在底层子进程被实际 reap 确认退出后才报告清理成功。
     pub fn terminate_until(&mut self, deadline: Option<Instant>) -> bool {
-        if self.reaped.load(Ordering::SeqCst) {
+        if self.parent_reaped.load(Ordering::SeqCst) && self.tree_terminated.load(Ordering::SeqCst)
+        {
             return true;
         }
 
-        // 1. 若尚未发送强杀，立即发送整棵树强杀信号
-        if !self.kill_sent.swap(true, Ordering::SeqCst) {
+        // 1. 若尚未清理后代树，先终止整棵后代进程树（针对孤儿后代进程）
+        if !self.tree_terminated.swap(true, Ordering::SeqCst) {
             #[cfg(windows)]
             {
                 if let Some(ref guard) = self.job_guard {
@@ -429,44 +475,46 @@ impl ProcessSupervisor {
             {
                 unix_supervisor::kill_process_tree(self.child.id());
             }
+        }
 
+        // 2. 仅在主子进程尚未 reaped 时，才尝试强杀主子进程（杜绝 PID 复用误杀已回收主进程）
+        if !self.parent_reaped.load(Ordering::SeqCst) {
             let _ = self.child.kill();
         }
 
-        // 2. 优先执行立即非阻塞 try_wait
-        if let Ok(Some(_)) = self.child.try_wait() {
-            self.reaped.store(true, Ordering::SeqCst);
+        // 3. 优先执行立即非阻塞 try_wait 确认回收
+        if let Ok(Some(_)) = self.try_wait() {
             return true;
         }
 
-        // 3. 在单调绝对截止时间预算内有界等待状态回收
+        // 4. 在单调绝对截止时间预算内有界等待状态回收
         let drain_deadline = match deadline {
             Some(dl) => dl,
             None => Instant::now() + Duration::from_millis(100),
         };
 
         while Instant::now() < drain_deadline {
-            if let Ok(Some(_)) = self.child.try_wait() {
-                self.reaped.store(true, Ordering::SeqCst);
+            if let Ok(Some(_)) = self.try_wait() {
                 return true;
             }
             std::thread::sleep(Duration::from_millis(5));
         }
 
-        // 4. 超时后最后再次非阻塞 try_wait 确认
-        if let Ok(Some(_)) = self.child.try_wait() {
-            self.reaped.store(true, Ordering::SeqCst);
+        // 5. 超时后最后再次非阻塞 try_wait 确认
+        if let Ok(Some(_)) = self.try_wait() {
             return true;
         }
 
-        // 仍未完成 reap，绝不谎报成功
+        // 仍未完成主子进程 reap，绝不谎报成功
         false
     }
 }
 
 impl Drop for ProcessSupervisor {
     fn drop(&mut self) {
-        if !self.reaped.load(Ordering::SeqCst) {
+        if !self.parent_reaped.load(Ordering::SeqCst)
+            || !self.tree_terminated.load(Ordering::SeqCst)
+        {
             let _ = self.terminate_until(Some(Instant::now() + Duration::from_millis(50)));
         }
     }
@@ -777,7 +825,7 @@ pub(crate) fn execute_process_until_deadline(
     let mut supervisor = ProcessSupervisor::spawn(cmd)?;
 
     let mut stdin_comm = if let Some(data) = stdin_data {
-        if let Some(stdin) = supervisor.child_mut().stdin.take() {
+        if let Some(stdin) = supervisor.take_stdin() {
             let bytes = data.to_vec();
             Some(spawn_stdin_writer(stdin, bytes))
         } else {
@@ -788,14 +836,10 @@ pub(crate) fn execute_process_until_deadline(
     };
 
     let stdout_pipe = supervisor
-        .child_mut()
-        .stdout
-        .take()
+        .take_stdout()
         .ok_or("failed to capture stdout pipe")?;
     let stderr_pipe = supervisor
-        .child_mut()
-        .stderr
-        .take()
+        .take_stderr()
         .ok_or("failed to capture stderr pipe")?;
 
     #[cfg(windows)]
@@ -835,15 +879,17 @@ pub(crate) fn execute_process_until_deadline(
     // 循环轮询子进程退出状态直至截止时间
     let mut exit_status: Option<ExitStatus> = None;
     while Instant::now() < deadline {
-        match supervisor.child_mut().try_wait() {
+        match supervisor.try_wait() {
             Ok(Some(st)) => {
                 exit_status = Some(st);
                 break;
             }
             Ok(None) => std::thread::sleep(poll_interval),
             Err(e) => {
-                // 等待出错：第一动作立即强杀整个进程树，随后零宽限立即非阻塞回收句柄
-                let term_ok = supervisor.terminate_until(Some(deadline));
+                // 等待出错：在严格有界清理预算内强杀整个进程树并回收句柄
+                let cleanup_budget = Duration::from_millis(150);
+                let cleanup_deadline = Instant::now() + cleanup_budget;
+                let term_ok = supervisor.terminate_until(Some(cleanup_deadline));
                 let grace = Duration::ZERO;
                 let mut cleanup_errs = Vec::new();
                 if let Some(comm) = stdin_comm {
@@ -865,8 +911,10 @@ pub(crate) fn execute_process_until_deadline(
 
     // 检查是否超时
     if exit_status.is_none() {
-        // 超时：第一动作立即强杀整个进程树，随后零宽限立即非阻塞回收句柄，彻底消除延迟累加
-        let term_ok = supervisor.terminate_until(Some(deadline));
+        // 超时：分配统一单调的绝对清理预算（150ms），确保子进程树强杀、状态回收与 I/O 线程排空受单一绝对时间守护
+        let cleanup_budget = Duration::from_millis(150);
+        let cleanup_deadline = Instant::now() + cleanup_budget;
+        let term_ok = supervisor.terminate_until(Some(cleanup_deadline));
         let grace = Duration::ZERO;
         let mut cleanup_errs = Vec::new();
         if let Some(comm) = stdin_comm {
@@ -1098,8 +1146,13 @@ mod tests {
         // 生成 2MB 超过通常 4KB~64KB 操作系统管道缓冲区的数据
         let large_payload = vec![b'x'; 2 * 1024 * 1024];
 
+        let timeout = Duration::from_millis(300);
+        let cleanup_budget = Duration::from_millis(150);
+        let ci_tolerance = Duration::from_millis(250);
+        let max_allowed = timeout + cleanup_budget + ci_tolerance; // 700ms
+
         let start = Instant::now();
-        let deadline = start + Duration::from_millis(300);
+        let deadline = start + timeout;
         let res = execute_process_until_deadline(
             cmd,
             Some(&large_payload),
@@ -1108,7 +1161,7 @@ mod tests {
         );
 
         let elapsed = start.elapsed();
-        // 必须在严格有界时间内返回（远小于后代进程的 60 秒睡眠），同时容许并行测试高负载下的调度容差
+        // 显式区分业务执行截止时间、统一清理预算与系统调度容差，坚决防范 10x 宽限掩盖回归
         assert!(
             res.is_err(),
             "expected timeout or error due to bounded deadline, got {res:?}"
@@ -1119,8 +1172,8 @@ mod tests {
             "expected deadline timeout message, got: {err_msg}"
         );
         assert!(
-            elapsed < Duration::from_millis(3000),
-            "orphan holding stdin should not hang writer thread beyond bounded deadline, expected < 3000ms, took {elapsed:?}"
+            elapsed < max_allowed,
+            "orphan holding stdin should not hang beyond explicit timeout budget (300ms execution + 150ms cleanup + 250ms tolerance = 700ms), took {elapsed:?}"
         );
     }
 
