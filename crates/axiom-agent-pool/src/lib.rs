@@ -16,6 +16,9 @@ use axiom_smt::verify_function_in_module;
 pub use axiom_smt::SmtResult;
 use serde::{Deserialize, Serialize};
 
+use axiom_ast::merge::{merge_modules_3way, AstConflictReport};
+use axiom_smt::cascade::verify_dependent_closure;
+
 /// Detailed status tag of submitting a hole solution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -45,6 +48,7 @@ pub struct SubmitOutcome {
     pub smt_result: SmtResult,
     pub cas_events: Vec<CasEvent>,
     pub upgraded_to_verified: bool,
+    pub conflict_report: Option<AstConflictReport>,
 }
 
 /// Serializable Data Transfer Object for SubmitOutcome, decoupling clients/CLI from internal domain types.
@@ -60,6 +64,7 @@ pub struct SubmitOutcomeDto {
     pub cas_events: Vec<CasEvent>,
     pub counter_example: Option<String>,
     pub reason: Option<String>,
+    pub conflict_report: Option<AstConflictReport>,
 }
 
 impl SubmitOutcome {
@@ -138,6 +143,7 @@ impl SubmitOutcome {
             cas_events: self.cas_events.clone(),
             counter_example,
             reason,
+            conflict_report: self.conflict_report.clone(),
         }
     }
 }
@@ -152,6 +158,18 @@ pub enum CasEvent {
     RebaseSucceeded {
         rebased_root: NodeHash,
         attempts: usize,
+    },
+    Ast3WayRebaseSucceeded {
+        rebased_root: NodeHash,
+        cascade_verified_count: usize,
+    },
+    AstMergeConflict {
+        conflict_count: usize,
+        summary: String,
+    },
+    CascadeVerificationFailed {
+        failed_functions: Vec<String>,
+        reasons: Vec<String>,
     },
 }
 
@@ -799,6 +817,7 @@ impl AgentTaskPool {
                     smt_result: precheck_result,
                     cas_events: Vec::new(),
                     upgraded_to_verified: false,
+                    conflict_report: None,
                 });
             }
             SmtResult::Skipped(_) => {
@@ -809,12 +828,14 @@ impl AgentTaskPool {
                         smt_result: precheck_result,
                         cas_events: Vec::new(),
                         upgraded_to_verified: false,
+                        conflict_report: None,
                     });
                 }
                 return Ok(SubmitOutcome {
                     smt_result: precheck_result,
                     cas_events: Vec::new(),
                     upgraded_to_verified: false,
+                    conflict_report: None,
                 });
             }
             SmtResult::Sampled { points_checked: _ } => {
@@ -824,12 +845,14 @@ impl AgentTaskPool {
                         smt_result: precheck_result,
                         cas_events: Vec::new(),
                         upgraded_to_verified: false,
+                        conflict_report: None,
                     });
                 } else {
                     return Ok(SubmitOutcome {
                         smt_result: precheck_result,
                         cas_events: Vec::new(),
                         upgraded_to_verified: false,
+                        conflict_report: None,
                     });
                 }
             }
@@ -851,6 +874,7 @@ impl AgentTaskPool {
                     smt_result: precheck_result,
                     cas_events,
                     upgraded_to_verified: was_provisional,
+                    conflict_report: None,
                 })
             }
             Err(CasError::StaleRoot { current, expected }) => {
@@ -863,7 +887,7 @@ impl AgentTaskPool {
                 let latest_root = current.clone().ok_or_else(|| {
                     PoolError::CasFailure("stale root returned None current root".to_string())
                 })?;
-                let mut rebased_module = self
+                let latest_module = self
                     .db
                     .get_module(&latest_root)
                     .map_err(|e| PoolError::CasFailure(e.to_string()))?
@@ -872,6 +896,41 @@ impl AgentTaskPool {
                             "latest module for root `{latest_root}` not found in database"
                         ))
                     })?;
+
+                // 获取 base_module：优先根据 envelope.base_root_hash 从数据库加载
+                let base_module = if let Some(ref base_root) = envelope.base_root_hash {
+                    self.db
+                        .get_module(base_root)
+                        .ok()
+                        .flatten()
+                        .unwrap_or_else(|| self.verified_module.clone())
+                } else {
+                    self.verified_module.clone()
+                };
+
+                // 核心：调用 AST 级结构化三路合并算法 (Ticket 04)
+                let merge_result =
+                    merge_modules_3way(&base_module, &candidate_module, &latest_module);
+
+                let rebased_module = match merge_result {
+                    Ok(merged) => merged,
+                    Err(conflict_report) => {
+                        let conflict_count = conflict_report.conflicts.len();
+                        let summary = format!("{conflict_report}");
+                        cas_events.push(CasEvent::AstMergeConflict {
+                            conflict_count,
+                            summary: summary.clone(),
+                        });
+                        return Ok(SubmitOutcome {
+                            smt_result: SmtResult::Skipped(format!(
+                                "AST 3-way merge conflict detected: {summary}"
+                            )),
+                            cas_events,
+                            upgraded_to_verified: false,
+                            conflict_report: Some(conflict_report),
+                        });
+                    }
+                };
 
                 let base_func = rebased_module
                     .functions
@@ -882,14 +941,45 @@ impl AgentTaskPool {
                 let rebased_func_hash = compute_contract_hash(&base_func);
                 let rebased_deps = extract_function_dependencies(&base_func, &rebased_module);
 
-                let mut rebased_affected = Vec::new();
-                for (idx, function) in rebased_module.functions.iter_mut().enumerate() {
-                    if replace_hole(&mut function.body, hole_id, &solution) {
-                        rebased_affected.push(idx);
-                    }
-                }
-                if rebased_affected.is_empty() {
-                    return Err(PoolError::MissingHole(hole_id.to_owned()));
+                // 核心：执行跨符号级联 SMT 定理重验证 (Ticket 05)
+                let cascade_report =
+                    verify_dependent_closure(&rebased_module, &[&envelope.target_function]);
+
+                if !cascade_report.is_all_proved() {
+                    let failed_funcs: Vec<String> = cascade_report
+                        .failures
+                        .iter()
+                        .map(|f| f.function_name.clone())
+                        .collect();
+                    let failure_reasons: Vec<String> = cascade_report
+                        .failures
+                        .iter()
+                        .map(|f| format!("{}: {}", f.function_name, f.reason))
+                        .collect();
+                    cas_events.push(CasEvent::CascadeVerificationFailed {
+                        failed_functions: failed_funcs,
+                        reasons: failure_reasons,
+                    });
+
+                    let representative_result = cascade_report
+                        .results
+                        .get(&envelope.target_function)
+                        .cloned()
+                        .unwrap_or_else(|| {
+                            cascade_report
+                                .results
+                                .values()
+                                .find(|r| !r.is_proved())
+                                .cloned()
+                                .unwrap_or(SmtResult::Unknown("cascade verification failed".into()))
+                        });
+
+                    return Ok(SubmitOutcome {
+                        smt_result: representative_result,
+                        cas_events,
+                        upgraded_to_verified: false,
+                        conflict_report: None,
+                    });
                 }
 
                 let rebased_envelope = TaskEnvelope {
@@ -907,15 +997,6 @@ impl AgentTaskPool {
                     timestamp: candidate.timestamp + 1,
                 };
 
-                let recheck_result = verify_candidate_precheck(&rebased_module, &rebased_affected);
-                if !recheck_result.is_proved() {
-                    return Ok(SubmitOutcome {
-                        smt_result: recheck_result,
-                        cas_events,
-                        upgraded_to_verified: false,
-                    });
-                }
-
                 let commit_record = self
                     .db
                     .try_commit_candidate(
@@ -927,15 +1008,24 @@ impl AgentTaskPool {
                     .map_err(|e| PoolError::CasFailure(e.to_string()))?;
 
                 cas_events.push(CasEvent::RebaseSucceeded {
-                    rebased_root: latest_root,
+                    rebased_root: latest_root.clone(),
                     attempts: 1,
+                });
+                cas_events.push(CasEvent::Ast3WayRebaseSucceeded {
+                    rebased_root: latest_root,
+                    cascade_verified_count: cascade_report.verified_functions.len(),
                 });
 
                 self.apply_verified_commit(commit_record, rebased_module, hole_id);
                 Ok(SubmitOutcome {
-                    smt_result: recheck_result,
+                    smt_result: cascade_report
+                        .results
+                        .get(&envelope.target_function)
+                        .cloned()
+                        .unwrap_or(precheck_result),
                     cas_events,
                     upgraded_to_verified: was_provisional,
+                    conflict_report: None,
                 })
             }
             Err(other) => Err(PoolError::CasFailure(other.to_string())),

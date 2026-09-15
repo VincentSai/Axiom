@@ -1294,6 +1294,35 @@ fn render_submit_outcome(
                         rebased_root, attempts
                     );
                 }
+                axiom_agent_pool::CasEvent::Ast3WayRebaseSucceeded {
+                    rebased_root,
+                    cascade_verified_count,
+                } => {
+                    println!(
+                        "[CAS_EVENT:AST_3WAY_REBASE_SUCCEEDED] rebased to root: {} (cascade verified: {} functions)",
+                        rebased_root, cascade_verified_count
+                    );
+                }
+                axiom_agent_pool::CasEvent::AstMergeConflict {
+                    conflict_count,
+                    summary,
+                } => {
+                    println!(
+                        "[CAS_EVENT:AST_MERGE_CONFLICT] {conflict_count} structural conflict(s) detected:\n{summary}"
+                    );
+                }
+                axiom_agent_pool::CasEvent::CascadeVerificationFailed {
+                    failed_functions,
+                    reasons,
+                } => {
+                    println!(
+                        "[CAS_EVENT:CASCADE_VERIFICATION_FAILED] {} downstream function(s) failed contracts:",
+                        failed_functions.len()
+                    );
+                    for r in reasons {
+                        println!("  - {r}");
+                    }
+                }
             }
         }
 

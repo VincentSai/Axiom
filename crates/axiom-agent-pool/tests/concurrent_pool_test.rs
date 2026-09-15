@@ -931,3 +931,88 @@ fn simulate_legacy_profile_receipt(db_path: &std::path::Path) {
 
     std::fs::write(db_path, serde_json::to_string_pretty(&val).unwrap()).unwrap();
 }
+
+#[test]
+fn test_concurrent_workers_stale_root_rebase_via_ast_3way_merge_and_cascade_verify() {
+    let pool = Arc::new(Mutex::new(
+        AgentTaskPool::from_source(TWO_HOLE_SKELETON).expect("skeleton should parse"),
+    ));
+
+    // Worker 1 解决 increment_impl: value + 1
+    let worker1 = {
+        let pool = Arc::clone(&pool);
+        thread::spawn(move || {
+            pool.lock()
+                .unwrap()
+                .submit_solution_with_outcome("increment_impl", "value + 1", "worker_1")
+                .unwrap()
+        })
+    };
+
+    // Worker 2 解决 double_impl: value * 2
+    let worker2 = {
+        let pool = Arc::clone(&pool);
+        thread::spawn(move || {
+            pool.lock()
+                .unwrap()
+                .submit_solution_with_outcome("double_impl", "value * 2", "worker_2")
+                .unwrap()
+        })
+    };
+
+    let outcome1 = worker1.join().unwrap();
+    let outcome2 = worker2.join().unwrap();
+
+    assert!(outcome1.smt_result.is_proved());
+    assert!(outcome2.smt_result.is_proved());
+
+    let p = pool.lock().unwrap();
+    assert!(p.is_complete());
+    assert!(p.assemble_verified_module().is_ok());
+}
+
+#[test]
+fn test_stale_root_with_ast_conflict_returns_conflict_report() {
+    let temp_dir = std::env::temp_dir().join(format!(
+        "axiom_ast_conflict_test_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let db_path = temp_dir.join("astdb.json");
+
+    let skeleton = axiom_parser::parse_module(TWO_HOLE_SKELETON).unwrap();
+    let mut pool1 = AgentTaskPool::open_with_database(
+        skeleton.clone(),
+        axiom_db::AstDatabase::open(&db_path).unwrap(),
+    )
+    .unwrap();
+
+    let mut pool2 =
+        AgentTaskPool::open_with_database(skeleton, axiom_db::AstDatabase::open(&db_path).unwrap())
+            .unwrap();
+
+    // Worker 1 提交解 1: value + 1，成功落盘并更新 db_path 中的 root
+    let outcome1 = pool1
+        .submit_solution_with_outcome("increment_impl", "value + 1", "worker_1")
+        .unwrap();
+    assert!(outcome1.smt_result.is_proved());
+
+    // Worker 2 基于原始旧根试图提交冲突解: value + 2
+    let outcome2 = pool2
+        .submit_solution_with_outcome("increment_impl", "value + 2", "worker_2")
+        .unwrap();
+
+    // 验证：由于同一函数节点被双方不同填充，底层触发 StaleRoot 并产生 AST 冲突报告！
+    assert!(outcome2.conflict_report.is_some());
+    let report = outcome2.conflict_report.unwrap();
+    assert!(!report.conflicts.is_empty());
+    assert!(outcome2
+        .cas_events
+        .iter()
+        .any(|e| matches!(e, axiom_agent_pool::CasEvent::AstMergeConflict { .. })));
+
+    let _ = std::fs::remove_dir_all(temp_dir);
+}
