@@ -535,7 +535,7 @@ impl SealedSolverBinary {
                 )
             })?;
 
-        let lock_deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let lock_deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
         let mut _file_guard = None;
         while std::time::Instant::now() < lock_deadline {
             if os_file_lock::try_lock_exclusive(&lock_file) {

@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 use axiom_ast::merge::{merge_modules_3way, AstConflictReport};
 use axiom_smt::cascade::verify_dependent_closure;
 
+pub mod auto_heal;
+
 /// Detailed status tag of submitting a hole solution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -492,6 +494,11 @@ impl AgentTaskPool {
     /// Return all hole tasks originally defined in the skeleton module.
     pub fn all_tasks(&self) -> &[HoleTask] {
         &self.tasks
+    }
+
+    /// Return the HoleTask corresponding to a given hole_id if present.
+    pub fn task_for_hole(&self, hole_id: &str) -> Option<&HoleTask> {
+        self.tasks.iter().find(|t| t.hole_id == hole_id)
     }
 
     /// Return the tasks that still need verified implementations, in source order.

@@ -10,7 +10,7 @@ axiom-hole-extractor = { path = "../axiom-hole-extractor" }
 axiom-parser = { path = "../axiom-parser" }
 axiom-smt = { path = "../axiom-smt" }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
 
 [dev-dependencies]
 axiom-transpiler = { path = "../axiom-transpiler" }
-serde_json = "1.0"

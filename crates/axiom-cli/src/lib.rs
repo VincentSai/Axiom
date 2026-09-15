@@ -238,6 +238,35 @@ pub enum PoolAction {
         #[arg(long)]
         strict: bool,
     },
+
+    /// Automatically solve and self-heal a hole using external LLM / Agent engine (mock, codex).
+    Solve {
+        file: PathBuf,
+
+        /// Hole ID to resolve (e.g. `abs_impl`).
+        #[arg(long)]
+        hole: String,
+
+        /// Agent engine to use: `mock` or `codex`. Defaults to `mock`.
+        #[arg(long, default_value = "mock")]
+        engine: String,
+
+        /// Maximum self-healing iterations.
+        #[arg(long, default_value_t = 3)]
+        max_steps: usize,
+
+        /// Optional path to shared AST database file.
+        #[arg(long)]
+        db: Option<PathBuf>,
+
+        /// Strict verification policy: require formal SMT proof.
+        #[arg(long)]
+        strict: bool,
+
+        /// Output auto-heal execution history as structured JSON.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1264,6 +1293,71 @@ fn handle_pool_action(action: PoolAction) -> Result<(), CliError> {
                 print!("{assembled_source}");
             }
             Ok(())
+        }
+        PoolAction::Solve {
+            file,
+            hole,
+            engine,
+            max_steps,
+            db,
+            strict,
+            json,
+        } => {
+            let policy = if strict {
+                PoolVerificationPolicy::StrictProved
+            } else {
+                PoolVerificationPolicy::Permissive
+            };
+            let mut pool = create_task_pool(&file, db.as_deref(), policy)?;
+            if !json {
+                println!(
+                    "Solving hole `?{hole}` in `{}` using engine `{engine}` (max steps: {max_steps})...",
+                    file.display()
+                );
+            }
+
+            let outcome = axiom_agent_pool::auto_heal::solve_and_heal_with_engine(
+                &mut pool, &hole, &engine, max_steps,
+            )
+            .map_err(CliError::Pool)?;
+
+            if json {
+                let json_str =
+                    serde_json::to_string_pretty(&outcome).map_err(CliError::Serialize)?;
+                println!("{json_str}");
+            } else {
+                println!("Auto-Heal Summary for ?{}:", outcome.hole_id);
+                println!(
+                    "  Status:      {}",
+                    if outcome.success {
+                        "SUCCESS (Verified)"
+                    } else {
+                        "FAILED"
+                    }
+                );
+                println!("  Total Steps: {}", outcome.total_steps);
+                if let Some(sol) = &outcome.final_solution {
+                    println!("  Solution:    {}", sol);
+                }
+                println!("  Healing Trajectory:");
+                for step in &outcome.history {
+                    println!(
+                        "    Step {}: status={:?}, proved={}, candidate=`{}`",
+                        step.step, step.status, step.proved, step.candidate_solution
+                    );
+                    if let Some(ce) = &step.counter_example {
+                        println!("      Counterexample: {ce}");
+                    }
+                }
+            }
+
+            if outcome.success {
+                Ok(())
+            } else {
+                Err(CliError::HoleVerificationRejected(format!(
+                    "failed to find verified solution within {max_steps} steps"
+                )))
+            }
         }
     }
 }

@@ -135,3 +135,61 @@ fn increment(x: Int) -> Int
 
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn pool_cli_auto_heal_solve_flow() {
+    let dir = temp_dir("cli-solve");
+    let skeleton_path = dir.join("abs_skeleton.ax");
+    let skeleton_content = r#"
+fn safe_abs(x: Int) -> Int
+    requires {
+        x > -1000000,
+        x < 1000000,
+    }
+    ensures {
+        result >= 0,
+    }
+{
+    ?abs_hole
+}
+"#;
+    fs::write(&skeleton_path, skeleton_content).expect("skeleton write should succeed");
+
+    // 运行 axiom pool solve --file skeleton.ax --hole abs_hole --engine mock --max-steps 3 --json
+    let solve_output = Command::new(axiom_bin())
+        .args([
+            "pool",
+            "solve",
+            skeleton_path.to_str().unwrap(),
+            "--hole",
+            "abs_hole",
+            "--engine",
+            "mock",
+            "--max-steps",
+            "3",
+            "--json",
+        ])
+        .output()
+        .expect("pool solve should execute");
+
+    assert!(
+        solve_output.status.success(),
+        "solve command should succeed with exit code 0. stderr: {}",
+        String::from_utf8_lossy(&solve_output.stderr)
+    );
+
+    let stdout = String::from_utf8_lossy(&solve_output.stdout);
+    let outcome: axiom_agent_pool::auto_heal::AutoHealOutcome =
+        serde_json::from_str(&stdout).expect("output should deserialize into AutoHealOutcome");
+
+    assert!(outcome.success, "auto-heal outcome should be success");
+    assert_eq!(outcome.hole_id, "abs_hole");
+    assert_eq!(outcome.total_steps, 2);
+    assert_eq!(outcome.history.len(), 2);
+    assert!(!outcome.history[0].proved);
+    assert!(outcome.history[0].counter_example.is_some());
+    assert!(outcome.history[1].proved);
+    assert!(outcome.history[1].counter_example.is_none());
+
+    let _ = fs::remove_dir_all(&dir);
+}
