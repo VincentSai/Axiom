@@ -1,5 +1,6 @@
 //! Core abstract syntax tree definitions for Axiom.
 
+pub mod analysis;
 pub mod merge;
 
 use serde::{Deserialize, Serialize};

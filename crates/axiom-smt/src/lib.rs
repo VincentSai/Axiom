@@ -4,6 +4,7 @@
 //!   1. First-order full domain SMT theorem proving via Microsoft Z3 (or any SMT-LIB2 solver).
 //!   2. Built-in standalone symbolic interval and boundary grid verification.
 
+pub mod cascade;
 pub mod internal_solver;
 pub mod process_supervisor;
 pub mod smtlib2;
