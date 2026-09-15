@@ -1,4 +1,4 @@
-﻿> **Languages / 语言 / 語言**: [English](en/MULTI_AGENT_WORKFLOW.md) | [简体中文](zh-CN/MULTI_AGENT_WORKFLOW.md) | [繁體中文](zh-TW/MULTI_AGENT_WORKFLOW.md)
+> **Languages / 语言 / 語言**: [English](en/MULTI_AGENT_WORKFLOW.md) | [简体中文](zh-CN/MULTI_AGENT_WORKFLOW.md) | [繁體中文](zh-TW/MULTI_AGENT_WORKFLOW.md)
 
 ---
 
@@ -96,3 +96,27 @@ sequenceDiagram
 ```
 
 Agent 收到此 JSON 后，可以在单次迭代内直接定位边界条件漏洞并精准修复。
+
+---
+
+## 5. 生产级 AST 3-Way 合并与级联 SMT 定理重验 (Phase 2 & 3 落地)
+
+### 5.1 AST 级 3-Way 真实合并算法 (`merge_modules_3way`)
+Axiom 彻底废弃了行级文本合并机制，实现了基于语法树的三路合并：
+- **符号级正交融合**: 对函数、类型（Record/Enum）、代数效应（Effects）实施键值正交分析；并发新增与非冲突修改自动合并；
+- **节点级冲突报告 (`AstConflictReport`)**: 当且仅当多个 Agent 互斥修改同一 AST 节点时，输出精确结构化诊断，绝不产生破坏语法的 Git Conflict Markers。
+
+### 5.2 跨符号级联 SMT 重验 (`verify_dependent_closure`)
+为防止下游子函数的改动隐式破坏上游契约，Axiom 构建了静态调用图：
+- 提取受影响符号的传递闭包 $\mathcal{C}(F)$；
+- 级联触发闭包内全部函数的 SMT 定理重验；
+- 若任何上游契约违约，合并立即拒绝，杜绝隐式语义破坏。
+
+### 5.3 CLI 原生单步自愈引擎 (`axiom pool solve`)
+```bash
+# 自动调度 Worker 生成纯代数解并基于 SMT 反例单步自愈
+axiom pool solve examples/math.ax --hole abs_hole --engine codex --max-steps 3
+```
+- **第 0 步**: Worker 给出初始尝试（如幼稚解 `x`）；
+- **SMT 反例注入**: 求解器捕获边界违约（如 `x = -1.0` 或溢出点 `x = i64::MAX`）；
+- **第 1 步**: 提示词携带具体反例，Worker 靶向生成保护分支（如 `match x < 0 { true => -x, false => x }`），单步收敛并通过证明，自动签入 CAS 数据库！
