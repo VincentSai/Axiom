@@ -64,3 +64,35 @@ fn test_auto_heal_aborts_when_max_steps_exceeded() {
     assert!(outcome.final_solution.is_none());
     assert!(!pool.is_complete());
 }
+
+#[test]
+fn test_codex_cli_watchdog_timeout_kills_process_and_fails_closed() {
+    use axiom_agent_pool::auto_heal::call_codex_cli_with_timeout;
+    use std::path::Path;
+
+    #[cfg(windows)]
+    let hang_bin = Path::new("ping");
+    #[cfg(not(windows))]
+    let hang_bin = Path::new("sleep");
+
+    let start = std::time::Instant::now();
+    let res = call_codex_cli_with_timeout("some prompt", hang_bin, 150);
+    let elapsed = start.elapsed();
+
+    assert!(
+        res.is_err(),
+        "Watchdog MUST kill hung process and return error!"
+    );
+    let err_msg = res.unwrap_err();
+    assert!(
+        err_msg.contains("timed out")
+            || err_msg.contains("supervisor execution failed")
+            || err_msg.contains("failed"),
+        "Error message should indicate supervisor/timeout failure: {err_msg}"
+    );
+    assert!(
+        elapsed < std::time::Duration::from_millis(3000),
+        "Watchdog MUST terminate process promptly without hanging! Elapsed: {:?}",
+        elapsed
+    );
+}

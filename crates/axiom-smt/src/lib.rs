@@ -13,6 +13,10 @@ pub mod z3_solver;
 use std::collections::HashMap;
 
 use axiom_ast::{FunctionDecl, Module};
+pub use process_supervisor::{
+    execute_process_until_deadline, execute_supervised_command, ProcessExecutionOutput,
+    ProcessSupervisor, TimeoutPolicy,
+};
 pub use smtlib2::{
     generate_precondition_check_smtlib2, generate_smtlib2, generate_smtlib2_and_obligations,
     generate_smtlib2_with_module, generate_smtlib2_with_module_and_obligations,

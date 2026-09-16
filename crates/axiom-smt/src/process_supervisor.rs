@@ -919,7 +919,7 @@ fn spawn_stdin_writer(mut stdin: std::process::ChildStdin, bytes: Vec<u8>) -> St
 }
 
 /// 以绝对单调时钟截止时间监管执行子进程，并进行多通道有界 I/O 回收与看门狗强杀。
-pub(crate) fn execute_process_until_deadline(
+pub fn execute_process_until_deadline(
     mut cmd: Command,
     stdin_data: Option<&[u8]>,
     deadline: Instant,
@@ -1156,6 +1156,16 @@ pub(crate) fn execute_process_until_deadline(
         stdout,
         stderr,
     })
+}
+
+/// Convenience helper to run an external command under ProcessSupervisor using a TimeoutPolicy.
+pub fn execute_supervised_command(
+    cmd: Command,
+    stdin_data: Option<&[u8]>,
+    policy: TimeoutPolicy,
+) -> Result<ProcessExecutionOutput, String> {
+    let deadline = Instant::now() + policy.timeout;
+    execute_process_until_deadline(cmd, stdin_data, deadline, policy.poll_interval)
 }
 
 #[cfg(test)]

@@ -213,8 +213,21 @@ pub fn clean_expression_output(raw: &str) -> String {
     trimmed.to_string()
 }
 
-/// Invoke local Codex-CLI non-interactively to generate a solution.
+/// Invoke local Codex-CLI non-interactively to generate a solution under ProcessSupervisor watchdog.
 pub fn call_codex_cli(prompt: &str, codex_bin: &Path) -> Result<String, String> {
+    let timeout_ms = std::env::var("AXIOM_CODEX_TIMEOUT_MS")
+        .ok()
+        .and_then(|s| s.parse::<u32>().ok())
+        .unwrap_or(30_000);
+    call_codex_cli_with_timeout(prompt, codex_bin, timeout_ms)
+}
+
+/// Invoke local Codex-CLI non-interactively with an explicit watchdog timeout in milliseconds.
+pub fn call_codex_cli_with_timeout(
+    prompt: &str,
+    codex_bin: &Path,
+    timeout_ms: u32,
+) -> Result<String, String> {
     let mut cmd = Command::new(codex_bin);
     cmd.args([
         "exec",
@@ -225,34 +238,9 @@ pub fn call_codex_cli(prompt: &str, codex_bin: &Path) -> Result<String, String> 
         "read-only",
     ]);
 
-    // 配置代理（如果环境变量未设置，使用默认代理）
-    if std::env::var("HTTP_PROXY").is_err() && std::env::var("http_proxy").is_err() {
-        cmd.env("HTTP_PROXY", "http://127.0.0.1:7897");
-    }
-    if std::env::var("HTTPS_PROXY").is_err() && std::env::var("https_proxy").is_err() {
-        cmd.env("HTTPS_PROXY", "http://127.0.0.1:7897");
-    }
-
-    use std::io::Write;
-    use std::process::Stdio;
-
-    cmd.stdin(Stdio::piped());
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
-
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("failed to spawn codex-cli at {}: {e}", codex_bin.display()))?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(prompt.as_bytes())
-            .map_err(|e| format!("failed to write prompt to codex stdin: {e}"))?;
-    }
-
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("failed to wait for codex execution: {e}"))?;
+    let policy = axiom_smt::TimeoutPolicy::from_millis(timeout_ms);
+    let output = axiom_smt::execute_supervised_command(cmd, Some(prompt.as_bytes()), policy)
+        .map_err(|e| format!("codex supervisor execution failed: {e}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
