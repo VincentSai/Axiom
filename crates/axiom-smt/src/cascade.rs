@@ -23,12 +23,26 @@ pub struct CascadeVerificationReport {
     pub results: HashMap<String, SmtResult>,
     /// 级联失败/反例列表（若非空则证明级联受阻）
     pub failures: Vec<CascadeFailure>,
+    /// 下游依赖闭包中尚包含未填洞的在途函数列表（待决下游依赖）
+    pub pending_dependents: Vec<String>,
 }
 
 impl CascadeVerificationReport {
-    /// 检查闭包内所有受影响契约函数是否全部证明通过（All Proved）
+    /// 检查闭包内所有受影响契约函数是否全部证明通过（All Proved）且无在途待决依赖
     pub fn is_all_proved(&self) -> bool {
-        self.failures.is_empty() && self.results.values().all(|r| r.is_proved())
+        self.failures.is_empty()
+            && self.pending_dependents.is_empty()
+            && self.results.values().all(|r| r.is_proved())
+    }
+
+    /// 检查是否存在契约破坏或致命失败
+    pub fn has_failures(&self) -> bool {
+        !self.failures.is_empty()
+    }
+
+    /// 是否仅因下游存在在途依赖而暂时未全闭合
+    pub fn has_pending_dependents_only(&self) -> bool {
+        self.failures.is_empty() && !self.pending_dependents.is_empty()
     }
 }
 
@@ -56,6 +70,7 @@ pub fn verify_dependent_closure(
         verified_functions: Vec::new(),
         results: HashMap::new(),
         failures: Vec::new(),
+        pending_dependents: Vec::new(),
     };
 
     let trigger_sym = changed_symbols.first().copied().unwrap_or("unknown");
@@ -63,6 +78,20 @@ pub fn verify_dependent_closure(
     for func in &module.functions {
         if closure.contains(&func.name) && func.has_contracts() {
             report.verified_functions.push(func.name.clone());
+
+            let is_downstream = func.name != trigger_sym;
+            let contains_holes = axiom_ast::expr_contains_hole(&func.body);
+
+            // 若下游函数体内尚有未填的洞，说明下游在途尚未完工，记为待决依赖，不可判定为破坏失败
+            if is_downstream && contains_holes {
+                report.pending_dependents.push(func.name.clone());
+                report.results.insert(
+                    func.name.clone(),
+                    SmtResult::Skipped("contains in-flight unresolved holes".into()),
+                );
+                continue;
+            }
+
             let result = verify_function_in_module(func, module);
             if !result.is_proved() {
                 let reason = match &result {

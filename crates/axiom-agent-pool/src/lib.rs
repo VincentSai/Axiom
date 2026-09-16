@@ -866,7 +866,7 @@ impl AgentTaskPool {
         let cascade_report =
             verify_dependent_closure(&candidate_module, &[&envelope.target_function]);
 
-        if !cascade_report.is_all_proved() {
+        if cascade_report.has_failures() {
             let failed_funcs: Vec<String> = cascade_report
                 .failures
                 .iter()

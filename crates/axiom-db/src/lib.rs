@@ -1234,6 +1234,24 @@ impl AstDatabase {
         let smt_result = axiom_smt::verify_function_in_module(affected_func, &derived_module);
         let evidence = require_proved(smt_result, env_hash, cand_hash, affected_func)?;
 
+        // [Ticket 18 / Review Spec 3]: 统一级联验证内核：
+        // 检查下游传递闭包，确保已完工的下游函数没有被破坏
+        let cascade_report = axiom_smt::cascade::verify_dependent_closure(
+            &derived_module,
+            &[&envelope.target_function],
+        );
+        if cascade_report.has_failures() {
+            let reasons: Vec<String> = cascade_report
+                .failures
+                .iter()
+                .map(|f| format!("{}: {}", f.function_name, f.reason))
+                .collect();
+            return Err(CasError::VerificationRejected(format!(
+                "downstream contract violated by upstream candidate: {}",
+                reasons.join("; ")
+            )));
+        }
+
         Ok(CertifiedVerification {
             base_root_hash: expected_root.clone(),
             derived_module,
