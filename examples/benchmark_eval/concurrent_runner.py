@@ -1359,6 +1359,14 @@ def validate_benchmark_result_schema(data: dict):
 
     g2 = data["detailed_runs"].get("group2_rust", {})
     g3 = data["detailed_runs"].get("group3_axiom", {})
+
+    if "unit_test_passed" not in axiom_summary or not isinstance(axiom_summary["unit_test_passed"], bool):
+        raise ValueError("summary.axiom_group 必须包含布尔类型的 unit_test_passed 字段")
+    if axiom_summary["unit_test_passed"] != g3.get("unit_test_passed"):
+        raise ValueError("summary.axiom_group.unit_test_passed 与 detailed_runs.group3_axiom.unit_test_passed 不一致")
+    if axiom_summary.get("formal_proved") is True and axiom_summary["unit_test_passed"] is not True:
+        raise ValueError("Axiom 形式验证通过但业务测试向量未通过，存在契约脱节假阳性！")
+
     for g_data, g_name in [(g2, "Group 2"), (g3, "Group 3")]:
         for req in ["total_tasks", "git_tree_hash", "git_diff_hash", "git_provenance"]:
             if req not in g_data:
@@ -2624,6 +2632,28 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
             if curr_prov.z3_binary_sha256 != act_hash:
                 raise RuntimeError(f"Provenance z3_binary_sha256 ({curr_prov.z3_binary_sha256}) 与内核实测调用的 Z3 哈希 ({act_hash}) 不一致！")
 
+    # 4.5 业务 Oracle 双重验证 (Axiom转译并运行全部业务测试向量)
+    print("⏳ 执行业务 Oracle 双重验证 (Axiom转译并运行全部业务测试向量)...", end="", flush=True)
+    oracle_ok = False
+    oracle_msg = "未执行"
+    if v_ok and assembled_code:
+        with tempfile.TemporaryDirectory() as tmp_trans_dir:
+            ax_p = os.path.join(tmp_trans_dir, "assembled.ax")
+            rs_p = os.path.join(tmp_trans_dir, "assembled.rs")
+            with open(ax_p, "w", encoding="utf-8") as f:
+                f.write(assembled_code)
+            emit_res = subprocess.run([axiom_bin, "emit-rust", ax_p, "-o", rs_p], capture_output=True, text=True, timeout=30)
+            if emit_res.returncode != 0:
+                oracle_ok = False
+                oracle_msg = f"Axiom 转译 Rust 失败: {emit_res.stderr.strip()[:300]}"
+            else:
+                with open(rs_p, "r", encoding="utf-8") as f:
+                    transpiled_rust = f.read()
+                oracle_ok, oracle_msg = run_rust_system_tests(transpiled_rust, tasks)
+    print(f" {'通过 ✅' if oracle_ok else '未通过 ❌'}")
+    if not oracle_ok:
+        print(f"  业务 Oracle 报错详情: {oracle_msg}")
+
     # 5. 真实 CAS 并发竞争与排他文件锁压力测试
     print("⏳ 执行 AgentTaskPool 真实 CAS 并发竞争与排他文件锁压测...", end="", flush=True)
     cas_bench_data = benchmark_cas_concurrency_and_stale_root(axiom_bin, is_mock=args.mock)
@@ -2642,7 +2672,7 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
     workers_billed = sum(w["raw_result"]["raw_billed"]["total_tokens"] for w in worker_results)
 
     return {
-        "status": "success" if v_ok else "proof_failed",
+        "status": "success" if (v_ok and oracle_ok) else ("oracle_failed" if v_ok else "proof_failed"),
         "total_tasks": len(tasks),
         "wall_clock_sec": pipeline_wall_time,
         "worker_concurrency_sec": worker_wall_time,
@@ -2664,9 +2694,11 @@ def run_group3_axiom_pipeline(tasks: list, args, proxy: str, axiom_bin: str) -> 
                 "dependency_tokens": sum(w["capsule"]["dependency_tokens"] for w in worker_results),
                 "candidates_tokens": sum(w["raw_result"]["task_payload"]["candidates_tokens"] for w in worker_results),
             },
-            "tokens_to_proved": workers_payload if v_ok else None,
+            "tokens_to_proved": workers_payload if (v_ok and oracle_ok) else None,
         },
         "formal_proved": v_ok,
+        "unit_test_passed": oracle_ok,
+        "oracle_message": oracle_msg,
         "git_commit_sha": get_git_commit_sha(),
         "git_tree_hash": get_git_tree_hash(),
         "git_diff_hash": get_git_diff_hash(),
@@ -2739,6 +2771,7 @@ def render_mock_synthetic_report(args, tasks, g2_res, g3_res, g2_total_time, g3_
     print("【维度 4: 仿真测试与接口契约断言 (Mock Verification & Invariant Checks)】")
     print(f"  • Rust 仿真测试状态:  {'通过 ✅' if g2_res['unit_test_passed'] else '未通过 ❌'} (单测结构校验)")
     print(f"  • Axiom 仿真证明状态: {'通过 ✅' if g3_res['formal_proved'] else '未通过 ❌'} (协议握手与 AST 打洞还原校验)")
+    print(f"  • Axiom 业务验收状态: {'通过 ✅' if g3_res.get('unit_test_passed') else '未通过 ❌'} (转译Rust与测试向量双重闭环)")
     print(f"  • 证据评级:           synthetic_non_evidentiary (非实证，仅供流水线与类型系统离线自测)")
     print("=" * 70)
 
@@ -2774,6 +2807,7 @@ def render_live_empirical_report(args, tasks, g2_res, g3_res, g2_total_time, g3_
     print("【维度 4: 交付质量与形式验证结论】")
     print(f"  • Rust 交付状态:  {'全部单元测试通过 ✅' if g2_res['unit_test_passed'] else '单测未通过 ❌'} (基于离散测试向量采样)")
     print(f"  • Axiom 交付状态: {'Z3 SMT 定理证明通过 ✅ (All UNSAT)' if g3_res['formal_proved'] else 'SMT 证明失败 ❌'} (在指定 Profile 下，求解器对全部义务均判定为 UNSAT)")
+    print(f"  • Axiom 业务验收: {'业务测试向量通过 ✅' if g3_res.get('unit_test_passed') else '业务测试向量未通过 ❌'} (转译 Rust 并运行测试向量闭环)")
     print("=" * 70)
 
 
@@ -2883,6 +2917,7 @@ def main():
                 "resolver_tax_billed_tokens": 0,
                 "total_billed_tokens": g3_billed,
                 "formal_proved": g3_res["formal_proved"],
+                "unit_test_passed": g3_res["unit_test_passed"],
                 "speedup_vs_rust": None if args.mock else speedup,
                 "token_savings_pct": None if args.mock else round((g2_billed - g3_billed) / g2_billed * 100, 1) if g2_billed > 0 else 0.0,
                 "synthetic_note": "Comparative speedup and empirical token savings are omitted in synthetic mock mode (non-evidentiary protocol self-consistency benchmark only)" if args.mock else None
@@ -2898,6 +2933,7 @@ def main():
     assert sum(g3_res["tokens"]["capsule_breakdown"].values()) == g3_res["tokens"]["workers_payload"], \
         f"Axiom capsule_breakdown 必须与 workers_payload 完全自洽: {sum(g3_res['tokens']['capsule_breakdown'].values())} != {g3_res['tokens']['workers_payload']}"
     if g3_res["formal_proved"]:
+        assert g3_res["unit_test_passed"], f"Axiom 形式化证明通过，但业务测试向量未通过！契约与业务脱节: {g3_res.get('oracle_message')}"
         assert g3_res["tokens"]["tokens_to_proved"] == g3_res["tokens"]["workers_payload"], \
             f"formal_proved 下 tokens_to_proved 必须严格等于 workers_payload: {g3_res['tokens']['tokens_to_proved']} != {g3_res['tokens']['workers_payload']}"
 

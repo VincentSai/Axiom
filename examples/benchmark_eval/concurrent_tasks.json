@@ -190,8 +190,7 @@
         "ensures": [
           "result >= 0",
           "result <= unit_price * quantity",
-          "discount_pct == 0 => result == unit_price * quantity",
-          "discount_pct == 100 => result == 0"
+          "result == (unit_price * quantity * (100 - discount_pct)) / 100"
         ]
       },
       "canonical_axiom_expr": "(unit_price * quantity * (100 - discount_pct)) / 100",
@@ -337,8 +336,7 @@
         "ensures": [
           "result >= 0",
           "result <= cost",
-          "durability_cur == durability_max => result == cost",
-          "durability_cur == 0 => result == 0"
+          "result == (cost * durability_cur) / durability_max"
         ]
       },
       "canonical_axiom_expr": "(cost * durability_cur) / durability_max",

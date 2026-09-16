@@ -335,6 +335,11 @@ fn transpile_expr(expr: &Expr, ctx: &TranspileContext) -> Result<String, Transpi
         Expr::Ident(name) => Ok(name.clone()),
         Expr::Hole(name) => Err(TranspileError::ContainsHole(name.clone())),
         Expr::BinaryOp { left, op, right } => {
+            if matches!(op, BinaryOperator::Implies) {
+                let left_str = transpile_expr(left, ctx)?;
+                let right_str = transpile_expr(right, ctx)?;
+                return Ok(format!("(!{left_str} || {right_str})"));
+            }
             let mut left_str = transpile_expr(left, ctx)?;
             let mut right_str = transpile_expr(right, ctx)?;
             let left_is_decimal = is_expr_decimal(left, ctx);

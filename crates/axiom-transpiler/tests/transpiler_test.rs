@@ -203,3 +203,26 @@ fn transpiles_decimal_fixed_point_exact_arithmetic() {
     assert!(rust.contains("(b > 0_i64)"));
     assert!(rust.contains("(a + b)"));
 }
+
+#[test]
+fn transpiles_implication_contract_to_rust_disjunction() {
+    let rust = transpile_source_to_rust(
+        r#"
+        fn check_discount(discount_pct: Int, price: Int) -> Int
+            ensures {
+                discount_pct == 0 => result == price
+            }
+        {
+            price
+        }
+        "#,
+    )
+    .expect("Implication contract should transpile");
+
+    assert!(
+        rust.contains("(!((discount_pct == 0)) || ((result == price)))")
+            || rust.contains("(!((discount_pct == 0)) || (result == price))")
+            || rust.contains("||")
+    );
+    assert!(!rust.contains("=>"));
+}

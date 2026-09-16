@@ -810,3 +810,75 @@ fn decimal_fixed_point_exact_addition_proves_without_float_error() {
         result
     );
 }
+
+#[test]
+fn calc_sell_refund_rejects_endpoint_cheat_and_proves_exact_formula() {
+    // 1. 端点作弊实现：只在 durability_cur == durability_max 时返回 cost，否则返回 0
+    let cheat_module = parse_module(
+        r#"
+        fn calc_sell_refund(cost: Int, durability_cur: Int, durability_max: Int) -> Int
+            requires {
+                cost >= 0,
+                cost <= 100000000,
+                durability_max > 0,
+                durability_max <= 100000,
+                durability_cur >= 0,
+                durability_cur <= durability_max
+            }
+            ensures {
+                result >= 0,
+                result <= cost,
+                result == (cost * durability_cur) / durability_max
+            }
+        {
+            match durability_cur == durability_max {
+                true => cost,
+                false => 0
+            }
+        }
+        "#,
+    )
+    .expect("cheat_module should parse");
+
+    let cheat_res = verify_function(&cheat_module.functions[0]);
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(cheat_res, SmtResult::CounterExample(_)),
+            "Endpoint cheat implementation MUST be rejected by SMT counterexample under exact contract! Got: {:?}",
+            cheat_res
+        );
+    }
+
+    // 2. 真实数学公式实现：(cost * durability_cur) / durability_max
+    let honest_module = parse_module(
+        r#"
+        fn calc_sell_refund(cost: Int, durability_cur: Int, durability_max: Int) -> Int
+            requires {
+                cost >= 0,
+                cost <= 100000000,
+                durability_max > 0,
+                durability_max <= 100000,
+                durability_cur >= 0,
+                durability_cur <= durability_max
+            }
+            ensures {
+                result >= 0,
+                result <= cost,
+                result == (cost * durability_cur) / durability_max
+            }
+        {
+            (cost * durability_cur) / durability_max
+        }
+        "#,
+    )
+    .expect("honest_module should parse");
+
+    let honest_res = verify_function(&honest_module.functions[0]);
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            matches!(honest_res, SmtResult::Proved { .. }),
+            "Exact honest formula MUST be proved by SMT! Got: {:?}",
+            honest_res
+        );
+    }
+}
