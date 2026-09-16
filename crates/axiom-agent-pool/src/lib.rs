@@ -866,8 +866,49 @@ impl AgentTaskPool {
             SmtResult::Proved { .. } => {}
         }
 
-        // 2. 核心两阶段提交：直接交由数据库内核验证并铸造收据！
+        // 2. 核心两阶段提交：在提交前统一执行依赖闭包级联 SMT 验证 (Ticket 11)
         let mut cas_events = Vec::new();
+        let cascade_report =
+            verify_dependent_closure(&candidate_module, &[&envelope.target_function]);
+
+        if !cascade_report.is_all_proved() {
+            let failed_funcs: Vec<String> = cascade_report
+                .failures
+                .iter()
+                .map(|f| f.function_name.clone())
+                .collect();
+            let failure_reasons: Vec<String> = cascade_report
+                .failures
+                .iter()
+                .map(|f| format!("{}: {}", f.function_name, f.reason))
+                .collect();
+            cas_events.push(CasEvent::CascadeVerificationFailed {
+                failed_functions: failed_funcs,
+                reasons: failure_reasons,
+            });
+
+            let representative_result = cascade_report
+                .results
+                .values()
+                .find(|r| matches!(r, SmtResult::CounterExample(_)))
+                .cloned()
+                .or_else(|| {
+                    cascade_report
+                        .results
+                        .values()
+                        .find(|r| !r.is_proved())
+                        .cloned()
+                })
+                .unwrap_or(SmtResult::Unknown("cascade verification failed".into()));
+
+            return Ok(SubmitOutcome {
+                smt_result: representative_result,
+                cas_events,
+                upgraded_to_verified: false,
+                conflict_report: None,
+            });
+        }
+
         let expected_root = envelope.base_root_hash.clone();
         match self.db.try_commit_candidate(
             &expected_root,
@@ -878,7 +919,11 @@ impl AgentTaskPool {
             Ok(commit_record) => {
                 self.apply_verified_commit(commit_record, candidate_module, hole_id);
                 Ok(SubmitOutcome {
-                    smt_result: precheck_result,
+                    smt_result: cascade_report
+                        .results
+                        .get(&envelope.target_function)
+                        .cloned()
+                        .unwrap_or(precheck_result),
                     cas_events,
                     upgraded_to_verified: was_provisional,
                     conflict_report: None,
@@ -970,16 +1015,17 @@ impl AgentTaskPool {
 
                     let representative_result = cascade_report
                         .results
-                        .get(&envelope.target_function)
+                        .values()
+                        .find(|r| matches!(r, SmtResult::CounterExample(_)))
                         .cloned()
-                        .unwrap_or_else(|| {
+                        .or_else(|| {
                             cascade_report
                                 .results
                                 .values()
                                 .find(|r| !r.is_proved())
                                 .cloned()
-                                .unwrap_or(SmtResult::Unknown("cascade verification failed".into()))
-                        });
+                        })
+                        .unwrap_or(SmtResult::Unknown("cascade verification failed".into()));
 
                     return Ok(SubmitOutcome {
                         smt_result: representative_result,
