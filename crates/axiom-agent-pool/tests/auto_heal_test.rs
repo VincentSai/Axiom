@@ -70,10 +70,8 @@ fn test_codex_cli_watchdog_timeout_kills_process_and_fails_closed() {
     use axiom_agent_pool::auto_heal::call_codex_cli_with_timeout;
     use std::path::Path;
 
-    #[cfg(windows)]
-    let hang_bin = Path::new("ping");
-    #[cfg(not(windows))]
-    let hang_bin = Path::new("sleep");
+    let fake_bin_path = env!("CARGO_BIN_EXE_fake_codex_hang");
+    let hang_bin = Path::new(fake_bin_path);
 
     let start = std::time::Instant::now();
     let res = call_codex_cli_with_timeout("some prompt", hang_bin, 150);
@@ -85,10 +83,13 @@ fn test_codex_cli_watchdog_timeout_kills_process_and_fails_closed() {
     );
     let err_msg = res.unwrap_err();
     assert!(
-        err_msg.contains("timed out")
-            || err_msg.contains("supervisor execution failed")
-            || err_msg.contains("failed"),
-        "Error message should indicate supervisor/timeout failure: {err_msg}"
+        err_msg.contains("timed out"),
+        "Error message MUST strictly indicate timeout failure, but got: {err_msg}"
+    );
+    assert!(
+        elapsed >= std::time::Duration::from_millis(100),
+        "Watchdog MUST wait at least until the timeout deadline! Elapsed: {:?}",
+        elapsed
     );
     assert!(
         elapsed < std::time::Duration::from_millis(3000),

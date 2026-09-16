@@ -14,3 +14,8 @@ serde_json = "1.0"
 
 [dev-dependencies]
 axiom-transpiler = { path = "../axiom-transpiler" }
+
+[[bin]]
+name = "fake_codex_hang"
+path = "tests/fake_bin/fake_codex_hang.rs"
+test = false

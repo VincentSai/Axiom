@@ -1,0 +1,238 @@
+{
+  "version": "2.2",
+  "status": "completed_authentic_dual_track_audited",
+  "experiment_metadata": {
+    "engine": "codex",
+    "target_model": "codex/default",
+    "mode": "generate",
+    "evaluated_tasks_count": 3,
+    "timestamp": "2026-09-08 19:06:50",
+    "git_commit": "ced36a9",
+    "z3_version": "Z3 version 4.13.0 - 64 bit",
+    "platform": "win32",
+    "python_version": "3.14.2"
+  },
+  "totals": {
+    "task_payload_tokens": {
+      "group1_rust_monolith": 1527,
+      "group2_rust_micro": 1056,
+      "group3_axiom_hole": 1174
+    },
+    "raw_billed_tokens": {
+      "group1_rust_monolith": 46143,
+      "group2_rust_micro": 45375,
+      "group2_reasoning": 82,
+      "group3_axiom_hole": 49324,
+      "group3_reasoning": 35
+    }
+  },
+  "detailed_tasks": [
+    {
+      "task_id": 1,
+      "function_name": "calc_manhattan_dist",
+      "group1_rust_monolith": {
+        "task_payload_tokens": 508,
+        "raw_billed_tokens": 15556
+      },
+      "group2_rust_micro": {
+        "task_payload_tokens": 348,
+        "raw_billed_tokens": 15174,
+        "reasoning_tokens": 82,
+        "pass_at_1": true,
+        "final_pass": true,
+        "attempts": 1,
+        "traces": [
+          {
+            "round": 1,
+            "group": 2,
+            "prompt_preview": "You are an expert Rust engineer. Implement the following single Rust function:\n\n```rust\n/// Description: Calculate Manha...",
+            "raw_output": "pub fn calc_manhattan_dist(x1: i64, y1: i64, x2: i64, y2: i64) -> i64 {\n    let dx = if x1 >= x2 { x1 - x2 } else { x2 - x1 };\n    let dy = if y1 >= y2 { y1 - y2 } else { y2 - y1 };\n    dx.checked_add(dy)\n        .expect(\"Manhattan distance exceeds i64::MAX\")\n}",
+            "clean_code": "pub fn calc_manhattan_dist(x1: i64, y1: i64, x2: i64, y2: i64) -> i64 {\n    let dx = if x1 >= x2 { x1 - x2 } else { x2 - x1 };\n    let dy = if y1 >= y2 { y1 - y2 } else { y2 - y1 };\n    dx.checked_add(dy)\n        .expect(\"Manhattan distance exceeds i64::MAX\")\n}",
+            "status": "Passed",
+            "diagnostic": "All unit tests passed",
+            "usage": {
+              "payload_prompt": 236,
+              "payload_candidates": 112,
+              "raw_billed_input": 14980,
+              "raw_billed_output": 194,
+              "raw_billed_reasoning": 82,
+              "raw_billed_total": 15174
+            }
+          }
+        ]
+      },
+      "group3_axiom_hole": {
+        "task_payload_tokens": 369,
+        "raw_billed_tokens": 15140,
+        "reasoning_tokens": 0,
+        "pass_at_1": true,
+        "final_pass": true,
+        "attempts": 1,
+        "counterexample_encountered": false,
+        "traces": [
+          {
+            "round": 1,
+            "group": 3,
+            "prompt_preview": "You are an Axiom micro-worker. Write ONLY a single pure expression to fill the `?hole` in the function below:\n\n[Axiom Sy...",
+            "raw_output": "(match x1 >= x2 { true => x1 - x2, false => x2 - x1 }) + (match y1 >= y2 { true => y1 - y2, false => y2 - y1 })",
+            "clean_code": "(match x1 >= x2 { true => x1 - x2, false => x2 - x1 }) + (match y1 >= y2 { true => y1 - y2, false => y2 - y1 })",
+            "status": "Proved",
+            "diagnostic": "Axiom strict formal proof succeeded (Proved by Z3)",
+            "violated_clause": "",
+            "counter_example": null,
+            "usage": {
+              "payload_prompt": 317,
+              "payload_candidates": 52,
+              "raw_billed_input": 15088,
+              "raw_billed_output": 52,
+              "raw_billed_reasoning": 0,
+              "raw_billed_total": 15140
+            }
+          }
+        ]
+      }
+    },
+    {
+      "task_id": 2,
+      "function_name": "calc_chebyshev_dist",
+      "group1_rust_monolith": {
+        "task_payload_tokens": 586,
+        "raw_billed_tokens": 15360
+      },
+      "group2_rust_micro": {
+        "task_payload_tokens": 438,
+        "raw_billed_tokens": 15172,
+        "reasoning_tokens": 0,
+        "pass_at_1": true,
+        "final_pass": true,
+        "attempts": 1,
+        "traces": [
+          {
+            "round": 1,
+            "group": 2,
+            "prompt_preview": "You are an expert Rust engineer. Implement the following single Rust function:\n\n```rust\n/// Description: Calculate Cheby...",
+            "raw_output": "pub fn calc_chebyshev_dist(x1: i64, y1: i64, x2: i64, y2: i64) -> i64 {\n    let dx = if x1 >= x2 { x1 - x2 } else { x2 - x1 };\n    let dy = if y1 >= y2 { y1 - y2 } else { y2 - y1 };\n\n    if dx >= dy { dx } else { dy }\n}",
+            "clean_code": "pub fn calc_chebyshev_dist(x1: i64, y1: i64, x2: i64, y2: i64) -> i64 {\n    let dx = if x1 >= x2 { x1 - x2 } else { x2 - x1 };\n    let dy = if y1 >= y2 { y1 - y2 } else { y2 - y1 };\n\n    if dx >= dy { dx } else { dy }\n}",
+            "status": "Passed",
+            "diagnostic": "All unit tests passed",
+            "usage": {
+              "payload_prompt": 336,
+              "payload_candidates": 102,
+              "raw_billed_input": 15070,
+              "raw_billed_output": 102,
+              "raw_billed_reasoning": 0,
+              "raw_billed_total": 15172
+            }
+          }
+        ]
+      },
+      "group3_axiom_hole": {
+        "task_payload_tokens": 519,
+        "raw_billed_tokens": 15321,
+        "reasoning_tokens": 35,
+        "pass_at_1": true,
+        "final_pass": true,
+        "attempts": 1,
+        "counterexample_encountered": false,
+        "traces": [
+          {
+            "round": 1,
+            "group": 3,
+            "prompt_preview": "You are an Axiom micro-worker. Write ONLY a single pure expression to fill the `?hole` in the function below:\n\n[Axiom Sy...",
+            "raw_output": "match (match x1 >= x2 { true => x1 - x2, false => x2 - x1 }) >= (match y1 >= y2 { true => y1 - y2, false => y2 - y1 }) { true => match x1 >= x2 { true => x1 - x2, false => x2 - x1 }, false => match y1 >= y2 { true => y1 - y2, false => y2 - y1 } }",
+            "clean_code": "match (match x1 >= x2 { true => x1 - x2, false => x2 - x1 }) >= (match y1 >= y2 { true => y1 - y2, false => y2 - y1 }) { true => match x1 >= x2 { true => x1 - x2, false => x2 - x1 }, false => match y1 >= y2 { true => y1 - y2, false => y2 - y1 } }",
+            "status": "Proved",
+            "diagnostic": "Axiom strict formal proof succeeded (Proved by Z3)",
+            "violated_clause": "",
+            "counter_example": null,
+            "usage": {
+              "payload_prompt": 411,
+              "payload_candidates": 108,
+              "raw_billed_input": 15178,
+              "raw_billed_output": 143,
+              "raw_billed_reasoning": 35,
+              "raw_billed_total": 15321
+            }
+          }
+        ]
+      }
+    },
+    {
+      "task_id": 3,
+      "function_name": "is_aabb_intersect",
+      "group1_rust_monolith": {
+        "task_payload_tokens": 433,
+        "raw_billed_tokens": 15227
+      },
+      "group2_rust_micro": {
+        "task_payload_tokens": 270,
+        "raw_billed_tokens": 15029,
+        "reasoning_tokens": 0,
+        "pass_at_1": true,
+        "final_pass": true,
+        "attempts": 1,
+        "traces": [
+          {
+            "round": 1,
+            "group": 2,
+            "prompt_preview": "You are an expert Rust engineer. Implement the following single Rust function:\n\n```rust\n/// Description: Check whether t...",
+            "raw_output": "pub fn is_aabb_intersect(\n    min_x1: i64,\n    min_y1: i64,\n    max_x1: i64,\n    max_y1: i64,\n    min_x2: i64,\n    min_y2: i64,\n    max_x2: i64,\n    max_y2: i64,\n) -> bool {\n    min_x1 <= max_x2 && max_x1 >= min_x2 && min_y1 <= max_y2 && max_y1 >= min_y2\n}",
+            "clean_code": "pub fn is_aabb_intersect(\n    min_x1: i64,\n    min_y1: i64,\n    max_x1: i64,\n    max_y1: i64,\n    min_x2: i64,\n    min_y2: i64,\n    max_x2: i64,\n    max_y2: i64,\n) -> bool {\n    min_x1 <= max_x2 && max_x1 >= min_x2 && min_y1 <= max_y2 && max_y1 >= min_y2\n}",
+            "status": "Passed",
+            "diagnostic": "All unit tests passed",
+            "usage": {
+              "payload_prompt": 156,
+              "payload_candidates": 114,
+              "raw_billed_input": 14915,
+              "raw_billed_output": 114,
+              "raw_billed_reasoning": 0,
+              "raw_billed_total": 15029
+            }
+          }
+        ]
+      },
+      "group3_axiom_hole": {
+        "task_payload_tokens": 286,
+        "raw_billed_tokens": 18863,
+        "reasoning_tokens": 0,
+        "pass_at_1": true,
+        "final_pass": true,
+        "attempts": 1,
+        "counterexample_encountered": false,
+        "traces": [
+          {
+            "round": 1,
+            "group": 3,
+            "prompt_preview": "You are an Axiom micro-worker. Write ONLY a single pure expression to fill the `?hole` in the function below:\n\n[Axiom Sy...",
+            "raw_output": "min_x1 <= max_x2 && max_x1 >= min_x2 && min_y1 <= max_y2 && max_y1 >= min_y2",
+            "clean_code": "min_x1 <= max_x2 && max_x1 >= min_x2 && min_y1 <= max_y2 && max_y1 >= min_y2",
+            "status": "Proved",
+            "diagnostic": "Axiom strict formal proof succeeded (Proved by Z3)",
+            "violated_clause": "",
+            "counter_example": null,
+            "usage": {
+              "payload_prompt": 251,
+              "payload_candidates": 35,
+              "raw_billed_input": 18828,
+              "raw_billed_output": 35,
+              "raw_billed_reasoning": 0,
+              "raw_billed_total": 18863
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "verification_summary": {
+    "group2_rust": {
+      "pass_at_1": "3/3",
+      "final_pass": "3/3",
+      "verification_method": "rustc_test_vectors_discrete_sampling"
+    },
+    "group3_axiom": {
+      "pass_at_1": "3/3",
+      "final_proved": "3/3",
+      "verification_method": "microsoft_z3_strict_exhaustive_smt_proof"
+    }
+  }
+}

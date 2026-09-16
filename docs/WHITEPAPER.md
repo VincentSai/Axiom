@@ -58,11 +58,19 @@ Axiom 任务池内核（`AgentTaskPool`）全面支持内容寻址（CAS）与�
 
 ---
 
-## 3. 真实多模型实证：OpenAI Codex 宏观并发对决 (Phase 3 实证数据)
+## 3. 双轨评测体系与 OpenAI Codex 宏观并发实证 (Phase 3 基准数据)
 
 外部评测曾提出过一个根本性问题：*“Axiom 的 Token 节省与可靠性，到底是因为语言本身，还是仅仅因为工作流拆解成了微任务？”*
 
-我们在背包交易与库存结算子系统（5 个核心算法函数）上，严格控制“单函数微任务”这一变量，使用本地已鉴权的 **OpenAI Codex CLI (`v0.147.0`, `gpt-5.6-sol`)**，通过代理 `127.0.0.1:7897` 进行了全口径实机宏观并发对决：
+为了客观回答这一问题，Axiom 构建了**离线全要素协议仿真 (Mock)** 与 **真实模型实机对决 (Live)** 的严格双轨评测体系（代码位于 [`examples/benchmark_eval/`](examples/benchmark_eval/)）：
+
+1. **离线全要素物理仿真基准 (Mock Benchmark)**：
+   - 归档于 [`examples/benchmark_eval/data/mock/concurrent_eval_data.json`](examples/benchmark_eval/data/mock/concurrent_eval_data.json)，明确标记为 `synthetic_non_evidentiary`；
+   - 职责：验证 5 Worker 并发填洞协议握手、AST CAS 组合器零文本冲突装配、Z3 SMT 全域定理证明以及转译 Rust 业务 Oracle 运行的工程自洽性，不作为模型 Token 节省与墙钟提速的实证论据。
+
+2. **真实 OpenAI Codex 宏观并发对决 (Live Empirical)**：
+   - 归档于 [`examples/benchmark_eval/data/live/`](examples/benchmark_eval/data/live/)；
+   - 在背包交易与库存结算子系统（5 个核心算法函数）上，严格控制“单函数微任务”这一变量，使用本地已鉴权的 **OpenAI Codex CLI (`v0.147.0`, `gpt-5.6-sol`)**，通过代理 `127.0.0.1:7897` 进行了全口径实机宏观并发对决：
 
 ### 3.1 核心基准对比数据矩阵
 
@@ -79,7 +87,9 @@ Axiom 任务池内核（`AgentTaskPool`）全面支持内容寻址（CAS）与�
 ### 3.2 关键实证结论与方法学边界
 1. **单一变量证实 Token 净节省优势**：在彻底消除“任务拆解颗粒度”这一变量后（两组均为单函数级任务），Axiom 的严密数学契约与受限纯表达式打洞依然比传统 Rust 提示词**精简了约 21% 的真实 API Token**；
 2. **零模型开销的确定性装配**：Axiom 的 AST Combinator 与 CAS 任务池由纯 Rust 算法驱动，组装耗时仅为毫秒级，**完全不消耗任何 LLM Token**；
-3. **形式化契约证明消除契约违背**：传统单元测试仅能覆盖有限离散测试点，而 Axiom 配合 Z3 对生成的全部函数实行了全域 LIA/NRA/BPA 形式化定理证明，保证在物理取值全域内无整数溢出、无除零、无未定义行为与契约违背；
+3. **适用子集与形式化边界**：
+   - 当前形式化证明与转译同构严格收敛于**无环纯表达式、定点微元制 Decimal、显式代数效应边界以及有界物理实数**；
+   - 对尚未形式化对齐的无界 IEEE 754 浮点舍入等语义，验证器采取保守的 Fail-Closed 拦截并拒绝签发证明；
 4. **形式化不等于全自动正确**：形式化定理证明消除的是“违反已写明契约的代码”。若契约本身不充要或与业务意图脱节，代码仍可能产生业务偏差。因此 Axiom 倡导“充要数学契约 + 业务 Oracle（转译后运行全量业务测试向量）”的双重闭环。
 
 ---
@@ -178,10 +188,11 @@ Axiom 放弃了不切实际的“零幻觉”口号，确立了一条端到端�
 > 因此 Axiom 倡导**双重闭环**：一方面通过 SMT 求解器穷尽输入全域消除未测边界反例，另一方面通过 Transpiler 转译为物理机器码后运行真实业务测试向量（Business Oracle），确保数学契约与现实业务意图完全对齐。
 
 ### Q4: 评测数据是否存在伪造或人为修饰？
-> **答复**：绝对严禁伪造。所有评测代码均开源于 [`examples/benchmark_eval/`](examples/benchmark_eval/)：
-> - 运行脚本直接调用已鉴权的官方 Codex-CLI 与官方 API；
-> - Token 消耗严格提取自 API 原始返回的 `turn.completed` 事件；
-> - 数据文件 [`concurrent_eval_data.json`](examples/benchmark_eval/data/concurrent_eval_data.json) 包含完整的 Git Commit SHA、Tree Hash、Z3 求解器路径与 SHA-256 哈希，任何第三方均可拉取代码并在本地一键复现。
+> **答复**：绝对严禁伪造，秉持科学实证与物理隔离原则。所有评测代码均开源于 [`examples/benchmark_eval/`](examples/benchmark_eval/)：
+> - **严格目录隔离**：离线协议仿真数据置于 `data/mock/` 目录并强制标注 `synthetic_non_evidentiary`，真实模型实测数据置于 `data/live/` 目录，杜绝混淆；
+> - **单一真相源 Provenance**：所有评测输出均包含不可篡改的 Git Commit SHA、Tree Hash、Z3 求解器路径与其二进制 SHA-256 哈希，任何第三方均可拉取代码并在本地直接验证；
+> - **先落盘原则 (Persist-Before-Assert)**：评测流水线先完整存档全部原始运行观测（包含各种业务失败、超时或契约脱节反例），绝不因实验未达预期而丢弃数据；
+> - **Token 账单真实性**：真实实测中的 Token 消耗严格提取自本地 Codex-CLI / API 返回的原始 `turn.completed` 审计事件，不采用估算值拼接。
 
 ---
 

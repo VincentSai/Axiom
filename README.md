@@ -45,9 +45,17 @@
 
 ---
 
-## 🏆 真实 OpenAI Codex 宏观并发实证 (Live Empirical Evidence)
+## 🏆 基准评测与宏观并发实证 (Benchmark & Empirical Evidence)
 
-在背包交易与库存结算子系统（5 个核心算法函数）的严格单一变量 A/B 对照实测中（基于本地已鉴权的 **OpenAI Codex CLI `v0.147.0`, `gpt-5.6-sol`** 与 **Microsoft Z3 4.13.0**）：
+Axiom 构建了涵盖**离线全要素协议仿真 (Mock)**与**真实模型宏观对决 (Live)**的双轨评测体系（评测套件位于 [`examples/benchmark_eval/`](examples/benchmark_eval/)）：
+
+### 1. 离线全要素物理仿真基准 (Mock Benchmark)
+- 完整流转 5 Worker 纯代数填洞、AST CAS 组合器零文本冲突装配、Z3 SMT 全域定理证明以及 Rust 业务测试向量双重验收；
+- 证明了打洞协议、词法作用域类型系统、进程看门狗与级联提交闭环的端到端结构自洽性；
+- 详细离线协议审计数据存档于 [`examples/benchmark_eval/data/mock/concurrent_eval_data.json`](examples/benchmark_eval/data/mock/concurrent_eval_data.json)（严格标注为 `synthetic_non_evidentiary`）。
+
+### 2. 真实 OpenAI Codex 宏观并发 A/B 实测 (Live Empirical)
+在背包交易与库存结算子系统（5 个核心算法函数）的严格单一变量 A/B 对照实测中（控制两组均为单函数级微任务，基于本地已鉴权的 **OpenAI Codex CLI `v0.147.0`, `gpt-5.6-sol`** 与 **Microsoft Z3 4.13.0**）：
 
 | 对照维度 | Group 2: 传统工程微任务 (Rust Git Flow) | Group 3: Axiom 形式化打洞流水线 | 科学对比结论 |
 | :--- | :--- | :--- | :--- |
@@ -59,7 +67,11 @@
 | **双Worker CAS争用压测** | - | **2/2 签入成功 (耗时 17.86s)** | 跨进程排他锁与 AST 重基 100% 稳健 |
 | **终态质量保证** | 基于离散测试向量采样通过 | **Z3 SMT 全域定理证明 + 业务 Oracle 双重闭环** | **兼顾数学反例消灭与业务意图对齐** |
 
-> 完整实证审计数据链已归档于 [`examples/benchmark_eval/data/concurrent_eval_data.json`](examples/benchmark_eval/data/concurrent_eval_data.json)。
+### 3. 适用子集与方法学边界说明
+- **适用逻辑子集**：当前形式化证明与转译同构严格收敛于**无环纯表达式、定点微元制 Decimal、显式代数效应边界与有界物理实数**；
+- **Fail-Closed 拦截**：对于未形式化对齐的无界 IEEE 754 浮点舍入等语义，验证器采取保守的 Fail-Closed 拦截并拒绝签发证明；
+- **业务 Oracle 双重闭环**：形式化定理证明解决的是“程序不违背已写明的数学契约”；必须结合 Transpiler 转译为物理机器码后执行业务测试向量（Business Oracle），消除契约不充要导致的业务脱节；
+- **数据严格隔离**：真实在线实测数据归档于 [`examples/benchmark_eval/data/live/`](examples/benchmark_eval/data/live/)，与离线协议测试数据彻底隔离，绝不混淆。
 
 ---
 

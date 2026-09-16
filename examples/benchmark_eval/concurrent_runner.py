@@ -1365,7 +1365,7 @@ def validate_benchmark_result_schema(data: dict):
     if axiom_summary["unit_test_passed"] != g3.get("unit_test_passed"):
         raise ValueError("summary.axiom_group.unit_test_passed 与 detailed_runs.group3_axiom.unit_test_passed 不一致")
     if axiom_summary.get("formal_proved") is True and axiom_summary["unit_test_passed"] is not True:
-        raise ValueError("Axiom 形式验证通过但业务测试向量未通过，存在契约脱节假阳性！")
+        print("⚠️ [OBSERVATION WARNING]: Axiom 形式验证通过 (formal_proved=True) 但业务测试向量未通过 (unit_test_passed=False)，检测到契约与业务脱节的客观反例！已忠实记录于审计快照。")
 
     for g_data, g_name in [(g2, "Group 2"), (g3, "Group 3")]:
         for req in ["total_tasks", "git_tree_hash", "git_diff_hash", "git_provenance"]:
@@ -2817,7 +2817,15 @@ def main():
     parser.add_argument("--codex-model", default=None, help="Codex 模型代号")
     parser.add_argument("--proxy", default=None, help="HTTP 代理")
     parser.add_argument("--mock", action="store_true", help="离线物理仿真模式 (0 成本验证完整流程)")
+    parser.add_argument("--output", default=None, help="自定义输出 JSON 路径 (默认: mock 模式写至 data/mock/，实测模式写至 data/live/)")
     args = parser.parse_args()
+
+    if args.output:
+        output_file_path = os.path.abspath(args.output)
+    elif args.mock:
+        output_file_path = os.path.join(SCRIPT_DIR, "data", "mock", "concurrent_eval_data.json")
+    else:
+        output_file_path = os.path.join(SCRIPT_DIR, "data", "live", "concurrent_eval_data.json")
 
     target_proxy = args.proxy
     if not target_proxy and not urllib.request.getproxies().get("https"):
@@ -2918,6 +2926,7 @@ def main():
                 "total_billed_tokens": g3_billed,
                 "formal_proved": g3_res["formal_proved"],
                 "unit_test_passed": g3_res["unit_test_passed"],
+                "contract_soundness_gap": (g3_res["formal_proved"] is True and g3_res.get("unit_test_passed") is not True),
                 "speedup_vs_rust": None if args.mock else speedup,
                 "token_savings_pct": None if args.mock else round((g2_billed - g3_billed) / g2_billed * 100, 1) if g2_billed > 0 else 0.0,
                 "synthetic_note": "Comparative speedup and empirical token savings are omitted in synthetic mock mode (non-evidentiary protocol self-consistency benchmark only)" if args.mock else None
@@ -2929,20 +2938,32 @@ def main():
         }
     }
 
-    # 强不变式断言 Fail-Closed 校验
+    # 1. 结构 Schema 强校验 (验证合法的数据结构与字段一致性)
+    validate_benchmark_result_schema(output_payload)
+
+    # 2. 先行落盘持久化 (Persist-Before-Assert: 保证即使发生任何异常或断言失败，现场观测数据也绝不丢失)
+    os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+    with open(output_file_path, "w", encoding="utf-8") as f:
+        json.dump(output_payload, f, indent=2, ensure_ascii=False)
+    print(f"💾 并发流水线详细审计数据已安全持久化落盘: {output_file_path}\n")
+
+    if output_file_path != OUTPUT_DATA_PATH:
+        try:
+            os.makedirs(os.path.dirname(OUTPUT_DATA_PATH), exist_ok=True)
+            with open(OUTPUT_DATA_PATH, "w", encoding="utf-8") as f:
+                json.dump(output_payload, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
+    # 3. 强不变式断言与退出策略 (数据已安全存档在磁盘后进行)
     assert sum(g3_res["tokens"]["capsule_breakdown"].values()) == g3_res["tokens"]["workers_payload"], \
         f"Axiom capsule_breakdown 必须与 workers_payload 完全自洽: {sum(g3_res['tokens']['capsule_breakdown'].values())} != {g3_res['tokens']['workers_payload']}"
     if g3_res["formal_proved"]:
-        assert g3_res["unit_test_passed"], f"Axiom 形式化证明通过，但业务测试向量未通过！契约与业务脱节: {g3_res.get('oracle_message')}"
-        assert g3_res["tokens"]["tokens_to_proved"] == g3_res["tokens"]["workers_payload"], \
-            f"formal_proved 下 tokens_to_proved 必须严格等于 workers_payload: {g3_res['tokens']['tokens_to_proved']} != {g3_res['tokens']['workers_payload']}"
-
-    validate_benchmark_result_schema(output_payload)
-
-    os.makedirs(os.path.dirname(OUTPUT_DATA_PATH), exist_ok=True)
-    with open(OUTPUT_DATA_PATH, "w", encoding="utf-8") as f:
-        json.dump(output_payload, f, indent=2, ensure_ascii=False)
-    print(f"💾 并发流水线详细审计数据已落盘并通过强 Schema 校验: {OUTPUT_DATA_PATH}\n")
+        if g3_res["tokens"]["tokens_to_proved"] != g3_res["tokens"]["workers_payload"]:
+            raise AssertionError(f"formal_proved 下 tokens_to_proved 必须严格等于 workers_payload: {g3_res['tokens']['tokens_to_proved']} != {g3_res['tokens']['workers_payload']}")
+        if not g3_res["unit_test_passed"]:
+            print(f"❌ [GATE ERROR]: Axiom 形式化证明通过，但业务测试向量未通过！契约与业务脱节: {g3_res.get('oracle_message')}")
+            sys.exit(2)
 
 
 if __name__ == "__main__":
