@@ -86,7 +86,7 @@ impl fmt::Display for NodeHash {
     }
 }
 
-fn compute_hash<T: Serialize>(prefix: &str, value: &T) -> NodeHash {
+pub fn compute_hash<T: Serialize>(prefix: &str, value: &T) -> NodeHash {
     let bytes = serde_json::to_vec(value).expect("Axiom serialization cannot fail");
     let digest = Sha256::digest(bytes);
     NodeHash(format!("#{prefix}_{digest:x}"))
@@ -218,11 +218,12 @@ impl fmt::Display for ProofLevel {
 }
 
 /// Current verification profile specification identifying SMT encoding rules,
-/// arithmetic overflow guards, division-by-zero path-condition rules, and solver requirements.
-pub const CURRENT_VERIFICATION_PROFILE: &str = "axiom-smt-v4-sha256sealed-truncdiv-residualmatch";
+/// typed IR environment, decimal scale guards, fail-closed float semantics, and solver requirements.
+pub const CURRENT_VERIFICATION_PROFILE: &str =
+    "axiom-smt-v5-typed-ir-decimal-scale-guard-failclosed-float";
 
-/// Current database schema version (Version 4 incorporates solver_sha256 in receipts with double attestation).
-pub const CURRENT_SCHEMA_VERSION: u32 = 4;
+/// Current database schema version (Version 5 incorporates typed lexical IR & decimal scale guards).
+pub const CURRENT_SCHEMA_VERSION: u32 = 5;
 
 /// Returns the cryptographically secure hash of the current verification profile.
 pub fn current_verification_profile_hash() -> NodeHash {

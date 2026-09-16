@@ -1096,13 +1096,43 @@ impl AgentTaskPool {
         self.pending_holes.is_empty()
     }
 
+    /// Return whether all holes in the pool and working module AST have been closed.
+    pub fn holes_complete(&self) -> bool {
+        self.pending_holes.is_empty() && !ast_contains_any_hole(&self.verified_module)
+    }
+
+    /// Check whether all contracted functions in the working module are formally proved under current rules.
+    pub fn module_verified(&self) -> bool {
+        let contracted_functions: Vec<&axiom_ast::FunctionDecl> = self
+            .verified_module
+            .functions
+            .iter()
+            .filter(|f| f.has_contracts())
+            .collect();
+        if contracted_functions.is_empty() {
+            return true;
+        }
+        contracted_functions.into_iter().all(|func| {
+            let res = verify_function_in_module(func, &self.verified_module);
+            res.is_proved()
+        })
+    }
+
+    /// Check whether the workspace/pool is fully verified:
+    /// Both all holes must be complete AND all contracted functions in the entire module must be formally proved.
+    pub fn is_fully_verified(&self) -> bool {
+        self.holes_complete() && self.module_verified()
+    }
+
     /// Assemble a clone of the verified, hole-free module.
     ///
     /// 严禁妥协强门禁：
     /// 1. 所有已分发的洞必须已被解决（非 Unresolved）；
     /// 2. 证据账本强门禁：所有已分发洞 100% 具备 ProofLevel::Proved 证据；
     ///    若有任何洞仅为 Sampled 或 Unverified，坚决拒绝，返回 PoolError::InsufficientEvidence！
-    /// 3. 深入 AST 扫描，若有残留的 Expr::Hole，拒绝导出。
+    /// 3. 深入 AST 扫描，若有残留的 Expr::Hole，拒绝导出；
+    /// 4. Ticket 17 / Review Spec 2 - 唯一发布强门禁：全模块契约覆盖校验，
+    ///    严禁未验证函数、离散错误函数或无洞错误函数发布。
     pub fn assemble_verified_module(&self) -> Result<Module, PoolError> {
         let unresolved_holes: Vec<String> = self
             .tasks
@@ -1128,6 +1158,20 @@ impl AgentTaskPool {
                 "unresolved_ast_hole".to_string()
             ]));
         }
+
+        // [Ticket 17 / Review Spec 2]: 唯一发布强门禁：全模块契约覆盖校验
+        for func in &self.verified_module.functions {
+            if func.has_contracts() {
+                let res = verify_function_in_module(func, &self.verified_module);
+                if !res.is_proved() {
+                    return Err(PoolError::ModuleVerificationFailed {
+                        function_name: func.name.clone(),
+                        reason: format!("{res:?}"),
+                    });
+                }
+            }
+        }
+
         Ok(self.verified_module.clone())
     }
 
@@ -1176,8 +1220,15 @@ pub enum PoolError {
     MissingHole(String),
     CandidateContainsHole(String),
     Incomplete(Vec<String>),
-    InsufficientEvidence { hole_id: String, level: ProofLevel },
+    InsufficientEvidence {
+        hole_id: String,
+        level: ProofLevel,
+    },
     CasFailure(String),
+    ModuleVerificationFailed {
+        function_name: String,
+        reason: String,
+    },
 }
 
 impl fmt::Display for PoolError {
@@ -1209,6 +1260,10 @@ impl fmt::Display for PoolError {
                 "hole `{hole_id}` does not meet formal verification bar: evidence level is `{level:?}`, required `Proved`"
             ),
             Self::CasFailure(msg) => write!(formatter, "CAS commit failed: {msg}"),
+            Self::ModuleVerificationFailed { function_name, reason } => write!(
+                formatter,
+                "module verification failed for function `{function_name}`: {reason}"
+            ),
         }
     }
 }
@@ -1223,7 +1278,8 @@ impl std::error::Error for PoolError {
             | Self::CandidateContainsHole(_)
             | Self::Incomplete(_)
             | Self::InsufficientEvidence { .. }
-            | Self::CasFailure(_) => None,
+            | Self::CasFailure(_)
+            | Self::ModuleVerificationFailed { .. } => None,
         }
     }
 }
@@ -1421,9 +1477,19 @@ impl VerifiedWorkspace {
         self.inner.pending_hole_ids()
     }
 
-    /// Check whether all holes have been verified and closed under current policy.
+    /// Return whether all holes in the workspace have been filled.
+    pub fn holes_complete(&self) -> bool {
+        self.inner.holes_complete()
+    }
+
+    /// Check whether all contracted functions across the entire module are formally proved.
+    pub fn module_verified(&self) -> bool {
+        self.inner.module_verified()
+    }
+
+    /// Check whether the workspace is fully verified: all holes filled AND all contracts proved.
     pub fn is_fully_verified(&self) -> bool {
-        self.inner.is_complete()
+        self.inner.is_fully_verified()
     }
 
     /// Submit a solution for a hole.
