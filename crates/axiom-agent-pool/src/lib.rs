@@ -430,11 +430,6 @@ impl AgentTaskPool {
         &self.db
     }
 
-    /// Access the underlying mutable AST database.
-    pub fn database_mut(&mut self) -> &mut AstDatabase {
-        &mut self.db
-    }
-
     /// Access the verified module baseline.
     pub fn verified_module(&self) -> &Module {
         &self.verified_module
@@ -1344,4 +1339,153 @@ fn extract_function_dependencies(func: &axiom_ast::FunctionDecl, module: &Module
     deps.sort();
     deps.dedup();
     deps
+}
+
+/// High-level deep-module workspace providing a unified, formally verified workflow
+/// for multi-agent hole resolution, verification, and assembly.
+///
+/// It encapsulates CAS storage, optimistic rebase, dependent-closure cascade verification,
+/// and cryptographic receipt ledger behind a minimal, impenetrable interface.
+#[derive(Debug, Clone)]
+pub struct VerifiedWorkspace {
+    inner: AgentTaskPool,
+}
+
+impl VerifiedWorkspace {
+    /// Open a verified workspace with a skeleton module and underlying AST database.
+    pub fn open(skeleton_module: Module, db: AstDatabase) -> Result<Self, PoolError> {
+        Ok(Self {
+            inner: AgentTaskPool::open_with_database(skeleton_module, db)?,
+        })
+    }
+
+    /// Open or initialize a verified workspace backed by persistent files.
+    pub fn open_persisted(
+        skeleton_path: &std::path::Path,
+        db_path: &std::path::Path,
+    ) -> Result<Self, PoolError> {
+        Ok(Self {
+            inner: AgentTaskPool::open_persisted(skeleton_path, db_path)?,
+        })
+    }
+
+    /// Parse an Axiom skeleton source string and initialize an in-memory verified workspace.
+    pub fn from_source(source: &str) -> Result<Self, PoolError> {
+        Ok(Self {
+            inner: AgentTaskPool::from_source(source)?,
+        })
+    }
+
+    /// Set the verification policy for this workspace.
+    pub fn with_policy(mut self, policy: PoolVerificationPolicy) -> Self {
+        self.inner = self.inner.with_policy(policy);
+        self
+    }
+
+    /// Set verification policy mutably.
+    pub fn set_policy(&mut self, policy: PoolVerificationPolicy) {
+        self.inner.set_policy(policy);
+    }
+
+    /// Current verification policy of the workspace.
+    pub fn policy(&self) -> PoolVerificationPolicy {
+        self.inner.policy()
+    }
+
+    /// Dispatch task envelopes for all remaining holes.
+    /// Each envelope encapsulates isolated readonly context capsules cutting off irrelevant code.
+    pub fn dispatch_tasks(&self) -> Vec<TaskEnvelope> {
+        self.pending_holes()
+            .iter()
+            .filter_map(|id| self.inner.envelope_for_hole(id).cloned())
+            .collect()
+    }
+
+    /// Retrieve the task envelope for a specific hole.
+    pub fn envelope_for_hole(&self, hole_id: &str) -> Option<&TaskEnvelope> {
+        self.inner.envelope_for_hole(hole_id)
+    }
+
+    /// Retrieve the original HoleTask specification for a specific hole.
+    pub fn task_for_hole(&self, hole_id: &str) -> Option<&HoleTask> {
+        self.inner.task_for_hole(hole_id)
+    }
+
+    /// Return all hole tasks originally defined in the skeleton module.
+    pub fn all_tasks(&self) -> &[HoleTask] {
+        self.inner.all_tasks()
+    }
+
+    /// Return hole IDs that are still pending resolution in source order.
+    pub fn pending_holes(&self) -> Vec<String> {
+        self.inner.pending_hole_ids()
+    }
+
+    /// Check whether all holes have been verified and closed under current policy.
+    pub fn is_fully_verified(&self) -> bool {
+        self.inner.is_complete()
+    }
+
+    /// Submit a solution for a hole.
+    ///
+    /// Executes full pipeline: SMT theorem proving, dependent-closure cascade validation,
+    /// optimistic AST rebase, and content-addressed receipt ledger commit.
+    pub fn submit_solution(
+        &mut self,
+        hole_id: &str,
+        source: &str,
+    ) -> Result<SubmitOutcomeDto, PoolError> {
+        self.submit_source(hole_id, source)
+    }
+
+    /// Submit a source code expression solution for a hole.
+    pub fn submit_source(
+        &mut self,
+        hole_id: &str,
+        source: &str,
+    ) -> Result<SubmitOutcomeDto, PoolError> {
+        let outcome =
+            self.inner
+                .submit_solution_with_outcome(hole_id, source, "verified-workspace")?;
+        Ok(outcome.to_dto(hole_id))
+    }
+
+    /// Assemble the finalized, fully verified module with all holes resolved.
+    /// Fails closed if any holes remain unsolved or lack formal proof.
+    pub fn assemble_verified_module(&self) -> Result<Module, PoolError> {
+        self.inner.assemble_verified_module()
+    }
+
+    /// Run the automatic self-healing repair loop on a failing hole using a named engine ("mock" or "codex").
+    pub fn solve_and_heal(
+        &mut self,
+        hole_id: &str,
+        engine: &str,
+        max_steps: usize,
+    ) -> Result<auto_heal::AutoHealOutcome, PoolError> {
+        auto_heal::solve_and_heal_with_engine(&mut self.inner, hole_id, engine, max_steps)
+    }
+
+    /// Run the automated self-healing loop using a custom strategy closure.
+    pub fn solve_and_heal_with_strategy<F>(
+        &mut self,
+        hole_id: &str,
+        max_steps: usize,
+        strategy: F,
+    ) -> Result<auto_heal::AutoHealOutcome, PoolError>
+    where
+        F: FnMut(usize, Option<&str>) -> String,
+    {
+        auto_heal::solve_and_heal_with_strategy(&mut self.inner, hole_id, max_steps, strategy)
+    }
+
+    /// Readonly access to verified audit commits history.
+    pub fn commits(&self) -> &[CommitRecord] {
+        self.inner.commits()
+    }
+
+    /// Current root module hash in CAS.
+    pub fn current_root(&self) -> Option<NodeHash> {
+        self.inner.current_root()
+    }
 }
