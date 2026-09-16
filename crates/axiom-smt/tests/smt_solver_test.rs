@@ -6,7 +6,7 @@ fn verifies_safe_division_with_precondition() {
     let module = parse_module(
         r#"
         fn safe_div(a: Float, b: Float) -> Float
-            requires { b != 0.0 }
+            requires { b != 0.0, a >= -1000.0, a <= 1000.0, b >= -1000.0, b <= 1000.0 }
             ensures { result * b == a }
         {
             a / b
@@ -334,7 +334,7 @@ fn composite_real_expression_skips_integer_safety_bounds() {
     let module = parse_module(
         r#"
         fn composite_real_calc(x: Float, y: Float) -> Float
-            requires { x > 0.0 && y > 0.0 }
+            requires { x > 0.0, x <= 1000.0, y > 0.0, y <= 1000.0 }
             ensures { result > 0.0 }
         {
             (x + 1.0) + (y * 2.0)

@@ -132,8 +132,175 @@ pub fn verify_function(func: &FunctionDecl) -> SmtResult {
     verify_function_in_module(func, &dummy_module)
 }
 
+const IEEE754_MAX_SAFE_INTEGER: f64 = 9_007_199_254_740_991.0; // 2^53 - 1
+
+fn extract_path_string(expr: &axiom_ast::Expr) -> Option<String> {
+    match expr {
+        axiom_ast::Expr::Ident(name) => Some(name.clone()),
+        axiom_ast::Expr::FieldAccess { target, field } => {
+            extract_path_string(target).map(|t| format!("{t}.{field}"))
+        }
+        _ => None,
+    }
+}
+
+fn extract_numeric_constant(expr: &axiom_ast::Expr) -> Option<f64> {
+    match expr {
+        axiom_ast::Expr::Literal(axiom_ast::Literal::Float(f)) => Some(*f),
+        axiom_ast::Expr::Literal(axiom_ast::Literal::Int(i)) => Some(*i as f64),
+        axiom_ast::Expr::UnaryOp {
+            op: axiom_ast::UnaryOperator::Negate,
+            operand,
+        } => extract_numeric_constant(operand).map(|v| -v),
+        _ => None,
+    }
+}
+
+fn record_bounds(
+    expr: &axiom_ast::Expr,
+    has_lower: &mut HashMap<String, bool>,
+    has_upper: &mut HashMap<String, bool>,
+) {
+    if let axiom_ast::Expr::BinaryOp { left, op, right } = expr {
+        match op {
+            axiom_ast::BinaryOperator::And => {
+                record_bounds(left, has_lower, has_upper);
+                record_bounds(right, has_lower, has_upper);
+            }
+            axiom_ast::BinaryOperator::GreaterThan
+            | axiom_ast::BinaryOperator::GreaterThanOrEqual => {
+                if let Some(path) = extract_path_string(left) {
+                    if let Some(c) = extract_numeric_constant(right) {
+                        if c.abs() <= IEEE754_MAX_SAFE_INTEGER {
+                            has_lower.insert(path, true);
+                        }
+                    }
+                } else if let Some(path) = extract_path_string(right) {
+                    if let Some(c) = extract_numeric_constant(left) {
+                        if c.abs() <= IEEE754_MAX_SAFE_INTEGER {
+                            has_upper.insert(path, true);
+                        }
+                    }
+                }
+            }
+            axiom_ast::BinaryOperator::LessThan | axiom_ast::BinaryOperator::LessThanOrEqual => {
+                if let Some(path) = extract_path_string(left) {
+                    if let Some(c) = extract_numeric_constant(right) {
+                        if c.abs() <= IEEE754_MAX_SAFE_INTEGER {
+                            has_upper.insert(path, true);
+                        }
+                    }
+                } else if let Some(path) = extract_path_string(right) {
+                    if let Some(c) = extract_numeric_constant(left) {
+                        if c.abs() <= IEEE754_MAX_SAFE_INTEGER {
+                            has_lower.insert(path, true);
+                        }
+                    }
+                }
+            }
+            axiom_ast::BinaryOperator::Equal => {
+                if let Some(path) = extract_path_string(left) {
+                    if let Some(c) = extract_numeric_constant(right) {
+                        if c.abs() <= IEEE754_MAX_SAFE_INTEGER {
+                            has_lower.insert(path.clone(), true);
+                            has_upper.insert(path, true);
+                        }
+                    }
+                } else if let Some(path) = extract_path_string(right) {
+                    if let Some(c) = extract_numeric_constant(left) {
+                        if c.abs() <= IEEE754_MAX_SAFE_INTEGER {
+                            has_lower.insert(path.clone(), true);
+                            has_upper.insert(path, true);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// 判定一个函数是否包含在实数理论下不健全的浮点数契约 (Unsound/Unbounded Float Contract)。
+///
+/// 当浮点参数未在 `requires` 中严格限定在 IEEE-754 安全有效位区间 ([-2^53 + 1, 2^53 - 1]) 时，
+/// 实数理论 (Real) 的数学证明可能在机器运行时因精度截断发生分歧（如 2^53 + 1.0 == 2^53）。
+/// 此时必须 Fail-Closed 拦截并返回 Skipped，严禁给出 Proved 误导。
+///
+/// 注意：仅对函数体或契约中实际被访问/引用的浮点路径进行有界性检查，未被引用的字段不施加虚假约束。
+fn function_has_unsound_float_contract(func: &FunctionDecl, module: Option<&Module>) -> bool {
+    if !func.has_contracts() {
+        return false;
+    }
+
+    let dummy_module;
+    let mod_ref = match module {
+        Some(m) => m,
+        None => {
+            dummy_module = Module {
+                types: vec![],
+                functions: vec![func.clone()],
+                effects: vec![],
+            };
+            &dummy_module
+        }
+    };
+
+    let type_env = axiom_ast::TypeEnv::new(mod_ref, Some(func));
+
+    let mut referenced_float_paths = std::collections::HashSet::new();
+    let mut visit_for_floats = |expr: &axiom_ast::Expr| {
+        if let Some(path) = extract_path_string(expr) {
+            let root = path.split('.').next().unwrap_or("");
+            if func.params.iter().any(|p| p.name == root)
+                && type_env.infer_type(expr) == Some(axiom_ast::Type::Float)
+            {
+                referenced_float_paths.insert(path);
+            }
+        }
+    };
+
+    axiom_ast::visit_expr(&func.body, &mut visit_for_floats);
+    for req in &func.requires {
+        axiom_ast::visit_expr(req, &mut visit_for_floats);
+    }
+    for ens in &func.ensures {
+        axiom_ast::visit_expr(ens, &mut visit_for_floats);
+    }
+
+    let returns_float = func.return_type == axiom_ast::Type::Float;
+    if referenced_float_paths.is_empty() && !returns_float {
+        return false;
+    }
+
+    if referenced_float_paths.is_empty() && returns_float {
+        return true;
+    }
+
+    let mut has_lower = HashMap::new();
+    let mut has_upper = HashMap::new();
+    for req in &func.requires {
+        record_bounds(req, &mut has_lower, &mut has_upper);
+    }
+
+    for path in &referenced_float_paths {
+        let lower_ok = has_lower.get(path).copied().unwrap_or(false);
+        let upper_ok = has_upper.get(path).copied().unwrap_or(false);
+        if !lower_ok || !upper_ok {
+            return true;
+        }
+    }
+
+    false
+}
+
 /// Verifies a function using full module context for record flattening and pure function calls.
 pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtResult {
+    if function_has_unsound_float_contract(func, Some(module)) {
+        return SmtResult::Skipped(
+            "unbounded floating-point arithmetic is not verified soundly under real theory (IEEE-754 divergence prevented)".into(),
+        );
+    }
+
     if let Some(z3_path) = find_z3_executable() {
         // [Round 20 P1 Spec 3]: 构造只读内容寻址密封沙箱副本，彻底消除 TOCTOU
         let sealed_solver = match SealedSolverBinary::seal_from_path(&z3_path) {
@@ -185,6 +352,12 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
 
 /// Verifies a function explicitly using the Z3 solver via SMT-LIB2 pipe.
 pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String> {
+    if function_has_unsound_float_contract(func, None) {
+        return Ok(SmtResult::Skipped(
+            "unbounded floating-point arithmetic is not verified soundly under real theory (IEEE-754 divergence prevented)".into()
+        ));
+    }
+
     let z3_path = find_z3_executable().ok_or_else(|| {
         "Z3 executable not found in PATH or standard install directories".to_string()
     })?;

@@ -22,6 +22,7 @@ pub struct SmtContext<'a> {
     pub functions: HashMap<String, &'a FunctionDecl>,
     pub current_func: Option<&'a FunctionDecl>,
     pub local_decimals: HashMap<String, bool>,
+    pub type_env: Option<axiom_ast::TypeEnv<'a>>,
 }
 
 impl<'a> SmtContext<'a> {
@@ -47,10 +48,24 @@ impl<'a> SmtContext<'a> {
             functions,
             current_func: None,
             local_decimals: HashMap::new(),
+            type_env: Some(axiom_ast::TypeEnv::new(module, None)),
         }
     }
 
+    pub fn infer_type(&self, expr: &Expr) -> Option<Type> {
+        if let Some(ref env) = self.type_env {
+            return env.infer_type(expr);
+        }
+        if self.is_decimal(expr) {
+            return Some(Type::Decimal);
+        }
+        None
+    }
+
     pub fn is_decimal(&self, expr: &Expr) -> bool {
+        if let Some(ref env) = self.type_env {
+            return env.is_decimal(expr);
+        }
         match expr {
             Expr::Literal(Literal::Decimal(_)) => true,
             Expr::Ident(name) => {
@@ -156,19 +171,15 @@ pub fn generate_smtlib2_with_module_and_obligations(
         ));
     }
 
-    let empty_records = HashMap::new();
-    let empty_functions = HashMap::new();
-    let mut ctx = if let Some(m) = module {
-        SmtContext::from_module(m)
-    } else {
-        SmtContext {
-            records: empty_records,
-            functions: empty_functions,
-            current_func: None,
-            local_decimals: HashMap::new(),
-        }
+    let dummy_mod = Module {
+        types: vec![],
+        functions: vec![func.clone()],
+        effects: vec![],
     };
+    let effective_module = module.unwrap_or(&dummy_mod);
+    let mut ctx = SmtContext::from_module(effective_module);
     ctx.current_func = Some(func);
+    ctx.type_env = Some(axiom_ast::TypeEnv::new(effective_module, Some(func)));
 
     let mut smt = String::new();
     smt.push_str("; Axiom Formal Verification Query for: ");
@@ -357,11 +368,19 @@ fn bind_record_body_to_results(
             // If block contains let statements, wrap bindings around result asserts
             let mut let_bindings = Vec::new();
             let mut child_ctx = ctx.clone();
+            if let Some(ref mut env) = child_ctx.type_env {
+                env.push_scope();
+            }
             for s in statements {
                 if let Expr::Let { name, value } = s {
                     let val_smt = expr_to_smt(value, var_types, &child_ctx)?;
                     let is_dec = child_ctx.is_decimal(value);
                     child_ctx.local_decimals.insert(name.clone(), is_dec);
+                    if let Some(ref mut env) = child_ctx.type_env {
+                        if let Some(v_ty) = env.infer_type(value) {
+                            env.insert(name.clone(), v_ty);
+                        }
+                    }
                     let_bindings.push((name.clone(), val_smt));
                 }
             }
@@ -722,8 +741,11 @@ fn expr_to_smt(
                 expr_to_smt(right, var_types, ctx)?
             };
 
-            if ctx.is_decimal(left) || ctx.is_decimal(right) {
-                match op {
+            let lt = ctx.infer_type(left);
+            let rt = ctx.infer_type(right);
+
+            match (lt, rt) {
+                (Some(Type::Decimal), Some(Type::Decimal)) => match op {
                     BinaryOperator::Multiply => {
                         return Ok(emit_trunc_div_smt(&format!("(* {} {})", l, r), "1000000"));
                     }
@@ -731,6 +753,34 @@ fn expr_to_smt(
                         return Ok(emit_trunc_div_smt(&format!("(* {} 1000000)", l), &r));
                     }
                     _ => {}
+                },
+                (Some(Type::Decimal), Some(Type::Int)) => match op {
+                    BinaryOperator::Multiply => {
+                        return Ok(format!("(* {} {})", l, r));
+                    }
+                    BinaryOperator::Divide => {
+                        return Ok(emit_trunc_div_smt(&l, &r));
+                    }
+                    _ => {}
+                },
+                (Some(Type::Int), Some(Type::Decimal)) if *op == BinaryOperator::Multiply => {
+                    return Ok(format!("(* {} {})", l, r));
+                }
+                _ => {
+                    if ctx.is_decimal(left) && ctx.is_decimal(right) {
+                        match op {
+                            BinaryOperator::Multiply => {
+                                return Ok(emit_trunc_div_smt(
+                                    &format!("(* {} {})", l, r),
+                                    "1000000",
+                                ));
+                            }
+                            BinaryOperator::Divide => {
+                                return Ok(emit_trunc_div_smt(&format!("(* {} 1000000)", l), &r));
+                            }
+                            _ => {}
+                        }
+                    }
                 }
             }
 
@@ -969,6 +1019,11 @@ fn build_block_smt(
         let mut child_ctx = ctx.clone();
         let is_dec = ctx.is_decimal(value);
         child_ctx.local_decimals.insert(name.clone(), is_dec);
+        if let Some(ref mut env) = child_ctx.type_env {
+            if let Some(v_ty) = env.infer_type(value) {
+                env.insert(name.clone(), v_ty);
+            }
+        }
         let rest_smt = build_block_smt(rest, tail, &child_var_types, &child_ctx)?;
         Ok(format!("(let (({} {})) {})", name, val_smt, rest_smt))
     } else {
@@ -995,19 +1050,15 @@ pub fn generate_precondition_check_smtlib2(
         return Ok(String::new());
     }
 
-    let empty_records = HashMap::new();
-    let empty_functions = HashMap::new();
-    let mut ctx = if let Some(m) = module {
-        SmtContext::from_module(m)
-    } else {
-        SmtContext {
-            records: empty_records,
-            functions: empty_functions,
-            current_func: None,
-            local_decimals: HashMap::new(),
-        }
+    let dummy_mod = Module {
+        types: vec![],
+        functions: vec![func.clone()],
+        effects: vec![],
     };
+    let effective_module = module.unwrap_or(&dummy_mod);
+    let mut ctx = SmtContext::from_module(effective_module);
     ctx.current_func = Some(func);
+    ctx.type_env = Some(axiom_ast::TypeEnv::new(effective_module, Some(func)));
 
     let mut smt = String::new();
     smt.push_str("; Axiom Precondition Satisfiability (Vacuity) Query for: ");
@@ -1283,7 +1334,6 @@ fn collect_safety_obligations_recursive(
             if !is_real {
                 let l_smt = expr_to_smt(&left_expanded, var_types, ctx)?;
                 let r_smt = expr_to_smt(&right_expanded, var_types, ctx)?;
-                let is_dec = ctx.is_decimal(left) || ctx.is_decimal(right);
 
                 match op {
                     BinaryOperator::Add => {
@@ -1303,7 +1353,9 @@ fn collect_safety_obligations_recursive(
                         emit_safety_obligation(ob, path_conditions, obligations);
                     }
                     BinaryOperator::Multiply => {
-                        if is_dec {
+                        let lt = ctx.infer_type(left);
+                        let rt = ctx.infer_type(right);
+                        if lt == Some(Type::Decimal) && rt == Some(Type::Decimal) {
                             // 1. i128 intermediate safety obligation
                             let intermediate = format!("(* {} {})", l_smt, r_smt);
                             let intermediate_ob = format!(
@@ -1317,6 +1369,21 @@ fn collect_safety_obligations_recursive(
                             let result_ob = format!(
                                 "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
                                 scaled, scaled
+                            );
+                            emit_safety_obligation(result_ob, path_conditions, obligations);
+                        } else if (lt == Some(Type::Decimal) && rt == Some(Type::Int))
+                            || (lt == Some(Type::Int) && rt == Some(Type::Decimal))
+                        {
+                            let intermediate = format!("(* {} {})", l_smt, r_smt);
+                            let intermediate_ob = format!(
+                                "(and (>= {} (- 170141183460469231731687303715884105728)) (<= {} 170141183460469231731687303715884105727))",
+                                intermediate, intermediate
+                            );
+                            emit_safety_obligation(intermediate_ob, path_conditions, obligations);
+
+                            let result_ob = format!(
+                                "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
+                                intermediate, intermediate
                             );
                             emit_safety_obligation(result_ob, path_conditions, obligations);
                         } else {
@@ -1334,7 +1401,9 @@ fn collect_safety_obligations_recursive(
                             path_conditions,
                             obligations,
                         );
-                        if is_dec {
+                        let lt = ctx.infer_type(left);
+                        let rt = ctx.infer_type(right);
+                        if lt == Some(Type::Decimal) && rt == Some(Type::Decimal) {
                             // 1. i128 intermediate safety obligation for left * 1_000_000
                             let intermediate = format!("(* {} 1000000)", l_smt);
                             let intermediate_ob = format!(
@@ -1345,6 +1414,13 @@ fn collect_safety_obligations_recursive(
 
                             // 2. i64 result safety obligation after fixed-point scaling recovery
                             let scaled = emit_trunc_div_smt(&intermediate, &r_smt);
+                            let result_ob = format!(
+                                "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
+                                scaled, scaled
+                            );
+                            emit_safety_obligation(result_ob, path_conditions, obligations);
+                        } else if lt == Some(Type::Decimal) && rt == Some(Type::Int) {
+                            let scaled = emit_trunc_div_smt(&l_smt, &r_smt);
                             let result_ob = format!(
                                 "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
                                 scaled, scaled

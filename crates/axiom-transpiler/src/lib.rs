@@ -190,11 +190,13 @@ fn camel_to_snake(s: &str) -> String {
     result
 }
 
+#[derive(Clone)]
 struct TranspileContext<'a> {
     module: &'a Module,
     current_effects: &'a [String],
     func_effects: &'a HashMap<&'a str, &'a [String]>,
     enum_names: &'a [&'a str],
+    type_env: axiom_ast::TypeEnv<'a>,
 }
 
 fn transpile_function(
@@ -216,11 +218,13 @@ fn transpile_function(
 
     let params = params_vec.join(", ");
 
+    let type_env = axiom_ast::TypeEnv::new(module, Some(function));
     let ctx = TranspileContext {
         module,
         current_effects: &function.effects,
         func_effects,
         enum_names,
+        type_env,
     };
 
     if function.has_contracts() && function.contains_raw() {
@@ -342,22 +346,25 @@ fn transpile_expr(expr: &Expr, ctx: &TranspileContext) -> Result<String, Transpi
             }
             let mut left_str = transpile_expr(left, ctx)?;
             let mut right_str = transpile_expr(right, ctx)?;
-            let left_is_decimal = is_expr_decimal(left, ctx);
-            let right_is_decimal = is_expr_decimal(right, ctx);
-            if left_is_decimal {
+            let mut left_ty = ctx.type_env.infer_type(left);
+            let mut right_ty = ctx.type_env.infer_type(right);
+
+            if left_ty == Some(Type::Decimal) {
                 if let Expr::Literal(Literal::Float(f)) = right.as_ref() {
                     let micros = axiom_ast::float_to_decimal_micros(*f);
                     right_str = format!("{micros}_i64");
+                    right_ty = Some(Type::Decimal);
                 }
-            } else if right_is_decimal {
+            } else if right_ty == Some(Type::Decimal) {
                 if let Expr::Literal(Literal::Float(f)) = left.as_ref() {
                     let micros = axiom_ast::float_to_decimal_micros(*f);
                     left_str = format!("{micros}_i64");
+                    left_ty = Some(Type::Decimal);
                 }
             }
 
-            if left_is_decimal || right_is_decimal {
-                match op {
+            match (left_ty, right_ty) {
+                (Some(Type::Decimal), Some(Type::Decimal)) => match op {
                     BinaryOperator::Multiply => {
                         return Ok(format!(
                             "(((({left_str} as i128) * ({right_str} as i128)) / 1_000_000_i128) as i64)"
@@ -369,7 +376,26 @@ fn transpile_expr(expr: &Expr, ctx: &TranspileContext) -> Result<String, Transpi
                         ));
                     }
                     _ => {}
+                },
+                (Some(Type::Decimal), Some(Type::Int)) => match op {
+                    BinaryOperator::Multiply => {
+                        return Ok(format!(
+                            "(((({left_str} as i128) * ({right_str} as i128))) as i64)"
+                        ));
+                    }
+                    BinaryOperator::Divide => {
+                        return Ok(format!(
+                            "(((({left_str} as i128) / ({right_str} as i128))) as i64)"
+                        ));
+                    }
+                    _ => {}
+                },
+                (Some(Type::Int), Some(Type::Decimal)) if *op == BinaryOperator::Multiply => {
+                    return Ok(format!(
+                        "(((({left_str} as i128) * ({right_str} as i128))) as i64)"
+                    ));
                 }
+                _ => {}
             }
 
             Ok(format!("({left_str} {} {right_str})", binary_operator(op)))
@@ -384,18 +410,24 @@ fn transpile_expr(expr: &Expr, ctx: &TranspileContext) -> Result<String, Transpi
         )),
         Expr::Let { name, value } => Ok(format!("let {name} = {};", transpile_expr(value, ctx)?)),
         Expr::Block { statements, tail } => {
+            let mut block_ctx = ctx.clone();
+            block_ctx.type_env.push_scope();
             let mut rendered = String::from("{\n");
             for statement in statements {
                 rendered.push_str("        ");
-                rendered.push_str(&transpile_expr(statement, ctx)?);
-                if !matches!(statement, Expr::Let { .. }) {
+                rendered.push_str(&transpile_expr(statement, &block_ctx)?);
+                if let Expr::Let { name, value } = statement {
+                    if let Some(v_ty) = block_ctx.type_env.infer_type(value) {
+                        block_ctx.type_env.insert(name.clone(), v_ty);
+                    }
+                } else {
                     rendered.push(';');
                 }
                 rendered.push('\n');
             }
             if let Some(tail) = tail {
                 rendered.push_str("        ");
-                rendered.push_str(&transpile_expr(tail, ctx)?);
+                rendered.push_str(&transpile_expr(tail, &block_ctx)?);
                 rendered.push('\n');
             }
             rendered.push_str("    }");
@@ -627,38 +659,6 @@ fn transpile_literal(literal: &Literal) -> String {
         Literal::Bool(value) => value.to_string(),
         Literal::String(value) => format!("String::from({value:?})"),
         Literal::Unit => "()".into(),
-    }
-}
-
-fn is_expr_decimal(expr: &Expr, ctx: &TranspileContext) -> bool {
-    match expr {
-        Expr::Literal(Literal::Decimal(_)) => true,
-        Expr::Ident(name) => {
-            for func in &ctx.module.functions {
-                for p in &func.params {
-                    if &p.name == name && p.ty == Type::Decimal {
-                        return true;
-                    }
-                }
-            }
-            false
-        }
-        Expr::FieldAccess { field, .. } => {
-            for ty in &ctx.module.types {
-                if let TypeDef::Record { fields, .. } = ty {
-                    for f in fields {
-                        if &f.name == field && f.ty == Type::Decimal {
-                            return true;
-                        }
-                    }
-                }
-            }
-            false
-        }
-        Expr::BinaryOp { left, right, .. } => {
-            is_expr_decimal(left, ctx) || is_expr_decimal(right, ctx)
-        }
-        _ => false,
     }
 }
 

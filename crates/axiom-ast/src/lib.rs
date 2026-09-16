@@ -2,6 +2,9 @@
 
 pub mod analysis;
 pub mod merge;
+pub mod type_env;
+
+pub use type_env::TypeEnv;
 
 use serde::{Deserialize, Serialize};
 
