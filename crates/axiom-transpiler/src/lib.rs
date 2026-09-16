@@ -355,6 +355,23 @@ fn transpile_expr(expr: &Expr, ctx: &TranspileContext) -> Result<String, Transpi
                     left_str = format!("{micros}_i64");
                 }
             }
+
+            if left_is_decimal || right_is_decimal {
+                match op {
+                    BinaryOperator::Multiply => {
+                        return Ok(format!(
+                            "(((({left_str} as i128) * ({right_str} as i128)) / 1_000_000_i128) as i64)"
+                        ));
+                    }
+                    BinaryOperator::Divide => {
+                        return Ok(format!(
+                            "(((({left_str} as i128) * 1_000_000_i128) / ({right_str} as i128)) as i64)"
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+
             Ok(format!("({left_str} {} {right_str})", binary_operator(op)))
         }
         Expr::UnaryOp { op, operand } => Ok(format!(

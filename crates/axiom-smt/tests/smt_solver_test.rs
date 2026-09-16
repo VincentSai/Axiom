@@ -882,3 +882,89 @@ fn calc_sell_refund_rejects_endpoint_cheat_and_proves_exact_formula() {
         );
     }
 }
+
+#[test]
+fn decimal_fixed_point_exact_multiplication_and_division_prove_without_scale_error() {
+    let module = parse_module(
+        r#"
+        fn mul_exact(a: Decimal, b: Decimal) -> Decimal
+            requires { a == 2.5d, b == 4.0d }
+            ensures { result == 10.0d }
+        {
+            a * b
+        }
+
+        fn div_exact(a: Decimal, b: Decimal) -> Decimal
+            requires { a == 10.0d, b == 4.0d }
+            ensures { result == 2.5d }
+        {
+            a / b
+        }
+        "#,
+    )
+    .expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        let mul_res = verify_function(&module.functions[0]);
+        assert!(
+            matches!(mul_res, SmtResult::Proved { .. }),
+            "Decimal multiplication (2.5d * 4.0d == 10.0d) MUST be proved under fixed-point scaling! Got: {:?}",
+            mul_res
+        );
+
+        let div_res = verify_function(&module.functions[1]);
+        assert!(
+            matches!(div_res, SmtResult::Proved { .. }),
+            "Decimal division (10.0d / 4.0d == 2.5d) MUST be proved under fixed-point scaling! Got: {:?}",
+            div_res
+        );
+    }
+}
+
+#[test]
+fn decimal_large_multiplication_with_i128_guard_proves_successfully() {
+    let module = parse_module(
+        r#"
+        fn mul_large(a: Decimal, b: Decimal) -> Decimal
+            requires { a == 50000.0d, b == 50000.0d }
+            ensures { result == 2500000000.0d }
+        {
+            a * b
+        }
+        "#,
+    )
+    .expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        let res = verify_function(&module.functions[0]);
+        assert!(
+            matches!(res, SmtResult::Proved { .. }),
+            "Large Decimal multiplication (intermediate exceeds i64 but within i128) MUST be proved! Got: {:?}",
+            res
+        );
+    }
+}
+
+#[test]
+fn decimal_multiplication_overflowing_i64_result_is_caught() {
+    let module = parse_module(
+        r#"
+        fn mul_overflow(a: Decimal, b: Decimal) -> Decimal
+            requires { a >= 100000000000.0d, b >= 100000000000.0d }
+            ensures { result >= 0.0d }
+        {
+            a * b
+        }
+        "#,
+    )
+    .expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        let res = verify_function(&module.functions[0]);
+        assert!(
+            matches!(res, SmtResult::CounterExample { .. }),
+            "Decimal multiplication overflowing final i64 MUST trigger CounterExample! Got: {:?}",
+            res
+        );
+    }
+}

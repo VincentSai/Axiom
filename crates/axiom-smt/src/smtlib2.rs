@@ -10,12 +10,18 @@ use axiom_ast::{
 pub const I64_MIN: i64 = -9223372036854775808;
 /// Maximum boundary of signed 64-bit physical machine word integer.
 pub const I64_MAX: i64 = 9223372036854775807;
+/// Minimum boundary of signed 128-bit integer for intermediate arithmetic.
+pub const I128_MIN: i128 = -170141183460469231731687303715884105728;
+/// Maximum boundary of signed 128-bit integer for intermediate arithmetic.
+pub const I128_MAX: i128 = 170141183460469231731687303715884105727;
 
 /// Context containing module records and function definitions.
 #[derive(Debug, Clone, Default)]
 pub struct SmtContext<'a> {
     pub records: HashMap<String, Vec<(String, Type)>>,
     pub functions: HashMap<String, &'a FunctionDecl>,
+    pub current_func: Option<&'a FunctionDecl>,
+    pub local_decimals: HashMap<String, bool>,
 }
 
 impl<'a> SmtContext<'a> {
@@ -36,7 +42,79 @@ impl<'a> SmtContext<'a> {
         for f in &module.functions {
             functions.insert(f.name.clone(), f);
         }
-        Self { records, functions }
+        Self {
+            records,
+            functions,
+            current_func: None,
+            local_decimals: HashMap::new(),
+        }
+    }
+
+    pub fn is_decimal(&self, expr: &Expr) -> bool {
+        match expr {
+            Expr::Literal(Literal::Decimal(_)) => true,
+            Expr::Ident(name) => {
+                if let Some(&is_dec) = self.local_decimals.get(name) {
+                    if is_dec {
+                        return true;
+                    }
+                }
+                if name == "result" {
+                    if let Some(f) = self.current_func {
+                        return f.return_type == Type::Decimal;
+                    }
+                }
+                if let Some(f) = self.current_func {
+                    for p in &f.params {
+                        if &p.name == name && p.ty == Type::Decimal {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            Expr::FieldAccess { field, .. } => {
+                for fields in self.records.values() {
+                    for (f_name, f_ty) in fields {
+                        if f_name == field && *f_ty == Type::Decimal {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            Expr::BinaryOp {
+                left,
+                op:
+                    BinaryOperator::Add
+                    | BinaryOperator::Subtract
+                    | BinaryOperator::Multiply
+                    | BinaryOperator::Divide
+                    | BinaryOperator::Modulo,
+                right,
+            } => self.is_decimal(left) || self.is_decimal(right),
+            Expr::UnaryOp {
+                op: UnaryOperator::Negate,
+                operand,
+            } => self.is_decimal(operand),
+            Expr::Call { callee, .. } => {
+                if let Expr::Ident(ref name) = **callee {
+                    if let Some(target) = self.functions.get(name) {
+                        return target.return_type == Type::Decimal;
+                    }
+                }
+                false
+            }
+            Expr::Block { tail: Some(t), .. } => self.is_decimal(t),
+            Expr::Match { arms, .. } => {
+                if let Some(first) = arms.first() {
+                    self.is_decimal(&first.body)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
     }
 }
 
@@ -80,14 +158,17 @@ pub fn generate_smtlib2_with_module_and_obligations(
 
     let empty_records = HashMap::new();
     let empty_functions = HashMap::new();
-    let ctx = if let Some(m) = module {
+    let mut ctx = if let Some(m) = module {
         SmtContext::from_module(m)
     } else {
         SmtContext {
             records: empty_records,
             functions: empty_functions,
+            current_func: None,
+            local_decimals: HashMap::new(),
         }
     };
+    ctx.current_func = Some(func);
 
     let mut smt = String::new();
     smt.push_str("; Axiom Formal Verification Query for: ");
@@ -142,7 +223,7 @@ pub fn generate_smtlib2_with_module_and_obligations(
         smt.push_str("; Preconditions (Requires)\n");
         for req in &func.requires {
             let inlined_req = inline_calls(req, &ctx, 0)?;
-            let req_expr = expr_to_smt(&inlined_req, &var_types)?;
+            let req_expr = expr_to_smt(&inlined_req, &var_types, &ctx)?;
             smt.push_str(&format!("(assert {})\n", req_expr));
         }
         smt.push('\n');
@@ -152,11 +233,11 @@ pub fn generate_smtlib2_with_module_and_obligations(
     smt.push_str("; Function Body Definition\n");
     let inlined_body = inline_calls(&func.body, &ctx, 0)?;
     if flat_results.len() == 1 && flat_results[0].0 == "result" {
-        let body_expr = expr_to_smt(&inlined_body, &var_types)?;
+        let body_expr = expr_to_smt(&inlined_body, &var_types, &ctx)?;
         smt.push_str(&format!("(assert (= result {}))\n\n", body_expr));
     } else {
         // Returned a record: bind individual fields if body is a RecordInit or let block
-        bind_record_body_to_results(&inlined_body, &var_types, &mut smt)?;
+        bind_record_body_to_results(&inlined_body, &var_types, &mut smt, &ctx)?;
     }
 
     // 5. Assert negation of postconditions (Ensures) and 64-bit safety range obligations
@@ -166,7 +247,7 @@ pub fn generate_smtlib2_with_module_and_obligations(
     let mut obligations = Vec::new();
     for ens in &func.ensures {
         let inlined_ens = inline_calls(ens, &ctx, 0)?;
-        let ens_expr = expr_to_smt(&inlined_ens, &var_types)?;
+        let ens_expr = expr_to_smt(&inlined_ens, &var_types, &ctx)?;
         obligations.push(ens_expr);
     }
     // Safety range obligation: result Ints must not overflow 64-bit signed integer limits
@@ -188,6 +269,7 @@ pub fn generate_smtlib2_with_module_and_obligations(
         &mut safety_subs,
         &[],
         &mut subexpr_obligations,
+        &ctx,
     )?;
     for safe_ob in subexpr_obligations {
         if !obligations.contains(&safe_ob) {
@@ -260,11 +342,12 @@ fn bind_record_body_to_results(
     body: &Expr,
     var_types: &HashMap<String, &'static str>,
     smt: &mut String,
+    ctx: &SmtContext,
 ) -> Result<(), String> {
     match body {
         Expr::RecordInit { fields, .. } => {
             for (f_name, f_expr) in fields {
-                let val_smt = expr_to_smt(f_expr, var_types)?;
+                let val_smt = expr_to_smt(f_expr, var_types, ctx)?;
                 smt.push_str(&format!("(assert (= result_{} {}))\n", f_name, val_smt));
             }
             smt.push('\n');
@@ -273,9 +356,12 @@ fn bind_record_body_to_results(
         Expr::Block { statements, tail } => {
             // If block contains let statements, wrap bindings around result asserts
             let mut let_bindings = Vec::new();
+            let mut child_ctx = ctx.clone();
             for s in statements {
                 if let Expr::Let { name, value } = s {
-                    let val_smt = expr_to_smt(value, var_types)?;
+                    let val_smt = expr_to_smt(value, var_types, &child_ctx)?;
+                    let is_dec = child_ctx.is_decimal(value);
+                    child_ctx.local_decimals.insert(name.clone(), is_dec);
                     let_bindings.push((name.clone(), val_smt));
                 }
             }
@@ -283,7 +369,7 @@ fn bind_record_body_to_results(
             if let Some(tail_expr) = tail {
                 if let Expr::RecordInit { fields, .. } = tail_expr.as_ref() {
                     for (f_name, f_expr) in fields {
-                        let inner_val = expr_to_smt(f_expr, var_types)?;
+                        let inner_val = expr_to_smt(f_expr, var_types, &child_ctx)?;
                         let mut full_val = inner_val;
                         for (let_name, let_val) in let_bindings.iter().rev() {
                             full_val = format!("(let (({} {})) {})", let_name, let_val, full_val);
@@ -551,7 +637,11 @@ pub fn emit_trunc_mod_smt(l: &str, r: &str) -> String {
     )
 }
 
-fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result<String, String> {
+fn expr_to_smt(
+    expr: &Expr,
+    var_types: &HashMap<String, &'static str>,
+    ctx: &SmtContext,
+) -> Result<String, String> {
     match expr {
         Expr::Literal(Literal::Int(n)) => {
             if *n == I64_MIN {
@@ -591,7 +681,7 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
             }
         }
         Expr::UnaryOp { op, operand } => {
-            let inner = expr_to_smt(operand, var_types)?;
+            let inner = expr_to_smt(operand, var_types, ctx)?;
             match op {
                 UnaryOperator::Negate => Ok(format!("(- {})", inner)),
                 UnaryOperator::Not => Ok(format!("(not {})", inner)),
@@ -611,10 +701,10 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
                         micros.to_string()
                     }
                 } else {
-                    expr_to_smt(left, var_types)?
+                    expr_to_smt(left, var_types, ctx)?
                 }
             } else {
-                expr_to_smt(left, var_types)?
+                expr_to_smt(left, var_types, ctx)?
             };
 
             let r = if lt == "Int" && matches!(right.as_ref(), Expr::Literal(Literal::Float(_))) {
@@ -626,11 +716,23 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
                         micros.to_string()
                     }
                 } else {
-                    expr_to_smt(right, var_types)?
+                    expr_to_smt(right, var_types, ctx)?
                 }
             } else {
-                expr_to_smt(right, var_types)?
+                expr_to_smt(right, var_types, ctx)?
             };
+
+            if ctx.is_decimal(left) || ctx.is_decimal(right) {
+                match op {
+                    BinaryOperator::Multiply => {
+                        return Ok(emit_trunc_div_smt(&format!("(* {} {})", l, r), "1000000"));
+                    }
+                    BinaryOperator::Divide => {
+                        return Ok(emit_trunc_div_smt(&format!("(* {} 1000000)", l), &r));
+                    }
+                    _ => {}
+                }
+            }
 
             match op {
                 BinaryOperator::Divide => {
@@ -665,26 +767,26 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
             }
         }
         Expr::Let { name, value } => {
-            let val = expr_to_smt(value, var_types)?;
+            let val = expr_to_smt(value, var_types, ctx)?;
             Ok(format!("(let (({} {})))", name, val))
         }
         Expr::Block { statements, tail } => {
             if statements.is_empty() {
                 if let Some(t) = tail {
-                    expr_to_smt(t, var_types)
+                    expr_to_smt(t, var_types, ctx)
                 } else {
                     Ok("0".into())
                 }
             } else {
-                build_block_smt(statements, tail.as_deref(), var_types)
+                build_block_smt(statements, tail.as_deref(), var_types, ctx)
             }
         }
         Expr::Call { callee, args } => {
-            let callee_str = expr_to_smt(callee, var_types)?;
+            let callee_str = expr_to_smt(callee, var_types, ctx)?;
             let mut s = format!("({}", callee_str);
             for arg in args {
                 s.push(' ');
-                s.push_str(&expr_to_smt(arg, var_types)?);
+                s.push_str(&expr_to_smt(arg, var_types, ctx)?);
             }
             s.push(')');
             Ok(s)
@@ -703,7 +805,7 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
                 }
             }
 
-            let cond_str = expr_to_smt(target, var_types)?;
+            let cond_str = expr_to_smt(target, var_types, ctx)?;
 
             // 2. 若首臂即为不可反驳 catch-all，直接翻译该臂 body（若是 Ident 则建立词法绑定）
             if reachable_arms.len() == 1 {
@@ -712,10 +814,13 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
                     let empty_subs = HashMap::new();
                     let target_ty = infer_expr_type(target, var_types, &empty_subs);
                     arm_var_types.insert(id.clone(), target_ty);
-                    let body_smt = expr_to_smt(&reachable_arms[0].body, &arm_var_types)?;
+                    let mut arm_ctx = ctx.clone();
+                    let target_is_dec = ctx.is_decimal(target);
+                    arm_ctx.local_decimals.insert(id.clone(), target_is_dec);
+                    let body_smt = expr_to_smt(&reachable_arms[0].body, &arm_var_types, &arm_ctx)?;
                     return Ok(format!("(let (({} {})) {})", id, cond_str, body_smt));
                 } else if matches!(reachable_arms[0].pattern, Pattern::Wildcard) {
-                    return expr_to_smt(&reachable_arms[0].body, var_types);
+                    return expr_to_smt(&reachable_arms[0].body, var_types, ctx);
                 }
             }
 
@@ -731,10 +836,13 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
                     let empty_subs = HashMap::new();
                     let target_ty = infer_expr_type(target, var_types, &empty_subs);
                     arm_var_types.insert(id.clone(), target_ty);
-                    let body_smt = expr_to_smt(&last_arm.body, &arm_var_types)?;
+                    let mut arm_ctx = ctx.clone();
+                    let target_is_dec = ctx.is_decimal(target);
+                    arm_ctx.local_decimals.insert(id.clone(), target_is_dec);
+                    let body_smt = expr_to_smt(&last_arm.body, &arm_var_types, &arm_ctx)?;
                     format!("(let (({} {})) {})", id, cond_str, body_smt)
                 } else {
-                    expr_to_smt(&last_arm.body, var_types)?
+                    expr_to_smt(&last_arm.body, var_types, ctx)?
                 };
 
                 for arm in reachable_arms[..last_idx].iter().rev() {
@@ -742,7 +850,7 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
                     let pat_cond = pat_cond_opt.ok_or_else(|| {
                         "unexpected catch-all before last reachable arm".to_string()
                     })?;
-                    let body_smt = expr_to_smt(&arm.body, var_types)?;
+                    let body_smt = expr_to_smt(&arm.body, var_types, ctx)?;
                     current_else = format!("(ite {} {} {})", pat_cond, body_smt, current_else);
                 }
                 return Ok(current_else);
@@ -755,16 +863,16 @@ fn expr_to_smt(expr: &Expr, var_types: &HashMap<String, &'static str>) -> Result
                         Pattern::Literal(Literal::Bool(true)),
                         Pattern::Literal(Literal::Bool(false)),
                     ) => {
-                        let true_body = expr_to_smt(&reachable_arms[0].body, var_types)?;
-                        let false_body = expr_to_smt(&reachable_arms[1].body, var_types)?;
+                        let true_body = expr_to_smt(&reachable_arms[0].body, var_types, ctx)?;
+                        let false_body = expr_to_smt(&reachable_arms[1].body, var_types, ctx)?;
                         return Ok(format!("(ite {} {} {})", cond_str, true_body, false_body));
                     }
                     (
                         Pattern::Literal(Literal::Bool(false)),
                         Pattern::Literal(Literal::Bool(true)),
                     ) => {
-                        let false_body = expr_to_smt(&reachable_arms[0].body, var_types)?;
-                        let true_body = expr_to_smt(&reachable_arms[1].body, var_types)?;
+                        let false_body = expr_to_smt(&reachable_arms[0].body, var_types, ctx)?;
+                        let true_body = expr_to_smt(&reachable_arms[1].body, var_types, ctx)?;
                         return Ok(format!("(ite {} {} {})", cond_str, true_body, false_body));
                     }
                     _ => {}
@@ -840,10 +948,11 @@ fn build_block_smt(
     statements: &[Expr],
     tail: Option<&Expr>,
     var_types: &HashMap<String, &'static str>,
+    ctx: &SmtContext,
 ) -> Result<String, String> {
     if statements.is_empty() {
         if let Some(t) = tail {
-            return expr_to_smt(t, var_types);
+            return expr_to_smt(t, var_types, ctx);
         }
         return Ok("0".into());
     }
@@ -852,15 +961,18 @@ fn build_block_smt(
     let rest = &statements[1..];
 
     if let Expr::Let { name, value } = first {
-        let val_smt = expr_to_smt(value, var_types)?;
+        let val_smt = expr_to_smt(value, var_types, ctx)?;
         let empty_subs = HashMap::new();
         let val_ty = infer_expr_type(value, var_types, &empty_subs);
         let mut child_var_types = var_types.clone();
         child_var_types.insert(name.clone(), val_ty);
-        let rest_smt = build_block_smt(rest, tail, &child_var_types)?;
+        let mut child_ctx = ctx.clone();
+        let is_dec = ctx.is_decimal(value);
+        child_ctx.local_decimals.insert(name.clone(), is_dec);
+        let rest_smt = build_block_smt(rest, tail, &child_var_types, &child_ctx)?;
         Ok(format!("(let (({} {})) {})", name, val_smt, rest_smt))
     } else {
-        build_block_smt(rest, tail, var_types)
+        build_block_smt(rest, tail, var_types, ctx)
     }
 }
 
@@ -885,14 +997,17 @@ pub fn generate_precondition_check_smtlib2(
 
     let empty_records = HashMap::new();
     let empty_functions = HashMap::new();
-    let ctx = if let Some(m) = module {
+    let mut ctx = if let Some(m) = module {
         SmtContext::from_module(m)
     } else {
         SmtContext {
             records: empty_records,
             functions: empty_functions,
+            current_func: None,
+            local_decimals: HashMap::new(),
         }
     };
+    ctx.current_func = Some(func);
 
     let mut smt = String::new();
     smt.push_str("; Axiom Precondition Satisfiability (Vacuity) Query for: ");
@@ -926,7 +1041,7 @@ pub fn generate_precondition_check_smtlib2(
     smt.push_str("; Assert all preconditions\n");
     for req in &func.requires {
         let inlined_req = inline_calls(req, &ctx, 0)?;
-        let req_expr = expr_to_smt(&inlined_req, &var_types)?;
+        let req_expr = expr_to_smt(&inlined_req, &var_types, &ctx)?;
         smt.push_str(&format!("(assert {})\n", req_expr));
     }
     smt.push_str("\n(check-sat)\n");
@@ -1138,6 +1253,7 @@ fn collect_safety_obligations_recursive(
     subs: &mut HashMap<String, Expr>,
     path_conditions: &[String],
     obligations: &mut Vec<String>,
+    ctx: &SmtContext,
 ) -> Result<(), String> {
     match expr {
         Expr::BinaryOp { left, op, right } => {
@@ -1147,6 +1263,7 @@ fn collect_safety_obligations_recursive(
                 subs,
                 path_conditions,
                 obligations,
+                ctx,
             )?;
             collect_safety_obligations_recursive(
                 right,
@@ -1154,6 +1271,7 @@ fn collect_safety_obligations_recursive(
                 subs,
                 path_conditions,
                 obligations,
+                ctx,
             )?;
 
             let left_expanded = substitute_expr_with_subs(left, subs);
@@ -1163,8 +1281,9 @@ fn collect_safety_obligations_recursive(
                 || infer_expr_type(right, var_types, subs) == "Real";
 
             if !is_real {
-                let l_smt = expr_to_smt(&left_expanded, var_types)?;
-                let r_smt = expr_to_smt(&right_expanded, var_types)?;
+                let l_smt = expr_to_smt(&left_expanded, var_types, ctx)?;
+                let r_smt = expr_to_smt(&right_expanded, var_types, ctx)?;
+                let is_dec = ctx.is_decimal(left) || ctx.is_decimal(right);
 
                 match op {
                     BinaryOperator::Add => {
@@ -1184,12 +1303,30 @@ fn collect_safety_obligations_recursive(
                         emit_safety_obligation(ob, path_conditions, obligations);
                     }
                     BinaryOperator::Multiply => {
-                        let op_smt = format!("(* {} {})", l_smt, r_smt);
-                        let ob = format!(
-                            "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
-                            op_smt, op_smt
-                        );
-                        emit_safety_obligation(ob, path_conditions, obligations);
+                        if is_dec {
+                            // 1. i128 intermediate safety obligation
+                            let intermediate = format!("(* {} {})", l_smt, r_smt);
+                            let intermediate_ob = format!(
+                                "(and (>= {} (- 170141183460469231731687303715884105728)) (<= {} 170141183460469231731687303715884105727))",
+                                intermediate, intermediate
+                            );
+                            emit_safety_obligation(intermediate_ob, path_conditions, obligations);
+
+                            // 2. i64 result safety obligation after fixed-point scaling recovery
+                            let scaled = emit_trunc_div_smt(&intermediate, "1000000");
+                            let result_ob = format!(
+                                "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
+                                scaled, scaled
+                            );
+                            emit_safety_obligation(result_ob, path_conditions, obligations);
+                        } else {
+                            let op_smt = format!("(* {} {})", l_smt, r_smt);
+                            let ob = format!(
+                                "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
+                                op_smt, op_smt
+                            );
+                            emit_safety_obligation(ob, path_conditions, obligations);
+                        }
                     }
                     BinaryOperator::Divide => {
                         emit_safety_obligation(
@@ -1197,14 +1334,32 @@ fn collect_safety_obligations_recursive(
                             path_conditions,
                             obligations,
                         );
-                        emit_safety_obligation(
-                            format!(
-                                "(not (and (= {} (- 9223372036854775808)) (= {} (- 1))))",
-                                l_smt, r_smt
-                            ),
-                            path_conditions,
-                            obligations,
-                        );
+                        if is_dec {
+                            // 1. i128 intermediate safety obligation for left * 1_000_000
+                            let intermediate = format!("(* {} 1000000)", l_smt);
+                            let intermediate_ob = format!(
+                                "(and (>= {} (- 170141183460469231731687303715884105728)) (<= {} 170141183460469231731687303715884105727))",
+                                intermediate, intermediate
+                            );
+                            emit_safety_obligation(intermediate_ob, path_conditions, obligations);
+
+                            // 2. i64 result safety obligation after fixed-point scaling recovery
+                            let scaled = emit_trunc_div_smt(&intermediate, &r_smt);
+                            let result_ob = format!(
+                                "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
+                                scaled, scaled
+                            );
+                            emit_safety_obligation(result_ob, path_conditions, obligations);
+                        } else {
+                            emit_safety_obligation(
+                                format!(
+                                    "(not (and (= {} (- 9223372036854775808)) (= {} (- 1))))",
+                                    l_smt, r_smt
+                                ),
+                                path_conditions,
+                                obligations,
+                            );
+                        }
                     }
                     BinaryOperator::Modulo => {
                         emit_safety_obligation(
@@ -1232,12 +1387,13 @@ fn collect_safety_obligations_recursive(
                 subs,
                 path_conditions,
                 obligations,
+                ctx,
             )?;
             if *op == UnaryOperator::Negate {
                 let is_real = infer_expr_type(operand, var_types, subs) == "Real";
                 if !is_real {
                     let operand_expanded = substitute_expr_with_subs(operand, subs);
-                    let inner_smt = expr_to_smt(&operand_expanded, var_types)?;
+                    let inner_smt = expr_to_smt(&operand_expanded, var_types, ctx)?;
                     let ob = format!("(not (= {} (- 9223372036854775808)))", inner_smt);
                     emit_safety_obligation(ob, path_conditions, obligations);
                 }
@@ -1250,12 +1406,14 @@ fn collect_safety_obligations_recursive(
                 subs,
                 path_conditions,
                 obligations,
+                ctx,
             )?;
             let expanded_val = substitute_expr_with_subs(value, subs);
             subs.insert(name.clone(), expanded_val);
         }
         Expr::Block { statements, tail } => {
             let mut curr_subs = subs.clone();
+            let mut curr_ctx = ctx.clone();
             for stmt in statements {
                 if let Expr::Let { name, value } = stmt {
                     collect_safety_obligations_recursive(
@@ -1264,8 +1422,11 @@ fn collect_safety_obligations_recursive(
                         &mut curr_subs,
                         path_conditions,
                         obligations,
+                        &curr_ctx,
                     )?;
                     let expanded_val = substitute_expr_with_subs(value, &curr_subs);
+                    let is_dec = curr_ctx.is_decimal(value);
+                    curr_ctx.local_decimals.insert(name.clone(), is_dec);
                     curr_subs.insert(name.clone(), expanded_val);
                 } else {
                     collect_safety_obligations_recursive(
@@ -1274,6 +1435,7 @@ fn collect_safety_obligations_recursive(
                         &mut curr_subs,
                         path_conditions,
                         obligations,
+                        &curr_ctx,
                     )?;
                 }
             }
@@ -1284,6 +1446,7 @@ fn collect_safety_obligations_recursive(
                     &mut curr_subs,
                     path_conditions,
                     obligations,
+                    &curr_ctx,
                 )?;
             }
         }
@@ -1294,16 +1457,20 @@ fn collect_safety_obligations_recursive(
                 subs,
                 path_conditions,
                 obligations,
+                ctx,
             )?;
             let target_expanded = substitute_expr_with_subs(target, subs);
-            let target_smt_res = expr_to_smt(&target_expanded, var_types);
+            let target_smt_res = expr_to_smt(&target_expanded, var_types, ctx);
 
             if let Ok(target_smt) = target_smt_res {
                 let mut accumulated_negations: Vec<String> = path_conditions.to_vec();
                 for arm in arms {
                     let mut arm_subs = subs.clone();
+                    let mut arm_ctx = ctx.clone();
                     if let Pattern::Ident(ref id) = arm.pattern {
                         arm_subs.insert(id.clone(), target_expanded.clone());
+                        let is_dec = ctx.is_decimal(target);
+                        arm_ctx.local_decimals.insert(id.clone(), is_dec);
                     }
 
                     // 调用统一的模式条件生成器计算当前臂模式的匹配条件与未匹配否定条件
@@ -1325,6 +1492,7 @@ fn collect_safety_obligations_recursive(
                         &mut arm_subs,
                         &arm_paths,
                         obligations,
+                        &arm_ctx,
                     )?;
 
                     // [Spec 1, P0] 遇到首个 catch-all 分支，后续所有分支在物理上均为不可达死代码，立即终止分析
@@ -1340,8 +1508,11 @@ fn collect_safety_obligations_recursive(
             } else {
                 for arm in arms {
                     let mut arm_subs = subs.clone();
+                    let mut arm_ctx = ctx.clone();
                     if let Pattern::Ident(ref id) = arm.pattern {
                         arm_subs.remove(id);
+                        let is_dec = ctx.is_decimal(target);
+                        arm_ctx.local_decimals.insert(id.clone(), is_dec);
                     }
                     let is_catch_all = matches!(arm.pattern, Pattern::Wildcard | Pattern::Ident(_));
                     collect_safety_obligations_recursive(
@@ -1350,6 +1521,7 @@ fn collect_safety_obligations_recursive(
                         &mut arm_subs,
                         path_conditions,
                         obligations,
+                        &arm_ctx,
                     )?;
                     if is_catch_all {
                         break;
@@ -1364,6 +1536,7 @@ fn collect_safety_obligations_recursive(
                 subs,
                 path_conditions,
                 obligations,
+                ctx,
             )?;
             for arg in args {
                 collect_safety_obligations_recursive(
@@ -1372,6 +1545,7 @@ fn collect_safety_obligations_recursive(
                     subs,
                     path_conditions,
                     obligations,
+                    ctx,
                 )?;
             }
         }
@@ -1382,6 +1556,7 @@ fn collect_safety_obligations_recursive(
                 subs,
                 path_conditions,
                 obligations,
+                ctx,
             )?;
         }
         Expr::RecordInit { fields, .. } => {
@@ -1392,6 +1567,7 @@ fn collect_safety_obligations_recursive(
                     subs,
                     path_conditions,
                     obligations,
+                    ctx,
                 )?;
             }
         }
@@ -1402,6 +1578,7 @@ fn collect_safety_obligations_recursive(
                 subs,
                 path_conditions,
                 obligations,
+                ctx,
             )?;
             for (_, val) in updates {
                 collect_safety_obligations_recursive(
@@ -1410,6 +1587,7 @@ fn collect_safety_obligations_recursive(
                     subs,
                     path_conditions,
                     obligations,
+                    ctx,
                 )?;
             }
         }

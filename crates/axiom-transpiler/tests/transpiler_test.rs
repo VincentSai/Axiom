@@ -226,3 +226,21 @@ fn transpiles_implication_contract_to_rust_disjunction() {
     );
     assert!(!rust.contains("=>"));
 }
+
+#[test]
+fn transpiles_decimal_multiplication_and_division_with_scale_recovery_and_i128_guard() {
+    let rust = transpile_source_to_rust(
+        r#"
+        fn mul_div(a: Decimal, b: Decimal) -> Decimal
+            requires { a > 0.0, b > 0.0 }
+            ensures { result > 0.0 }
+        {
+            (a * b) / 2.0d
+        }
+        "#,
+    )
+    .expect("Decimal mul_div should transpile");
+
+    assert!(rust.contains("as i128"));
+    assert!(rust.contains("1000000") || rust.contains("1_000_000"));
+}
