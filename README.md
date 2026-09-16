@@ -7,15 +7,16 @@
 
 > **Axiom** 是一个专门面向 **AI 协作的受限纯函数 DSL、形式化验证与多 Agent 协同流水线**。  
 > **核心战略定位**：**不替代通用语言 (Rust / C# / TypeScript)**，而是与其深度共生——Axiom 专注于最适合 AI 生成、最需要确定性防御的核心逻辑层（数值管线、状态机转移、规则判定、权限校验），外围无缝转译并嵌入 Rust、Unity C#、WASM 与 C。  
-> **不可替代性护城河**：
-> 1. **形式化语义最小完备集**：受限纯表达式、显式代数效应（Algebraic Effects）与定点数微元制，将代码生成空间完全收敛在可判定的 SMT 理论域；
-> 2. **AST 级 3-Way 结构化合并**：彻底杜绝多 Agent 协同中的文本级代码冲突，配合跨符号级联定理证明消除隐式语义破坏；
-> 3. **反例单步自愈闭环**：SMT 求解器精准提取数值反例，驱动 Agent 在 1 轮内通过分支守卫自动修复收敛并原子签入 CAS 任务池；
-> 4. **不可伪造的真实实证数据**：在真实 OpenAI Codex 宏观并发流水线实测中，Axiom 相比传统 Rust 微任务**全链路净节省 21.0% 的真实 API Token**，且达成 **Z3 SMT 全域数学证明（All UNSAT）**。
+> **生产级能力链与核心价值**：
+> 1. **受限纯表达式与充要契约**：语言内核仅保留纯表达式、代数效应边界与定点数微元制，消除隐式副作用与精度漂移，收敛在可判定的 SMT 理论域；
+> 2. **深模块与统一级联提交内核**：通过 `VerifiedWorkspace` 封装 CAS 内容寻址与 AST 3-Way 合并，所有提交路径强制执行符号依赖闭包级联重验，杜绝隐式语义破坏；
+> 3. **SMT 反例驱动单步自愈**：精确提取机器反例引导 Agent 单步增加守卫分支，自愈收敛耗时低于通用重试；
+> 4. **定理证明与业务 Oracle 双重闭环**：不仅在全域取值上通过 Z3 形式化证明杜绝溢出/除零/越界，更通过转译为原生 Rust 执行业务测试向量验收，杜绝契约不充要带来的业务偏差；
+> 5. **透明且客观的真实基准**：在相同任务颗粒度的 OpenAI Codex 宏观并发实测中，Axiom 全链路净节省 **21.0%** 真实 API Token，组合器 0 模型开销，CAS 争用 100% 稳健签入。
 
 ---
 
-## 🌟 核心架构与共生体系
+## 🌟 核心架构与端到端能力链
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -25,18 +26,22 @@
                                 │ FFI / Native Bridge / WASM
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│               Axiom Verified Logic Layer (Axiom 内核)            │
+│           Axiom Verified Logic Layer (VerifiedWorkspace)        │
 │  • Pure Functions (受限纯表达式)   • Algebraic Effects (显式副作用隔离) │
 │  • Decimal Fixed-Point (微元制)   • SMT Contracts (requires/ensures)│
-│  • AST 3-Way CAS Database        • Cascade Verification Closure    │
+│  • AST 3-Way CAS Database        • Unified Cascade Submit Kernel   │
+│  • ProcessSupervisor (看门狗防挂死) • Rust Business Oracle Testbed  │
 └───────────────────────────────┬─────────────────────────────────┘
-                                │ Hole Extraction & Task Envelope
+                                │ Task Envelope & Holes
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │              Multi-Agent Orchestration & Self-Healing           │
-│   • OpenAI Codex CLI • Local SMT Solver • Single-Step Healing   │
+│   • OpenAI Codex CLI • Z3 SMT Counter-Example • 1-Step Healing  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**端到端真实能力链**：
+`局部任务信封 (Task Envelope) -> Agent 受限表达式生成 -> SMT 全域定理证明 -> 依赖闭包级联验证 -> CAS 审计回执生成 -> AST 3-Way 重基提交 -> 无洞纯模块发布与业务 Oracle 验收`
 
 ---
 
@@ -52,7 +57,7 @@
 | **全链路总真实账单** | **95,263** Tokens | **75,238** Tokens | **Axiom 全链路净节省 21.0% Token** |
 | **组合器/合并消耗** | 0 Token (仅 Git 引擎本地合并) | **0 Token (原生 AST CAS 零模型调用)** | 保持 0 文本解决税 |
 | **双Worker CAS争用压测** | - | **2/2 签入成功 (耗时 17.86s)** | 跨进程排他锁与 AST 重基 100% 稳健 |
-| **终态质量保证** | 基于离散测试向量采样通过 | **Z3 SMT 全域定理证明通过 (All UNSAT)** | **无限输入全域无Bug，彻底消灭未测边界幻觉** |
+| **终态质量保证** | 基于离散测试向量采样通过 | **Z3 SMT 全域定理证明 + 业务 Oracle 双重闭环** | **兼顾数学反例消灭与业务意图对齐** |
 
 > 完整实证审计数据链已归档于 [`examples/benchmark_eval/data/concurrent_eval_data.json`](examples/benchmark_eval/data/concurrent_eval_data.json)。
 

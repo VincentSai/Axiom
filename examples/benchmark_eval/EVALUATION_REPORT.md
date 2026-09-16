@@ -98,23 +98,38 @@ python examples/benchmark_eval/eval_runner.py --mode count --tasks 5
 本组基准评测由 [`concurrent_runner.py`](./concurrent_runner.py) 驱动，直接调用本机已鉴权的 **OpenAI Codex CLI (`v0.147.0`)**，通过本地代理 `127.0.0.1:7897` 并发调度真实模型推理。所有 Token 消耗直接解析自官方 API 返回的 `turn.completed` 原始事件，严禁任何人工乘数估算。
 
 ### 1. 实机运行环境与密码学背书
-- **评测引擎**: OpenAI Codex CLI (`v0.147.0`, 基座模型 `gpt-5.6-sol`)
-- **形式化证明内核**: Microsoft Z3 SMT-LIB2 Engine (`4.13.0`, SHA-256: `d4863502...`)
-- **编译器组件**: Axiom Toolchain (`axiom.exe`, 包含 CAS 数据库与 AST Combinator)
-- **实证证据评级**: `live_empirical`（数据完整归档于 [`data/concurrent_eval_data.json`](./data/concurrent_eval_data.json)）
+- **评测引擎**: OpenAI Codex CLI / 基座模型
+- **形式化证明内核**: Microsoft Z3 SMT-LIB2 Engine (`4.13.0`)
+- **编译器组件**: Axiom Toolchain (`axiom.exe`, 包含 CAS 数据库与 AST 组合器)
+- **实证验证机制**: SMT 全域定理证明 + 统一级联验证 + 业务 Oracle 双重验证（转译运行全量业务测试向量）
 
 ### 2. 核心实验对照实测数据 (背包交易与库存结算子系统，5并发Worker)
 
-| 对照维度 | Group 2: 传统工程微任务 (Rust Git Flow) | Group 3: Axiom 形式化打洞流水线 | 科学对比结论 |
+| 对照维度 | Group 2: 传统工程微任务 (Rust Git Flow) | Group 3: Axiom 形式化打洞流水线 | 科学对比分析与权衡 |
 | :--- | :--- | :--- | :--- |
 | **协作机制** | 5 分支独立生成 + 串行 Git 合并 | 5 Worker 纯代数填洞 + AST CAS 组合器 | 物理杜绝文本合并冲突 |
-| **合并冲突率** | 0.0% (无二次文本冲突修复) | **0.0% (零文本级冲突)** | 保持同等高质量干净交付 |
-| **Worker并发耗时** | 25.07 秒 | **22.97 秒** | 代数打洞 Worker 推理更纯粹、速度更快 |
-| **全链路总真实账单** | **95,263** Tokens | **75,238** Tokens | **Axiom 全链路净节省 21.0% Token** |
+| **合并冲突率** | 0.0% (无二次文本冲突修复) | **0.0% (零文本级冲突)** | 保持干净交付 |
+| **Worker并发耗时** | 25.07 秒 | **22.97 秒** | 受限纯表达式填洞推理上下文更精炼 |
+| **全链路总真实账单** | **95,263** Tokens | **75,238** Tokens | **受限纯代数上下文精炼带来 ~21% Token 削减** |
 | **组合器/合并消耗** | 0 Token (仅 Git 引擎本地合并) | **0 Token (原生 AST CAS 零模型调用)** | 保持 0 文本解决税 |
-| **双Worker CAS争用压测** | - | **2/2 签入成功 (耗时 17.86s)** | 跨进程排他锁与 AST 重基 100% 稳健 |
-| **终态质量保证** | 基于离散测试向量采样通过 | **Z3 SMT 全域定理证明通过 (All UNSAT)** | **无限输入全域无Bug，彻底消灭未测边界幻觉** |
+| **双Worker CAS争用压测** | - | **2/2 签入成功 (耗时 17.86s)** | 跨进程排他锁与 AST 重基稳健生效 |
+| **终态质量保证** | 基于离散测试向量采样通过 | **Z3 SMT 全域证明 + 业务 Oracle 共同闭环** | **兼顾数学契约的一致性与业务意图的真实性** |
 
-### 3. 关键科学发现
-1. **单一变量证实 Token 净节省优势**: 在消除“任务拆解颗粒度”这一变量后（两组均为单函数级 Worker），Axiom 的严密数学契约与纯表达式打洞依然比传统 Rust 提示词**节省了 21.0% 的真实 API Token**；
-2. **形式化数学闭环物理消灭 Bug**: 传统单元测试只能对预置的离散测试点进行抽样，而 Axiom 配合 Z3 对生成的全部函数实行了全域 LIA/NRA/BPA 形式化定理证明，保证在 `[-2^63, 2^63 - 1]` 整数与定点数全域无溢出、无空指针、无除零与契约违约。
+### 3. 关键科学发现与能力边界界定
+
+1. **真实能力链的价值闭环**:
+   Axiom 的核心价值并非概念宣传，而在于构建了一条严密的 AI 辅助工程能力链：
+   ```text
+   局部任务信封 (Task Envelope)
+   → Agent 生成受限纯代数表达式 (Restricted Pure Expression)
+   → SMT 全域定理证明与物理范围安全核验 (SMT Verification)
+   → 依赖闭包统一级联验证 (Unified Cascade Validation)
+   → 内容寻址审计证据账本 (Content-Addressed Receipt Ledger)
+   → AST/CAS 乐观重基提交 (CAS Commit)
+   → 无洞纯模块组装与发布 (Zero-Hole Assembly)
+   ```
+2. **形式化证明与业务 Oracle 的分工边界**:
+   - **形式化证明 (SMT)** 的价值在于消灭“违反已定义契约的反例”，并在物理范围（如 `i64`/`i128` 防溢出、除零保护、定点数缩放同构）上提供全域数学保证；
+   - **形式化不等于全自动正确**：形式化契约必须具备数学上的充要性（如将 `<= 0` 补全为精确充要公式 `refund == -cost`）。为了防止业务意图与形式化契约脱节，生产环境必须引入**业务 Oracle 双重验证**（通过 `axiom emit-rust` 转译并通过独立业务测试向量验收），构建双重防护网；
+3. **架构收敛与深模块价值**:
+   任务池彻底移除 `database_mut` 等直接暴露内部状态的浅接口，收敛为 `VerifiedWorkspace`。外部调用者无法绕过验证门直接篡改内部 AST，并发任务分发受单调绝对看门狗守护，兼顾开发效率与工业级系统可靠性。
