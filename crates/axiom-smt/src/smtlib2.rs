@@ -707,11 +707,23 @@ fn expr_to_smt(
             }
         }
         Expr::BinaryOp { left, op, right } => {
-            let empty_subs = HashMap::new();
-            let lt = infer_expr_type(left, var_types, &empty_subs);
-            let rt = infer_expr_type(right, var_types, &empty_subs);
+            let mut lt = ctx.infer_type(left);
+            let mut rt = ctx.infer_type(right);
 
-            let l = if rt == "Int" && matches!(left.as_ref(), Expr::Literal(Literal::Float(_))) {
+            // 上下文精化：若一方为 Decimal，且另一方为 FloatLiteral，则精化为 Decimal
+            if lt == Some(Type::Decimal)
+                && matches!(right.as_ref(), Expr::Literal(Literal::Float(_)))
+            {
+                rt = Some(Type::Decimal);
+            } else if rt == Some(Type::Decimal)
+                && matches!(left.as_ref(), Expr::Literal(Literal::Float(_)))
+            {
+                lt = Some(Type::Decimal);
+            }
+
+            let l = if (rt == Some(Type::Decimal) || rt == Some(Type::Int))
+                && matches!(left.as_ref(), Expr::Literal(Literal::Float(_)))
+            {
                 if let Expr::Literal(Literal::Float(f)) = left.as_ref() {
                     let micros = axiom_ast::float_to_decimal_micros(*f);
                     if micros < 0 {
@@ -726,7 +738,9 @@ fn expr_to_smt(
                 expr_to_smt(left, var_types, ctx)?
             };
 
-            let r = if lt == "Int" && matches!(right.as_ref(), Expr::Literal(Literal::Float(_))) {
+            let r = if (lt == Some(Type::Decimal) || lt == Some(Type::Int))
+                && matches!(right.as_ref(), Expr::Literal(Literal::Float(_)))
+            {
                 if let Expr::Literal(Literal::Float(f)) = right.as_ref() {
                     let micros = axiom_ast::float_to_decimal_micros(*f);
                     if micros < 0 {
@@ -740,9 +754,6 @@ fn expr_to_smt(
             } else {
                 expr_to_smt(right, var_types, ctx)?
             };
-
-            let lt = ctx.infer_type(left);
-            let rt = ctx.infer_type(right);
 
             match (lt, rt) {
                 (Some(Type::Decimal), Some(Type::Decimal)) => match op {
@@ -763,9 +774,15 @@ fn expr_to_smt(
                     }
                     _ => {}
                 },
-                (Some(Type::Int), Some(Type::Decimal)) if *op == BinaryOperator::Multiply => {
-                    return Ok(format!("(* {} {})", l, r));
-                }
+                (Some(Type::Int), Some(Type::Decimal)) => match op {
+                    BinaryOperator::Multiply => {
+                        return Ok(format!("(* {} {})", l, r));
+                    }
+                    BinaryOperator::Divide => {
+                        return Ok(emit_trunc_div_smt(&format!("(* {} 1000000000000)", l), &r));
+                    }
+                    _ => {}
+                },
                 _ => {
                     if ctx.is_decimal(left) && ctx.is_decimal(right) {
                         match op {
@@ -867,6 +884,12 @@ fn expr_to_smt(
                     let mut arm_ctx = ctx.clone();
                     let target_is_dec = ctx.is_decimal(target);
                     arm_ctx.local_decimals.insert(id.clone(), target_is_dec);
+                    let inferred_target_ty = ctx.infer_type(target);
+                    if let Some(ref mut env) = arm_ctx.type_env {
+                        if let Some(ref ty) = inferred_target_ty {
+                            env.insert(id.clone(), ty.clone());
+                        }
+                    }
                     let body_smt = expr_to_smt(&reachable_arms[0].body, &arm_var_types, &arm_ctx)?;
                     return Ok(format!("(let (({} {})) {})", id, cond_str, body_smt));
                 } else if matches!(reachable_arms[0].pattern, Pattern::Wildcard) {
@@ -889,6 +912,12 @@ fn expr_to_smt(
                     let mut arm_ctx = ctx.clone();
                     let target_is_dec = ctx.is_decimal(target);
                     arm_ctx.local_decimals.insert(id.clone(), target_is_dec);
+                    let inferred_target_ty = ctx.infer_type(target);
+                    if let Some(ref mut env) = arm_ctx.type_env {
+                        if let Some(ref ty) = inferred_target_ty {
+                            env.insert(id.clone(), ty.clone());
+                        }
+                    }
                     let body_smt = expr_to_smt(&last_arm.body, &arm_var_types, &arm_ctx)?;
                     format!("(let (({} {})) {})", id, cond_str, body_smt)
                 } else {
@@ -1328,12 +1357,61 @@ fn collect_safety_obligations_recursive(
             let left_expanded = substitute_expr_with_subs(left, subs);
             let right_expanded = substitute_expr_with_subs(right, subs);
 
-            let is_real = infer_expr_type(left, var_types, subs) == "Real"
-                || infer_expr_type(right, var_types, subs) == "Real";
+            let mut lt = ctx.infer_type(left);
+            let mut rt = ctx.infer_type(right);
+
+            // 上下文精化：若一方为 Decimal，且另一方为 FloatLiteral，则精化为 Decimal
+            if lt == Some(Type::Decimal)
+                && matches!(right.as_ref(), Expr::Literal(Literal::Float(_)))
+            {
+                rt = Some(Type::Decimal);
+            } else if rt == Some(Type::Decimal)
+                && matches!(left.as_ref(), Expr::Literal(Literal::Float(_)))
+            {
+                lt = Some(Type::Decimal);
+            }
+
+            let is_real = if lt == Some(Type::Decimal) || rt == Some(Type::Decimal) {
+                false
+            } else {
+                infer_expr_type(left, var_types, subs) == "Real"
+                    || infer_expr_type(right, var_types, subs) == "Real"
+            };
 
             if !is_real {
-                let l_smt = expr_to_smt(&left_expanded, var_types, ctx)?;
-                let r_smt = expr_to_smt(&right_expanded, var_types, ctx)?;
+                let l_smt = if (rt == Some(Type::Decimal) || rt == Some(Type::Int))
+                    && matches!(left_expanded, Expr::Literal(Literal::Float(_)))
+                {
+                    if let Expr::Literal(Literal::Float(f)) = left_expanded {
+                        let micros = axiom_ast::float_to_decimal_micros(f);
+                        if micros < 0 {
+                            format!("(- {})", micros.abs())
+                        } else {
+                            micros.to_string()
+                        }
+                    } else {
+                        expr_to_smt(&left_expanded, var_types, ctx)?
+                    }
+                } else {
+                    expr_to_smt(&left_expanded, var_types, ctx)?
+                };
+
+                let r_smt = if (lt == Some(Type::Decimal) || lt == Some(Type::Int))
+                    && matches!(right_expanded, Expr::Literal(Literal::Float(_)))
+                {
+                    if let Expr::Literal(Literal::Float(f)) = right_expanded {
+                        let micros = axiom_ast::float_to_decimal_micros(f);
+                        if micros < 0 {
+                            format!("(- {})", micros.abs())
+                        } else {
+                            micros.to_string()
+                        }
+                    } else {
+                        expr_to_smt(&right_expanded, var_types, ctx)?
+                    }
+                } else {
+                    expr_to_smt(&right_expanded, var_types, ctx)?
+                };
 
                 match op {
                     BinaryOperator::Add => {
@@ -1353,8 +1431,6 @@ fn collect_safety_obligations_recursive(
                         emit_safety_obligation(ob, path_conditions, obligations);
                     }
                     BinaryOperator::Multiply => {
-                        let lt = ctx.infer_type(left);
-                        let rt = ctx.infer_type(right);
                         if lt == Some(Type::Decimal) && rt == Some(Type::Decimal) {
                             // 1. i128 intermediate safety obligation
                             let intermediate = format!("(* {} {})", l_smt, r_smt);
@@ -1401,8 +1477,6 @@ fn collect_safety_obligations_recursive(
                             path_conditions,
                             obligations,
                         );
-                        let lt = ctx.infer_type(left);
-                        let rt = ctx.infer_type(right);
                         if lt == Some(Type::Decimal) && rt == Some(Type::Decimal) {
                             // 1. i128 intermediate safety obligation for left * 1_000_000
                             let intermediate = format!("(* {} 1000000)", l_smt);
@@ -1421,6 +1495,22 @@ fn collect_safety_obligations_recursive(
                             emit_safety_obligation(result_ob, path_conditions, obligations);
                         } else if lt == Some(Type::Decimal) && rt == Some(Type::Int) {
                             let scaled = emit_trunc_div_smt(&l_smt, &r_smt);
+                            let result_ob = format!(
+                                "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
+                                scaled, scaled
+                            );
+                            emit_safety_obligation(result_ob, path_conditions, obligations);
+                        } else if lt == Some(Type::Int) && rt == Some(Type::Decimal) {
+                            // 1. i128 intermediate safety obligation for left * 1_000_000_000_000
+                            let intermediate = format!("(* {} 1000000000000)", l_smt);
+                            let intermediate_ob = format!(
+                                "(and (>= {} (- 170141183460469231731687303715884105728)) (<= {} 170141183460469231731687303715884105727))",
+                                intermediate, intermediate
+                            );
+                            emit_safety_obligation(intermediate_ob, path_conditions, obligations);
+
+                            // 2. i64 result safety obligation after fixed-point scaling recovery
+                            let scaled = emit_trunc_div_smt(&intermediate, &r_smt);
                             let result_ob = format!(
                                 "(and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807))",
                                 scaled, scaled
@@ -1490,6 +1580,9 @@ fn collect_safety_obligations_recursive(
         Expr::Block { statements, tail } => {
             let mut curr_subs = subs.clone();
             let mut curr_ctx = ctx.clone();
+            if let Some(ref mut env) = curr_ctx.type_env {
+                env.push_scope();
+            }
             for stmt in statements {
                 if let Expr::Let { name, value } = stmt {
                     collect_safety_obligations_recursive(
@@ -1503,6 +1596,12 @@ fn collect_safety_obligations_recursive(
                     let expanded_val = substitute_expr_with_subs(value, &curr_subs);
                     let is_dec = curr_ctx.is_decimal(value);
                     curr_ctx.local_decimals.insert(name.clone(), is_dec);
+                    let val_ty = curr_ctx.infer_type(value);
+                    if let Some(ref mut env) = curr_ctx.type_env {
+                        if let Some(ref ty) = val_ty {
+                            env.insert(name.clone(), ty.clone());
+                        }
+                    }
                     curr_subs.insert(name.clone(), expanded_val);
                 } else {
                     collect_safety_obligations_recursive(
@@ -1537,6 +1636,7 @@ fn collect_safety_obligations_recursive(
             )?;
             let target_expanded = substitute_expr_with_subs(target, subs);
             let target_smt_res = expr_to_smt(&target_expanded, var_types, ctx);
+            let target_ty = ctx.infer_type(target);
 
             if let Ok(target_smt) = target_smt_res {
                 let mut accumulated_negations: Vec<String> = path_conditions.to_vec();
@@ -1547,6 +1647,11 @@ fn collect_safety_obligations_recursive(
                         arm_subs.insert(id.clone(), target_expanded.clone());
                         let is_dec = ctx.is_decimal(target);
                         arm_ctx.local_decimals.insert(id.clone(), is_dec);
+                        if let Some(ref mut env) = arm_ctx.type_env {
+                            if let Some(ref ty) = target_ty {
+                                env.insert(id.clone(), ty.clone());
+                            }
+                        }
                     }
 
                     // 调用统一的模式条件生成器计算当前臂模式的匹配条件与未匹配否定条件
@@ -1589,6 +1694,11 @@ fn collect_safety_obligations_recursive(
                         arm_subs.remove(id);
                         let is_dec = ctx.is_decimal(target);
                         arm_ctx.local_decimals.insert(id.clone(), is_dec);
+                        if let Some(ref mut env) = arm_ctx.type_env {
+                            if let Some(ref ty) = target_ty {
+                                env.insert(id.clone(), ty.clone());
+                            }
+                        }
                     }
                     let is_catch_all = matches!(arm.pattern, Pattern::Wildcard | Pattern::Ident(_));
                     collect_safety_obligations_recursive(

@@ -390,11 +390,19 @@ fn transpile_expr(expr: &Expr, ctx: &TranspileContext) -> Result<String, Transpi
                     }
                     _ => {}
                 },
-                (Some(Type::Int), Some(Type::Decimal)) if *op == BinaryOperator::Multiply => {
-                    return Ok(format!(
-                        "(((({left_str} as i128) * ({right_str} as i128))) as i64)"
-                    ));
-                }
+                (Some(Type::Int), Some(Type::Decimal)) => match op {
+                    BinaryOperator::Multiply => {
+                        return Ok(format!(
+                            "(((({left_str} as i128) * ({right_str} as i128))) as i64)"
+                        ));
+                    }
+                    BinaryOperator::Divide => {
+                        return Ok(format!(
+                            "(((({left_str} as i128) * 1_000_000_000_000_i128) / ({right_str} as i128)) as i64)"
+                        ));
+                    }
+                    _ => {}
+                },
                 _ => {}
             }
 
@@ -526,10 +534,18 @@ fn transpile_expr(expr: &Expr, ctx: &TranspileContext) -> Result<String, Transpi
         }
         Expr::Match { target, arms } => {
             let target_str = transpile_expr(target, ctx)?;
+            let target_ty = ctx.type_env.infer_type(target);
             let mut arms_rendered = Vec::new();
             for arm in arms {
+                let mut arm_ctx = ctx.clone();
+                arm_ctx.type_env.push_scope();
+                if let Pattern::Ident(ref id) = arm.pattern {
+                    if let Some(ref ty) = target_ty {
+                        arm_ctx.type_env.insert(id.clone(), ty.clone());
+                    }
+                }
                 let pat_str = transpile_pattern(&arm.pattern);
-                let body_str = transpile_expr(&arm.body, ctx)?;
+                let body_str = transpile_expr(&arm.body, &arm_ctx)?;
                 arms_rendered.push(format!("        {pat_str} => {body_str},"));
             }
             Ok(format!(

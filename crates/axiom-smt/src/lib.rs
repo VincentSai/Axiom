@@ -132,55 +132,112 @@ pub fn verify_function(func: &FunctionDecl) -> SmtResult {
     verify_function_in_module(func, &dummy_module)
 }
 
-fn expr_contains_float_operation(expr: &axiom_ast::Expr, type_env: &axiom_ast::TypeEnv) -> bool {
-    let mut found = false;
-    let mut visit = |e: &axiom_ast::Expr| {
-        if found {
-            return;
-        }
-        match e {
-            axiom_ast::Expr::Ident(name)
-                if type_env.lookup(name) == Some(axiom_ast::Type::Float) =>
-            {
-                found = true;
-            }
-            axiom_ast::Expr::Call { callee, .. } => {
-                if let axiom_ast::Expr::Ident(fn_name) = callee.as_ref() {
-                    if let Some(f) = type_env
-                        .module()
-                        .functions
-                        .iter()
-                        .find(|f| &f.name == fn_name)
-                    {
-                        if f.return_type == axiom_ast::Type::Float {
-                            found = true;
-                        }
+fn expr_contains_float_operation(
+    expr: &axiom_ast::Expr,
+    type_env: &mut axiom_ast::TypeEnv,
+) -> bool {
+    match expr {
+        axiom_ast::Expr::Ident(name) => type_env.lookup(name) == Some(axiom_ast::Type::Float),
+        axiom_ast::Expr::Call { callee, args } => {
+            if let axiom_ast::Expr::Ident(fn_name) = callee.as_ref() {
+                if let Some(f) = type_env
+                    .module()
+                    .functions
+                    .iter()
+                    .find(|f| &f.name == fn_name)
+                {
+                    if f.return_type == axiom_ast::Type::Float {
+                        return true;
                     }
                 }
             }
-            axiom_ast::Expr::BinaryOp { left, op: _, right } => {
-                let lt = type_env.infer_type(left);
-                let rt = type_env.infer_type(right);
-                // 仅当涉及 Float 且未被 Decimal 规则提升覆盖时判定为 Float 操作
-                if (lt == Some(axiom_ast::Type::Float) || rt == Some(axiom_ast::Type::Float))
-                    && lt != Some(axiom_ast::Type::Decimal)
-                    && rt != Some(axiom_ast::Type::Decimal)
-                {
-                    found = true;
+            args.iter()
+                .any(|a| expr_contains_float_operation(a, type_env))
+        }
+        axiom_ast::Expr::BinaryOp { left, right, .. } => {
+            let lt = type_env.infer_type(left);
+            let rt = type_env.infer_type(right);
+            // 仅当涉及 Float 且未被 Decimal 规则提升覆盖时判定为 Float 操作
+            if (lt == Some(axiom_ast::Type::Float) || rt == Some(axiom_ast::Type::Float))
+                && lt != Some(axiom_ast::Type::Decimal)
+                && rt != Some(axiom_ast::Type::Decimal)
+            {
+                return true;
+            }
+            expr_contains_float_operation(left, type_env)
+                || expr_contains_float_operation(right, type_env)
+        }
+        axiom_ast::Expr::UnaryOp { op, operand } => {
+            if *op == axiom_ast::UnaryOperator::Negate
+                && type_env.infer_type(operand) == Some(axiom_ast::Type::Float)
+            {
+                return true;
+            }
+            expr_contains_float_operation(operand, type_env)
+        }
+        axiom_ast::Expr::Block { statements, tail } => {
+            let mut child_env = type_env.clone();
+            child_env.push_scope();
+            for stmt in statements {
+                if let axiom_ast::Expr::Let { name, value } = stmt {
+                    if expr_contains_float_operation(value, &mut child_env) {
+                        return true;
+                    }
+                    if let Some(ty) = child_env.infer_type(value) {
+                        child_env.insert(name.clone(), ty);
+                    }
+                } else if expr_contains_float_operation(stmt, &mut child_env) {
+                    return true;
                 }
             }
-            axiom_ast::Expr::UnaryOp {
-                op: axiom_ast::UnaryOperator::Negate,
-                operand,
-            } if type_env.infer_type(operand) == Some(axiom_ast::Type::Float) => {
-                found = true;
+            if let Some(t) = tail {
+                expr_contains_float_operation(t, &mut child_env)
+            } else {
+                false
             }
-            _ => {}
         }
-    };
-
-    axiom_ast::visit_expr(expr, &mut visit);
-    found
+        axiom_ast::Expr::Match { target, arms } => {
+            if expr_contains_float_operation(target, type_env) {
+                return true;
+            }
+            let target_ty = type_env.infer_type(target);
+            for arm in arms {
+                let mut child_env = type_env.clone();
+                child_env.push_scope();
+                if let axiom_ast::Pattern::Ident(ref id) = arm.pattern {
+                    if let Some(ref ty) = target_ty {
+                        child_env.insert(id.clone(), ty.clone());
+                    }
+                }
+                if expr_contains_float_operation(&arm.body, &mut child_env) {
+                    return true;
+                }
+            }
+            false
+        }
+        axiom_ast::Expr::Let { name, value } => {
+            if expr_contains_float_operation(value, type_env) {
+                return true;
+            }
+            if let Some(ty) = type_env.infer_type(value) {
+                type_env.insert(name.clone(), ty);
+            }
+            false
+        }
+        axiom_ast::Expr::RecordInit { fields, .. } => fields
+            .iter()
+            .any(|(_, v)| expr_contains_float_operation(v, type_env)),
+        axiom_ast::Expr::RecordUpdate { base, updates } => {
+            expr_contains_float_operation(base, type_env)
+                || updates
+                    .iter()
+                    .any(|(_, v)| expr_contains_float_operation(v, type_env))
+        }
+        axiom_ast::Expr::FieldAccess { target, .. } => {
+            expr_contains_float_operation(target, type_env)
+        }
+        _ => false,
+    }
 }
 
 /// 判定一个函数是否包含在实数理论下不健全的浮点数契约 (Unsound Float Contract)。
@@ -220,16 +277,16 @@ fn function_has_unsound_float_contract(func: &FunctionDecl, module: Option<&Modu
 
     // 3. 检查契约或函数体中是否引用了 Float 变量、Float 函数调用或未被 Decimal 提升的 Float 运算/比较
     let type_env = axiom_ast::TypeEnv::new(mod_ref, Some(func));
-    if expr_contains_float_operation(&func.body, &type_env) {
+    if expr_contains_float_operation(&func.body, &mut type_env.clone()) {
         return true;
     }
     for req in &func.requires {
-        if expr_contains_float_operation(req, &type_env) {
+        if expr_contains_float_operation(req, &mut type_env.clone()) {
             return true;
         }
     }
     for ens in &func.ensures {
-        if expr_contains_float_operation(ens, &type_env) {
+        if expr_contains_float_operation(ens, &mut type_env.clone()) {
             return true;
         }
     }

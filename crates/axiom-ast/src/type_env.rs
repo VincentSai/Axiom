@@ -190,12 +190,13 @@ impl<'a> TypeEnv<'a> {
                 ty_name.as_ref().map(|name| Type::Custom(name.clone()))
             }
             Expr::RecordUpdate { base, .. } => self.infer_type(base),
-            Expr::Match { arms, .. } => {
+            Expr::Match { target, arms } => {
+                let target_ty = self.infer_type(target);
                 for arm in arms {
                     let mut child_env = self.clone();
                     child_env.push_scope();
                     if let crate::Pattern::Ident(id) = &arm.pattern {
-                        child_env.insert(id.clone(), Type::Int);
+                        child_env.insert(id.clone(), target_ty.clone().unwrap_or(Type::Int));
                     }
                     if let Some(body_ty) = child_env.infer_type(&arm.body) {
                         return Some(body_ty);
@@ -205,6 +206,21 @@ impl<'a> TypeEnv<'a> {
             }
             Expr::Raw(_) => None,
         }
+    }
+
+    /// 在当前环境中推断表达式在指定上下文类型中的有效操作数类型（用于 FloatLiteral 到 Decimal 的上下文精化）
+    pub fn infer_effective_operand_type(
+        &self,
+        expr: &Expr,
+        context_ty: Option<&Type>,
+    ) -> Option<Type> {
+        let base_ty = self.infer_type(expr);
+        if let Some(Type::Decimal) = context_ty {
+            if matches!(expr, Expr::Literal(Literal::Float(_))) {
+                return Some(Type::Decimal);
+            }
+        }
+        base_ty
     }
 
     /// 判断表达式是否为 Decimal 类型
