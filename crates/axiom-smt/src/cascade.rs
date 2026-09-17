@@ -65,6 +65,17 @@ pub fn verify_dependent_closure(
     let graph = CallGraph::from_module(module);
     let closure = graph.transitive_dependents(changed_symbols);
 
+    // 1. 搜集当前模块中所有仍包含 hole 的函数名称集合
+    let hole_functions: Vec<&str> = module
+        .functions
+        .iter()
+        .filter(|f| axiom_ast::expr_contains_hole(&f.body))
+        .map(|f| f.name.as_str())
+        .collect();
+
+    // 2. 计算所有仍包含洞的函数的下游传递影响闭包（所有直接或间接依赖这些洞的函数）
+    let pending_closure = graph.transitive_dependents(&hole_functions);
+
     let mut report = CascadeVerificationReport {
         triggers: changed_symbols.iter().map(|s| s.to_string()).collect(),
         verified_functions: Vec::new(),
@@ -79,15 +90,14 @@ pub fn verify_dependent_closure(
         if closure.contains(&func.name) && func.has_contracts() {
             report.verified_functions.push(func.name.clone());
 
-            let is_downstream = func.name != trigger_sym;
-            let contains_holes = axiom_ast::expr_contains_hole(&func.body);
+            let is_downstream = !changed_symbols.contains(&func.name.as_str());
 
-            // 若下游函数体内尚有未填的洞，说明下游在途尚未完工，记为待决依赖，不可判定为破坏失败
-            if is_downstream && contains_holes {
+            // 若下游函数自身带洞，或者在其依赖链上存在尚未填完的洞，说明下游在途尚未完工，记为待决依赖，不可判定为破坏失败
+            if is_downstream && pending_closure.contains(&func.name) {
                 report.pending_dependents.push(func.name.clone());
                 report.results.insert(
                     func.name.clone(),
-                    SmtResult::Skipped("contains in-flight unresolved holes".into()),
+                    SmtResult::Skipped("contains or depends on in-flight unresolved holes".into()),
                 );
                 continue;
             }
