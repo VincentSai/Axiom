@@ -2,7 +2,7 @@ use axiom_parser::parse_module;
 use axiom_smt::{verify_function, verify_module, SmtResult};
 
 #[test]
-fn verifies_safe_division_with_precondition() {
+fn verifies_safe_division_with_precondition_is_fail_closed_skipped() {
     let module = parse_module(
         r#"
         fn safe_div(a: Float, b: Float) -> Float
@@ -16,10 +16,15 @@ fn verifies_safe_division_with_precondition() {
     .expect("safe_div should parse");
 
     let result = verify_function(&module.functions[0]);
-    assert!(matches!(
-        result,
-        SmtResult::Proved { .. } | SmtResult::Sampled { .. }
-    ));
+    match result {
+        SmtResult::Skipped(reason) => {
+            assert!(
+                reason.contains("floating-point arithmetic is not verified soundly"),
+                "Expected fail-closed reason, got: {reason}"
+            );
+        }
+        other => panic!("expected Skipped due to float fail-closed, got {:?}", other),
+    }
 }
 
 #[test]
@@ -343,15 +348,22 @@ fn composite_real_expression_skips_integer_safety_bounds() {
     )
     .expect("function should parse");
 
-    let res = verify_function(&module.functions[0]);
+    let (smt_query, _) = axiom_smt::generate_smtlib2_with_module_and_obligations(
+        &module.functions[0],
+        Some(&module),
+    )
+    .expect("SMT query generation should succeed");
 
-    if axiom_smt::find_z3_executable().is_some() {
-        assert!(
-            matches!(res, SmtResult::Proved { .. }),
-            "Composite Real operations must not have 64-bit integer overflow bounds injected! Got: {:?}",
-            res
-        );
-    }
+    // 实数计算不应被注入 i64 整数溢出检查
+    assert!(!smt_query.contains("9223372036854775807"));
+
+    // 验证入口对 Float 契约实施 Fail-Closed 拦截
+    let res = verify_function(&module.functions[0]);
+    assert!(
+        matches!(res, SmtResult::Skipped(_)),
+        "Float function must be fail-closed skipped! Got: {:?}",
+        res
+    );
 }
 
 #[test]

@@ -147,3 +147,33 @@ fn test_float_fail_closed_prevents_false_proof() {
         res
     );
 }
+
+#[test]
+fn test_bounded_float_contract_fails_closed() {
+    // 针对 630ed5e 审计反例：即使 x 在 requires 中被精确约束为 0.1 (满足历史有界条件)，
+    // 依然由于 IEEE-754 硬件舍入分歧 (0.1 + 0.2 != 0.3) 必须被 Fail-Closed 拦截为 Skipped！
+    let src = r#"
+        fn bounded(x: Float) -> Float
+            requires { x == 0.1 }
+            ensures { result == 0.3 }
+        {
+            x + 0.2
+        }
+    "#;
+    let module = parse_module(src).unwrap();
+    let proofs = verify_module(&module);
+    let res = &proofs["bounded"];
+    assert!(
+        !res.is_proved(),
+        "Bounded float contract must NOT be proved!"
+    );
+    match res {
+        axiom_smt::SmtResult::Skipped(reason) => {
+            assert!(
+                reason.contains("floating-point arithmetic is not verified soundly"),
+                "Unexpected skip reason: {reason}"
+            );
+        }
+        other => panic!("Expected Skipped, got {:?}", other),
+    }
+}
