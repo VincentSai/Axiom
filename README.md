@@ -52,26 +52,27 @@ Axiom 构建了涵盖**离线全要素协议仿真 (Mock)**与**真实模型宏�
 ### 1. 离线全要素物理仿真基准 (Mock Benchmark)
 - 完整流转 5 Worker 纯代数填洞、AST CAS 组合器零文本冲突装配、Z3 SMT 全域定理证明以及 Rust 业务测试向量双重验收；
 - 证明了打洞协议、词法作用域类型系统、进程看门狗与级联提交闭环的端到端结构自洽性；
-- 详细离线协议审计数据存档于 [`examples/benchmark_eval/data/mock/concurrent_eval_data.json`](examples/benchmark_eval/data/mock/concurrent_eval_data.json)（严格标注为 `synthetic_non_evidentiary`）。
+- 详细离线协议审计数据存档于 [`examples/benchmark_eval/data/mock/concurrent_eval_data.json`](examples/benchmark_eval/data/mock/concurrent_eval_data.json)（严格标注为 `synthetic_non_evidentiary` 协议自洽性基准），并支持通过 `runs/{run_id}.json` 追溯不可变运行档案。
 
-### 2. 真实 OpenAI Codex 宏观并发 A/B 实测 (Live Empirical)
-在背包交易与库存结算子系统（5 个核心算法函数）的严格单一变量 A/B 对照实测中（控制两组均为单函数级微任务，基于本地已鉴权的 **OpenAI Codex CLI `v0.147.0`, `gpt-5.6-sol`** 与 **Microsoft Z3 4.13.0**）：
+### 2. 真实模型并发评测假说与历史基准记录 (Live Empirical Observations)
+> [!NOTE]
+> 下表数据为历史原型版本（commit `a22ce40` 前期探索版本，基于 OpenAI Codex CLI `v0.147.0`, `gpt-5.6-sol` 与 Z3 4.13.0）在 inventory_settlement 微任务下的单次基线观测记录。在当前版本引入更严密的 Fail-Closed 浮点拦截与严格双重门禁后，**“代数打洞是否必然带来全链路 Token 净节省”被作为核心产品假说**，待后续具备信息等价对照组与不可变实时快照的新一轮 Live 实测进一步复核检验，不作为当前版本的固有必然收益外推。
 
-| 对照维度 | Group 2: 传统工程微任务 (Rust Git Flow) | Group 3: Axiom 形式化打洞流水线 | 科学对比结论 |
+| 对照维度 | Group 2: 传统工程微任务 (Rust Git Flow) | Group 3: Axiom 形式化打洞流水线 | 历史实测观察 (commit a22ce40) |
 | :--- | :--- | :--- | :--- |
 | **协作机制** | 5 分支独立生成 + 串行 Git 合并 | 5 Worker 纯代数填洞 + AST CAS 组合器 | 物理杜绝文本合并冲突 |
 | **合并冲突率** | 0.0% (无二次文本冲突修复) | **0.0% (零文本级冲突)** | 保持同等高质量干净交付 |
-| **Worker并发耗时** | 25.07 秒 | **22.97 秒** | 代数打洞 Worker 推理更纯粹、速度更快 |
-| **全链路总真实账单** | **95,263** Tokens | **75,238** Tokens | **Axiom 全链路净节省 21.0% Token** |
+| **Worker并发耗时** | 25.07 秒 | **22.97 秒** | 代数打洞 Worker 推理更聚焦 |
+| **全链路总账单** | **95,263** Tokens | **75,238** Tokens | **历史单次记录节省 21.0% Token (待新版复核)** |
 | **组合器/合并消耗** | 0 Token (仅 Git 引擎本地合并) | **0 Token (原生 AST CAS 零模型调用)** | 保持 0 文本解决税 |
 | **双Worker CAS争用压测** | - | **2/2 签入成功 (耗时 17.86s)** | 跨进程排他锁与 AST 重基 100% 稳健 |
 | **终态质量保证** | 基于离散测试向量采样通过 | **Z3 SMT 全域定理证明 + 业务 Oracle 双重闭环** | **兼顾数学反例消灭与业务意图对齐** |
 
 ### 3. 适用子集与方法学边界说明
-- **适用逻辑子集**：当前形式化证明与转译同构严格收敛于**无环纯表达式、定点微元制 Decimal、显式代数效应边界与有界物理实数**；
-- **Fail-Closed 拦截**：对于未形式化对齐的无界 IEEE 754 浮点舍入等语义，验证器采取保守的 Fail-Closed 拦截并拒绝签发证明；
+- **适用逻辑子集**：当前形式化证明与转译同构严格收敛于**无环纯表达式、定点微元制 Decimal (i64/i128)、显式代数效应边界**；
+- **Fail-Closed 拦截**：由于实数理论 (Real) 无法健全建模 IEEE-754 有限字长浮点舍入与精度发散，凡带契约且涉及 `Type::Float` 的函数一律采取严格的 **Fail-Closed 拦截并返回 `Skipped`**，绝不签发虚假证明；
 - **业务 Oracle 双重闭环**：形式化定理证明解决的是“程序不违背已写明的数学契约”；必须结合 Transpiler 转译为物理机器码后执行业务测试向量（Business Oracle），消除契约不充要导致的业务脱节；
-- **数据严格隔离**：真实在线实测数据归档于 [`examples/benchmark_eval/data/live/`](examples/benchmark_eval/data/live/)，与离线协议测试数据彻底隔离，绝不混淆。
+- **运行档案与可复现性**：评测运行器全面支持唯一不可变 `run_id` 快照持久化（`data/mock/runs/` 及 `data/live/runs/`），每次运行均记录 Git Commit、Tree Hash、Dirty Status 及 Solver Identity，实现全程可溯源审计。
 
 ---
 

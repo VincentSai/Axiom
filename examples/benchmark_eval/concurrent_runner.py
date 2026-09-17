@@ -28,6 +28,7 @@ import time
 from typing import Any, Dict, List, Optional, Tuple
 import urllib.error
 import urllib.request
+import uuid
 
 if sys.platform == "win32":
     try:
@@ -1312,6 +1313,10 @@ def validate_benchmark_result_schema(data: dict):
             raise ValueError(f"当 is_mock 为 False 时，evidence_grade 必须为 live_empirical，收到: {meta.get('evidence_grade')}")
     else:
         raise ValueError(f"is_mock 必须为原生布尔值，收到: {meta.get('is_mock')}")
+
+    if "run_id" in meta:
+        if not isinstance(meta["run_id"], str) or not meta["run_id"].strip():
+            raise ValueError("experiment_metadata.run_id 必须为非空字符串")
 
     # 使用单一真相源 ProvenanceCapsule.from_dict 严格校验顶层 Provenance 并深度复算密码学 SHA-256
     top_prov = ProvenanceCapsule.from_dict(meta["git_provenance"], schema_version=version)
@@ -2885,13 +2890,15 @@ def main():
     # 4. 落盘
     g2_billed = g2_res["tokens"]["total_raw_billed"]
     g3_billed = g3_res["tokens"]["total_raw_billed"]
+    import uuid
+    run_id = f"run_{time.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
     output_payload = {
         "version": "3.1",
         "subsystem": "inventory_settlement",
         "experiment_metadata": {
+            "run_id": run_id,
             "engine": args.engine,
-            "mode": "concurrent_multi_agent",
-            "eval_mode": "mock" if args.mock else "live_codex",
+            "eval_mode": "codex_cli_mock" if args.mock else f"{args.engine}_live_api",
             "is_mock": args.mock,
             "evidence_grade": "synthetic_non_evidentiary" if args.mock else "live_empirical",
             "git_commit": get_git_commit_sha(),
@@ -2938,10 +2945,16 @@ def main():
         }
     }
 
-    # 1. 结构 Schema 强校验 (验证合法的数据结构与字段一致性)
-    validate_benchmark_result_schema(output_payload)
+    # 1. 先行落盘持久化 (Persist-Before-Assert: 保证即使发生任何异常或断言失败，现场观测数据也绝不丢失)
+    # (a) 写入唯一不可变快照归档 runs/{run_id}.json
+    archive_dir = os.path.join(os.path.dirname(output_file_path), "runs")
+    os.makedirs(archive_dir, exist_ok=True)
+    archive_file_path = os.path.join(archive_dir, f"{run_id}.json")
+    with open(archive_file_path, "w", encoding="utf-8") as f:
+        json.dump(output_payload, f, indent=2, ensure_ascii=False)
+    print(f"📁 唯一不可变快照档案已存档: {archive_file_path}")
 
-    # 2. 先行落盘持久化 (Persist-Before-Assert: 保证即使发生任何异常或断言失败，现场观测数据也绝不丢失)
+    # (b) 写入指定输出路径
     os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
     with open(output_file_path, "w", encoding="utf-8") as f:
         json.dump(output_payload, f, indent=2, ensure_ascii=False)
@@ -2954,6 +2967,9 @@ def main():
                 json.dump(output_payload, f, indent=2, ensure_ascii=False)
         except Exception:
             pass
+
+    # 2. 结构 Schema 强校验 (验证合法的数据结构与字段一致性)
+    validate_benchmark_result_schema(output_payload)
 
     # 3. 强不变式断言与退出策略 (数据已安全存档在磁盘后进行)
     assert sum(g3_res["tokens"]["capsule_breakdown"].values()) == g3_res["tokens"]["workers_payload"], \
