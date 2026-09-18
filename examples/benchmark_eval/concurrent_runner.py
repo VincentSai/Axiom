@@ -2871,32 +2871,20 @@ def main():
         print("*" * 78)
     print("=" * 70)
 
-    # 1. 运行 Group 2 (Rust)
-    g2_res = run_group2_rust_pipeline(tasks, args, target_proxy)
-
-    # 2. 运行 Group 3 (Axiom)
-    g3_res = run_group3_axiom_pipeline(tasks, args, target_proxy, axiom_bin)
-
-    # 3. 结果汇总与对比分析
-    g2_total_time = g2_res["wall_clock_sec"]
-    g3_total_time = g3_res["wall_clock_sec"]
-    speedup = round(g2_total_time / g3_total_time, 2) if g3_total_time > 0 else 1.0
-
-    if args.mock:
-        render_mock_synthetic_report(args, tasks, g2_res, g3_res, g2_total_time, g3_total_time)
-    else:
-        render_live_empirical_report(args, tasks, g2_res, g3_res, g2_total_time, g3_total_time, speedup)
-
-    # 4. 落盘
-    g2_billed = g2_res["tokens"]["total_raw_billed"]
-    g3_billed = g3_res["tokens"]["total_raw_billed"]
+    # 先行生成唯一不可变的运行凭据并先行落盘 (Persist-On-Start: 即使流水线在早期异常中断，也完整保留审计线索)
     import uuid
     run_id = f"run_{time.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
-    output_payload = {
+    archive_dir = os.path.join(os.path.dirname(output_file_path), "runs")
+    os.makedirs(archive_dir, exist_ok=True)
+    archive_file_path = os.path.join(archive_dir, f"{run_id}.json")
+
+    initial_payload = {
         "version": "3.1",
         "subsystem": "inventory_settlement",
+        "status": "in_progress",
         "experiment_metadata": {
             "run_id": run_id,
+            "status": "in_progress",
             "engine": args.engine,
             "eval_mode": "codex_cli_mock" if args.mock else f"{args.engine}_live_api",
             "is_mock": args.mock,
@@ -2910,76 +2898,164 @@ def main():
             "z3_version": get_git_provenance().z3_version,
             "platform": sys.platform,
             "python_version": sys.version.split()[0],
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-        },
-        "summary": {
-            "rust_group": {
-                "wall_clock_sec": g2_total_time,
-                "conflict_rate_pct": g2_res["conflict_rate_pct"],
-                "conflict_count": g2_res["conflict_count"],
-                "resolver_calls_count": g2_res["resolver_calls_count"],
-                "workers_billed_tokens": g2_res["tokens"]["workers_raw_billed"],
-                "resolver_tax_billed_tokens": g2_res["tokens"]["resolver_billed_tax"],
-                "total_billed_tokens": g2_billed,
-                "unit_test_passed": g2_res["unit_test_passed"]
-            },
-            "axiom_group": {
-                "wall_clock_sec": g3_total_time,
-                "conflict_rate_pct": 0.0,
-                "conflict_count": 0,
-                "resolver_calls_count": 0,
-                "workers_billed_tokens": g3_res["tokens"]["workers_raw_billed"],
-                "resolver_tax_billed_tokens": 0,
-                "total_billed_tokens": g3_billed,
-                "formal_proved": g3_res["formal_proved"],
-                "unit_test_passed": g3_res["unit_test_passed"],
-                "contract_soundness_gap": (g3_res["formal_proved"] is True and g3_res.get("unit_test_passed") is not True),
-                "speedup_vs_rust": None if args.mock else speedup,
-                "token_savings_pct": None if args.mock else round((g2_billed - g3_billed) / g2_billed * 100, 1) if g2_billed > 0 else 0.0,
-                "synthetic_note": "Comparative speedup and empirical token savings are omitted in synthetic mock mode (non-evidentiary protocol self-consistency benchmark only)" if args.mock else None
-            }
-        },
-        "detailed_runs": {
-            "group2_rust": g2_res,
-            "group3_axiom": g3_res
+            "start_time": time.strftime("%Y-%m-%d %H:%M:%S")
         }
     }
-
-    # 1. 先行落盘持久化 (Persist-Before-Assert: 保证即使发生任何异常或断言失败，现场观测数据也绝不丢失)
-    # (a) 写入唯一不可变快照归档 runs/{run_id}.json
-    archive_dir = os.path.join(os.path.dirname(output_file_path), "runs")
-    os.makedirs(archive_dir, exist_ok=True)
-    archive_file_path = os.path.join(archive_dir, f"{run_id}.json")
     with open(archive_file_path, "w", encoding="utf-8") as f:
-        json.dump(output_payload, f, indent=2, ensure_ascii=False)
-    print(f"📁 唯一不可变快照档案已存档: {archive_file_path}")
+        json.dump(initial_payload, f, indent=2, ensure_ascii=False)
+    print(f"📁 初始运行快照已预先持久化存档: {archive_file_path}")
 
-    # (b) 写入指定输出路径
-    os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
-    with open(output_file_path, "w", encoding="utf-8") as f:
-        json.dump(output_payload, f, indent=2, ensure_ascii=False)
-    print(f"💾 并发流水线详细审计数据已安全持久化落盘: {output_file_path}\n")
+    pipeline_completed = False
+    try:
+        # 1. 运行 Group 2 (Rust)
+        g2_res = run_group2_rust_pipeline(tasks, args, target_proxy)
 
-    if output_file_path != OUTPUT_DATA_PATH:
-        try:
-            os.makedirs(os.path.dirname(OUTPUT_DATA_PATH), exist_ok=True)
-            with open(OUTPUT_DATA_PATH, "w", encoding="utf-8") as f:
-                json.dump(output_payload, f, indent=2, ensure_ascii=False)
-        except Exception:
-            pass
+        # 2. 运行 Group 3 (Axiom)
+        g3_res = run_group3_axiom_pipeline(tasks, args, target_proxy, axiom_bin)
 
-    # 2. 结构 Schema 强校验 (验证合法的数据结构与字段一致性)
-    validate_benchmark_result_schema(output_payload)
+        # 3. 结果汇总与对比分析
+        g2_total_time = g2_res["wall_clock_sec"]
+        g3_total_time = g3_res["wall_clock_sec"]
+        speedup = round(g2_total_time / g3_total_time, 2) if g3_total_time > 0 else 1.0
 
-    # 3. 强不变式断言与退出策略 (数据已安全存档在磁盘后进行)
-    assert sum(g3_res["tokens"]["capsule_breakdown"].values()) == g3_res["tokens"]["workers_payload"], \
-        f"Axiom capsule_breakdown 必须与 workers_payload 完全自洽: {sum(g3_res['tokens']['capsule_breakdown'].values())} != {g3_res['tokens']['workers_payload']}"
-    if g3_res["formal_proved"]:
-        if g3_res["tokens"]["tokens_to_proved"] != g3_res["tokens"]["workers_payload"]:
-            raise AssertionError(f"formal_proved 下 tokens_to_proved 必须严格等于 workers_payload: {g3_res['tokens']['tokens_to_proved']} != {g3_res['tokens']['workers_payload']}")
-        if not g3_res["unit_test_passed"]:
-            print(f"❌ [GATE ERROR]: Axiom 形式化证明通过，但业务测试向量未通过！契约与业务脱节: {g3_res.get('oracle_message')}")
-            sys.exit(2)
+        if args.mock:
+            render_mock_synthetic_report(args, tasks, g2_res, g3_res, g2_total_time, g3_total_time)
+        else:
+            render_live_empirical_report(args, tasks, g2_res, g3_res, g2_total_time, g3_total_time, speedup)
+
+        # 4. 落盘
+        g2_billed = g2_res["tokens"]["total_raw_billed"]
+        g3_billed = g3_res["tokens"]["total_raw_billed"]
+        output_payload = {
+            "version": "3.1",
+            "subsystem": "inventory_settlement",
+            "status": "completed",
+            "experiment_metadata": {
+                "run_id": run_id,
+                "status": "completed",
+                "engine": args.engine,
+                "eval_mode": "codex_cli_mock" if args.mock else f"{args.engine}_live_api",
+                "is_mock": args.mock,
+                "evidence_grade": "synthetic_non_evidentiary" if args.mock else "live_empirical",
+                "git_commit": get_git_commit_sha(),
+                "git_tree_hash": get_git_tree_hash(),
+                "git_diff_hash": get_git_diff_hash(),
+                "git_provenance": get_git_provenance_dict(),
+                "git_status": get_git_status(),
+                "z3_path": get_git_provenance().z3_path,
+                "z3_version": get_git_provenance().z3_version,
+                "platform": sys.platform,
+                "python_version": sys.version.split()[0],
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+            },
+            "summary": {
+                "rust_group": {
+                    "wall_clock_sec": g2_total_time,
+                    "conflict_rate_pct": g2_res["conflict_rate_pct"],
+                    "conflict_count": g2_res["conflict_count"],
+                    "resolver_calls_count": g2_res["resolver_calls_count"],
+                    "workers_billed_tokens": g2_res["tokens"]["workers_raw_billed"],
+                    "resolver_tax_billed_tokens": g2_res["tokens"]["resolver_billed_tax"],
+                    "total_billed_tokens": g2_billed,
+                    "unit_test_passed": g2_res["unit_test_passed"]
+                },
+                "axiom_group": {
+                    "wall_clock_sec": g3_total_time,
+                    "conflict_rate_pct": 0.0,
+                    "conflict_count": 0,
+                    "resolver_calls_count": 0,
+                    "workers_billed_tokens": g3_res["tokens"]["workers_raw_billed"],
+                    "resolver_tax_billed_tokens": 0,
+                    "total_billed_tokens": g3_billed,
+                    "formal_proved": g3_res["formal_proved"],
+                    "unit_test_passed": g3_res["unit_test_passed"],
+                    "contract_soundness_gap": (g3_res["formal_proved"] is True and g3_res.get("unit_test_passed") is not True),
+                    "speedup_vs_rust": None if args.mock else speedup,
+                    "token_savings_pct": None if args.mock else round((g2_billed - g3_billed) / g2_billed * 100, 1) if g2_billed > 0 else 0.0,
+                    "synthetic_note": "Comparative speedup and empirical token savings are omitted in synthetic mock mode (non-evidentiary protocol self-consistency benchmark only)" if args.mock else None
+                }
+            },
+            "detailed_runs": {
+                "group2_rust": g2_res,
+                "group3_axiom": g3_res
+            }
+        }
+
+        # 先行落盘持久化 (Persist-Before-Assert: 保证即使发生任何异常或断言失败，现场观测数据也绝不丢失)
+        # (a) 写入唯一不可变快照归档 runs/{run_id}.json
+        with open(archive_file_path, "w", encoding="utf-8") as f:
+            json.dump(output_payload, f, indent=2, ensure_ascii=False)
+        print(f"📁 唯一不可变快照档案已完成更新: {archive_file_path}")
+
+        # (b) 写入指定输出路径
+        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
+        with open(output_file_path, "w", encoding="utf-8") as f:
+            json.dump(output_payload, f, indent=2, ensure_ascii=False)
+        print(f"💾 并发流水线详细审计数据已安全持久化落盘: {output_file_path}\n")
+
+        if output_file_path != OUTPUT_DATA_PATH:
+            try:
+                os.makedirs(os.path.dirname(OUTPUT_DATA_PATH), exist_ok=True)
+                with open(OUTPUT_DATA_PATH, "w", encoding="utf-8") as f:
+                    json.dump(output_payload, f, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+
+        pipeline_completed = True
+
+        # 2. 结构 Schema 强校验 (验证合法的数据结构与字段一致性)
+        validate_benchmark_result_schema(output_payload)
+
+        # 3. 强不变式断言与退出策略 (数据已安全存档在磁盘后进行)
+        assert sum(g3_res["tokens"]["capsule_breakdown"].values()) == g3_res["tokens"]["workers_payload"], \
+            f"Axiom capsule_breakdown 必须与 workers_payload 完全自洽: {sum(g3_res['tokens']['capsule_breakdown'].values())} != {g3_res['tokens']['workers_payload']}"
+        if g3_res["formal_proved"]:
+            if g3_res["tokens"]["tokens_to_proved"] != g3_res["tokens"]["workers_payload"]:
+                raise AssertionError(f"formal_proved 下 tokens_to_proved 必须严格等于 workers_payload: {g3_res['tokens']['tokens_to_proved']} != {g3_res['tokens']['workers_payload']}")
+            if not g3_res["unit_test_passed"]:
+                print(f"❌ [GATE ERROR]: Axiom 形式化证明通过，但业务测试向量未通过！契约与业务脱节: {g3_res.get('oracle_message')}")
+                sys.exit(2)
+    except BaseException as exc:
+        if not pipeline_completed:
+            import traceback
+            err_msg = f"{type(exc).__name__}: {exc}"
+            tb_str = traceback.format_exc()
+            print(f"\n⚠️ [RUNNER RECOVERY]: 评测过程中断或异常退出: {err_msg}")
+            failure_payload = {
+                "version": "3.1",
+                "subsystem": "inventory_settlement",
+                "status": "failed",
+                "error": {
+                    "type": type(exc).__name__,
+                    "message": str(exc),
+                    "traceback": tb_str,
+                },
+                "experiment_metadata": {
+                    "run_id": run_id,
+                    "status": "failed",
+                    "engine": args.engine,
+                    "eval_mode": "codex_cli_mock" if args.mock else f"{args.engine}_live_api",
+                    "is_mock": args.mock,
+                    "evidence_grade": "synthetic_non_evidentiary" if args.mock else "live_empirical",
+                    "git_commit": get_git_commit_sha(),
+                    "git_tree_hash": get_git_tree_hash(),
+                    "git_diff_hash": get_git_diff_hash(),
+                    "git_provenance": get_git_provenance_dict(),
+                    "git_status": get_git_status(),
+                    "z3_path": get_git_provenance().z3_path,
+                    "z3_version": get_git_provenance().z3_version,
+                    "platform": sys.platform,
+                    "python_version": sys.version.split()[0],
+                    "failed_at": time.strftime("%Y-%m-%d %H:%M:%S")
+                }
+            }
+            try:
+                with open(archive_file_path, "w", encoding="utf-8") as f:
+                    json.dump(failure_payload, f, indent=2, ensure_ascii=False)
+                print(f"🛡️ 异常现场审计快照已安全写入落盘: {archive_file_path}")
+            except Exception as write_err:
+                print(f"❌ 写入异常现场快照失败: {write_err}")
+        raise
 
 
 if __name__ == "__main__":
