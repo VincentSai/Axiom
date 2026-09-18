@@ -119,6 +119,9 @@ pub fn generate_c_header(module: &Module, guard_name: &str) -> Result<String, Ff
          #include <stdbool.h>\n\
          #include <stddef.h>\n\
          #include <stdint.h>\n\n\
+         /* Axiom Decimal: 64-bit integer representing micros (scale = 1,000,000) */\n\
+         #define AXIOM_DECIMAL_SCALE 1000000LL\n\
+         typedef int64_t axiom_decimal_t;\n\n\
          typedef struct AxiomString {{\n\
              const uint8_t *ptr;\n\
              size_t len;\n\
@@ -392,8 +395,8 @@ fn type_suffix(ty: &Type) -> String {
 
 fn c_type(ty: &Type, list_types: &BTreeMap<String, String>) -> Result<String, FfiError> {
     match ty {
-        Type::Int => Ok("int64_t".into()),
-        Type::Float | Type::Decimal => Ok("double".into()),
+        Type::Int | Type::Decimal => Ok("int64_t".into()),
+        Type::Float => Ok("double".into()),
         Type::Bool => Ok("bool".into()),
         Type::String => Ok("AxiomString".into()),
         Type::Unit => Ok("void".into()),
@@ -559,8 +562,8 @@ fn rust_function_signature(function: &FunctionDecl) -> Result<String, FfiError> 
 
 fn rust_ffi_type(ty: &Type) -> String {
     match ty {
-        Type::Int => "i64".into(),
-        Type::Float | Type::Decimal => "f64".into(),
+        Type::Int | Type::Decimal => "i64".into(),
+        Type::Float => "f64".into(),
         Type::Bool => "bool".into(),
         Type::String => "AxiomString".into(),
         Type::Unit => "()".into(),

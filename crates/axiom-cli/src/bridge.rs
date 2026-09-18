@@ -493,7 +493,11 @@ fn legacy_input_statement(field: &FieldDef) -> Option<String> {
             "_input.{} = (long)Mathf.RoundToInt(Input.GetAxisRaw(\"{input_name}\"));",
             field.name
         )),
-        Type::Float | Type::Decimal => Some(format!(
+        Type::Decimal => Some(format!(
+            "_input.{} = (long)System.Math.Round(Input.GetAxisRaw(\"{input_name}\") * 1000000.0);",
+            field.name
+        )),
+        Type::Float => Some(format!(
             "_input.{} = Input.GetAxisRaw(\"{input_name}\");",
             field.name
         )),
@@ -503,8 +507,8 @@ fn legacy_input_statement(field: &FieldDef) -> Option<String> {
 
 fn csharp_type(ty: &Type) -> String {
     match ty {
-        Type::Int => "long".into(),
-        Type::Float | Type::Decimal => "double".into(),
+        Type::Int | Type::Decimal => "long".into(),
+        Type::Float => "double".into(),
         Type::Bool => "bool".into(),
         Type::String => "AxiomString".into(),
         Type::Unit => "byte".into(),

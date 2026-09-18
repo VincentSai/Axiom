@@ -252,9 +252,9 @@ fn render_function_type(params: &[FunctionParam], return_type: &Type) -> Result<
 
 fn render_type(ty: &Type) -> Result<String, WitError> {
     match ty {
-        Type::Int => Ok("s64".into()),
+        Type::Int | Type::Decimal => Ok("s64".into()),
         Type::Float => Ok("f64".into()),
-        Type::Decimal | Type::String => Ok("string".into()),
+        Type::String => Ok("string".into()),
         Type::Bool => Ok("bool".into()),
         Type::Unit => Ok("()".into()),
         Type::Custom(name) => render_custom_type(name),

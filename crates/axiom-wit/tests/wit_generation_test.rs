@@ -53,7 +53,7 @@ fn generates_transfer_effect_interfaces_and_export() {
     assert!(wit.contains("import clock;"));
     assert!(wit.contains("import audit-log;"));
     assert!(wit.contains(
-        "export execute-transfer: func(from-id: s64, to-id: s64, amount: string) -> result<transfer-receipt, transfer-error>;"
+        "export execute-transfer: func(from-id: s64, to-id: s64, amount: s64) -> result<transfer-receipt, transfer-error>;"
     ));
 }
 
