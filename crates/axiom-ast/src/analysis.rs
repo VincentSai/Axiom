@@ -108,4 +108,62 @@ impl CallGraph {
 
         affected
     }
+
+    /// 获取符号的直接被调用依赖者/被引用的符号集合
+    pub fn direct_dependencies(&self, symbol: &str) -> Option<&HashSet<String>> {
+        self.callees.get(symbol)
+    }
+
+    /// 计算给定根符号集合的全部直接或间接被调用依赖闭包（Transitive Dependency Closure）
+    ///
+    /// 无论调用链多深，使用 BFS 沿 `callees` 向下遍历，自动处理循环调用并返回完整被依赖符号集合。
+    /// 结果始终包含传入的 `root_symbols` 本身。
+    pub fn transitive_dependencies(&self, root_symbols: &[&str]) -> HashSet<String> {
+        let mut deps = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        for &sym in root_symbols {
+            let sym_str = sym.to_string();
+            if deps.insert(sym_str.clone()) {
+                queue.push_back(sym_str);
+            }
+        }
+
+        while let Some(current) = queue.pop_front() {
+            if let Some(upstream) = self.callees.get(&current) {
+                for callee in upstream {
+                    if deps.insert(callee.clone()) {
+                        queue.push_back(callee.clone());
+                    }
+                }
+            }
+        }
+
+        deps
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_callgraph_bidirectional_transitive_closures() {
+        let mut graph = CallGraph::default();
+        // A -> B -> C
+        graph.add_edge("A", "B");
+        graph.add_edge("B", "C");
+
+        // A 的被调用依赖闭包应包含 A, B, C
+        let deps_a = graph.transitive_dependencies(&["A"]);
+        assert!(deps_a.contains("A"));
+        assert!(deps_a.contains("B"));
+        assert!(deps_a.contains("C"));
+
+        // C 的调用者影响闭包应包含 C, B, A
+        let callers_c = graph.transitive_dependents(&["C"]);
+        assert!(callers_c.contains("C"));
+        assert!(callers_c.contains("B"));
+        assert!(callers_c.contains("A"));
+    }
 }

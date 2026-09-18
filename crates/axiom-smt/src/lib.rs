@@ -240,12 +240,40 @@ fn expr_contains_float_operation(
     }
 }
 
+/// 判定一个函数本地是否直接包含未受支持的浮点特性（Float 参数、Float 返回值、直接浮点算术/比较/字面量）
+fn function_has_local_unsupported_float(func: &FunctionDecl, module: &Module) -> bool {
+    if func.return_type == axiom_ast::Type::Float {
+        return true;
+    }
+    if func.params.iter().any(|p| p.ty == axiom_ast::Type::Float) {
+        return true;
+    }
+    let mut type_env = axiom_ast::TypeEnv::new(module, Some(func));
+    if expr_contains_float_operation(&func.body, &mut type_env) {
+        return true;
+    }
+    for req in &func.requires {
+        if expr_contains_float_operation(req, &mut type_env) {
+            return true;
+        }
+    }
+    for ens in &func.ensures {
+        if expr_contains_float_operation(ens, &mut type_env) {
+            return true;
+        }
+    }
+    false
+}
+
 /// 判定一个函数是否包含在实数理论下不健全的浮点数契约 (Unsound Float Contract)。
 ///
 /// 在未接入严格的 IEEE-754 浮点理论 (Q_FPA) 与形式化误差界之前，
 /// 实数理论 (Real) 的数学证明可能在机器运行时因精度舍入发生分歧（如 0.1 + 0.2 != 0.3，或 2^53 + 1.0 == 2^53）。
 /// 即使参数限定在有限区间内，有限字长浮点算术依然存在舍入误差。
-/// 因此，只要带有契约的函数在其签名、契约或体内涉及浮点数运算/路径，
+///
+/// 特别地，任何直接或【间接】调用了涉及浮点运算辅助函数的契约函数，
+/// 其数值语义均受到非健全浮点理论的污染。
+/// 因此，带契约函数若自身或其传递调用闭包中涉及任何浮点运算/参数/返回，
 /// 必须实施严格 Fail-Closed 拦截并返回 Skipped，严禁给出 Proved 误导。
 fn function_has_unsound_float_contract(func: &FunctionDecl, module: Option<&Module>) -> bool {
     if !func.has_contracts() {
@@ -265,28 +293,34 @@ fn function_has_unsound_float_contract(func: &FunctionDecl, module: Option<&Modu
         }
     };
 
-    // 1. 若返回类型为 Float，且带有契约，一律拦截
-    if func.return_type == axiom_ast::Type::Float {
+    // 1. 查找模块中所有本地包含浮点的函数集合（Float Seeds）
+    let float_seeds: Vec<&str> = mod_ref
+        .functions
+        .iter()
+        .filter(|f| function_has_local_unsupported_float(f, mod_ref))
+        .map(|f| f.name.as_str())
+        .collect();
+
+    if float_seeds.is_empty() {
+        return false;
+    }
+
+    // 2. 若 func 自身就在 float_seeds 中，直接拦截
+    if float_seeds.contains(&func.name.as_str()) {
         return true;
     }
 
-    // 2. 若直接参数类型为 Float，且带有契约，一律拦截
-    if func.params.iter().any(|p| p.ty == axiom_ast::Type::Float) {
+    // 3. 构建调用图，计算受到 float_seeds 污染的调用者闭包 (Callers)
+    let graph = axiom_ast::analysis::CallGraph::from_module(mod_ref);
+    let tainted_callers = graph.transitive_dependents(&float_seeds);
+    if tainted_callers.contains(&func.name) {
         return true;
     }
 
-    // 3. 检查契约或函数体中是否引用了 Float 变量、Float 函数调用或未被 Decimal 提升的 Float 运算/比较
-    let type_env = axiom_ast::TypeEnv::new(mod_ref, Some(func));
-    if expr_contains_float_operation(&func.body, &mut type_env.clone()) {
-        return true;
-    }
-    for req in &func.requires {
-        if expr_contains_float_operation(req, &mut type_env.clone()) {
-            return true;
-        }
-    }
-    for ens in &func.ensures {
-        if expr_contains_float_operation(ens, &mut type_env.clone()) {
+    // 4. 双向核验：计算当前函数向下的被调用依赖闭包 (Callees)
+    let my_dependencies = graph.transitive_dependencies(&[&func.name]);
+    for seed in &float_seeds {
+        if my_dependencies.contains(*seed) {
             return true;
         }
     }

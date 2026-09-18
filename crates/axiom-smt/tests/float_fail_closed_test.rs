@@ -87,11 +87,103 @@ fn test_module_verification_skips_all_contracted_floats() {
         );
     }
     assert!(
-        !results["bounded_float"].is_proved(),
-        "Float contract must NOT be proved!"
-    );
-    assert!(
         matches!(results["bounded_float"], SmtResult::Skipped(_)),
         "Float contract must be Skipped!"
+    );
+}
+
+#[test]
+fn test_hidden_float_indirect_call_returns_bool_is_fail_closed_skipped() {
+    // 外部审查复现核心反例 (review-c391897)：
+    // hidden_float 返回 Bool 且自身无契约，其函数体包含 0.1 + 0.2 == 0.3
+    // public_check 带有契约并调用 hidden_float
+    // 必须严密拦截 public_check 为 Skipped，绝不能在 Real 理论下错误 Proved！
+    let src = r#"
+        fn hidden_float() -> Bool {
+            0.1 + 0.2 == 0.3
+        }
+
+        fn public_check() -> Bool
+            ensures { result == true }
+        {
+            hidden_float()
+        }
+    "#;
+    let module = parse_module(src).expect("should parse");
+    let results = verify_module(&module);
+
+    let pub_res = &results["public_check"];
+    assert!(
+        !pub_res.is_proved(),
+        "public_check calling hidden_float MUST NOT be proved! Got: {:?}",
+        pub_res
+    );
+    assert!(
+        matches!(pub_res, SmtResult::Skipped(_)),
+        "public_check must be Skipped due to transitive float taint, got: {:?}",
+        pub_res
+    );
+}
+
+#[test]
+fn test_hidden_float_indirect_call_with_float_param_is_fail_closed_skipped() {
+    let src = r#"
+        fn hidden_float(x: Float) -> Bool {
+            x + 0.2 == 0.3
+        }
+
+        fn public_check() -> Bool
+            ensures { result == true }
+        {
+            hidden_float(0.1)
+        }
+    "#;
+    let module = parse_module(src).expect("should parse");
+    let results = verify_module(&module);
+
+    let pub_res = &results["public_check"];
+    assert!(
+        !pub_res.is_proved(),
+        "public_check calling hidden_float with float param MUST NOT be proved! Got: {:?}",
+        pub_res
+    );
+    assert!(
+        matches!(pub_res, SmtResult::Skipped(_)),
+        "public_check must be Skipped due to transitive float taint, got: {:?}",
+        pub_res
+    );
+}
+
+#[test]
+fn test_multi_layer_transitive_float_call_is_fail_closed_skipped() {
+    // 三层传递依赖链: leaf_float (底层) -> mid_helper (中层) -> top_check (顶层契约函数)
+    let src = r#"
+        fn leaf_float() -> Bool {
+            0.1 + 0.2 == 0.3
+        }
+
+        fn mid_helper() -> Bool {
+            leaf_float()
+        }
+
+        fn top_check() -> Bool
+            ensures { result == true }
+        {
+            mid_helper()
+        }
+    "#;
+    let module = parse_module(src).expect("should parse");
+    let results = verify_module(&module);
+
+    let top_res = &results["top_check"];
+    assert!(
+        !top_res.is_proved(),
+        "top_check transitively calling leaf_float MUST NOT be proved! Got: {:?}",
+        top_res
+    );
+    assert!(
+        matches!(top_res, SmtResult::Skipped(_)),
+        "top_check must be Skipped due to multi-layer transitive float taint, got: {:?}",
+        top_res
     );
 }
