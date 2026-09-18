@@ -72,20 +72,48 @@ fn test_module_with_both_valid_hole_and_unrelated_faulty_function_cannot_publish
 }
 
 #[test]
-fn test_profile_v5_invalidates_v4_receipts() {
+fn test_profile_v6_invalidates_v5_and_v4_receipts() {
     use axiom_db::{compute_hash, NodeHash, VerificationReceipt};
 
     let v4_profile = "axiom-smt-v4-sha256sealed-truncdiv-residualmatch";
     let v4_hash = compute_hash("vprof", &v4_profile);
-    let v5_hash = current_verification_profile_hash();
+
+    let v5_profile = "axiom-smt-v5-typed-ir-decimal-scale-guard-failclosed-float";
+    let v5_hash = compute_hash("vprof", &v5_profile);
+
+    let v6_hash = current_verification_profile_hash();
 
     assert_ne!(
-        v4_hash, v5_hash,
-        "Profile v5 hash must differ from v4 hash!"
+        v5_hash, v6_hash,
+        "Profile v6 hash must differ from v5 hash!"
+    );
+    assert_ne!(
+        v4_hash, v6_hash,
+        "Profile v6 hash must differ from v4 hash!"
     );
 
     let valid_sha256 =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
+
+    let old_v5_receipt = VerificationReceipt {
+        candidate_hash: NodeHash::from_str(
+            "#cand_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        )
+        .unwrap(),
+        proof_level: ProofLevel::Proved,
+        solver: "Microsoft Z3 (SMT-LIB2)".to_string(),
+        solver_version: "4.13.0".to_string(),
+        solver_sha256: Some(valid_sha256.clone()),
+        obligations_checked: 2,
+        proof_obligation_hash: NodeHash::from_str(
+            "#obl_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        )
+        .unwrap(),
+        verification_profile_hash: v5_hash,
+        attested_commit_hash: None,
+        verified_at: 1000,
+    };
+
     let old_v4_receipt = VerificationReceipt {
         candidate_hash: NodeHash::from_str(
             "#cand_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -105,9 +133,13 @@ fn test_profile_v5_invalidates_v4_receipts() {
         verified_at: 1000,
     };
 
-    // 在当前最新系统下，v4 旧回执在当前 v5 profile 下必须被判定为无效
+    // 在升级到 v6 规则后，旧 v5 和旧 v4 回执全部被标记为失效，必须重新验证
     assert!(
-        !old_v4_receipt.is_currently_valid_proved(&v5_hash),
-        "Old v4 verification receipt must be invalidated under current v5 profile!"
+        !old_v5_receipt.is_currently_valid_proved(&v6_hash),
+        "Old v5 verification receipt must be invalidated under current v6 profile!"
+    );
+    assert!(
+        !old_v4_receipt.is_currently_valid_proved(&v6_hash),
+        "Old v4 verification receipt must be invalidated under current v6 profile!"
     );
 }

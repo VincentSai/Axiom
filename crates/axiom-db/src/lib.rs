@@ -218,9 +218,10 @@ impl fmt::Display for ProofLevel {
 }
 
 /// Current verification profile specification identifying SMT encoding rules,
-/// typed IR environment, decimal scale guards, fail-closed float semantics, and solver requirements.
+/// typed IR environment, decimal scale guards, transitive float closures,
+/// cross-language micros ABI, and solver requirements.
 pub const CURRENT_VERIFICATION_PROFILE: &str =
-    "axiom-smt-v5-typed-ir-decimal-scale-guard-failclosed-float";
+    "axiom-smt-v6-transitive-float-closure-decimal-micros-abi";
 
 /// Current database schema version (Version 5 incorporates typed lexical IR & decimal scale guards).
 pub const CURRENT_SCHEMA_VERSION: u32 = 5;
