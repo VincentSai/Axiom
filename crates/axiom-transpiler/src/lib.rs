@@ -468,6 +468,14 @@ fn transpile_expr(expr: &Expr, ctx: &TranspileContext) -> Result<String, Transpi
             }
 
             // Case 2: Standard call or internal function call with effect propagation
+            if let Expr::Ident(func_name) = callee.as_ref() {
+                if let Err(err) = ctx.type_env.check_call_types(func_name, args) {
+                    return Err(TranspileError::UnsupportedExpression(format!(
+                        "call argument type mismatch: {err}"
+                    )));
+                }
+            }
+
             let callee_str = transpile_expr(callee, ctx)?;
             let mut args_rendered = args
                 .iter()

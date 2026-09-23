@@ -237,4 +237,65 @@ impl<'a> TypeEnv<'a> {
     pub fn is_float(&self, expr: &Expr) -> bool {
         self.infer_type(expr) == Some(Type::Float)
     }
+
+    /// 严格核验针对指定目标函数的调用实参类型是否与目标形参声明完全匹配
+    pub fn check_call_types(&self, callee_name: &str, args: &[Expr]) -> Result<(), String> {
+        let Some(target_func) = self.module.functions.iter().find(|f| f.name == callee_name) else {
+            // 未知函数调用由未知调用拦截器 (has_unknown_external_callees) 单独拦截
+            return Ok(());
+        };
+
+        if args.len() != target_func.params.len() {
+            return Err(format!(
+                "function `{}` expects {} arguments, but {} were provided",
+                callee_name,
+                target_func.params.len(),
+                args.len()
+            ));
+        }
+
+        for (idx, (param, arg)) in target_func.params.iter().zip(args.iter()).enumerate() {
+            let actual_ty = self.infer_type(arg);
+            if let Some(ref act) = actual_ty {
+                // 如果形参是 Decimal，但实参是浮点字面量，允许字面量精化为 Decimal
+                let effective_ty = match (&param.ty, arg) {
+                    (Type::Decimal, Expr::Literal(Literal::Float(_))) => Type::Decimal,
+                    _ => act.clone(),
+                };
+                if effective_ty != param.ty {
+                    return Err(format!(
+                        "type mismatch for parameter `{}` (#{}) of function `{}`: expected {:?}, found {:?}",
+                        param.name,
+                        idx + 1,
+                        callee_name,
+                        param.ty,
+                        act
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// 递归检查整个表达式中所有模块内函数调用的实参类型健全性
+    pub fn check_expr_call_types(&self, expr: &Expr) -> Result<(), String> {
+        let mut error = None;
+        crate::visit_expr(expr, &mut |e| {
+            if error.is_some() {
+                return;
+            }
+            if let Expr::Call { callee, args } = e {
+                if let Expr::Ident(ref callee_name) = **callee {
+                    if let Err(err) = self.check_call_types(callee_name, args) {
+                        error = Some(err);
+                    }
+                }
+            }
+        });
+        match error {
+            Some(err) => Err(err),
+            None => Ok(()),
+        }
+    }
 }

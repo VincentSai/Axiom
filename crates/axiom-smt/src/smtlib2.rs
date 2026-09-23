@@ -424,6 +424,29 @@ fn inline_calls(expr: &Expr, ctx: &SmtContext, depth: usize) -> Result<Expr, Str
                         .map(|a| inline_calls(a, ctx, depth + 1))
                         .collect::<Result<_, _>>()?;
 
+                    if inlined_args.len() != target_func.params.len() {
+                        return Err(format!(
+                            "call to `{fn_name}` argument count mismatch: expected {}, got {}",
+                            target_func.params.len(),
+                            inlined_args.len()
+                        ));
+                    }
+                    for (param, arg) in target_func.params.iter().zip(&inlined_args) {
+                        let actual_ty = ctx.infer_type(arg);
+                        if let Some(ref act) = actual_ty {
+                            let effective_ty = match (&param.ty, arg) {
+                                (Type::Decimal, Expr::Literal(Literal::Float(_))) => Type::Decimal,
+                                _ => act.clone(),
+                            };
+                            if effective_ty != param.ty {
+                                return Err(format!(
+                                    "call argument type mismatch in inlining `{fn_name}`: parameter `{}` expects {:?}, found {:?}",
+                                    param.name, param.ty, act
+                                ));
+                            }
+                        }
+                    }
+
                     let mut subs = HashMap::new();
                     for (param, arg) in target_func.params.iter().zip(inlined_args) {
                         subs.insert(param.name.clone(), arg);

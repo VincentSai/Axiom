@@ -373,4 +373,17 @@ impl FunctionDecl {
     pub fn has_contracts(&self) -> bool {
         !self.requires.is_empty() || !self.ensures.is_empty()
     }
+
+    /// Checks whether all calls within the function body and contracts satisfy parameter type agreement.
+    pub fn check_call_types(&self, module: &Module) -> Result<(), String> {
+        let env = TypeEnv::new(module, Some(self));
+        env.check_expr_call_types(&self.body)?;
+        for req in &self.requires {
+            env.check_expr_call_types(req)?;
+        }
+        for ens in &self.ensures {
+            env.check_expr_call_types(ens)?;
+        }
+        Ok(())
+    }
 }

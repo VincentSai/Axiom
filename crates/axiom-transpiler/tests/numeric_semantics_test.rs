@@ -177,3 +177,49 @@ fn test_bounded_float_contract_fails_closed() {
         other => panic!("Expected Skipped, got {:?}", other),
     }
 }
+
+#[test]
+fn test_call_argument_type_mismatch_fails_smt_and_transpiler() {
+    // 外部审查 934d05e P0 核心反例：
+    // helper 期望 Decimal 形参，wrapper 将 Int 实参 n 传入。
+    // 在旧逻辑中，SMT 内联跨类型代入误判为 Proved，而 Rust 转译裸传导致运行时契约失败。
+    // 修复后：SMT 求解前门禁与内联门禁严格拦截为 Skipped，Transpiler 同步拦截拒绝生成代码！
+    let src = r#"
+        fn helper(x: Decimal) -> Decimal {
+            x * 2.0d
+        }
+
+        fn wrapper(n: Int) -> Decimal
+            requires { n == 1500000 }
+            ensures { result == 3000000.0d }
+        {
+            helper(n)
+        }
+    "#;
+    let module = parse_module(src).unwrap();
+
+    // 1. SMT 必须拒绝证明 (Fail-Closed Skipped)
+    let proofs = verify_module(&module);
+    let res = &proofs["wrapper"];
+    assert!(
+        !res.is_proved(),
+        "wrapper calling helper with mismatched argument type MUST NOT be proved! Got: {:?}",
+        res
+    );
+    match res {
+        axiom_smt::SmtResult::Skipped(reason) => {
+            assert!(
+                reason.contains("call argument type mismatch"),
+                "Expected call argument type mismatch in skip reason, got: {reason}"
+            );
+        }
+        other => panic!("Expected SmtResult::Skipped, got: {:?}", other),
+    }
+
+    // 2. 转译器必须拒绝生成代码
+    let transpile_res = transpile_to_rust(&module);
+    assert!(
+        transpile_res.is_err(),
+        "Transpiler must reject code with call argument type mismatch!"
+    );
+}

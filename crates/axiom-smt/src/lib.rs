@@ -172,6 +172,11 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
                     "contracts cannot be verified soundly with unknown external function calls (fail-closed)".into(),
                 );
             }
+            if let Err(err) = func.check_call_types(module) {
+                return SmtResult::Skipped(format!(
+                    "call argument type mismatch cannot be soundly verified under current theory: {err}"
+                ));
+            }
         }
     }
 
