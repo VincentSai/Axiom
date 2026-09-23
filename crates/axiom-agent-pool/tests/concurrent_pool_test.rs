@@ -1,3 +1,10 @@
+//! Concurrent Agent Task Pool Integration Tests.
+//!
+//! ### 测试分层体系说明 (Three-Layer Test Architecture)
+//! - **Layer 1 (单进程功能与形式证明)**: 验证单个 Worker 解决独立 Hole 时的 SMT 证明与反例反馈机制；
+//! - **Layer 2 (并发争用、CAS 重基与版本提交树协议)**: 验证多线程/多 Worker 并发向同一 Task Pool 提交时的 CAS 根递增、过期基线自动重基 (StaleRoot Rebase) 与级联重验；
+//! - **Layer 3 (真实 LLM A/B 在线生成)**: 真实模型宏观指标评测（需外部 API 驱动）。本测试套件旨在提供严格确定性的协议与内核正确性保障（Layer 1/2）。
+
 use std::sync::{Arc, Mutex};
 use std::thread;
 

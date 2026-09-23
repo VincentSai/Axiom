@@ -1,3 +1,15 @@
+//! Multi-Agent End-to-End Release and Verification Integration Tests.
+//!
+//! ### 测试分层体系与测试范围声明 (Three-Layer Test Architecture)
+//! - **Layer 1 (单进程功能与形式证明正确性)**:
+//!   验证打洞提取、AST 解析、SMT 形式化契约求解器与反例反馈循环的确定性行为。
+//! - **Layer 2 (多进程/多线程并发争用、CAS 提交树重基与崩溃恢复)**:
+//!   验证跨线程/跨进程提交争用、CAS 根版本递增、级联失效重验与装配发布门禁的协议正确性。
+//!   本测试属于此类协议与状态机验证。
+//! - **Layer 3 (真实 LLM 在线并发与经济学 A/B 评测)**:
+//!   使用真实模型 API（如 OpenAI Codex/Claude）在严格等价环境下测试 LLM 代码生成能力、
+//!   Pass@1 / Pass@Final 成功率与实际 Token 消耗。Mock 与单测套件不替代 Layer 3 经济学结论。
+
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -16,6 +28,12 @@ use axiom_vfs::export_database_module;
 const HOLE_COUNT: usize = 20;
 static NEXT_TEMP_DIR: AtomicUsize = AtomicUsize::new(0);
 
+/// 验证 20 个并发 Worker 协作填洞、反例拒绝、无洞装配、AST 数据库持久化与最终转译编译。
+///
+/// **重要声明 (Protocol Correctness Notice)**:
+/// 本测试旨在全链路严格验证 CAS 任务池调度、反例拦截拒绝、三方合并级联重验与完整发布发布的
+/// **系统协议与发布门禁正确性**（Layer 2），测试中使用的候选解为确定性表达式（如 `value + 1`），
+/// 不构成 20 个真实 LLM 模型的在线冲突率或 Token 节省指标（Layer 3）。
 #[test]
 fn twenty_workers_verify_and_publish_a_hole_free_release() {
     let skeleton = twenty_hole_skeleton();
