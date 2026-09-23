@@ -1,4 +1,4 @@
-﻿# 🔬 Axiom 与主流编程语言深度对比研究报告 (Language Comparison & Boundary Analysis)
+# 🔬 Axiom 与主流编程语言深度对比研究报告 (Language Comparison & Boundary Analysis)
 
 > **调研目标**：基于 Axiom 语言规范、编译器核心源码 (`crates/axiom-*`) 以及工业级基准评测实测数据，全面剖析 Axiom 与主流编程语言（Rust, Python, TypeScript, Go, C/C++, Haskell/Unison）的架构差异，明确 Axiom 的**独有能力边界**、**物理/工程局限**以及**刻意拒绝支持的语言特性 (Anti-Features)**。
 
@@ -22,9 +22,9 @@
 
 这些能力是目前 Python、Rust、TypeScript 或 Go 在现有语言架构下**无法原生做到**的：
 
-### 1. $O(1)$ 微型上下文隔离，使 AI Token 消耗暴降 60%
-- **传统语言的死穴**：Agent 在修改包含 50 个函数的传统源码大文件时，必须反复读取上千行上下文，极易引起注意力衰减与代码幻觉，导致生成与修复消耗海量 Tokens。
-- **Axiom 的解法**：编译器原生工具 `axiom extract-holes` 将架构骨架机械化拆解为 200 个独立的 `hole-task.json`（每个仅 ~160 Tokens）。Worker Agent 仅需理解当前单函数的局部契约并输出单一纯表达式（~18 Tokens），**单洞上下文复杂度被严格限制在 $O(1)$**。实测 200 个函数的实现阶段仅消耗 3.56 万 Tokens，相比 Rust 节省 58.9% 以上。
+### 1. $O(1)$ 微型上下文隔离与打洞任务拆解
+- **传统语言的挑战**：Agent 在修改包含数十个函数的传统源码大文件时，往往需要反复读取长上下文，易引起注意力衰减与代码幻觉，导致生成与修复消耗较多 Tokens。
+- **Axiom 的解法**：编译器原生工具 `axiom extract-holes` 将架构骨架机械化拆解为独立的 `hole-task.json`（每个仅 ~160 Tokens）。Worker Agent 仅需理解当前单函数的局部契约并输出单一纯表达式（~18 Tokens），**单洞上下文复杂度被严格限制在 $O(1)$**。在前期小微案例探索中曾展示出显著的上下文精炼潜力（注：该探索数据基于特定微型样本，定性为产品设计假说，不作为生产通用推论）。
 
 ### 2. 形式化契约与 SMT 静态验证 (优先 Z3 定理证明，Fail-Closed)
 - **传统语言的痛点**：单元测试只能通过有限输入抽样验证正确性，对于复杂数值公式（如护甲减伤、暴击截断、坐标越界），极其容易遗漏边界反例（Counter-Example）。

@@ -93,11 +93,13 @@ python examples/benchmark_eval/eval_runner.py --mode count --tasks 5
 
 ---
 
-## 🏆 四、真实 OpenAI Codex 宏观并发流水线实证报告 (Live Empirical Evidence)
+## 🏆 四、历史 OpenAI Codex 宏观并发实测探索记录 (Historical Live Empirical Baseline - commit a22ce40)
 
-本组基准评测由 [`concurrent_runner.py`](./concurrent_runner.py) 驱动，直接调用本机已鉴权的 **OpenAI Codex CLI (`v0.147.0`)**，通过本地代理 `127.0.0.1:7897` 并发调度真实模型推理。所有 Token 消耗直接解析自官方 API 返回的 `turn.completed` 原始事件，严禁任何人工乘数估算。
+> ℹ️ **说明与证据分级**：当前代码库主干默认归档配套为 `synthetic_non_evidentiary` 离线全要素物理仿真套件（位于 [`data/mock/`](./data/mock/)），用于协议自洽性、CAS 重基与 AST 组合器无损校验。本节记录为前期原型探索阶段（commit `a22ce40`）基于本地鉴权 Codex CLI 的单次历史实测观测，定性为**待新一轮信息等价对决复核的产品假说**。
 
-### 1. 实机运行环境与密码学背书
+本组历史基准评测由 [`concurrent_runner.py`](./concurrent_runner.py) 驱动，调用本机已鉴权的 **OpenAI Codex CLI (`v0.147.0`)**，通过本地代理 `127.0.0.1:7897` 并发调度真实模型推理。所有 Token 消耗直接解析自官方 API 返回的 `turn.completed` 原始事件，严禁任何人工乘数估算。
+
+### 1. 历史实机运行环境与密码学背书 (commit a22ce40)
 - **评测引擎**: OpenAI Codex CLI / 基座模型
 - **形式化证明内核**: Microsoft Z3 SMT-LIB2 Engine (`4.13.0`)
 - **编译器组件**: Axiom Toolchain (`axiom.exe`, 包含 CAS 数据库与 AST 组合器)
@@ -107,10 +109,10 @@ python examples/benchmark_eval/eval_runner.py --mode count --tasks 5
 
 | 对照维度 | Group 2: 传统工程微任务 (Rust Git Flow) | Group 3: Axiom 形式化打洞流水线 | 科学对比分析与权衡 |
 | :--- | :--- | :--- | :--- |
-| **协作机制** | 5 分支独立生成 + 串行 Git 合并 | 5 Worker 纯代数填洞 + AST CAS 组合器 | 物理杜绝文本合并冲突 |
+| **协作机制** | 5 分支独立生成 + 串行 Git 合并 | 5 Worker 纯代数填洞 + AST CAS 组合器 | 物理杜绝文本级合并冲突 |
 | **合并冲突率** | 0.0% (无二次文本冲突修复) | **0.0% (零文本级冲突)** | 保持干净交付 |
 | **Worker并发耗时** | 25.07 秒 | **22.97 秒** | 受限纯表达式填洞推理上下文更精炼 |
-| **全链路总真实账单** | **95,263** Tokens | **75,238** Tokens | **受限纯代数上下文精炼带来 ~21% Token 削减** |
+| **全链路总真实账单** | **95,263** Tokens | **75,238** Tokens | **历史单次记录呈现 ~21% Token 削减 (待新版复核假说)** |
 | **组合器/合并消耗** | 0 Token (仅 Git 引擎本地合并) | **0 Token (原生 AST CAS 零模型调用)** | 保持 0 文本解决税 |
 | **双Worker CAS争用压测** | - | **2/2 签入成功 (耗时 17.86s)** | 跨进程排他锁与 AST 重基稳健生效 |
 | **终态质量保证** | 基于离散测试向量采样通过 | **Z3 SMT 全域证明 + 业务 Oracle 共同闭环** | **兼顾数学契约的一致性与业务意图的真实性** |
