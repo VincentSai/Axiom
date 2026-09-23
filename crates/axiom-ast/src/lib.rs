@@ -21,6 +21,46 @@ pub enum Type {
     Custom(String),
 }
 
+impl Type {
+    /// 检查类型自身或其泛型容器嵌套（如 List<Decimal>, Option<Decimal>, Result<Decimal, String>）中是否包含 Decimal
+    pub fn contains_decimal(&self) -> bool {
+        match self {
+            Type::Decimal => true,
+            Type::Custom(name) => type_str_contains_decimal(name),
+            _ => false,
+        }
+    }
+}
+
+fn type_str_contains_decimal(s: &str) -> bool {
+    let s = s.trim();
+    if s == "Decimal" {
+        return true;
+    }
+    if let Some(open) = s.find('<') {
+        if s.ends_with('>') {
+            let inner = &s[open + 1..s.len() - 1];
+            let mut depth = 0usize;
+            let mut start = 0usize;
+            for (i, c) in inner.char_indices() {
+                match c {
+                    '<' | '(' => depth += 1,
+                    '>' | ')' => depth = depth.saturating_sub(1),
+                    ',' if depth == 0 => {
+                        if type_str_contains_decimal(&inner[start..i]) {
+                            return true;
+                        }
+                        start = i + 1;
+                    }
+                    _ => {}
+                }
+            }
+            return type_str_contains_decimal(&inner[start..]);
+        }
+    }
+    false
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FieldDef {
     pub name: String,

@@ -290,3 +290,21 @@ fn transpiles_nested_decimal_in_containers_and_compiles_with_rustc() {
         String::from_utf8_lossy(&compiled.stderr)
     );
 }
+
+#[test]
+fn contracted_function_with_unknown_external_callee_fails_transpilation() {
+    let source = r#"
+        fn contracted_with_external(x: Int) -> Int
+            requires { x > 0 }
+            ensures { result > 0 }
+        {
+            unknown_external_blackbox(x)
+        }
+    "#;
+
+    let res = transpile_source_to_rust(source);
+    assert!(
+        res.is_err(),
+        "Transpiler must reject contracted function calling unknown external functions via Capability gates"
+    );
+}

@@ -1,8 +1,8 @@
-//! Typed Capability IR and Whole-Module Function Capability Analysis.
+//! 全模块函数能力分析摘要与边界安全门禁 (Function Capability Summary & Safety Gates).
 //!
-//! Provides a single, authoritative source of truth for function purity, effect boundaries,
-//! floating-point taint closures, decimal usage, arithmetic overflow potentials,
-//! and unknown external call boundaries.
+//! 作为编译期与形式化验证期的全模块函数能力快照分析工具，提供单一权威的函数纯度判定、
+//! Effect 传递闭包、浮点污染闭包、Decimal 微元使用、潜在算术溢出以及未知外部调用安全门禁。
+//! 本模块并非独立全指令集 IR，而是轻量级、面向契约与安全证明的函数属性分析摘要表 (Capability Map)。
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -198,6 +198,23 @@ impl ModuleCapabilityMap {
     /// 获取模块所有函数的摘要表引用
     pub fn all_summaries(&self) -> &HashMap<String, FunctionCapabilitySummary> {
         &self.summaries
+    }
+
+    /// 模块中是否有任何函数涉及浮点运算或浮点污染
+    pub fn has_any_float(&self) -> bool {
+        self.summaries.values().any(|s| s.transitive_float_tainted)
+    }
+
+    /// 模块中是否有任何函数涉及 Decimal 运算或类型
+    pub fn has_any_decimal(&self) -> bool {
+        self.summaries.values().any(|s| s.has_decimal)
+    }
+
+    /// 模块中是否有任何函数涉及未知外部调用
+    pub fn has_any_unknown_external_callees(&self) -> bool {
+        self.summaries
+            .values()
+            .any(|s| s.transitive_has_unknown_external_callees)
     }
 }
 
@@ -403,10 +420,10 @@ fn function_has_decimal_usage(
     _module: &Module,
     type_env: &mut TypeEnv,
 ) -> bool {
-    if func.return_type == Type::Decimal {
+    if func.return_type.contains_decimal() {
         return true;
     }
-    if func.params.iter().any(|p| p.ty == Type::Decimal) {
+    if func.params.iter().any(|p| p.ty.contains_decimal()) {
         return true;
     }
     if expr_contains_decimal(&func.body, type_env) {
@@ -513,4 +530,49 @@ fn function_may_overflow(func: &FunctionDecl, _module: &Module, type_env: &mut T
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_type_contains_decimal_nested() {
+        assert!(Type::Decimal.contains_decimal());
+        assert!(!Type::Int.contains_decimal());
+        assert!(!Type::Float.contains_decimal());
+        assert!(Type::Custom("List<Decimal>".into()).contains_decimal());
+        assert!(Type::Custom("Option<Decimal>".into()).contains_decimal());
+        assert!(Type::Custom("Result<Decimal, String>".into()).contains_decimal());
+        assert!(Type::Custom("Result<String, Decimal>".into()).contains_decimal());
+        assert!(!Type::Custom("List<Int>".into()).contains_decimal());
+        assert!(!Type::Custom("Result<Int, String>".into()).contains_decimal());
+    }
+
+    #[test]
+    fn test_module_capability_map_nested_decimal() {
+        let module = Module {
+            types: vec![],
+            effects: vec![],
+            functions: vec![FunctionDecl {
+                name: "calculate_balances".into(),
+                params: vec![crate::FunctionParam {
+                    name: "amounts".into(),
+                    ty: Type::Custom("List<Decimal>".into()),
+                }],
+                return_type: Type::Custom("Option<Decimal>".into()),
+                effects: vec![],
+                requires: vec![],
+                ensures: vec![],
+                body: Expr::Literal(Literal::Decimal(100_000_000)),
+            }],
+        };
+
+        let cap_map = ModuleCapabilityMap::from_module(&module);
+        assert!(cap_map.has_any_decimal());
+        let summary = cap_map.get("calculate_balances").unwrap();
+        assert!(summary.has_decimal);
+        assert!(summary.is_pure);
+        assert!(!summary.transitive_float_tainted);
+    }
 }

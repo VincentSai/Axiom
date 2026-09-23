@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
+use axiom_ast::capability::ModuleCapabilityMap;
 use axiom_ast::{
     BinaryOperator, EffectDecl, Expr, FunctionDecl, Literal, Module, Pattern, Type, TypeDef,
     UnaryOperator,
@@ -47,8 +48,9 @@ impl From<ParseError> for TranspileError {
 
 pub fn transpile_to_rust(module: &Module) -> Result<String, TranspileError> {
     let mut output = String::new();
+    let capabilities = ModuleCapabilityMap::from_module(module);
 
-    if module_has_decimal(module) {
+    if module_has_decimal(module) || capabilities.has_any_decimal() {
         output.push_str("pub type Decimal = i64;\n\n");
     }
 
@@ -81,6 +83,7 @@ pub fn transpile_to_rust(module: &Module) -> Result<String, TranspileError> {
             module,
             &func_effects,
             &enum_names,
+            &capabilities,
         )?);
         output.push('\n');
     }
@@ -189,6 +192,7 @@ struct TranspileContext<'a> {
     func_effects: &'a HashMap<&'a str, &'a [String]>,
     enum_names: &'a [&'a str],
     type_env: axiom_ast::TypeEnv<'a>,
+    capabilities: &'a ModuleCapabilityMap,
 }
 
 fn transpile_function(
@@ -196,6 +200,7 @@ fn transpile_function(
     module: &Module,
     func_effects: &HashMap<&str, &[String]>,
     enum_names: &[&str],
+    capabilities: &ModuleCapabilityMap,
 ) -> Result<String, TranspileError> {
     let mut params_vec: Vec<String> = function
         .params
@@ -217,6 +222,7 @@ fn transpile_function(
         func_effects,
         enum_names,
         type_env,
+        capabilities,
     };
 
     if function.has_contracts() && function.contains_raw() {
@@ -224,6 +230,15 @@ fn transpile_function(
             "Expr::Raw is forbidden in contracted function `{}` to guarantee formal verification soundness",
             function.name
         )));
+    }
+
+    if let Some(summary) = ctx.capabilities.get(&function.name) {
+        if function.has_contracts() && summary.transitive_has_unknown_external_callees {
+            return Err(TranspileError::UnsupportedExpression(format!(
+                "Contracted function `{}` transitively invokes unknown external callees, which violates formal verification safety boundaries",
+                function.name
+            )));
+        }
     }
 
     let mut body_code = String::new();
@@ -326,30 +341,7 @@ fn find_top_level_comma(s: &str) -> Option<usize> {
 }
 
 pub fn type_contains_decimal(ty: &Type) -> bool {
-    match ty {
-        Type::Decimal => true,
-        Type::Custom(name) => type_str_contains_decimal(name),
-        _ => false,
-    }
-}
-
-pub fn type_str_contains_decimal(s: &str) -> bool {
-    let s = s.trim();
-    if s == "Decimal" {
-        return true;
-    }
-    if let Some(open) = s.find('<') {
-        if s.ends_with('>') {
-            let inner = &s[open + 1..s.len() - 1];
-            if let Some(idx) = find_top_level_comma(inner) {
-                return type_str_contains_decimal(&inner[..idx])
-                    || type_str_contains_decimal(&inner[idx + 1..]);
-            } else {
-                return type_str_contains_decimal(inner);
-            }
-        }
-    }
-    false
+    ty.contains_decimal()
 }
 
 fn expr_mentions_decimal(expr: &Expr) -> bool {
