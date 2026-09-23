@@ -269,9 +269,9 @@ fn render_custom_type(name: &str) -> Result<String, WitError> {
 
     let Some(open) = name.find('<') else {
         return Ok(match name {
-            "Int" => "s64".into(),
+            "Int" | "Decimal" => "s64".into(),
             "Float" => "f64".into(),
-            "Decimal" | "String" => "string".into(),
+            "String" => "string".into(),
             "Bool" => "bool".into(),
             "Unit" | "()" => "()".into(),
             custom => wit_identifier(custom),

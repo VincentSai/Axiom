@@ -1,4 +1,5 @@
 use axiom_transpiler::transpile_source_to_rust;
+use std::process::Command;
 
 #[test]
 fn transpiles_primitive_function_signatures_and_expressions() {
@@ -243,4 +244,49 @@ fn transpiles_decimal_multiplication_and_division_with_scale_recovery_and_i128_g
 
     assert!(rust.contains("as i128"));
     assert!(rust.contains("1000000") || rust.contains("1_000_000"));
+}
+
+#[test]
+fn transpiles_nested_decimal_in_containers_and_compiles_with_rustc() {
+    let source = r#"
+        type Ledger = {
+            transactions: List<Decimal>,
+            checkpoint: Option<Decimal>,
+        }
+
+        fn first_entry(ledger: Ledger) -> Option<Decimal> {
+            ledger.checkpoint
+        }
+    "#;
+
+    let rust =
+        transpile_source_to_rust(source).expect("nested Decimal in containers should transpile");
+
+    assert!(
+        rust.contains("pub type Decimal = i64;"),
+        "Generated Rust must contain Decimal alias when used in List<Decimal>, but was:\n{rust}"
+    );
+    assert!(rust.contains("pub transactions: Vec<Decimal>,"));
+    assert!(rust.contains("pub checkpoint: Option<Decimal>,"));
+
+    let temp_dir =
+        std::env::temp_dir().join(format!("axiom_nested_decimal_{}", std::process::id()));
+    std::fs::create_dir_all(&temp_dir).unwrap();
+    let rust_path = temp_dir.join("ledger.rs");
+    std::fs::write(&rust_path, format!("{rust}\nfn main() {{}}\n")).unwrap();
+
+    let compiled = Command::new("rustc")
+        .args(["--edition=2021", "-A", "warnings", "--crate-type=lib"])
+        .arg(&rust_path)
+        .arg("--out-dir")
+        .arg(&temp_dir)
+        .output()
+        .expect("failed to execute rustc");
+
+    assert!(
+        compiled.status.success(),
+        "rustc compilation failed on nested Decimal code:\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&compiled.stdout),
+        String::from_utf8_lossy(&compiled.stderr)
+    );
 }

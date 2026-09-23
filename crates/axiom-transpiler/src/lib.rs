@@ -48,15 +48,7 @@ impl From<ParseError> for TranspileError {
 pub fn transpile_to_rust(module: &Module) -> Result<String, TranspileError> {
     let mut output = String::new();
 
-    let has_decimal = module.types.iter().any(|t| match t {
-        TypeDef::Record { fields, .. } => fields.iter().any(|f| f.ty == Type::Decimal),
-        _ => false,
-    }) || module
-        .functions
-        .iter()
-        .any(|f| f.return_type == Type::Decimal || f.params.iter().any(|p| p.ty == Type::Decimal));
-
-    if has_decimal {
+    if module_has_decimal(module) {
         output.push_str("pub type Decimal = i64;\n\n");
     }
 
@@ -331,6 +323,78 @@ fn find_top_level_comma(s: &str) -> Option<usize> {
         }
     }
     None
+}
+
+pub fn type_contains_decimal(ty: &Type) -> bool {
+    match ty {
+        Type::Decimal => true,
+        Type::Custom(name) => type_str_contains_decimal(name),
+        _ => false,
+    }
+}
+
+pub fn type_str_contains_decimal(s: &str) -> bool {
+    let s = s.trim();
+    if s == "Decimal" {
+        return true;
+    }
+    if let Some(open) = s.find('<') {
+        if s.ends_with('>') {
+            let inner = &s[open + 1..s.len() - 1];
+            if let Some(idx) = find_top_level_comma(inner) {
+                return type_str_contains_decimal(&inner[..idx])
+                    || type_str_contains_decimal(&inner[idx + 1..]);
+            } else {
+                return type_str_contains_decimal(inner);
+            }
+        }
+    }
+    false
+}
+
+fn expr_mentions_decimal(expr: &Expr) -> bool {
+    match expr {
+        Expr::Literal(Literal::Decimal(_)) => true,
+        Expr::BinaryOp { left, right, .. } => {
+            expr_mentions_decimal(left) || expr_mentions_decimal(right)
+        }
+        Expr::UnaryOp { operand, .. } => expr_mentions_decimal(operand),
+        Expr::Call { args, .. } => args.iter().any(expr_mentions_decimal),
+        Expr::Block { statements, tail } => {
+            statements.iter().any(expr_mentions_decimal)
+                || tail.as_ref().is_some_and(|t| expr_mentions_decimal(t))
+        }
+        Expr::Let { value, .. } => expr_mentions_decimal(value),
+        Expr::Match { target, arms } => {
+            expr_mentions_decimal(target) || arms.iter().any(|arm| expr_mentions_decimal(&arm.body))
+        }
+        Expr::RecordInit { fields, .. } => fields.iter().any(|(_, v)| expr_mentions_decimal(v)),
+        Expr::RecordUpdate { base, updates } => {
+            expr_mentions_decimal(base) || updates.iter().any(|(_, v)| expr_mentions_decimal(v))
+        }
+        Expr::FieldAccess { target, .. } => expr_mentions_decimal(target),
+        _ => false,
+    }
+}
+
+fn module_has_decimal(module: &Module) -> bool {
+    module.types.iter().any(|t| match t {
+        TypeDef::Record { fields, .. } => fields.iter().any(|f| type_contains_decimal(&f.ty)),
+        TypeDef::Enum { variants, .. } => variants
+            .iter()
+            .any(|v| v.fields.iter().any(|f| type_contains_decimal(&f.ty))),
+    }) || module.effects.iter().any(|e| {
+        e.operations.iter().any(|op| {
+            type_contains_decimal(&op.return_type)
+                || op.params.iter().any(|p| type_contains_decimal(&p.ty))
+        })
+    }) || module.functions.iter().any(|f| {
+        type_contains_decimal(&f.return_type)
+            || f.params.iter().any(|p| type_contains_decimal(&p.ty))
+            || expr_mentions_decimal(&f.body)
+            || f.requires.iter().any(expr_mentions_decimal)
+            || f.ensures.iter().any(expr_mentions_decimal)
+    })
 }
 
 fn transpile_expr(expr: &Expr, ctx: &TranspileContext) -> Result<String, TranspileError> {

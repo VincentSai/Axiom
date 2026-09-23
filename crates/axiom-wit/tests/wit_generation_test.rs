@@ -75,3 +75,34 @@ fn generates_game_loop_types_effects_and_exports() {
     assert!(wit.contains("export update-physics: func(entity: entity, dt: f64) -> entity;"));
     assert!(wit.contains("export tick-frame: func(world: world-state, dt: f64) -> world-state;"));
 }
+
+#[test]
+fn test_generates_nested_decimal_types() {
+    let source = r#"
+        type Portfolio = {
+            balances: List<Decimal>,
+            threshold: Option<Decimal>,
+        }
+
+        fn evaluate_portfolio(p: Portfolio) -> Result<Decimal, String> { ?hole }
+    "#;
+
+    let wit = generate_wit_from_source(source, "axiom:portfolio").unwrap();
+
+    assert!(wit.contains("record portfolio {"));
+    assert!(
+        wit.contains("balances: list<s64>,"),
+        "List<Decimal> in WIT must be list<s64>, but got:\n{}",
+        wit
+    );
+    assert!(
+        wit.contains("threshold: option<s64>,"),
+        "Option<Decimal> in WIT must be option<s64>, but got:\n{}",
+        wit
+    );
+    assert!(
+        wit.contains("export evaluate-portfolio: func(p: portfolio) -> result<s64, string>;"),
+        "Result<Decimal, String> in WIT must have s64, but got:\n{}",
+        wit
+    );
+}
