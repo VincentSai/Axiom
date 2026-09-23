@@ -1281,6 +1281,30 @@ class CasBenchmarkEvidence:
 
 
 
+def atomic_write_json(file_path: str, data: dict, indent: int = 2):
+    """原子化安全落盘 JSON 文件：
+    1. 先写入同目录临时文件（.tmp.<basename>.<uuid>）；
+    2. 显式调用 flush() 与 fsync()，确保操作系统脏页彻底写入物理介质；
+    3. 通过 os.replace 原子覆写目标路径，避免异常或崩溃留下半写入损坏文件。
+    """
+    abs_path = os.path.abspath(file_path)
+    dir_name = os.path.dirname(abs_path)
+    os.makedirs(dir_name, exist_ok=True)
+    tmp_path = os.path.join(dir_name, f".tmp.{os.path.basename(abs_path)}.{uuid.uuid4().hex[:8]}")
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=indent, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, abs_path)
+    finally:
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
 def validate_benchmark_result_schema(data: dict):
     """校验评测结果输出 JSON 顶层与各子系统的 Schema 规范，Fail-Closed 严禁 unknown，显式向前兼容 3.0 并严格校验 3.1"""
     required_top_keys = ["version", "subsystem", "experiment_metadata", "summary", "detailed_runs"]
@@ -1317,6 +1341,15 @@ def validate_benchmark_result_schema(data: dict):
     if "run_id" in meta:
         if not isinstance(meta["run_id"], str) or not meta["run_id"].strip():
             raise ValueError("experiment_metadata.run_id 必须为非空字符串")
+
+    # 校验顶层 status 与 meta.status 规范与一致性
+    valid_statuses = {"in_progress", "pipeline_finished", "completed", "oracle_failed", "failed"}
+    if "status" in data:
+        status_val = data["status"]
+        if status_val not in valid_statuses:
+            raise ValueError(f"不合法的顶层 status: {status_val} (仅支持 {valid_statuses})")
+        if "status" in meta and meta["status"] != status_val:
+            raise ValueError(f"顶层 status 与 experiment_metadata.status 不一致: {status_val} != {meta['status']}")
 
     # 使用单一真相源 ProvenanceCapsule.from_dict 严格校验顶层 Provenance 并深度复算密码学 SHA-256
     top_prov = ProvenanceCapsule.from_dict(meta["git_provenance"], schema_version=version)
@@ -2872,7 +2905,6 @@ def main():
     print("=" * 70)
 
     # 先行生成唯一不可变的运行凭据并先行落盘 (Persist-On-Start: 即使流水线在早期异常中断，也完整保留审计线索)
-    import uuid
     run_id = f"run_{time.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
     archive_dir = os.path.join(os.path.dirname(output_file_path), "runs")
     os.makedirs(archive_dir, exist_ok=True)
@@ -2901,11 +2933,14 @@ def main():
             "start_time": time.strftime("%Y-%m-%d %H:%M:%S")
         }
     }
-    with open(archive_file_path, "w", encoding="utf-8") as f:
-        json.dump(initial_payload, f, indent=2, ensure_ascii=False)
-    print(f"📁 初始运行快照已预先持久化存档: {archive_file_path}")
+    atomic_write_json(archive_file_path, initial_payload)
+    print(f"📁 初始运行快照已预先持久化存档 (status=in_progress): {archive_file_path}")
 
-    pipeline_completed = False
+    g2_res = None
+    g3_res = None
+    gate_passed = False
+    is_oracle_failure = False
+
     try:
         # 1. 运行 Group 2 (Rust)
         g2_res = run_group2_rust_pipeline(tasks, args, target_proxy)
@@ -2923,16 +2958,21 @@ def main():
         else:
             render_live_empirical_report(args, tasks, g2_res, g3_res, g2_total_time, g3_total_time, speedup)
 
-        # 4. 落盘
+        # 4. 落盘预备与阶段状态确定
         g2_billed = g2_res["tokens"]["total_raw_billed"]
         g3_billed = g3_res["tokens"]["total_raw_billed"]
+
+        # 检查业务 Oracle 是否脱节失败
+        is_oracle_failure = (g3_res.get("formal_proved") is True and g3_res.get("unit_test_passed") is not True)
+        stage_status = "oracle_failed" if is_oracle_failure else "pipeline_finished"
+
         output_payload = {
             "version": "3.1",
             "subsystem": "inventory_settlement",
-            "status": "completed",
+            "status": stage_status,
             "experiment_metadata": {
                 "run_id": run_id,
-                "status": "completed",
+                "status": stage_status,
                 "engine": args.engine,
                 "eval_mode": "codex_cli_mock" if args.mock else f"{args.engine}_live_api",
                 "is_mock": args.mock,
@@ -2969,7 +3009,7 @@ def main():
                     "total_billed_tokens": g3_billed,
                     "formal_proved": g3_res["formal_proved"],
                     "unit_test_passed": g3_res["unit_test_passed"],
-                    "contract_soundness_gap": (g3_res["formal_proved"] is True and g3_res.get("unit_test_passed") is not True),
+                    "contract_soundness_gap": is_oracle_failure,
                     "speedup_vs_rust": None if args.mock else speedup,
                     "token_savings_pct": None if args.mock else round((g2_billed - g3_billed) / g2_billed * 100, 1) if g2_billed > 0 else 0.0,
                     "synthetic_note": "Comparative speedup and empirical token savings are omitted in synthetic mock mode (non-evidentiary protocol self-consistency benchmark only)" if args.mock else None
@@ -2981,42 +3021,51 @@ def main():
             }
         }
 
-        # 先行落盘持久化 (Persist-Before-Assert: 保证即使发生任何异常或断言失败，现场观测数据也绝不丢失)
-        # (a) 写入唯一不可变快照归档 runs/{run_id}.json
-        with open(archive_file_path, "w", encoding="utf-8") as f:
-            json.dump(output_payload, f, indent=2, ensure_ascii=False)
-        print(f"📁 唯一不可变快照档案已完成更新: {archive_file_path}")
-
-        # (b) 写入指定输出路径
-        os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
-        with open(output_file_path, "w", encoding="utf-8") as f:
-            json.dump(output_payload, f, indent=2, ensure_ascii=False)
-        print(f"💾 并发流水线详细审计数据已安全持久化落盘: {output_file_path}\n")
-
+        # 先行原子落盘 (Persist-Before-Assert: 保存完整计算结果，此时状态为 pipeline_finished 或 oracle_failed)
+        atomic_write_json(archive_file_path, output_payload)
+        atomic_write_json(output_file_path, output_payload)
         if output_file_path != OUTPUT_DATA_PATH:
             try:
-                os.makedirs(os.path.dirname(OUTPUT_DATA_PATH), exist_ok=True)
-                with open(OUTPUT_DATA_PATH, "w", encoding="utf-8") as f:
-                    json.dump(output_payload, f, indent=2, ensure_ascii=False)
+                atomic_write_json(OUTPUT_DATA_PATH, output_payload)
             except Exception:
                 pass
 
-        pipeline_completed = True
-
-        # 2. 结构 Schema 强校验 (验证合法的数据结构与字段一致性)
+        # 门禁 1: 结构 Schema 强校验 (验证合法的数据结构与字段一致性)
         validate_benchmark_result_schema(output_payload)
 
-        # 3. 强不变式断言与退出策略 (数据已安全存档在磁盘后进行)
+        # 门禁 2: 账单不变量自洽性校验
         assert sum(g3_res["tokens"]["capsule_breakdown"].values()) == g3_res["tokens"]["workers_payload"], \
             f"Axiom capsule_breakdown 必须与 workers_payload 完全自洽: {sum(g3_res['tokens']['capsule_breakdown'].values())} != {g3_res['tokens']['workers_payload']}"
         if g3_res["formal_proved"]:
             if g3_res["tokens"]["tokens_to_proved"] != g3_res["tokens"]["workers_payload"]:
                 raise AssertionError(f"formal_proved 下 tokens_to_proved 必须严格等于 workers_payload: {g3_res['tokens']['tokens_to_proved']} != {g3_res['tokens']['workers_payload']}")
-            if not g3_res["unit_test_passed"]:
-                print(f"❌ [GATE ERROR]: Axiom 形式化证明通过，但业务测试向量未通过！契约与业务脱节: {g3_res.get('oracle_message')}")
-                sys.exit(2)
+
+        # 门禁 3: 业务 Oracle 门禁判定
+        if is_oracle_failure:
+            print(f"❌ [GATE ERROR]: Axiom 形式化证明通过，但业务测试向量未通过！契约与业务脱节: {g3_res.get('oracle_message')}")
+            print(f"📁 唯一不可变快照已安全保存为 oracle_failed: {archive_file_path}")
+            sys.exit(2)
+
+        # 全部门禁与断言全部通过，终态晋级为 completed
+        output_payload["status"] = "completed"
+        output_payload["experiment_metadata"]["status"] = "completed"
+        atomic_write_json(archive_file_path, output_payload)
+        atomic_write_json(output_file_path, output_payload)
+        if output_file_path != OUTPUT_DATA_PATH:
+            try:
+                atomic_write_json(OUTPUT_DATA_PATH, output_payload)
+            except Exception:
+                pass
+        gate_passed = True
+        print(f"📁 唯一不可变快照档案已完成更新 (status=completed): {archive_file_path}")
+        print(f"💾 并发流水线详细审计数据已安全持久化落盘: {output_file_path}\n")
+
     except BaseException as exc:
-        if not pipeline_completed:
+        if not gate_passed:
+            # 如果是正常由于 Oracle 失败调用的 sys.exit(2)，磁盘上已安全存档为 oracle_failed，直接透传退出
+            if isinstance(exc, SystemExit) and exc.code == 2 and is_oracle_failure:
+                raise
+
             import traceback
             err_msg = f"{type(exc).__name__}: {exc}"
             tb_str = traceback.format_exc()
@@ -3047,12 +3096,16 @@ def main():
                     "platform": sys.platform,
                     "python_version": sys.version.split()[0],
                     "failed_at": time.strftime("%Y-%m-%d %H:%M:%S")
+                },
+                "partial_runs": {
+                    "group2_rust": g2_res,
+                    "group3_axiom": g3_res
                 }
             }
             try:
-                with open(archive_file_path, "w", encoding="utf-8") as f:
-                    json.dump(failure_payload, f, indent=2, ensure_ascii=False)
-                print(f"🛡️ 异常现场审计快照已安全写入落盘: {archive_file_path}")
+                atomic_write_json(archive_file_path, failure_payload)
+                atomic_write_json(output_file_path, failure_payload)
+                print(f"🛡️ 异常现场审计快照已安全写入落盘 (status=failed): {archive_file_path}")
             except Exception as write_err:
                 print(f"❌ 写入异常现场快照失败: {write_err}")
         raise
