@@ -187,3 +187,62 @@ fn test_multi_layer_transitive_float_call_is_fail_closed_skipped() {
         top_res
     );
 }
+
+#[test]
+fn test_unknown_external_call_in_contract_fails_closed() {
+    // 审计要求：未建模未知外部调用默认 Fail-Closed 拦截，严禁签发假证明
+    let src = r#"
+        fn safe_looking(x: Int) -> Int
+            requires { x > 0 }
+            ensures { result > 0 }
+        {
+            unregistered_foreign_lib(x)
+        }
+    "#;
+    let module = parse_module(src).expect("should parse");
+    let results = verify_module(&module);
+
+    let res = &results["safe_looking"];
+    assert!(
+        !res.is_proved(),
+        "Function calling unregistered foreign function MUST NOT be proved! Got: {:?}",
+        res
+    );
+    match res {
+        SmtResult::Skipped(reason) => {
+            assert!(
+                reason.contains("unknown external function calls (fail-closed)"),
+                "Expected unknown external function fail-closed skip, got: {reason}"
+            );
+        }
+        other => panic!("expected SmtResult::Skipped, got: {:?}", other),
+    }
+}
+
+#[test]
+fn test_type_and_function_name_collision_isolation() {
+    // 测试类型与函数同名时，CallGraph 与 TypeDependencyGraph 严格隔离，不会错误发生污点扩散
+    let src = r#"
+        type Config = { val: Float }
+
+        fn pure_calc(x: Int) -> Int
+            requires { x > 10, x < 1000 }
+            ensures { result > 20 }
+        {
+            x * 2
+        }
+    "#;
+    let module = parse_module(src).expect("should parse");
+    let results = verify_module(&module);
+
+    let res = &results["pure_calc"];
+    if axiom_smt::find_z3_executable().is_some() {
+        assert!(
+            res.is_proved(),
+            "pure_calc must prove without false taint from unused Config type! Got: {:?}",
+            res
+        );
+    } else {
+        assert!(matches!(res, SmtResult::Sampled { .. }));
+    }
+}

@@ -1,9 +1,11 @@
 //! Core abstract syntax tree definitions for Axiom.
 
 pub mod analysis;
+pub mod capability;
 pub mod merge;
 pub mod type_env;
 
+pub use capability::{FunctionCapabilitySummary, ModuleCapabilityMap};
 pub use type_env::TypeEnv;
 
 use serde::{Deserialize, Serialize};

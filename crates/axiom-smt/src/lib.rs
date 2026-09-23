@@ -132,150 +132,10 @@ pub fn verify_function(func: &FunctionDecl) -> SmtResult {
     verify_function_in_module(func, &dummy_module)
 }
 
-fn expr_contains_float_operation(
-    expr: &axiom_ast::Expr,
-    type_env: &mut axiom_ast::TypeEnv,
-) -> bool {
-    match expr {
-        axiom_ast::Expr::Ident(name) => type_env.lookup(name) == Some(axiom_ast::Type::Float),
-        axiom_ast::Expr::Call { callee, args } => {
-            if let axiom_ast::Expr::Ident(fn_name) = callee.as_ref() {
-                if let Some(f) = type_env
-                    .module()
-                    .functions
-                    .iter()
-                    .find(|f| &f.name == fn_name)
-                {
-                    if f.return_type == axiom_ast::Type::Float {
-                        return true;
-                    }
-                }
-            }
-            args.iter()
-                .any(|a| expr_contains_float_operation(a, type_env))
-        }
-        axiom_ast::Expr::BinaryOp { left, right, .. } => {
-            let lt = type_env.infer_type(left);
-            let rt = type_env.infer_type(right);
-            // 仅当涉及 Float 且未被 Decimal 规则提升覆盖时判定为 Float 操作
-            if (lt == Some(axiom_ast::Type::Float) || rt == Some(axiom_ast::Type::Float))
-                && lt != Some(axiom_ast::Type::Decimal)
-                && rt != Some(axiom_ast::Type::Decimal)
-            {
-                return true;
-            }
-            expr_contains_float_operation(left, type_env)
-                || expr_contains_float_operation(right, type_env)
-        }
-        axiom_ast::Expr::UnaryOp { op, operand } => {
-            if *op == axiom_ast::UnaryOperator::Negate
-                && type_env.infer_type(operand) == Some(axiom_ast::Type::Float)
-            {
-                return true;
-            }
-            expr_contains_float_operation(operand, type_env)
-        }
-        axiom_ast::Expr::Block { statements, tail } => {
-            let mut child_env = type_env.clone();
-            child_env.push_scope();
-            for stmt in statements {
-                if let axiom_ast::Expr::Let { name, value } = stmt {
-                    if expr_contains_float_operation(value, &mut child_env) {
-                        return true;
-                    }
-                    if let Some(ty) = child_env.infer_type(value) {
-                        child_env.insert(name.clone(), ty);
-                    }
-                } else if expr_contains_float_operation(stmt, &mut child_env) {
-                    return true;
-                }
-            }
-            if let Some(t) = tail {
-                expr_contains_float_operation(t, &mut child_env)
-            } else {
-                false
-            }
-        }
-        axiom_ast::Expr::Match { target, arms } => {
-            if expr_contains_float_operation(target, type_env) {
-                return true;
-            }
-            let target_ty = type_env.infer_type(target);
-            for arm in arms {
-                let mut child_env = type_env.clone();
-                child_env.push_scope();
-                if let axiom_ast::Pattern::Ident(ref id) = arm.pattern {
-                    if let Some(ref ty) = target_ty {
-                        child_env.insert(id.clone(), ty.clone());
-                    }
-                }
-                if expr_contains_float_operation(&arm.body, &mut child_env) {
-                    return true;
-                }
-            }
-            false
-        }
-        axiom_ast::Expr::Let { name, value } => {
-            if expr_contains_float_operation(value, type_env) {
-                return true;
-            }
-            if let Some(ty) = type_env.infer_type(value) {
-                type_env.insert(name.clone(), ty);
-            }
-            false
-        }
-        axiom_ast::Expr::RecordInit { fields, .. } => fields
-            .iter()
-            .any(|(_, v)| expr_contains_float_operation(v, type_env)),
-        axiom_ast::Expr::RecordUpdate { base, updates } => {
-            expr_contains_float_operation(base, type_env)
-                || updates
-                    .iter()
-                    .any(|(_, v)| expr_contains_float_operation(v, type_env))
-        }
-        axiom_ast::Expr::FieldAccess { target, .. } => {
-            expr_contains_float_operation(target, type_env)
-        }
-        _ => false,
-    }
-}
-
-/// 判定一个函数本地是否直接包含未受支持的浮点特性（Float 参数、Float 返回值、直接浮点算术/比较/字面量）
-fn function_has_local_unsupported_float(func: &FunctionDecl, module: &Module) -> bool {
-    if func.return_type == axiom_ast::Type::Float {
-        return true;
-    }
-    if func.params.iter().any(|p| p.ty == axiom_ast::Type::Float) {
-        return true;
-    }
-    let mut type_env = axiom_ast::TypeEnv::new(module, Some(func));
-    if expr_contains_float_operation(&func.body, &mut type_env) {
-        return true;
-    }
-    for req in &func.requires {
-        if expr_contains_float_operation(req, &mut type_env) {
-            return true;
-        }
-    }
-    for ens in &func.ensures {
-        if expr_contains_float_operation(ens, &mut type_env) {
-            return true;
-        }
-    }
-    false
-}
-
 /// 判定一个函数是否包含在实数理论下不健全的浮点数契约 (Unsound Float Contract)。
 ///
-/// 在未接入严格的 IEEE-754 浮点理论 (Q_FPA) 与形式化误差界之前，
-/// 实数理论 (Real) 的数学证明可能在机器运行时因精度舍入发生分歧（如 0.1 + 0.2 != 0.3，或 2^53 + 1.0 == 2^53）。
-/// 即使参数限定在有限区间内，有限字长浮点算术依然存在舍入误差。
-///
-/// 特别地，任何直接或【间接】调用了涉及浮点运算辅助函数的契约函数，
-/// 其数值语义均受到非健全浮点理论的污染。
-/// 因此，带契约函数若自身或其传递调用闭包中涉及任何浮点运算/参数/返回，
-/// 必须实施严格 Fail-Closed 拦截并返回 Skipped，严禁给出 Proved 误导。
-fn function_has_unsound_float_contract(func: &FunctionDecl, module: Option<&Module>) -> bool {
+/// 委托给统一的 `ModuleCapabilityMap` 进行权威判定。
+pub fn function_has_unsound_float_contract(func: &FunctionDecl, module: Option<&Module>) -> bool {
     if !func.has_contracts() {
         return false;
     }
@@ -293,47 +153,26 @@ fn function_has_unsound_float_contract(func: &FunctionDecl, module: Option<&Modu
         }
     };
 
-    // 1. 查找模块中所有本地包含浮点的函数集合（Float Seeds）
-    let float_seeds: Vec<&str> = mod_ref
-        .functions
-        .iter()
-        .filter(|f| function_has_local_unsupported_float(f, mod_ref))
-        .map(|f| f.name.as_str())
-        .collect();
-
-    if float_seeds.is_empty() {
-        return false;
-    }
-
-    // 2. 若 func 自身就在 float_seeds 中，直接拦截
-    if float_seeds.contains(&func.name.as_str()) {
-        return true;
-    }
-
-    // 3. 构建调用图，计算受到 float_seeds 污染的调用者闭包 (Callers)
-    let graph = axiom_ast::analysis::CallGraph::from_module(mod_ref);
-    let tainted_callers = graph.transitive_dependents(&float_seeds);
-    if tainted_callers.contains(&func.name) {
-        return true;
-    }
-
-    // 4. 双向核验：计算当前函数向下的被调用依赖闭包 (Callees)
-    let my_dependencies = graph.transitive_dependencies(&[&func.name]);
-    for seed in &float_seeds {
-        if my_dependencies.contains(*seed) {
-            return true;
-        }
-    }
-
-    false
+    let cap_map = axiom_ast::capability::ModuleCapabilityMap::from_module(mod_ref);
+    cap_map.is_transitive_float_tainted(&func.name)
 }
 
 /// Verifies a function using full module context for record flattening and pure function calls.
 pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtResult {
-    if function_has_unsound_float_contract(func, Some(module)) {
-        return SmtResult::Skipped(
-            "floating-point arithmetic is not verified soundly under real theory (IEEE-754 divergence prevented)".into(),
-        );
+    let cap_map = axiom_ast::capability::ModuleCapabilityMap::from_module(module);
+    if let Some(summary) = cap_map.get(&func.name) {
+        if summary.has_contracts {
+            if summary.transitive_float_tainted {
+                return SmtResult::Skipped(
+                    "floating-point arithmetic is not verified soundly under real theory (IEEE-754 divergence prevented)".into(),
+                );
+            }
+            if summary.transitive_has_unknown_external_callees {
+                return SmtResult::Skipped(
+                    "contracts cannot be verified soundly with unknown external function calls (fail-closed)".into(),
+                );
+            }
+        }
     }
 
     if let Some(z3_path) = find_z3_executable() {
