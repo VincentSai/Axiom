@@ -1307,7 +1307,7 @@ def atomic_write_json(file_path: str, data: dict, indent: int = 2):
 
 def validate_benchmark_result_schema(data: dict):
     """校验评测结果输出 JSON 顶层与各子系统的 Schema 规范，Fail-Closed 严禁 unknown，显式向前兼容 3.0 并严格校验 3.1"""
-    required_top_keys = ["version", "subsystem", "experiment_metadata", "summary", "detailed_runs"]
+    required_top_keys = ["version", "subsystem", "experiment_metadata"]
     for key in required_top_keys:
         if key not in data:
             raise ValueError(f"Benchmark 输出结果缺少必填顶层字段: {key}")
@@ -1316,7 +1316,40 @@ def validate_benchmark_result_schema(data: dict):
     if version not in ("3.0", "3.1"):
         raise ValueError(f"不支持的 Schema 版本: {version} (当前仅支持 3.0 与 3.1 规范)")
 
+    # 校验顶层 status 与 meta.status 规范与一致性 (Tagged Union Tag)
+    valid_statuses = {"in_progress", "pipeline_finished", "completed", "oracle_failed", "failed"}
+    status_val = data.get("status", "completed")
+    if status_val not in valid_statuses:
+        raise ValueError(f"不合法的顶层 status: {status_val} (仅支持 {valid_statuses})")
+
     meta = data["experiment_metadata"]
+    if "status" in meta and meta["status"] != status_val:
+        raise ValueError(f"顶层 status 与 experiment_metadata.status 不一致: {status_val} != {meta['status']}")
+
+    # 统一 Tagged Union 的 error 字段契约
+    if "error" in data and data["error"] is not None:
+        if not isinstance(data["error"], dict):
+            raise ValueError("顶层 error 必须为字典或 None")
+        for err_field in ("type", "message"):
+            if err_field not in data["error"]:
+                raise ValueError(f"error 字典缺少必要字段: {err_field}")
+
+    # failed 状态：必须包含非空的 error 字典
+    if status_val == "failed":
+        if not data.get("error"):
+            raise ValueError("status 为 failed 时，顶层必须包含有效的 error 字典")
+        return
+
+    # in_progress 状态：初始快照无需后续的完成态产物
+    if status_val == "in_progress":
+        return
+
+    # 对于 pipeline_finished, completed, oracle_failed，要求顶层必须包含有效的 summary 与 detailed_runs
+    if "summary" not in data or data["summary"] is None:
+        raise ValueError(f"status 为 {status_val} 时，顶层 summary 不能为空")
+    if "detailed_runs" not in data or data["detailed_runs"] is None:
+        raise ValueError(f"status 为 {status_val} 时，顶层 detailed_runs 不能为空")
+
     required_meta = [
         "engine", "eval_mode", "is_mock", "evidence_grade",
         "git_commit", "git_tree_hash", "git_diff_hash", "git_provenance",
@@ -1341,15 +1374,6 @@ def validate_benchmark_result_schema(data: dict):
     if "run_id" in meta:
         if not isinstance(meta["run_id"], str) or not meta["run_id"].strip():
             raise ValueError("experiment_metadata.run_id 必须为非空字符串")
-
-    # 校验顶层 status 与 meta.status 规范与一致性
-    valid_statuses = {"in_progress", "pipeline_finished", "completed", "oracle_failed", "failed"}
-    if "status" in data:
-        status_val = data["status"]
-        if status_val not in valid_statuses:
-            raise ValueError(f"不合法的顶层 status: {status_val} (仅支持 {valid_statuses})")
-        if "status" in meta and meta["status"] != status_val:
-            raise ValueError(f"顶层 status 与 experiment_metadata.status 不一致: {status_val} != {meta['status']}")
 
     # 使用单一真相源 ProvenanceCapsule.from_dict 严格校验顶层 Provenance 并深度复算密码学 SHA-256
     top_prov = ProvenanceCapsule.from_dict(meta["git_provenance"], schema_version=version)
@@ -2910,10 +2934,17 @@ def main():
     os.makedirs(archive_dir, exist_ok=True)
     archive_file_path = os.path.join(archive_dir, f"{run_id}.json")
 
+    start_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
     initial_payload = {
         "version": "3.1",
         "subsystem": "inventory_settlement",
         "status": "in_progress",
+        "error": None,
+        "summary": None,
+        "detailed_runs": {
+            "group2_rust": None,
+            "group3_axiom": None
+        },
         "experiment_metadata": {
             "run_id": run_id,
             "status": "in_progress",
@@ -2930,7 +2961,8 @@ def main():
             "z3_version": get_git_provenance().z3_version,
             "platform": sys.platform,
             "python_version": sys.version.split()[0],
-            "start_time": time.strftime("%Y-%m-%d %H:%M:%S")
+            "timestamp": start_time_str,
+            "start_time": start_time_str
         }
     }
     atomic_write_json(archive_file_path, initial_payload)
@@ -2966,10 +2998,20 @@ def main():
         is_oracle_failure = (g3_res.get("formal_proved") is True and g3_res.get("unit_test_passed") is not True)
         stage_status = "oracle_failed" if is_oracle_failure else "pipeline_finished"
 
+        oracle_error = None
+        if is_oracle_failure:
+            oracle_error = {
+                "type": "OracleSoundnessGapError",
+                "message": g3_res.get("oracle_message", "Formal verification proved but business test failed"),
+                "stage": "oracle_gate",
+                "traceback": None,
+            }
+
         output_payload = {
             "version": "3.1",
             "subsystem": "inventory_settlement",
             "status": stage_status,
+            "error": oracle_error,
             "experiment_metadata": {
                 "run_id": run_id,
                 "status": stage_status,
@@ -3070,6 +3112,7 @@ def main():
             err_msg = f"{type(exc).__name__}: {exc}"
             tb_str = traceback.format_exc()
             print(f"\n⚠️ [RUNNER RECOVERY]: 评测过程中断或异常退出: {err_msg}")
+            failed_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
             failure_payload = {
                 "version": "3.1",
                 "subsystem": "inventory_settlement",
@@ -3077,7 +3120,17 @@ def main():
                 "error": {
                     "type": type(exc).__name__,
                     "message": str(exc),
+                    "stage": "pipeline_execution",
                     "traceback": tb_str,
+                },
+                "summary": None,
+                "detailed_runs": {
+                    "group2_rust": g2_res,
+                    "group3_axiom": g3_res
+                },
+                "partial_runs": {
+                    "group2_rust": g2_res,
+                    "group3_axiom": g3_res
                 },
                 "experiment_metadata": {
                     "run_id": run_id,
@@ -3095,11 +3148,8 @@ def main():
                     "z3_version": get_git_provenance().z3_version,
                     "platform": sys.platform,
                     "python_version": sys.version.split()[0],
-                    "failed_at": time.strftime("%Y-%m-%d %H:%M:%S")
-                },
-                "partial_runs": {
-                    "group2_rust": g2_res,
-                    "group3_axiom": g3_res
+                    "timestamp": failed_time_str,
+                    "failed_at": failed_time_str
                 }
             }
             try:
