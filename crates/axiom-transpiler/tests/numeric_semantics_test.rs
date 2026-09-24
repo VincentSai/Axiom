@@ -3,11 +3,20 @@ use axiom_smt::verify_module;
 use axiom_transpiler::transpile_to_rust;
 use std::{fs, process::Command};
 
-fn run_probe_binary(name: &str, source: &str, call: &str) -> (String, Option<i32>) {
+fn run_probe_binary_ext(
+    name: &str,
+    source: &str,
+    call: &str,
+    debug_assertions: bool,
+) -> (String, bool, Option<i32>) {
     let module = parse_module(source).expect("probe must parse");
     let rust = transpile_to_rust(&module).expect("probe must transpile");
 
-    let temp_dir = std::env::temp_dir().join(format!("axiom_numeric_probe_{}", std::process::id()));
+    let temp_dir = std::env::temp_dir().join(format!(
+        "axiom_numeric_probe_{}_{}",
+        std::process::id(),
+        name
+    ));
     fs::create_dir_all(&temp_dir).unwrap();
 
     let rust_path = temp_dir.join(format!("{name}.rs"));
@@ -18,14 +27,14 @@ fn run_probe_binary(name: &str, source: &str, call: &str) -> (String, Option<i32
     )
     .unwrap();
 
+    let debug_flag = if debug_assertions {
+        "-Cdebug-assertions=yes"
+    } else {
+        "-Cdebug-assertions=no"
+    };
+
     let compiled = Command::new("rustc")
-        .args([
-            "--edition=2021",
-            "-A",
-            "warnings",
-            "-C",
-            "debug-assertions=no",
-        ])
+        .args(["--edition=2021", "-A", "warnings", debug_flag])
         .arg(&rust_path)
         .arg("-o")
         .arg(&exe_path)
@@ -43,7 +52,12 @@ fn run_probe_binary(name: &str, source: &str, call: &str) -> (String, Option<i32
         .expect("failed to run probe binary");
 
     let stdout = String::from_utf8_lossy(&ran.stdout).trim().to_string();
-    (stdout, ran.status.code())
+    (stdout, ran.status.success(), ran.status.code())
+}
+
+fn run_probe_binary(name: &str, source: &str, call: &str) -> (String, Option<i32>) {
+    let (stdout, _success, code) = run_probe_binary_ext(name, source, call, false);
+    (stdout, code)
 }
 
 #[test]
@@ -300,5 +314,98 @@ fn test_differential_hygienic_inlining_and_decimal_execution() {
     assert_eq!(
         out, "15000000",
         "Differential execution: Rust compiled runtime result must match SMT proved result (15_000_000 micros), got: {out}"
+    );
+}
+
+#[test]
+fn test_differential_inlining_unused_param_division_by_zero_counterexample_and_panic() {
+    let src = r#"
+        fn helper(x: Int) -> Int ensures { result == 1 } {
+            1
+        }
+        fn wrapper(n: Int) -> Int ensures { result == 1 } {
+            helper(1 / n)
+        }
+    "#;
+    let module = parse_module(src).unwrap();
+    let proofs = verify_module(&module);
+    // 1. SMT 形式化验证：必须截获除零安全风险并输出 CounterExample，拒绝误判 Proved
+    assert!(
+        matches!(proofs["wrapper"], axiom_smt::SmtResult::CounterExample(_)),
+        "SMT must produce CounterExample on wrapper(n) due to 1/n division-by-zero risk, got: {:?}",
+        proofs["wrapper"]
+    );
+
+    // 2. Transpiled Rust 编译并在操作系统中真实执行：
+    // 当传入 n = 0 时，Rust 执行 helper(1 / 0) 触发除零 panic (status.success() == false)
+    let (_out_zero, success_zero, _code_zero) =
+        run_probe_binary_ext("diff_div_zero", src, "wrapper(0)", false);
+    assert!(
+        !success_zero,
+        "Running wrapper(0) in compiled Rust must panic on division by zero!"
+    );
+
+    // 当传入 n = 2 时，Rust 运行正常返回 1
+    let (out_safe, success_safe, _code_safe) =
+        run_probe_binary_ext("diff_div_safe", src, "wrapper(2)", false);
+    assert!(success_safe, "Running wrapper(2) must succeed!");
+    assert_eq!(out_safe, "1");
+}
+
+#[test]
+fn test_differential_hygienic_renamer_avoids_user_shadowing() {
+    let src = r#"
+        fn helper(x: Int) -> Int ensures { result == x + 1 } {
+            let y = 1;
+            x + y
+        }
+        fn wrapper() -> Int ensures { result == 2 } {
+            let y__axiom_in_1_1 = 2;
+            helper(y__axiom_in_1_1)
+        }
+    "#;
+    let module = parse_module(src).unwrap();
+    let proofs = verify_module(&module);
+    // 1. SMT 验证：因为 2 + 1 = 3 != 2，绝不会与用户同名变量冲突，必须报 CounterExample
+    assert!(
+        matches!(proofs["wrapper"], axiom_smt::SmtResult::CounterExample(_)),
+        "wrapper must produce CounterExample because 2 + 1 = 3 != 2, got: {:?}",
+        proofs["wrapper"]
+    );
+
+    // 2. Transpiled Rust 编译运行：输出真实为 3，与 SMT 严格一致
+    let (out, success, _) = run_probe_binary_ext("diff_hygiene_collision", src, "wrapper()", false);
+    assert!(success);
+    assert_eq!(
+        out, "3",
+        "Differential execution: Rust compiled runtime result must evaluate to 3, matching SMT mathematical semantics!"
+    );
+}
+
+#[test]
+fn test_differential_callee_precondition_counterexample_and_debug_assert() {
+    let src = r#"
+        fn helper(x: Int) -> Int requires { x > 0 } ensures { result == x } {
+            x
+        }
+        fn wrapper() -> Int ensures { result == 0 } {
+            helper(0)
+        }
+    "#;
+    let module = parse_module(src).unwrap();
+    let proofs = verify_module(&module);
+    // 1. SMT 验证：调用点传入 0 违背了 helper 的前置条件 x > 0，必须拒绝通过并返回 CounterExample
+    assert!(
+        matches!(proofs["wrapper"], axiom_smt::SmtResult::CounterExample(_)),
+        "SMT must produce CounterExample because helper requires x > 0 but was called with 0, got: {:?}",
+        proofs["wrapper"]
+    );
+
+    // 2. Transpiled Rust 在启用 debug_assertions 下运行：触发 helper 的 debug_assert!(x > 0) panic！
+    let (_out_debug, success_debug, _) =
+        run_probe_binary_ext("diff_callee_precond", src, "wrapper()", true);
+    assert!(
+        !success_debug,
+        "Transpiled Rust under debug-assertions must panic when callee precondition is violated!"
     );
 }
