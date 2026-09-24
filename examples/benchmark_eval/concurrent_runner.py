@@ -1334,22 +1334,10 @@ def validate_benchmark_result_schema(data: dict):
             if err_field not in data["error"]:
                 raise ValueError(f"error 字典缺少必要字段: {err_field}")
 
-    # failed 状态：必须包含非空的 error 字典
-    if status_val == "failed":
-        if not data.get("error"):
-            raise ValueError("status 为 failed 时，顶层必须包含有效的 error 字典")
-        return
-
-    # in_progress 状态：初始快照无需后续的完成态产物
-    if status_val == "in_progress":
-        return
-
-    # 对于 pipeline_finished, completed, oracle_failed，要求顶层必须包含有效的 summary 与 detailed_runs
-    if "summary" not in data or data["summary"] is None:
-        raise ValueError(f"status 为 {status_val} 时，顶层 summary 不能为空")
-    if "detailed_runs" not in data or data["detailed_runs"] is None:
-        raise ValueError(f"status 为 {status_val} 时，顶层 detailed_runs 不能为空")
-
+    # =========================================================================
+    # [第一阶段]: 公共元数据与防伪凭据完整性前置校验 (All-Status Common Provenance Gates)
+    # 无论是 in_progress, failed 还是 completed，所有快照都必须具备完整可信的防伪凭据
+    # =========================================================================
     required_meta = [
         "engine", "eval_mode", "is_mock", "evidence_grade",
         "git_commit", "git_tree_hash", "git_diff_hash", "git_provenance",
@@ -1401,9 +1389,44 @@ def validate_benchmark_result_schema(data: dict):
         if gstatus.get("dirty_files") != list(top_prov.dirty_files):
             raise ValueError("git_status.dirty_files 与 git_provenance 不一致")
 
+    is_mock = meta.get("is_mock")
+    # [P1 Spec 4] 深度防伪强互锁：防御攻击者仅改顶层 3 个字段将 mock 伪造为 live
+    z3_p = meta.get("z3_path")
+    if not is_mock:
+        if "synthetic" in top_prov.z3_version.lower() or "mock" in top_prov.z3_version.lower():
+            raise ValueError(f"实测模式下严禁使用 mock 占位 Z3 版本: {top_prov.z3_version}")
+        if not z3_p or not isinstance(z3_p, str) or not os.path.isfile(z3_p):
+            raise ValueError(f"实测模式下 meta.z3_path 必须指向真实存在的求解器文件: {z3_p}")
+        if not top_prov.z3_binary_sha256 or top_prov.z3_binary_sha256 == MOCK_Z3_SHA256:
+            raise ValueError("实测模式下严禁使用 mock 占位 Z3 二进制哈希！")
+        with open(z3_p, "rb") as zf:
+            computed_z3_hash = hashlib.sha256(zf.read()).hexdigest()
+        if computed_z3_hash != top_prov.z3_binary_sha256:
+            raise ValueError(f"实测模式下 z3_path 文件真实 SHA-256 ({computed_z3_hash}) 与 Provenance 记录 ({top_prov.z3_binary_sha256}) 不匹配！")
+        if top_prov.z3_path and os.path.abspath(top_prov.z3_path) != os.path.abspath(z3_p):
+            raise ValueError(f"Provenance.z3_path ({top_prov.z3_path}) 与 meta.z3_path ({z3_p}) 路径不一致！")
+
+    # =========================================================================
+    # [第二阶段]: 状态专属分支校验 (State-Specific Gates)
+    # =========================================================================
+    # failed 状态：必须包含非空的 error 字典
+    if status_val == "failed":
+        if not data.get("error"):
+            raise ValueError("status 为 failed 时，顶层必须包含有效的 error 字典")
+        return
+
+    # in_progress 状态：初始快照无需后续的完成态产物
+    if status_val == "in_progress":
+        return
+
+    # 对于 pipeline_finished, completed, oracle_failed，要求顶层必须包含有效的 summary 与 detailed_runs
+    if "summary" not in data or data["summary"] is None:
+        raise ValueError(f"status 为 {status_val} 时，顶层 summary 不能为空")
+    if "detailed_runs" not in data or data["detailed_runs"] is None:
+        raise ValueError(f"status 为 {status_val} 时，顶层 detailed_runs 不能为空")
+
     summary = data.get("summary", {})
     axiom_summary = summary.get("axiom_group", {})
-    is_mock = meta.get("is_mock")
     if is_mock:
         if axiom_summary.get("speedup_vs_rust") is not None:
             raise ValueError("在 mock 模式下，summary.axiom_group.speedup_vs_rust 必须为 None")
@@ -1448,22 +1471,6 @@ def validate_benchmark_result_schema(data: dict):
             raise ValueError(f"{g_name} git_diff_hash 与顶层不一致: {g_data['git_diff_hash']} != {top_prov.git_diff_hash}")
         if "git_commit_sha" in g_data and g_data["git_commit_sha"] != top_prov.git_commit:
             raise ValueError(f"{g_name} git_commit_sha 与顶层不一致: {g_data['git_commit_sha']} != {top_prov.git_commit}")
-
-    # [P1 Spec 4] 深度防伪强互锁：防御攻击者仅改顶层 3 个字段将 mock 伪造为 live
-    z3_p = meta.get("z3_path")
-    if not is_mock:
-        if "synthetic" in top_prov.z3_version.lower() or "mock" in top_prov.z3_version.lower():
-            raise ValueError(f"实测模式下严禁使用 mock 占位 Z3 版本: {top_prov.z3_version}")
-        if not z3_p or not isinstance(z3_p, str) or not os.path.isfile(z3_p):
-            raise ValueError(f"实测模式下 meta.z3_path 必须指向真实存在的求解器文件: {z3_p}")
-        if not top_prov.z3_binary_sha256 or top_prov.z3_binary_sha256 == MOCK_Z3_SHA256:
-            raise ValueError("实测模式下严禁使用 mock 占位 Z3 二进制哈希！")
-        with open(z3_p, "rb") as zf:
-            computed_z3_hash = hashlib.sha256(zf.read()).hexdigest()
-        if computed_z3_hash != top_prov.z3_binary_sha256:
-            raise ValueError(f"实测模式下 z3_path 文件真实 SHA-256 ({computed_z3_hash}) 与 Provenance 记录 ({top_prov.z3_binary_sha256}) 不匹配！")
-        if top_prov.z3_path and os.path.abspath(top_prov.z3_path) != os.path.abspath(z3_p):
-            raise ValueError(f"Provenance.z3_path ({top_prov.z3_path}) 与 meta.z3_path ({z3_p}) 路径不一致！")
 
     # 强互锁 CAS 压测真实性与模式一致性 (通过 CasBenchmarkEvidence 深模块内聚校验)
     cas_bench = g3.get("cas_concurrency_benchmark")
