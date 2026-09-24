@@ -980,3 +980,79 @@ fn decimal_multiplication_overflowing_i64_result_is_caught() {
         );
     }
 }
+
+#[test]
+fn test_smt_inlining_variable_capture_soundness() {
+    let module = parse_module(
+        r#"
+        fn helper(x: Int) -> Int {
+            let y = 1;
+            x + y
+        }
+
+        fn wrapper(y: Int) -> Int
+            ensures {
+                result == 2
+            }
+        {
+            helper(y)
+        }
+        "#,
+    )
+    .expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        let wrapper_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "wrapper")
+            .unwrap();
+        let res = axiom_smt::verify_function_in_module(wrapper_fn, &module);
+        assert!(
+            matches!(res, SmtResult::CounterExample(_)),
+            "wrapper must produce CounterExample because result is y + 1 != 2 for general y, got: {:?}",
+            res
+        );
+    }
+}
+
+#[test]
+fn test_smt_inlining_nested_and_shadowing_variable_capture_soundness() {
+    let module = parse_module(
+        r#"
+        fn inner(x: Int) -> Int {
+            let y = 10;
+            let y = y + 5;
+            x + y
+        }
+
+        fn outer(x: Int) -> Int {
+            let y = 100;
+            inner(x) + y
+        }
+
+        fn test_runner(y: Int) -> Int
+            ensures {
+                result == 115
+            }
+        {
+            outer(y)
+        }
+        "#,
+    )
+    .expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        let runner_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "test_runner")
+            .unwrap();
+        let res = axiom_smt::verify_function_in_module(runner_fn, &module);
+        assert!(
+            matches!(res, SmtResult::CounterExample(_)),
+            "test_runner must produce CounterExample because result is y + 115 != 115 for general y, got: {:?}",
+            res
+        );
+    }
+}

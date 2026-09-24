@@ -1,10 +1,13 @@
 //! SMT-LIB2 generator for Axiom functions and contracts.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use axiom_ast::{
     BinaryOperator, Expr, FunctionDecl, Literal, Module, Pattern, Type, TypeDef, UnaryOperator,
 };
+
+static NEXT_INLINE_CALL_ID: AtomicUsize = AtomicUsize::new(1);
 
 /// Minimum boundary of signed 64-bit physical machine word integer.
 pub const I64_MIN: i64 = -9223372036854775808;
@@ -405,6 +408,156 @@ fn bind_record_body_to_results(
     }
 }
 
+fn alpha_rename_pattern(
+    pattern: &Pattern,
+    call_id: usize,
+    seq: &mut usize,
+    renames: &mut HashMap<String, String>,
+) -> Pattern {
+    match pattern {
+        Pattern::Wildcard => Pattern::Wildcard,
+        Pattern::Literal(lit) => Pattern::Literal(lit.clone()),
+        Pattern::Ident(name) => {
+            *seq += 1;
+            let fresh_name = format!("{name}__axiom_in_{call_id}_{seq}");
+            renames.insert(name.clone(), fresh_name.clone());
+            Pattern::Ident(fresh_name)
+        }
+        Pattern::Variant {
+            enum_name,
+            variant_name,
+            fields,
+        } => {
+            let new_fields = fields
+                .iter()
+                .map(|f| alpha_rename_pattern(f, call_id, seq, renames))
+                .collect();
+            Pattern::Variant {
+                enum_name: enum_name.clone(),
+                variant_name: variant_name.clone(),
+                fields: new_fields,
+            }
+        }
+    }
+}
+
+fn alpha_rename_locals(
+    expr: &Expr,
+    call_id: usize,
+    seq: &mut usize,
+    renames: &HashMap<String, String>,
+) -> Expr {
+    match expr {
+        Expr::Ident(name) => {
+            if let Some(new_name) = renames.get(name) {
+                Expr::Ident(new_name.clone())
+            } else {
+                Expr::Ident(name.clone())
+            }
+        }
+        Expr::Let { name, value } => {
+            let new_value = alpha_rename_locals(value, call_id, seq, renames);
+            *seq += 1;
+            let fresh_name = format!("{name}__axiom_in_{call_id}_{seq}");
+            Expr::Let {
+                name: fresh_name,
+                value: Box::new(new_value),
+            }
+        }
+        Expr::Block { statements, tail } => {
+            let mut curr_renames = renames.clone();
+            let mut new_stmts = Vec::with_capacity(statements.len());
+            for stmt in statements {
+                if let Expr::Let { name, value } = stmt {
+                    let new_val = alpha_rename_locals(value, call_id, seq, &curr_renames);
+                    *seq += 1;
+                    let fresh_name = format!("{name}__axiom_in_{call_id}_{seq}");
+                    curr_renames.insert(name.clone(), fresh_name.clone());
+                    new_stmts.push(Expr::Let {
+                        name: fresh_name,
+                        value: Box::new(new_val),
+                    });
+                } else {
+                    new_stmts.push(alpha_rename_locals(stmt, call_id, seq, &curr_renames));
+                }
+            }
+            let new_tail = tail
+                .as_ref()
+                .map(|t| Box::new(alpha_rename_locals(t, call_id, seq, &curr_renames)));
+            Expr::Block {
+                statements: new_stmts,
+                tail: new_tail,
+            }
+        }
+        Expr::Match { target, arms } => {
+            let new_target = alpha_rename_locals(target, call_id, seq, renames);
+            let new_arms = arms
+                .iter()
+                .map(|arm| {
+                    let mut arm_renames = renames.clone();
+                    let new_pattern =
+                        alpha_rename_pattern(&arm.pattern, call_id, seq, &mut arm_renames);
+                    let new_body = alpha_rename_locals(&arm.body, call_id, seq, &arm_renames);
+                    axiom_ast::MatchArm {
+                        pattern: new_pattern,
+                        body: new_body,
+                    }
+                })
+                .collect();
+            Expr::Match {
+                target: Box::new(new_target),
+                arms: new_arms,
+            }
+        }
+        Expr::FieldAccess { target, field } => Expr::FieldAccess {
+            target: Box::new(alpha_rename_locals(target, call_id, seq, renames)),
+            field: field.clone(),
+        },
+        Expr::RecordInit { ty_name, fields } => {
+            let new_fields = fields
+                .iter()
+                .map(|(k, v)| (k.clone(), alpha_rename_locals(v, call_id, seq, renames)))
+                .collect();
+            Expr::RecordInit {
+                ty_name: ty_name.clone(),
+                fields: new_fields,
+            }
+        }
+        Expr::RecordUpdate { base, updates } => {
+            let new_base = alpha_rename_locals(base, call_id, seq, renames);
+            let new_updates = updates
+                .iter()
+                .map(|(k, v)| (k.clone(), alpha_rename_locals(v, call_id, seq, renames)))
+                .collect();
+            Expr::RecordUpdate {
+                base: Box::new(new_base),
+                updates: new_updates,
+            }
+        }
+        Expr::Call { callee, args } => {
+            let new_callee = alpha_rename_locals(callee, call_id, seq, renames);
+            let new_args = args
+                .iter()
+                .map(|a| alpha_rename_locals(a, call_id, seq, renames))
+                .collect();
+            Expr::Call {
+                callee: Box::new(new_callee),
+                args: new_args,
+            }
+        }
+        Expr::BinaryOp { left, op, right } => Expr::BinaryOp {
+            left: Box::new(alpha_rename_locals(left, call_id, seq, renames)),
+            op: op.clone(),
+            right: Box::new(alpha_rename_locals(right, call_id, seq, renames)),
+        },
+        Expr::UnaryOp { op, operand } => Expr::UnaryOp {
+            op: op.clone(),
+            operand: Box::new(alpha_rename_locals(operand, call_id, seq, renames)),
+        },
+        _ => expr.clone(),
+    }
+}
+
 fn inline_calls(expr: &Expr, ctx: &SmtContext, depth: usize) -> Result<Expr, String> {
     if depth > 16 {
         return Err("recursion limit exceeded while inlining SMT calls".into());
@@ -451,7 +604,11 @@ fn inline_calls(expr: &Expr, ctx: &SmtContext, depth: usize) -> Result<Expr, Str
                     for (param, arg) in target_func.params.iter().zip(inlined_args) {
                         subs.insert(param.name.clone(), arg);
                     }
-                    let replaced_body = substitute_expr(&target_func.body, &subs);
+                    let call_id = NEXT_INLINE_CALL_ID.fetch_add(1, Ordering::Relaxed);
+                    let mut seq = 0usize;
+                    let renamed_body =
+                        alpha_rename_locals(&target_func.body, call_id, &mut seq, &HashMap::new());
+                    let replaced_body = substitute_expr(&renamed_body, &subs);
                     return inline_calls(&replaced_body, ctx, depth + 1);
                 }
             }
