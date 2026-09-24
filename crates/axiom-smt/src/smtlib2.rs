@@ -1572,6 +1572,98 @@ pub fn generate_precondition_check_smtlib2(
     Ok(smt)
 }
 
+/// Translates the safety obligations and call-site precondition obligations within `func.requires`
+/// into an SMT-LIB2 query to verify that the preconditions are well-formed (free from division by zero,
+/// invalid arguments to callee functions, etc.) WITHOUT assuming the preconditions themselves.
+pub fn generate_requires_well_formedness_smtlib2(
+    func: &FunctionDecl,
+    module: Option<&Module>,
+) -> Result<Option<(String, usize)>, String> {
+    if func.requires.is_empty() {
+        return Ok(None);
+    }
+
+    let dummy_mod = Module {
+        types: vec![],
+        functions: vec![func.clone()],
+        effects: vec![],
+    };
+    let effective_module = module.unwrap_or(&dummy_mod);
+    let mut ctx = SmtContext::from_module(effective_module);
+    ctx.current_func = Some(func);
+    ctx.type_env = Some(axiom_ast::TypeEnv::new(effective_module, Some(func)));
+
+    let mut flat_params = Vec::new();
+    for p in &func.params {
+        flatten_type_to_smt(&p.name, &p.ty, &ctx.records, &mut flat_params, 0)?;
+    }
+
+    let mut var_types: HashMap<String, &'static str> = HashMap::new();
+    for (name, smt_ty) in &flat_params {
+        var_types.insert(name.clone(), *smt_ty);
+    }
+
+    let mut wf_obligations = Vec::new();
+    let mut prior_paths = Vec::new();
+
+    for req in &func.requires {
+        let mut req_subs = HashMap::new();
+        collect_safety_obligations_recursive(
+            req,
+            &var_types,
+            &mut req_subs,
+            &prior_paths,
+            &mut wf_obligations,
+            &ctx,
+            0,
+        )?;
+        let inlined_req = inline_calls(req, &ctx, 0)?;
+        if let Ok(req_smt) = expr_to_smt(&inlined_req, &var_types, &ctx) {
+            prior_paths.push(req_smt);
+        }
+    }
+
+    if wf_obligations.is_empty() {
+        return Ok(None);
+    }
+
+    let mut smt = String::new();
+    smt.push_str("; Axiom Precondition Well-Formedness Query for: ");
+    smt.push_str(&func.name);
+    smt.push_str("\n(reset)\n(set-logic ALL)\n(set-option :produce-models true)\n\n");
+
+    for (name, smt_ty) in &flat_params {
+        smt.push_str(&format!("(declare-const {} {})\n", name, smt_ty));
+    }
+    smt.push('\n');
+
+    for (name, smt_ty) in &flat_params {
+        if *smt_ty == "Int" {
+            smt.push_str(&format!(
+                "(assert (and (>= {} (- 9223372036854775808)) (<= {} 9223372036854775807)))\n",
+                name, name
+            ));
+        }
+    }
+    smt.push('\n');
+
+    let obligations_count = wf_obligations.len();
+    if wf_obligations.len() == 1 {
+        smt.push_str(&format!("(assert (not {}))\n\n", wf_obligations[0]));
+    } else {
+        let mut all_obs = String::from("(and");
+        for ob in &wf_obligations {
+            all_obs.push(' ');
+            all_obs.push_str(ob);
+        }
+        all_obs.push(')');
+        smt.push_str(&format!("(assert (not {}))\n\n", all_obs));
+    }
+    smt.push_str("(check-sat)\n(get-model)\n");
+
+    Ok(Some((smt, obligations_count)))
+}
+
 fn infer_expr_type(
     expr: &Expr,
     var_types: &HashMap<String, &'static str>,
@@ -2263,6 +2355,15 @@ fn collect_safety_obligations_recursive(
                             let substituted_req = substitute_expr(req, &param_subs);
                             let fully_expanded_req =
                                 substitute_expr_with_subs(&substituted_req, subs);
+                            collect_safety_obligations_recursive(
+                                &fully_expanded_req,
+                                var_types,
+                                subs,
+                                path_conditions,
+                                obligations,
+                                ctx,
+                                depth + 1,
+                            )?;
                             let inlined_req = inline_calls(&fully_expanded_req, ctx, 0)?;
                             let req_smt = expr_to_smt(&inlined_req, var_types, ctx)?;
                             emit_safety_obligation(req_smt, path_conditions, obligations);

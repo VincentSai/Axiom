@@ -1322,3 +1322,177 @@ fn test_smt_call_site_precondition_lexical_scoping_with_shadowing() {
         );
     }
 }
+
+#[test]
+fn test_smt_nested_call_in_requires_checks_callee_precondition() {
+    let code = r#"
+        fn helper(x: Int) -> Int
+            requires { x > 0 }
+            ensures { result == x }
+        {
+            x
+        }
+
+        fn wrapper() -> Int
+            requires { helper(0) == 0 }
+            ensures { result == 0 }
+        {
+            0
+        }
+    "#;
+    let module = axiom_parser::parse_module(code).expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        let wrapper_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "wrapper")
+            .unwrap();
+        let res_wrapper = axiom_smt::verify_function_in_module(wrapper_fn, &module);
+        assert!(
+            matches!(res_wrapper, SmtResult::CounterExample(_)),
+            "wrapper must produce CounterExample because helper(0) in requires violates helper's requires x > 0, got: {:?}",
+            res_wrapper
+        );
+    }
+}
+
+#[test]
+fn test_smt_nested_call_in_ensures_checks_callee_precondition() {
+    let code = r#"
+        fn helper(x: Int) -> Int
+            requires { x > 0 }
+            ensures { result == x }
+        {
+            x
+        }
+
+        fn wrapper_bad() -> Int
+            requires { true }
+            ensures { helper(result) > 0 }
+        {
+            0
+        }
+
+        fn wrapper_good() -> Int
+            requires { true }
+            ensures { helper(result) > 0 }
+        {
+            1
+        }
+    "#;
+    let module = axiom_parser::parse_module(code).expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        let bad_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "wrapper_bad")
+            .unwrap();
+        let res_bad = axiom_smt::verify_function_in_module(bad_fn, &module);
+        assert!(
+            matches!(res_bad, SmtResult::CounterExample(_)),
+            "wrapper_bad must produce CounterExample because result=0 violates helper's requires x > 0, got: {:?}",
+            res_bad
+        );
+
+        let good_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "wrapper_good")
+            .unwrap();
+        let res_good = axiom_smt::verify_function_in_module(good_fn, &module);
+        assert!(
+            matches!(res_good, SmtResult::Proved { .. }),
+            "wrapper_good must be Proved because result=1 satisfies helper's requires x > 0, got: {:?}",
+            res_good
+        );
+    }
+}
+
+#[test]
+fn test_smt_requires_well_formedness_catches_unprotected_division_by_zero() {
+    let code = r#"
+        fn ill_formed_req(x: Int) -> Int
+            requires { 10 / x > 0 }
+            ensures { result == 1 }
+        {
+            1
+        }
+
+        fn well_formed_req(x: Int) -> Int
+            requires { x > 0 && 10 / x > 0 }
+            ensures { result == 1 }
+        {
+            1
+        }
+    "#;
+    let module = axiom_parser::parse_module(code).expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        let ill_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "ill_formed_req")
+            .unwrap();
+        let res_ill = axiom_smt::verify_function_in_module(ill_fn, &module);
+        assert!(
+            matches!(res_ill, SmtResult::CounterExample(_)),
+            "ill_formed_req must produce CounterExample because 10 / x lacks zero-guard, got: {:?}",
+            res_ill
+        );
+
+        let wf_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "well_formed_req")
+            .unwrap();
+        let res_wf = axiom_smt::verify_function_in_module(wf_fn, &module);
+        assert!(
+            matches!(res_wf, SmtResult::Proved { .. }),
+            "well_formed_req must be Proved because x > 0 guards division by zero, got: {:?}",
+            res_wf
+        );
+    }
+}
+
+#[test]
+fn test_smt_transitive_contract_propagation_across_multiple_call_levels() {
+    let code = r#"
+        fn level3(x: Int) -> Int
+            requires { x > 10 }
+            ensures { result == x * 2 }
+        {
+            x * 2
+        }
+
+        fn level2(n: Int) -> Int
+            requires { level3(n) > 20 }
+            ensures { result == n }
+        {
+            n
+        }
+
+        fn level1_bad() -> Int
+            requires { true }
+            ensures { result == 0 }
+        {
+            level2(5)
+        }
+    "#;
+    let module = axiom_parser::parse_module(code).expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        let l1_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "level1_bad")
+            .unwrap();
+        let res = axiom_smt::verify_function_in_module(l1_fn, &module);
+        assert!(
+            matches!(res, SmtResult::CounterExample(_)),
+            "level1_bad must produce CounterExample because level2(5) triggers level3(5) which violates x > 10, got: {:?}",
+            res
+        );
+    }
+}

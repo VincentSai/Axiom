@@ -18,8 +18,9 @@ pub use process_supervisor::{
     ProcessSupervisor, TimeoutPolicy,
 };
 pub use smtlib2::{
-    generate_precondition_check_smtlib2, generate_smtlib2, generate_smtlib2_and_obligations,
-    generate_smtlib2_with_module, generate_smtlib2_with_module_and_obligations,
+    generate_precondition_check_smtlib2, generate_requires_well_formedness_smtlib2,
+    generate_smtlib2, generate_smtlib2_and_obligations, generate_smtlib2_with_module,
+    generate_smtlib2_with_module_and_obligations,
 };
 pub use z3_solver::{
     compute_file_sha256, find_z3_executable, get_z3_version, resolve_solver_identity, run_z3_query,
@@ -204,6 +205,28 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
         if let Ok((smt2_query, num_obligations)) =
             generate_smtlib2_with_module_and_obligations(func, Some(module))
         {
+            // P0: Precondition Well-Formedness Check (Well-defined specification before assumption)
+            match generate_requires_well_formedness_smtlib2(func, Some(module)) {
+                Ok(Some((wf_query, _))) => {
+                    match run_z3_query(&sealed_solver.sealed_path, &wf_query) {
+                        Ok(Z3Result::Sat(ce)) => return SmtResult::CounterExample(ce),
+                        Ok(Z3Result::Unknown(reason)) => return SmtResult::Unknown(reason),
+                        Ok(Z3Result::Unsat) => {}
+                        Err(e) => {
+                            return SmtResult::Unknown(format!(
+                                "well-formedness check solver error: {e}"
+                            ))
+                        }
+                    }
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    return SmtResult::Unknown(format!(
+                        "well-formedness query generation error: {e}"
+                    ))
+                }
+            }
+
             // P0: Precondition Satisfiability Check (Vacuity Prevention)
             // 绑定密封沙箱副本执行
             if let Err(vacuity_err) = check_precondition_vacuity_fail_closed(
@@ -258,6 +281,21 @@ pub fn verify_function_with_z3(func: &FunctionDecl) -> Result<SmtResult, String>
     // [Round 20 P1 Spec 3]: 构造只读内容寻址密封沙箱副本，彻底消除 TOCTOU
     let sealed_solver = SealedSolverBinary::seal_from_path(&z3_path)
         .map_err(|e| format!("failed to seal solver binary: {e}"))?;
+
+    // P0: Precondition Well-Formedness Check (Well-defined specification before assumption)
+    match generate_requires_well_formedness_smtlib2(func, None) {
+        Ok(Some((wf_query, _))) => match run_z3_query(&sealed_solver.sealed_path, &wf_query)? {
+            Z3Result::Sat(ce) => return Ok(SmtResult::CounterExample(ce)),
+            Z3Result::Unknown(reason) => return Ok(SmtResult::Unknown(reason)),
+            Z3Result::Unsat => {}
+        },
+        Ok(None) => {}
+        Err(e) => {
+            return Ok(SmtResult::Unknown(format!(
+                "well-formedness query generation error: {e}"
+            )))
+        }
+    }
 
     // P0: Precondition Satisfiability Check (Vacuity Prevention)
     if let Err(vacuity_err) =
