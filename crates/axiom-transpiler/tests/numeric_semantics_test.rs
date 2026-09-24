@@ -409,3 +409,88 @@ fn test_differential_callee_precondition_counterexample_and_debug_assert() {
         "Transpiled Rust under debug-assertions must panic when callee precondition is violated!"
     );
 }
+
+#[test]
+fn test_differential_lexical_scoping_shadowing_counterexample_and_panic() {
+    let src = r#"
+        fn helper(x: Int) -> Int requires { x > 0 } ensures { result == x } {
+            x
+        }
+        fn wrapper(n: Int) -> Int requires { n > 0 } ensures { result == -1 } {
+            let n = -1;
+            helper(n)
+        }
+    "#;
+    let module = parse_module(src).unwrap();
+    let proofs = verify_module(&module);
+
+    // 1. SMT 验证：局部 let n = -1 遮蔽了顶层参数 n，导致 helper(n) 实参为 -1 违背 x > 0，必须拒绝通过产出 CounterExample！
+    assert!(
+        matches!(proofs["wrapper"], axiom_smt::SmtResult::CounterExample(_)),
+        "SMT must produce CounterExample because local let n = -1 violates helper's requires x > 0, got: {:?}",
+        proofs["wrapper"]
+    );
+
+    // 2. Transpiled Rust：调用 wrapper(10)，运行时局部变量 n = -1 传入 helper(-1) 触发 debug_assert!(x > 0) panic！
+    let (_out, success, _) = run_probe_binary_ext("diff_lexical_shadow", src, "wrapper(10)", true);
+    assert!(
+        !success,
+        "Transpiled Rust must panic at runtime due to callee precondition violation from shadowed variable!"
+    );
+}
+
+#[test]
+fn test_differential_requires_nested_call_well_formedness_counterexample_and_panic() {
+    let src = r#"
+        fn helper(x: Int) -> Int requires { x > 0 } ensures { result == x } {
+            x
+        }
+        fn wrapper() -> Int requires { helper(0) == 0 } ensures { result == 0 } {
+            0
+        }
+    "#;
+    let module = parse_module(src).unwrap();
+    let proofs = verify_module(&module);
+
+    // 1. SMT 验证：前置条件自身调用 helper(0) 违背良好定义性，必须报 CounterExample！
+    assert!(
+        matches!(proofs["wrapper"], axiom_smt::SmtResult::CounterExample(_)),
+        "SMT must produce CounterExample because requires clause calls helper(0) violating x > 0, got: {:?}",
+        proofs["wrapper"]
+    );
+
+    // 2. Transpiled Rust：调用 wrapper()，在执行 requires 检查时先计算 helper(0)，触发 helper 的 debug_assert panic！
+    let (_out, success, _) = run_probe_binary_ext("diff_req_wf", src, "wrapper()", true);
+    assert!(
+        !success,
+        "Transpiled Rust must panic when evaluating ill-formed precondition calling helper(0)!"
+    );
+}
+
+#[test]
+fn test_differential_ensures_nested_call_counterexample_and_panic() {
+    let src = r#"
+        fn helper(x: Int) -> Int requires { x > 0 } ensures { result == x } {
+            x
+        }
+        fn wrapper() -> Int requires { true } ensures { helper(result) > 0 } {
+            0
+        }
+    "#;
+    let module = parse_module(src).unwrap();
+    let proofs = verify_module(&module);
+
+    // 1. SMT 验证：后置条件 helper(result) 在 result=0 时违背 helper 的 requires x > 0，必须报 CounterExample！
+    assert!(
+        matches!(proofs["wrapper"], axiom_smt::SmtResult::CounterExample(_)),
+        "SMT must produce CounterExample because result=0 violates helper's requires x > 0 in ensures, got: {:?}",
+        proofs["wrapper"]
+    );
+
+    // 2. Transpiled Rust：调用 wrapper() 返回 0，在校验 ensures 时调用 helper(0)，触发 panic！
+    let (_out, success, _) = run_probe_binary_ext("diff_ens_nested", src, "wrapper()", true);
+    assert!(
+        !success,
+        "Transpiled Rust must panic when evaluating ensures calling helper(0)!"
+    );
+}
