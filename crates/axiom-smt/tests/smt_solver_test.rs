@@ -1056,3 +1056,47 @@ fn test_smt_inlining_nested_and_shadowing_variable_capture_soundness() {
         );
     }
 }
+
+#[test]
+fn test_smt_inlining_unused_param_preserves_safety_obligations_and_catches_div_zero() {
+    let module = axiom_parser::parse_module(
+        r#"
+        fn helper(x: Int) -> Int ensures { result == 1 } {
+            1
+        }
+        fn wrapper(n: Int) -> Int ensures { result == 1 } {
+            helper(1 / n)
+        }
+        fn safe_wrapper(n: Int) -> Int requires { n != 0 } ensures { result == 1 } {
+            helper(1 / n)
+        }
+        "#,
+    )
+    .expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        let wrapper_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "wrapper")
+            .unwrap();
+        let res = axiom_smt::verify_function_in_module(wrapper_fn, &module);
+        assert!(
+            matches!(res, SmtResult::CounterExample(_)),
+            "wrapper must produce CounterExample because 1/n can divide by zero when n=0, got: {:?}",
+            res
+        );
+
+        let safe_wrapper_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "safe_wrapper")
+            .unwrap();
+        let safe_res = axiom_smt::verify_function_in_module(safe_wrapper_fn, &module);
+        assert!(
+            matches!(safe_res, SmtResult::Proved { .. }),
+            "safe_wrapper with requires n != 0 must be Proved, got: {:?}",
+            safe_res
+        );
+    }
+}

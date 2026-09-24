@@ -358,53 +358,90 @@ fn bind_record_body_to_results(
     smt: &mut String,
     ctx: &SmtContext,
 ) -> Result<(), String> {
-    match body {
-        Expr::RecordInit { fields, .. } => {
-            for (f_name, f_expr) in fields {
-                let val_smt = expr_to_smt(f_expr, var_types, ctx)?;
-                smt.push_str(&format!("(assert (= result_{} {}))\n", f_name, val_smt));
-            }
-            smt.push('\n');
-            Ok(())
-        }
-        Expr::Block { statements, tail } => {
-            // If block contains let statements, wrap bindings around result asserts
-            let mut let_bindings = Vec::new();
-            let mut child_ctx = ctx.clone();
-            if let Some(ref mut env) = child_ctx.type_env {
-                env.push_scope();
-            }
-            for s in statements {
-                if let Expr::Let { name, value } = s {
-                    let val_smt = expr_to_smt(value, var_types, &child_ctx)?;
-                    let is_dec = child_ctx.is_decimal(value);
-                    child_ctx.local_decimals.insert(name.clone(), is_dec);
-                    if let Some(ref mut env) = child_ctx.type_env {
-                        if let Some(v_ty) = env.infer_type(value) {
-                            env.insert(name.clone(), v_ty);
-                        }
-                    }
-                    let_bindings.push((name.clone(), val_smt));
-                }
-            }
+    let mut let_bindings = Vec::new();
+    let mut current = body;
+    let mut child_ctx = ctx.clone();
 
-            if let Some(tail_expr) = tail {
-                if let Expr::RecordInit { fields, .. } = tail_expr.as_ref() {
-                    for (f_name, f_expr) in fields {
-                        let inner_val = expr_to_smt(f_expr, var_types, &child_ctx)?;
-                        let mut full_val = inner_val;
-                        for (let_name, let_val) in let_bindings.iter().rev() {
-                            full_val = format!("(let (({} {})) {})", let_name, let_val, full_val);
-                        }
-                        smt.push_str(&format!("(assert (= result_{} {}))\n", f_name, full_val));
+    while let Expr::Block { statements, tail } = current {
+        if let Some(ref mut env) = child_ctx.type_env {
+            env.push_scope();
+        }
+        for s in statements {
+            if let Expr::Let { name, value } = s {
+                let val_smt = expr_to_smt(value, var_types, &child_ctx)?;
+                let is_dec = child_ctx.is_decimal(value);
+                child_ctx.local_decimals.insert(name.clone(), is_dec);
+                if let Some(ref mut env) = child_ctx.type_env {
+                    if let Some(v_ty) = env.infer_type(value) {
+                        env.insert(name.clone(), v_ty);
                     }
-                    smt.push('\n');
-                    return Ok(());
+                }
+                let_bindings.push((name.clone(), val_smt));
+            }
+        }
+        if let Some(tail_expr) = tail {
+            current = tail_expr.as_ref();
+        } else {
+            return Err("record block body missing tail expression".into());
+        }
+    }
+
+    if let Expr::RecordInit { fields, .. } = current {
+        for (f_name, f_expr) in fields {
+            let inner_val = expr_to_smt(f_expr, var_types, &child_ctx)?;
+            let mut full_val = inner_val;
+            for (let_name, let_val) in let_bindings.iter().rev() {
+                full_val = format!("(let (({} {})) {})", let_name, let_val, full_val);
+            }
+            smt.push_str(&format!("(assert (= result_{} {}))\n", f_name, full_val));
+        }
+        smt.push('\n');
+        return Ok(());
+    }
+
+    Err("record function body must evaluate to a record".into())
+}
+
+fn flatten_block(statements: Vec<Expr>, tail: Option<Box<Expr>>) -> Expr {
+    let mut flat_stmts = statements;
+    match tail {
+        Some(tail_box) => match *tail_box {
+            Expr::Block {
+                statements: inner_stmts,
+                tail: inner_tail,
+            } => {
+                flat_stmts.extend(inner_stmts);
+                if flat_stmts.is_empty() {
+                    if let Some(it) = inner_tail {
+                        *it
+                    } else {
+                        Expr::Block {
+                            statements: flat_stmts,
+                            tail: None,
+                        }
+                    }
+                } else {
+                    Expr::Block {
+                        statements: flat_stmts,
+                        tail: inner_tail,
+                    }
                 }
             }
-            Err("record body must produce a record expression".into())
-        }
-        _ => Err("record function body must evaluate to a record".into()),
+            other => {
+                if flat_stmts.is_empty() {
+                    other
+                } else {
+                    Expr::Block {
+                        statements: flat_stmts,
+                        tail: Some(Box::new(other)),
+                    }
+                }
+            }
+        },
+        None => Expr::Block {
+            statements: flat_stmts,
+            tail: None,
+        },
     }
 }
 
@@ -600,16 +637,26 @@ fn inline_calls(expr: &Expr, ctx: &SmtContext, depth: usize) -> Result<Expr, Str
                         }
                     }
 
-                    let mut subs = HashMap::new();
-                    for (param, arg) in target_func.params.iter().zip(inlined_args) {
-                        subs.insert(param.name.clone(), arg);
-                    }
                     let call_id = NEXT_INLINE_CALL_ID.fetch_add(1, Ordering::Relaxed);
                     let mut seq = 0usize;
+                    let mut arg_bindings = Vec::with_capacity(target_func.params.len());
+                    let mut param_subs = HashMap::new();
+
+                    for (param, arg) in target_func.params.iter().zip(inlined_args) {
+                        seq += 1;
+                        let fresh_param = format!("{}__axiom_in_{}_{}", param.name, call_id, seq);
+                        arg_bindings.push(Expr::Let {
+                            name: fresh_param.clone(),
+                            value: Box::new(arg),
+                        });
+                        param_subs.insert(param.name.clone(), Expr::Ident(fresh_param));
+                    }
+
                     let renamed_body =
                         alpha_rename_locals(&target_func.body, call_id, &mut seq, &HashMap::new());
-                    let replaced_body = substitute_expr(&renamed_body, &subs);
-                    return inline_calls(&replaced_body, ctx, depth + 1);
+                    let replaced_body = substitute_expr(&renamed_body, &param_subs);
+                    let inlined_body = inline_calls(&replaced_body, ctx, depth + 1)?;
+                    return Ok(flatten_block(arg_bindings, Some(Box::new(inlined_body))));
                 }
             }
             // If function is not known in module, keep as-is
