@@ -1,13 +1,11 @@
 //! SMT-LIB2 generator for Axiom functions and contracts.
 
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::cell::{Cell, RefCell};
+use std::collections::{HashMap, HashSet};
 
 use axiom_ast::{
     BinaryOperator, Expr, FunctionDecl, Literal, Module, Pattern, Type, TypeDef, UnaryOperator,
 };
-
-static NEXT_INLINE_CALL_ID: AtomicUsize = AtomicUsize::new(1);
 
 /// Minimum boundary of signed 64-bit physical machine word integer.
 pub const I64_MIN: i64 = -9223372036854775808;
@@ -26,6 +24,8 @@ pub struct SmtContext<'a> {
     pub current_func: Option<&'a FunctionDecl>,
     pub local_decimals: HashMap<String, bool>,
     pub type_env: Option<axiom_ast::TypeEnv<'a>>,
+    pub reserved_names: RefCell<HashSet<String>>,
+    pub call_id_counter: Cell<usize>,
 }
 
 impl<'a> SmtContext<'a> {
@@ -46,13 +46,34 @@ impl<'a> SmtContext<'a> {
         for f in &module.functions {
             functions.insert(f.name.clone(), f);
         }
+        let reserved_names = collect_module_reserved_names(module);
         Self {
             records,
             functions,
             current_func: None,
             local_decimals: HashMap::new(),
             type_env: Some(axiom_ast::TypeEnv::new(module, None)),
+            reserved_names: RefCell::new(reserved_names),
+            call_id_counter: Cell::new(1),
         }
+    }
+
+    pub fn next_call_id(&self) -> usize {
+        let id = self.call_id_counter.get();
+        self.call_id_counter.set(id + 1);
+        id
+    }
+
+    pub fn alloc_fresh_id(&self, base_name: &str, call_id: usize, seq: usize) -> String {
+        let mut reserved = self.reserved_names.borrow_mut();
+        let mut candidate = format!("{base_name}__axiom_in_{call_id}_{seq}");
+        let mut attempt = 0usize;
+        while reserved.contains(&candidate) {
+            attempt += 1;
+            candidate = format!("{base_name}__axiom_in_{call_id}_{seq}_c{attempt}");
+        }
+        reserved.insert(candidate.clone());
+        candidate
     }
 
     pub fn infer_type(&self, expr: &Expr) -> Option<Type> {
@@ -445,18 +466,172 @@ fn flatten_block(statements: Vec<Expr>, tail: Option<Box<Expr>>) -> Expr {
     }
 }
 
+/// Collects all identifiers (types, functions, fields, parameters, let variables, patterns)
+/// across the entire module to construct a reserved name set for hygienic symbol generation.
+pub fn collect_module_reserved_names(module: &Module) -> HashSet<String> {
+    let mut names = HashSet::new();
+    let keywords = [
+        "result",
+        "true",
+        "false",
+        "Int",
+        "Real",
+        "Bool",
+        "String",
+        "Unit",
+        "Decimal",
+        "let",
+        "assert",
+        "check-sat",
+        "get-model",
+        "declare-const",
+        "define-fun",
+        "and",
+        "or",
+        "not",
+        "ite",
+        "mod",
+        "div",
+        "to_real",
+        "to_int",
+    ];
+    for kw in &keywords {
+        names.insert((*kw).to_string());
+    }
+
+    for ty in &module.types {
+        match ty {
+            TypeDef::Record { name, fields } => {
+                names.insert(name.clone());
+                for f in fields {
+                    names.insert(f.name.clone());
+                }
+            }
+            TypeDef::Enum { name, variants } => {
+                names.insert(name.clone());
+                for v in variants {
+                    names.insert(v.name.clone());
+                    for f in &v.fields {
+                        names.insert(f.name.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    for eff in &module.effects {
+        names.insert(eff.name.clone());
+        for op in &eff.operations {
+            names.insert(op.name.clone());
+        }
+    }
+
+    for func in &module.functions {
+        collect_function_reserved_names(func, &mut names);
+    }
+
+    names
+}
+
+pub fn collect_function_reserved_names(func: &FunctionDecl, names: &mut HashSet<String>) {
+    names.insert(func.name.clone());
+    for p in &func.params {
+        names.insert(p.name.clone());
+    }
+    for req in &func.requires {
+        collect_expr_identifiers(req, names);
+    }
+    for ens in &func.ensures {
+        collect_expr_identifiers(ens, names);
+    }
+    collect_expr_identifiers(&func.body, names);
+}
+
+fn collect_expr_identifiers(expr: &Expr, names: &mut HashSet<String>) {
+    match expr {
+        Expr::Ident(name) | Expr::Hole(name) => {
+            names.insert(name.clone());
+        }
+        Expr::Let { name, value } => {
+            names.insert(name.clone());
+            collect_expr_identifiers(value, names);
+        }
+        Expr::Block { statements, tail } => {
+            for s in statements {
+                collect_expr_identifiers(s, names);
+            }
+            if let Some(t) = tail {
+                collect_expr_identifiers(t, names);
+            }
+        }
+        Expr::BinaryOp { left, right, .. } => {
+            collect_expr_identifiers(left, names);
+            collect_expr_identifiers(right, names);
+        }
+        Expr::UnaryOp { operand, .. } => {
+            collect_expr_identifiers(operand, names);
+        }
+        Expr::Call { callee, args } => {
+            collect_expr_identifiers(callee, names);
+            for a in args {
+                collect_expr_identifiers(a, names);
+            }
+        }
+        Expr::FieldAccess { target, field } => {
+            collect_expr_identifiers(target, names);
+            names.insert(field.clone());
+        }
+        Expr::RecordInit { fields, .. } => {
+            for (f, v) in fields {
+                names.insert(f.clone());
+                collect_expr_identifiers(v, names);
+            }
+        }
+        Expr::RecordUpdate { base, updates } => {
+            collect_expr_identifiers(base, names);
+            for (f, v) in updates {
+                names.insert(f.clone());
+                collect_expr_identifiers(v, names);
+            }
+        }
+        Expr::Match { target, arms } => {
+            collect_expr_identifiers(target, names);
+            for arm in arms {
+                collect_pattern_identifiers(&arm.pattern, names);
+                collect_expr_identifiers(&arm.body, names);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_pattern_identifiers(pattern: &Pattern, names: &mut HashSet<String>) {
+    match pattern {
+        Pattern::Ident(name) => {
+            names.insert(name.clone());
+        }
+        Pattern::Variant { fields, .. } => {
+            for f in fields {
+                collect_pattern_identifiers(f, names);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn alpha_rename_pattern(
     pattern: &Pattern,
     call_id: usize,
     seq: &mut usize,
     renames: &mut HashMap<String, String>,
+    ctx: &SmtContext,
 ) -> Pattern {
     match pattern {
         Pattern::Wildcard => Pattern::Wildcard,
         Pattern::Literal(lit) => Pattern::Literal(lit.clone()),
         Pattern::Ident(name) => {
             *seq += 1;
-            let fresh_name = format!("{name}__axiom_in_{call_id}_{seq}");
+            let fresh_name = ctx.alloc_fresh_id(name, call_id, *seq);
             renames.insert(name.clone(), fresh_name.clone());
             Pattern::Ident(fresh_name)
         }
@@ -467,7 +642,7 @@ fn alpha_rename_pattern(
         } => {
             let new_fields = fields
                 .iter()
-                .map(|f| alpha_rename_pattern(f, call_id, seq, renames))
+                .map(|f| alpha_rename_pattern(f, call_id, seq, renames, ctx))
                 .collect();
             Pattern::Variant {
                 enum_name: enum_name.clone(),
@@ -483,6 +658,7 @@ fn alpha_rename_locals(
     call_id: usize,
     seq: &mut usize,
     renames: &HashMap<String, String>,
+    ctx: &SmtContext,
 ) -> Expr {
     match expr {
         Expr::Ident(name) => {
@@ -493,9 +669,9 @@ fn alpha_rename_locals(
             }
         }
         Expr::Let { name, value } => {
-            let new_value = alpha_rename_locals(value, call_id, seq, renames);
+            let new_value = alpha_rename_locals(value, call_id, seq, renames, ctx);
             *seq += 1;
-            let fresh_name = format!("{name}__axiom_in_{call_id}_{seq}");
+            let fresh_name = ctx.alloc_fresh_id(name, call_id, *seq);
             Expr::Let {
                 name: fresh_name,
                 value: Box::new(new_value),
@@ -506,35 +682,35 @@ fn alpha_rename_locals(
             let mut new_stmts = Vec::with_capacity(statements.len());
             for stmt in statements {
                 if let Expr::Let { name, value } = stmt {
-                    let new_val = alpha_rename_locals(value, call_id, seq, &curr_renames);
+                    let new_val = alpha_rename_locals(value, call_id, seq, &curr_renames, ctx);
                     *seq += 1;
-                    let fresh_name = format!("{name}__axiom_in_{call_id}_{seq}");
+                    let fresh_name = ctx.alloc_fresh_id(name, call_id, *seq);
                     curr_renames.insert(name.clone(), fresh_name.clone());
                     new_stmts.push(Expr::Let {
                         name: fresh_name,
                         value: Box::new(new_val),
                     });
                 } else {
-                    new_stmts.push(alpha_rename_locals(stmt, call_id, seq, &curr_renames));
+                    new_stmts.push(alpha_rename_locals(stmt, call_id, seq, &curr_renames, ctx));
                 }
             }
             let new_tail = tail
                 .as_ref()
-                .map(|t| Box::new(alpha_rename_locals(t, call_id, seq, &curr_renames)));
+                .map(|t| Box::new(alpha_rename_locals(t, call_id, seq, &curr_renames, ctx)));
             Expr::Block {
                 statements: new_stmts,
                 tail: new_tail,
             }
         }
         Expr::Match { target, arms } => {
-            let new_target = alpha_rename_locals(target, call_id, seq, renames);
+            let new_target = alpha_rename_locals(target, call_id, seq, renames, ctx);
             let new_arms = arms
                 .iter()
                 .map(|arm| {
                     let mut arm_renames = renames.clone();
                     let new_pattern =
-                        alpha_rename_pattern(&arm.pattern, call_id, seq, &mut arm_renames);
-                    let new_body = alpha_rename_locals(&arm.body, call_id, seq, &arm_renames);
+                        alpha_rename_pattern(&arm.pattern, call_id, seq, &mut arm_renames, ctx);
+                    let new_body = alpha_rename_locals(&arm.body, call_id, seq, &arm_renames, ctx);
                     axiom_ast::MatchArm {
                         pattern: new_pattern,
                         body: new_body,
@@ -547,13 +723,18 @@ fn alpha_rename_locals(
             }
         }
         Expr::FieldAccess { target, field } => Expr::FieldAccess {
-            target: Box::new(alpha_rename_locals(target, call_id, seq, renames)),
+            target: Box::new(alpha_rename_locals(target, call_id, seq, renames, ctx)),
             field: field.clone(),
         },
         Expr::RecordInit { ty_name, fields } => {
             let new_fields = fields
                 .iter()
-                .map(|(k, v)| (k.clone(), alpha_rename_locals(v, call_id, seq, renames)))
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        alpha_rename_locals(v, call_id, seq, renames, ctx),
+                    )
+                })
                 .collect();
             Expr::RecordInit {
                 ty_name: ty_name.clone(),
@@ -561,10 +742,15 @@ fn alpha_rename_locals(
             }
         }
         Expr::RecordUpdate { base, updates } => {
-            let new_base = alpha_rename_locals(base, call_id, seq, renames);
+            let new_base = alpha_rename_locals(base, call_id, seq, renames, ctx);
             let new_updates = updates
                 .iter()
-                .map(|(k, v)| (k.clone(), alpha_rename_locals(v, call_id, seq, renames)))
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        alpha_rename_locals(v, call_id, seq, renames, ctx),
+                    )
+                })
                 .collect();
             Expr::RecordUpdate {
                 base: Box::new(new_base),
@@ -572,10 +758,10 @@ fn alpha_rename_locals(
             }
         }
         Expr::Call { callee, args } => {
-            let new_callee = alpha_rename_locals(callee, call_id, seq, renames);
+            let new_callee = alpha_rename_locals(callee, call_id, seq, renames, ctx);
             let new_args = args
                 .iter()
-                .map(|a| alpha_rename_locals(a, call_id, seq, renames))
+                .map(|a| alpha_rename_locals(a, call_id, seq, renames, ctx))
                 .collect();
             Expr::Call {
                 callee: Box::new(new_callee),
@@ -583,13 +769,13 @@ fn alpha_rename_locals(
             }
         }
         Expr::BinaryOp { left, op, right } => Expr::BinaryOp {
-            left: Box::new(alpha_rename_locals(left, call_id, seq, renames)),
+            left: Box::new(alpha_rename_locals(left, call_id, seq, renames, ctx)),
             op: op.clone(),
-            right: Box::new(alpha_rename_locals(right, call_id, seq, renames)),
+            right: Box::new(alpha_rename_locals(right, call_id, seq, renames, ctx)),
         },
         Expr::UnaryOp { op, operand } => Expr::UnaryOp {
             op: op.clone(),
-            operand: Box::new(alpha_rename_locals(operand, call_id, seq, renames)),
+            operand: Box::new(alpha_rename_locals(operand, call_id, seq, renames, ctx)),
         },
         _ => expr.clone(),
     }
@@ -637,14 +823,14 @@ fn inline_calls(expr: &Expr, ctx: &SmtContext, depth: usize) -> Result<Expr, Str
                         }
                     }
 
-                    let call_id = NEXT_INLINE_CALL_ID.fetch_add(1, Ordering::Relaxed);
+                    let call_id = ctx.next_call_id();
                     let mut seq = 0usize;
                     let mut arg_bindings = Vec::with_capacity(target_func.params.len());
                     let mut param_subs = HashMap::new();
 
                     for (param, arg) in target_func.params.iter().zip(inlined_args) {
                         seq += 1;
-                        let fresh_param = format!("{}__axiom_in_{}_{}", param.name, call_id, seq);
+                        let fresh_param = ctx.alloc_fresh_id(&param.name, call_id, seq);
                         arg_bindings.push(Expr::Let {
                             name: fresh_param.clone(),
                             value: Box::new(arg),
@@ -652,8 +838,13 @@ fn inline_calls(expr: &Expr, ctx: &SmtContext, depth: usize) -> Result<Expr, Str
                         param_subs.insert(param.name.clone(), Expr::Ident(fresh_param));
                     }
 
-                    let renamed_body =
-                        alpha_rename_locals(&target_func.body, call_id, &mut seq, &HashMap::new());
+                    let renamed_body = alpha_rename_locals(
+                        &target_func.body,
+                        call_id,
+                        &mut seq,
+                        &HashMap::new(),
+                        ctx,
+                    );
                     let replaced_body = substitute_expr(&renamed_body, &param_subs);
                     let inlined_body = inline_calls(&replaced_body, ctx, depth + 1)?;
                     return Ok(flatten_block(arg_bindings, Some(Box::new(inlined_body))));

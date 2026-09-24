@@ -1100,3 +1100,88 @@ fn test_smt_inlining_unused_param_preserves_safety_obligations_and_catches_div_z
         );
     }
 }
+
+#[test]
+fn test_smt_hygienic_renaming_avoids_user_identifiers_collision() {
+    let module = axiom_parser::parse_module(
+        r#"
+        fn helper(x: Int) -> Int ensures { result == x + 1 } {
+            let y = 1;
+            x + y
+        }
+        fn wrapper_false() -> Int ensures { result == 2 } {
+            let y__axiom_in_1_1 = 2;
+            helper(y__axiom_in_1_1)
+        }
+        fn wrapper_true() -> Int ensures { result == 3 } {
+            let y__axiom_in_1_1 = 2;
+            helper(y__axiom_in_1_1)
+        }
+        "#,
+    )
+    .expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        let wrapper_false_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "wrapper_false")
+            .unwrap();
+        let res_false = axiom_smt::verify_function_in_module(wrapper_false_fn, &module);
+        assert!(
+            matches!(res_false, SmtResult::CounterExample(_)),
+            "wrapper_false must produce CounterExample because result is 3 != 2 (no variable capture), got: {:?}",
+            res_false
+        );
+
+        let wrapper_true_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "wrapper_true")
+            .unwrap();
+        let res_true = axiom_smt::verify_function_in_module(wrapper_true_fn, &module);
+        assert!(
+            matches!(res_true, SmtResult::Proved { .. }),
+            "wrapper_true must be Proved because 2 + 1 = 3, got: {:?}",
+            res_true
+        );
+    }
+}
+
+#[test]
+fn test_smt_hygienic_renaming_is_deterministic() {
+    let module = axiom_parser::parse_module(
+        r#"
+        fn helper(x: Int) -> Int ensures { result == x + 10 } {
+            let a = 4;
+            let b = 6;
+            x + a + b
+        }
+        fn caller(z: Int) -> Int ensures { result == z + 20 } {
+            let first = helper(z);
+            let second = helper(first);
+            second
+        }
+        "#,
+    )
+    .expect("module should parse");
+
+    let caller_fn = module
+        .functions
+        .iter()
+        .find(|f| f.name == "caller")
+        .unwrap();
+
+    let (smt1, obs1) =
+        axiom_smt::generate_smtlib2_with_module_and_obligations(caller_fn, Some(&module))
+            .expect("SMT 1 should generate");
+    let (smt2, obs2) =
+        axiom_smt::generate_smtlib2_with_module_and_obligations(caller_fn, Some(&module))
+            .expect("SMT 2 should generate");
+
+    assert_eq!(obs1, obs2, "obligations count must be identical");
+    assert_eq!(
+        smt1, smt2,
+        "generated SMT-LIB2 queries must be 100% byte-for-byte identical across runs"
+    );
+}
