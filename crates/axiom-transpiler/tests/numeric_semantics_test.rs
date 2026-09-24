@@ -266,3 +266,39 @@ fn test_decimal_return_type_int_literal_fail_closed_across_all_layers() {
         "Transpiler must reject function declaring Decimal return but returning Int literal"
     );
 }
+
+#[test]
+fn test_differential_hygienic_inlining_and_decimal_execution() {
+    let src = r#"
+        fn apply_markup(amount: Decimal) -> Decimal {
+            let bonus = 5.0d;
+            amount + bonus
+        }
+
+        fn compute_total(bonus: Decimal) -> Decimal
+            requires { bonus == 10.0d }
+            ensures { result == 15.0d }
+        {
+            apply_markup(bonus)
+        }
+    "#;
+    let module = parse_module(src).unwrap();
+
+    // 1. SMT 验证：在健全卫生内联下，apply_markup 内部的 bonus (5.0d) 不会捕获实参 bonus (10.0d)
+    // SMT 必须证明 result == 10.0d + 5.0d == 15.0d (Proved)
+    let proofs = verify_module(&module);
+    assert!(
+        proofs["compute_total"].is_proved(),
+        "compute_total with hygienic inlining must be proved! Got: {:?}",
+        proofs
+    );
+
+    // 2. Transpiler + rustc 编译并在操作系统中执行
+    // 10.0d = 10_000_000 微元，返回值应为 15_000_000 微元
+    let (out, code) = run_probe_binary("diff_hygiene", src, "compute_total(10_000_000)");
+    assert_eq!(code, Some(0));
+    assert_eq!(
+        out, "15000000",
+        "Differential execution: Rust compiled runtime result must match SMT proved result (15_000_000 micros), got: {out}"
+    );
+}
