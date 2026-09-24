@@ -26,7 +26,6 @@ pub struct SmtContext<'a> {
     pub type_env: Option<axiom_ast::TypeEnv<'a>>,
     pub reserved_names: RefCell<HashSet<String>>,
     pub call_id_counter: Cell<usize>,
-    pub call_site_preconditions: RefCell<Vec<Expr>>,
 }
 
 impl<'a> SmtContext<'a> {
@@ -56,7 +55,6 @@ impl<'a> SmtContext<'a> {
             type_env: Some(axiom_ast::TypeEnv::new(module, None)),
             reserved_names: RefCell::new(reserved_names),
             call_id_counter: Cell::new(1),
-            call_site_preconditions: RefCell::new(Vec::new()),
         }
     }
 
@@ -265,8 +263,6 @@ pub fn generate_smtlib2_with_module_and_obligations(
         }
         smt.push('\n');
     }
-    // Clear any preconditions collected during caller's requires inlining
-    ctx.call_site_preconditions.borrow_mut().clear();
 
     // 4. Bind function body to result
     smt.push_str("; Function Body Definition\n");
@@ -279,7 +275,7 @@ pub fn generate_smtlib2_with_module_and_obligations(
         bind_record_body_to_results(&inlined_body, &var_types, &mut smt, &ctx)?;
     }
 
-    // 5. Assert negation of postconditions (Ensures) and 64-bit safety range obligations
+    // 5. Assert negation of postconditions (Ensures) and safety/contract obligations
     smt.push_str(
         "; Goal: Find any counterexample violating Ensures clauses, Call-Site Preconditions, or 64-bit range safety\n",
     );
@@ -288,14 +284,6 @@ pub fn generate_smtlib2_with_module_and_obligations(
         let inlined_ens = inline_calls(ens, &ctx, 0)?;
         let ens_expr = expr_to_smt(&inlined_ens, &var_types, &ctx)?;
         obligations.push(ens_expr);
-    }
-    // 5.1 Call-site precondition obligations: caller must verify that arguments satisfy callee requires (Ticket 42)
-    let call_preconds: Vec<Expr> = ctx.call_site_preconditions.borrow().clone();
-    for req_expr in call_preconds {
-        let req_smt = expr_to_smt(&req_expr, &var_types, &ctx)?;
-        if !obligations.contains(&req_smt) {
-            obligations.push(req_smt);
-        }
     }
     // Safety range obligation: result Ints must not overflow 64-bit signed integer limits
     for (name, smt_ty) in &flat_results {
@@ -307,17 +295,42 @@ pub fn generate_smtlib2_with_module_and_obligations(
         }
     }
 
-    // Collect arithmetic safety obligations from intermediate subexpressions in the inlined body
+    // Collect arithmetic safety and callee contract obligations across body, requires, and ensures clauses
     let mut subexpr_obligations = Vec::new();
     let mut safety_subs = HashMap::new();
     collect_safety_obligations_recursive(
-        &inlined_body,
+        &func.body,
         &var_types,
         &mut safety_subs,
         &[],
         &mut subexpr_obligations,
         &ctx,
+        0,
     )?;
+    for req in &func.requires {
+        let mut req_subs = HashMap::new();
+        collect_safety_obligations_recursive(
+            req,
+            &var_types,
+            &mut req_subs,
+            &[],
+            &mut subexpr_obligations,
+            &ctx,
+            0,
+        )?;
+    }
+    for ens in &func.ensures {
+        let mut ens_subs = HashMap::new();
+        collect_safety_obligations_recursive(
+            ens,
+            &var_types,
+            &mut ens_subs,
+            &[],
+            &mut subexpr_obligations,
+            &ctx,
+            0,
+        )?;
+    }
     for safe_ob in subexpr_obligations {
         if !obligations.contains(&safe_ob) {
             obligations.push(safe_ob);
@@ -848,18 +861,6 @@ fn inline_calls(expr: &Expr, ctx: &SmtContext, depth: usize) -> Result<Expr, Str
                             value: Box::new(arg),
                         });
                         param_subs.insert(param.name.clone(), Expr::Ident(fresh_param));
-                    }
-
-                    if !target_func.requires.is_empty() {
-                        for req in &target_func.requires {
-                            let substituted_req = substitute_expr(req, &param_subs);
-                            let inlined_req = inline_calls(&substituted_req, ctx, depth + 1)?;
-                            let req_with_bindings =
-                                flatten_block(arg_bindings.clone(), Some(Box::new(inlined_req)));
-                            ctx.call_site_preconditions
-                                .borrow_mut()
-                                .push(req_with_bindings);
-                        }
                     }
 
                     let renamed_body = alpha_rename_locals(
@@ -1776,7 +1777,11 @@ fn collect_safety_obligations_recursive(
     path_conditions: &[String],
     obligations: &mut Vec<String>,
     ctx: &SmtContext,
+    depth: usize,
 ) -> Result<(), String> {
+    if depth > 16 {
+        return Err("recursion limit exceeded while collecting SMT obligations".into());
+    }
     match expr {
         Expr::BinaryOp { left, op, right } => {
             collect_safety_obligations_recursive(
@@ -1786,15 +1791,69 @@ fn collect_safety_obligations_recursive(
                 path_conditions,
                 obligations,
                 ctx,
+                depth,
             )?;
-            collect_safety_obligations_recursive(
-                right,
-                var_types,
-                subs,
-                path_conditions,
-                obligations,
-                ctx,
-            )?;
+            if *op == BinaryOperator::And {
+                let left_expanded = substitute_expr_with_subs(left, subs);
+                if let Ok(l_smt) = expr_to_smt(&left_expanded, var_types, ctx) {
+                    let mut right_paths = path_conditions.to_vec();
+                    right_paths.push(l_smt);
+                    collect_safety_obligations_recursive(
+                        right,
+                        var_types,
+                        subs,
+                        &right_paths,
+                        obligations,
+                        ctx,
+                        depth,
+                    )?;
+                } else {
+                    collect_safety_obligations_recursive(
+                        right,
+                        var_types,
+                        subs,
+                        path_conditions,
+                        obligations,
+                        ctx,
+                        depth,
+                    )?;
+                }
+            } else if *op == BinaryOperator::Or {
+                let left_expanded = substitute_expr_with_subs(left, subs);
+                if let Ok(l_smt) = expr_to_smt(&left_expanded, var_types, ctx) {
+                    let mut right_paths = path_conditions.to_vec();
+                    right_paths.push(format!("(not {})", l_smt));
+                    collect_safety_obligations_recursive(
+                        right,
+                        var_types,
+                        subs,
+                        &right_paths,
+                        obligations,
+                        ctx,
+                        depth,
+                    )?;
+                } else {
+                    collect_safety_obligations_recursive(
+                        right,
+                        var_types,
+                        subs,
+                        path_conditions,
+                        obligations,
+                        ctx,
+                        depth,
+                    )?;
+                }
+            } else {
+                collect_safety_obligations_recursive(
+                    right,
+                    var_types,
+                    subs,
+                    path_conditions,
+                    obligations,
+                    ctx,
+                    depth,
+                )?;
+            }
 
             let left_expanded = substitute_expr_with_subs(left, subs);
             let right_expanded = substitute_expr_with_subs(right, subs);
@@ -1996,6 +2055,7 @@ fn collect_safety_obligations_recursive(
                 path_conditions,
                 obligations,
                 ctx,
+                depth,
             )?;
             if *op == UnaryOperator::Negate {
                 let is_real = infer_expr_type(operand, var_types, subs) == "Real";
@@ -2015,6 +2075,7 @@ fn collect_safety_obligations_recursive(
                 path_conditions,
                 obligations,
                 ctx,
+                depth,
             )?;
             let expanded_val = substitute_expr_with_subs(value, subs);
             subs.insert(name.clone(), expanded_val);
@@ -2034,6 +2095,7 @@ fn collect_safety_obligations_recursive(
                         path_conditions,
                         obligations,
                         &curr_ctx,
+                        depth,
                     )?;
                     let expanded_val = substitute_expr_with_subs(value, &curr_subs);
                     let is_dec = curr_ctx.is_decimal(value);
@@ -2053,6 +2115,7 @@ fn collect_safety_obligations_recursive(
                         path_conditions,
                         obligations,
                         &curr_ctx,
+                        depth,
                     )?;
                 }
             }
@@ -2064,6 +2127,7 @@ fn collect_safety_obligations_recursive(
                     path_conditions,
                     obligations,
                     &curr_ctx,
+                    depth,
                 )?;
             }
         }
@@ -2075,6 +2139,7 @@ fn collect_safety_obligations_recursive(
                 path_conditions,
                 obligations,
                 ctx,
+                depth,
             )?;
             let target_expanded = substitute_expr_with_subs(target, subs);
             let target_smt_res = expr_to_smt(&target_expanded, var_types, ctx);
@@ -2116,6 +2181,7 @@ fn collect_safety_obligations_recursive(
                         &arm_paths,
                         obligations,
                         &arm_ctx,
+                        depth,
                     )?;
 
                     // [Spec 1, P0] 遇到首个 catch-all 分支，后续所有分支在物理上均为不可达死代码，立即终止分析
@@ -2150,6 +2216,7 @@ fn collect_safety_obligations_recursive(
                         path_conditions,
                         obligations,
                         &arm_ctx,
+                        depth,
                     )?;
                     if is_catch_all {
                         break;
@@ -2165,6 +2232,7 @@ fn collect_safety_obligations_recursive(
                 path_conditions,
                 obligations,
                 ctx,
+                depth,
             )?;
             for arg in args {
                 collect_safety_obligations_recursive(
@@ -2174,7 +2242,33 @@ fn collect_safety_obligations_recursive(
                     path_conditions,
                     obligations,
                     ctx,
+                    depth,
                 )?;
+            }
+
+            if let Expr::Ident(ref fn_name) = **callee {
+                if let Some(target_func) = ctx.functions.get(fn_name) {
+                    if !target_func.effects.is_empty() {
+                        return Err(format!(
+                            "cannot verify function calling effectful `{fn_name}`"
+                        ));
+                    }
+                    let mut param_subs = HashMap::new();
+                    for (param, arg) in target_func.params.iter().zip(args) {
+                        let arg_expanded = substitute_expr_with_subs(arg, subs);
+                        param_subs.insert(param.name.clone(), arg_expanded);
+                    }
+                    if !target_func.requires.is_empty() {
+                        for req in &target_func.requires {
+                            let substituted_req = substitute_expr(req, &param_subs);
+                            let fully_expanded_req =
+                                substitute_expr_with_subs(&substituted_req, subs);
+                            let inlined_req = inline_calls(&fully_expanded_req, ctx, 0)?;
+                            let req_smt = expr_to_smt(&inlined_req, var_types, ctx)?;
+                            emit_safety_obligation(req_smt, path_conditions, obligations);
+                        }
+                    }
+                }
             }
         }
         Expr::FieldAccess { target, .. } => {
@@ -2185,6 +2279,7 @@ fn collect_safety_obligations_recursive(
                 path_conditions,
                 obligations,
                 ctx,
+                depth,
             )?;
         }
         Expr::RecordInit { fields, .. } => {
@@ -2196,6 +2291,7 @@ fn collect_safety_obligations_recursive(
                     path_conditions,
                     obligations,
                     ctx,
+                    depth,
                 )?;
             }
         }
@@ -2207,6 +2303,7 @@ fn collect_safety_obligations_recursive(
                 path_conditions,
                 obligations,
                 ctx,
+                depth,
             )?;
             for (_, val) in updates {
                 collect_safety_obligations_recursive(
@@ -2216,6 +2313,7 @@ fn collect_safety_obligations_recursive(
                     path_conditions,
                     obligations,
                     ctx,
+                    depth,
                 )?;
             }
         }

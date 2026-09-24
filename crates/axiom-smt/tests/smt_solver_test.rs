@@ -1263,3 +1263,62 @@ fn test_smt_caller_must_satisfy_callee_preconditions() {
         );
     }
 }
+
+#[test]
+fn test_smt_call_site_precondition_lexical_scoping_with_shadowing() {
+    let module = parse_module(
+        r#"
+        fn helper(x: Int) -> Int
+            requires { x > 0 }
+            ensures { result == x }
+        { x }
+
+        fn wrapper(n: Int) -> Int
+            requires { n > 0 }
+            ensures { result == -1 }
+        {
+            let n = -1;
+            helper(n)
+        }
+
+        fn wrapper_valid(n: Int) -> Int
+            requires { n < 0 }
+            ensures { result == 2 }
+        {
+            let n = 2;
+            helper(n)
+        }
+        "#,
+    )
+    .expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        // 1. wrapper(n) 局部遮蔽为 n = -1 并传入 helper(n)，违背了 helper 的 requires { x > 0 }！
+        // 绝不能因为顶层形参声明了 n > 0 就误判为 Proved，必须精准产出 CounterExample！
+        let wrapper_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "wrapper")
+            .unwrap();
+        let res_wrapper = axiom_smt::verify_function_in_module(wrapper_fn, &module);
+        assert!(
+            matches!(res_wrapper, SmtResult::CounterExample(_)),
+            "wrapper must produce CounterExample because local let n = -1 violates helper's requires x > 0, got: {:?}",
+            res_wrapper
+        );
+
+        // 2. wrapper_valid(n) 虽然顶层形参声明了 n < 0，但局部绑定了 n = 2 并传入 helper(n)，
+        // 满足了 helper 的 requires x > 0，且 ensures 成立，必须判定为 Proved！
+        let valid_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "wrapper_valid")
+            .unwrap();
+        let res_valid = axiom_smt::verify_function_in_module(valid_fn, &module);
+        assert!(
+            matches!(res_valid, SmtResult::Proved { .. }),
+            "wrapper_valid must be Proved because local let n = 2 satisfies requires and ensures, got: {:?}",
+            res_valid
+        );
+    }
+}
