@@ -727,7 +727,7 @@ fn is_type_compatible(expected: &Type, actual: &Type) -> bool {
         return true;
     }
     match (expected, actual) {
-        (Type::Float, Type::Int) | (Type::Decimal, Type::Int) => true,
+        (Type::Float, Type::Int) => true,
         (Type::Custom(e), Type::Custom(a)) => {
             if e == a {
                 return true;
@@ -814,6 +814,32 @@ mod tests {
             err.message
                 .contains("Decimal (fixed-point) cannot be mixed with Float (IEEE-754)"),
             "unexpected error message: {}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn integer_literal_returned_for_decimal_is_rejected() {
+        let func = FunctionDecl {
+            name: "helper".into(),
+            params: vec![],
+            return_type: Type::Decimal,
+            effects: vec![],
+            requires: vec![],
+            ensures: vec![],
+            body: Expr::Literal(Literal::Int(2)),
+        };
+        let ctx = ModuleContext::default();
+        let res = check_function_types_with_ctx(&func, &ctx);
+        assert!(
+            res.is_err(),
+            "returning integer literal 2 for Decimal return type MUST fail typecheck"
+        );
+        let err = res.unwrap_err();
+        assert!(
+            err.message
+                .contains("declared return type `Decimal`, but body evaluates to `Int`"),
+            "expected return type mismatch error, got: {}",
             err.message
         );
     }

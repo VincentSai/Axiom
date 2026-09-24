@@ -174,3 +174,31 @@ fn invalid_contract(x: Int) -> Int
     );
     assert!(reports[0].diagnosis.contains("must evaluate to Bool"));
 }
+
+#[test]
+fn int_literal_returned_for_decimal_produces_type_error_diagnostic() {
+    let src = r#"
+        fn helper() -> Decimal {
+            2
+        }
+
+        fn wrapper() -> Decimal
+            ensures {
+                result == 4.0d
+            }
+        {
+            helper() * 2.0d
+        }
+    "#;
+    let reports = diagnose_source(src);
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].status, DiagnosticStatus::TypeError);
+    assert_eq!(reports[0].function_name.as_deref(), Some("helper"));
+    assert!(
+        reports[0]
+            .diagnosis
+            .contains("declared return type `Decimal`, but body evaluates to `Int`"),
+        "Expected return type mismatch diagnostic, got: {}",
+        reports[0].diagnosis
+    );
+}

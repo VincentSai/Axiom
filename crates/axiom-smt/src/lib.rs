@@ -177,6 +177,20 @@ pub fn verify_function_in_module(func: &FunctionDecl, module: &Module) -> SmtRes
                     "call argument type mismatch cannot be soundly verified under current theory: {err}"
                 ));
             }
+            if let Err(err) = func.check_return_type_soundness(module) {
+                return SmtResult::Skipped(format!(
+                    "return type mismatch cannot be soundly verified under current theory: {err}"
+                ));
+            }
+            for callee_name in &summary.transitive_callees {
+                if let Some(callee_fn) = module.functions.iter().find(|f| &f.name == callee_name) {
+                    if let Err(err) = callee_fn.check_return_type_soundness(module) {
+                        return SmtResult::Skipped(format!(
+                            "callee `{callee_name}` return type mismatch cannot be soundly verified: {err}"
+                        ));
+                    }
+                }
+            }
         }
     }
 

@@ -223,3 +223,46 @@ fn test_call_argument_type_mismatch_fails_smt_and_transpiler() {
         "Transpiler must reject code with call argument type mismatch!"
     );
 }
+
+#[test]
+fn test_decimal_return_type_int_literal_fail_closed_across_all_layers() {
+    let src = r#"
+        fn helper() -> Decimal {
+            2
+        }
+
+        fn wrapper() -> Decimal
+            ensures {
+                result == 4.0d
+            }
+        {
+            helper() * 2.0d
+        }
+    "#;
+
+    // 1. SMT 门禁：直接 Fail-Closed Skipped，绝不误签发 Proved
+    let module = parse_module(src).unwrap();
+    let proofs = verify_module(&module);
+    let res = &proofs["wrapper"];
+    assert!(
+        !res.is_proved(),
+        "wrapper calling helper with mismatched return type MUST NOT be proved! Got: {:?}",
+        res
+    );
+    match res {
+        axiom_smt::SmtResult::Skipped(reason) => {
+            assert!(
+                reason.contains("return type mismatch"),
+                "Expected return type mismatch in skip reason, got: {reason}"
+            );
+        }
+        other => panic!("Expected SmtResult::Skipped, got: {:?}", other),
+    }
+
+    // 2. 转译器门禁：直接拒绝生成代码
+    let transpile_res = transpile_to_rust(&module);
+    assert!(
+        transpile_res.is_err(),
+        "Transpiler must reject function declaring Decimal return but returning Int literal"
+    );
+}

@@ -241,6 +241,13 @@ fn transpile_function(
         }
     }
 
+    if let Err(err) = function.check_return_type_soundness(module) {
+        return Err(TranspileError::UnsupportedExpression(format!(
+            "Function `{}` violates return type soundness: {err}",
+            function.name
+        )));
+    }
+
     let mut body_code = String::new();
 
     // 1. Generate requires preconditions

@@ -426,4 +426,22 @@ impl FunctionDecl {
         }
         Ok(())
     }
+
+    /// Checks whether the inferred return type of the function body matches its declared return type.
+    pub fn check_return_type_soundness(&self, module: &Module) -> Result<(), String> {
+        let env = TypeEnv::new(module, Some(self));
+        if let Some(inferred_ty) = env.infer_type(&self.body) {
+            let effective_ty = match (&self.return_type, &self.body) {
+                (Type::Decimal, Expr::Literal(Literal::Float(_))) => Type::Decimal,
+                _ => inferred_ty,
+            };
+            if effective_ty != self.return_type {
+                return Err(format!(
+                    "function `{}` declared return type `{:?}`, but body evaluates to `{:?}`",
+                    self.name, self.return_type, effective_ty
+                ));
+            }
+        }
+        Ok(())
+    }
 }
