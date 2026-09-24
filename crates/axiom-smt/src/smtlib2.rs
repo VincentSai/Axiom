@@ -26,6 +26,7 @@ pub struct SmtContext<'a> {
     pub type_env: Option<axiom_ast::TypeEnv<'a>>,
     pub reserved_names: RefCell<HashSet<String>>,
     pub call_id_counter: Cell<usize>,
+    pub call_site_preconditions: RefCell<Vec<Expr>>,
 }
 
 impl<'a> SmtContext<'a> {
@@ -55,6 +56,7 @@ impl<'a> SmtContext<'a> {
             type_env: Some(axiom_ast::TypeEnv::new(module, None)),
             reserved_names: RefCell::new(reserved_names),
             call_id_counter: Cell::new(1),
+            call_site_preconditions: RefCell::new(Vec::new()),
         }
     }
 
@@ -263,6 +265,8 @@ pub fn generate_smtlib2_with_module_and_obligations(
         }
         smt.push('\n');
     }
+    // Clear any preconditions collected during caller's requires inlining
+    ctx.call_site_preconditions.borrow_mut().clear();
 
     // 4. Bind function body to result
     smt.push_str("; Function Body Definition\n");
@@ -277,13 +281,21 @@ pub fn generate_smtlib2_with_module_and_obligations(
 
     // 5. Assert negation of postconditions (Ensures) and 64-bit safety range obligations
     smt.push_str(
-        "; Goal: Find any counterexample violating Ensures clauses or 64-bit range safety\n",
+        "; Goal: Find any counterexample violating Ensures clauses, Call-Site Preconditions, or 64-bit range safety\n",
     );
     let mut obligations = Vec::new();
     for ens in &func.ensures {
         let inlined_ens = inline_calls(ens, &ctx, 0)?;
         let ens_expr = expr_to_smt(&inlined_ens, &var_types, &ctx)?;
         obligations.push(ens_expr);
+    }
+    // 5.1 Call-site precondition obligations: caller must verify that arguments satisfy callee requires (Ticket 42)
+    let call_preconds: Vec<Expr> = ctx.call_site_preconditions.borrow().clone();
+    for req_expr in call_preconds {
+        let req_smt = expr_to_smt(&req_expr, &var_types, &ctx)?;
+        if !obligations.contains(&req_smt) {
+            obligations.push(req_smt);
+        }
     }
     // Safety range obligation: result Ints must not overflow 64-bit signed integer limits
     for (name, smt_ty) in &flat_results {
@@ -836,6 +848,18 @@ fn inline_calls(expr: &Expr, ctx: &SmtContext, depth: usize) -> Result<Expr, Str
                             value: Box::new(arg),
                         });
                         param_subs.insert(param.name.clone(), Expr::Ident(fresh_param));
+                    }
+
+                    if !target_func.requires.is_empty() {
+                        for req in &target_func.requires {
+                            let substituted_req = substitute_expr(req, &param_subs);
+                            let inlined_req = inline_calls(&substituted_req, ctx, depth + 1)?;
+                            let req_with_bindings =
+                                flatten_block(arg_bindings.clone(), Some(Box::new(inlined_req)));
+                            ctx.call_site_preconditions
+                                .borrow_mut()
+                                .push(req_with_bindings);
+                        }
                     }
 
                     let renamed_body = alpha_rename_locals(

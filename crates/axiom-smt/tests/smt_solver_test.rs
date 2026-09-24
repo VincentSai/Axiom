@@ -1185,3 +1185,81 @@ fn test_smt_hygienic_renaming_is_deterministic() {
         "generated SMT-LIB2 queries must be 100% byte-for-byte identical across runs"
     );
 }
+
+#[test]
+fn test_smt_caller_must_satisfy_callee_preconditions() {
+    let module = axiom_parser::parse_module(
+        r#"
+        fn helper(x: Int) -> Int requires { x > 0 } ensures { result == x } {
+            x
+        }
+        fn wrapper() -> Int ensures { result == 0 } {
+            helper(0)
+        }
+        fn safe_caller() -> Int ensures { result == 10 } {
+            helper(10)
+        }
+        fn caller_with_var(n: Int) -> Int ensures { result == n } {
+            helper(n)
+        }
+        fn caller_with_requires(n: Int) -> Int requires { n > 0 } ensures { result == n } {
+            helper(n)
+        }
+        "#,
+    )
+    .expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        // 1. wrapper() 传入 0 违背 helper 的 requires { x > 0 } -> 报 CounterExample
+        let wrapper_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "wrapper")
+            .unwrap();
+        let res_wrapper = axiom_smt::verify_function_in_module(wrapper_fn, &module);
+        assert!(
+            matches!(res_wrapper, SmtResult::CounterExample(_)),
+            "wrapper must produce CounterExample because helper requires x > 0, but was called with 0, got: {:?}",
+            res_wrapper
+        );
+
+        // 2. safe_caller() 传入 10 满足 helper 的 requires { x > 0 } -> 证明为 Proved
+        let safe_caller_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "safe_caller")
+            .unwrap();
+        let res_safe = axiom_smt::verify_function_in_module(safe_caller_fn, &module);
+        assert!(
+            matches!(res_safe, SmtResult::Proved { .. }),
+            "safe_caller passing 10 > 0 must be Proved, got: {:?}",
+            res_safe
+        );
+
+        // 3. caller_with_var(n) 没有 requires { n > 0 }，无法保证 n > 0 -> 报 CounterExample
+        let caller_var_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "caller_with_var")
+            .unwrap();
+        let res_var = axiom_smt::verify_function_in_module(caller_var_fn, &module);
+        assert!(
+            matches!(res_var, SmtResult::CounterExample(_)),
+            "caller_with_var must produce CounterExample because parameter n is not guaranteed to be > 0, got: {:?}",
+            res_var
+        );
+
+        // 4. caller_with_requires(n) 自身声明 requires { n > 0 } 承担契约 -> 证明为 Proved
+        let caller_req_fn = module
+            .functions
+            .iter()
+            .find(|f| f.name == "caller_with_requires")
+            .unwrap();
+        let res_req = axiom_smt::verify_function_in_module(caller_req_fn, &module);
+        assert!(
+            matches!(res_req, SmtResult::Proved { .. }),
+            "caller_with_requires must be Proved, got: {:?}",
+            res_req
+        );
+    }
+}
