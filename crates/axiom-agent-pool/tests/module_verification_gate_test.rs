@@ -72,7 +72,7 @@ fn test_module_with_both_valid_hole_and_unrelated_faulty_function_cannot_publish
 }
 
 #[test]
-fn test_profile_v6_invalidates_v5_and_v4_receipts() {
+fn test_profile_v7_invalidates_v6_and_earlier_receipts() {
     use axiom_db::{compute_hash, NodeHash, VerificationReceipt};
 
     let v4_profile = "axiom-smt-v4-sha256sealed-truncdiv-residualmatch";
@@ -81,19 +81,45 @@ fn test_profile_v6_invalidates_v5_and_v4_receipts() {
     let v5_profile = "axiom-smt-v5-typed-ir-decimal-scale-guard-failclosed-float";
     let v5_hash = compute_hash("vprof", &v5_profile);
 
-    let v6_hash = current_verification_profile_hash();
+    let v6_profile = "axiom-smt-v6-transitive-float-closure-decimal-micros-abi";
+    let v6_hash = compute_hash("vprof", &v6_profile);
+
+    let v7_hash = current_verification_profile_hash();
 
     assert_ne!(
-        v5_hash, v6_hash,
-        "Profile v6 hash must differ from v5 hash!"
+        v6_hash, v7_hash,
+        "Profile v7 hash must differ from v6 hash!"
     );
     assert_ne!(
-        v4_hash, v6_hash,
-        "Profile v6 hash must differ from v4 hash!"
+        v5_hash, v7_hash,
+        "Profile v7 hash must differ from v5 hash!"
+    );
+    assert_ne!(
+        v4_hash, v7_hash,
+        "Profile v7 hash must differ from v4 hash!"
     );
 
     let valid_sha256 =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string();
+
+    let old_v6_receipt = VerificationReceipt {
+        candidate_hash: NodeHash::from_str(
+            "#cand_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        )
+        .unwrap(),
+        proof_level: ProofLevel::Proved,
+        solver: "Microsoft Z3 (SMT-LIB2)".to_string(),
+        solver_version: "4.13.0".to_string(),
+        solver_sha256: Some(valid_sha256.clone()),
+        obligations_checked: 2,
+        proof_obligation_hash: NodeHash::from_str(
+            "#obl_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        )
+        .unwrap(),
+        verification_profile_hash: v6_hash,
+        attested_commit_hash: None,
+        verified_at: 1000,
+    };
 
     let old_v5_receipt = VerificationReceipt {
         candidate_hash: NodeHash::from_str(
@@ -133,13 +159,17 @@ fn test_profile_v6_invalidates_v5_and_v4_receipts() {
         verified_at: 1000,
     };
 
-    // 在升级到 v6 规则后，旧 v5 和旧 v4 回执全部被标记为失效，必须重新验证
+    // 在升级到 v7 规则后，旧 v6、v5、v4 回执全部被标记为失效，必须重新验证
     assert!(
-        !old_v5_receipt.is_currently_valid_proved(&v6_hash),
-        "Old v5 verification receipt must be invalidated under current v6 profile!"
+        !old_v6_receipt.is_currently_valid_proved(&v7_hash),
+        "Old v6 verification receipt must be invalidated under current v7 profile!"
     );
     assert!(
-        !old_v4_receipt.is_currently_valid_proved(&v6_hash),
-        "Old v4 verification receipt must be invalidated under current v6 profile!"
+        !old_v5_receipt.is_currently_valid_proved(&v7_hash),
+        "Old v5 verification receipt must be invalidated under current v7 profile!"
+    );
+    assert!(
+        !old_v4_receipt.is_currently_valid_proved(&v7_hash),
+        "Old v4 verification receipt must be invalidated under current v7 profile!"
     );
 }

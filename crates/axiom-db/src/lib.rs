@@ -219,9 +219,10 @@ impl fmt::Display for ProofLevel {
 
 /// Current verification profile specification identifying SMT encoding rules,
 /// typed IR environment, decimal scale guards, transitive float closures,
+/// ANF inlining safety bindings, hygienic renamer, callee preconditions obligation,
 /// cross-language micros ABI, and solver requirements.
 pub const CURRENT_VERIFICATION_PROFILE: &str =
-    "axiom-smt-v6-transitive-float-closure-decimal-micros-abi";
+    "axiom-smt-v7-anf-hygienic-caller-requires-micros-abi";
 
 /// Current database schema version (Version 5 incorporates typed lexical IR & decimal scale guards).
 pub const CURRENT_SCHEMA_VERSION: u32 = 5;
