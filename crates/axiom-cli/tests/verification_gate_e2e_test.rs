@@ -141,3 +141,33 @@ fn emit_rust_with_proved_contracts_injects_receipt() {
         "expected stdout to contain verification receipt, got: {stdout}"
     );
 }
+
+#[test]
+fn emit_rust_rejects_unsafe_operation_inside_reachable_callee_body() {
+    let temp = TestDirectory::new();
+    let source = temp.write(
+        "unsafe_callee.ax",
+        r#"
+        fn helper(x: Int) -> Int {
+            let unused = 1 / x;
+            0
+        }
+
+        fn wrapper() -> Int ensures { result == 0 } {
+            helper(0)
+        }
+        "#,
+    );
+
+    let output = axiom(&["emit-rust", path_text(&source)]);
+
+    assert!(
+        !output.status.success(),
+        "emit-rust must reject a reachable callee body that divides by zero"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("formal verification gate failed"),
+        "expected release gate failure, got: {stderr}"
+    );
+}

@@ -806,6 +806,17 @@ fn alpha_rename_locals(
     }
 }
 
+fn instantiate_callee_body(
+    target_func: &FunctionDecl,
+    param_subs: &HashMap<String, Expr>,
+    call_id: usize,
+    seq: &mut usize,
+    ctx: &SmtContext,
+) -> Expr {
+    let renamed_body = alpha_rename_locals(&target_func.body, call_id, seq, &HashMap::new(), ctx);
+    substitute_expr(&renamed_body, param_subs)
+}
+
 fn inline_calls(expr: &Expr, ctx: &SmtContext, depth: usize) -> Result<Expr, String> {
     if depth > 16 {
         return Err("recursion limit exceeded while inlining SMT calls".into());
@@ -863,14 +874,8 @@ fn inline_calls(expr: &Expr, ctx: &SmtContext, depth: usize) -> Result<Expr, Str
                         param_subs.insert(param.name.clone(), Expr::Ident(fresh_param));
                     }
 
-                    let renamed_body = alpha_rename_locals(
-                        &target_func.body,
-                        call_id,
-                        &mut seq,
-                        &HashMap::new(),
-                        ctx,
-                    );
-                    let replaced_body = substitute_expr(&renamed_body, &param_subs);
+                    let replaced_body =
+                        instantiate_callee_body(target_func, &param_subs, call_id, &mut seq, ctx);
                     let inlined_body = inline_calls(&replaced_body, ctx, depth + 1)?;
                     return Ok(flatten_block(arg_bindings, Some(Box::new(inlined_body))));
                 }
@@ -2350,6 +2355,7 @@ fn collect_safety_obligations_recursive(
                         let arg_expanded = substitute_expr_with_subs(arg, subs);
                         param_subs.insert(param.name.clone(), arg_expanded);
                     }
+                    let mut callee_path_conditions = path_conditions.to_vec();
                     if !target_func.requires.is_empty() {
                         for req in &target_func.requires {
                             let substituted_req = substitute_expr(req, &param_subs);
@@ -2366,9 +2372,24 @@ fn collect_safety_obligations_recursive(
                             )?;
                             let inlined_req = inline_calls(&fully_expanded_req, ctx, 0)?;
                             let req_smt = expr_to_smt(&inlined_req, var_types, ctx)?;
-                            emit_safety_obligation(req_smt, path_conditions, obligations);
+                            emit_safety_obligation(req_smt.clone(), path_conditions, obligations);
+                            callee_path_conditions.push(req_smt);
                         }
                     }
+
+                    let call_id = ctx.next_call_id();
+                    let mut seq = 0usize;
+                    let instantiated_body =
+                        instantiate_callee_body(target_func, &param_subs, call_id, &mut seq, ctx);
+                    collect_safety_obligations_recursive(
+                        &instantiated_body,
+                        var_types,
+                        &mut HashMap::new(),
+                        &callee_path_conditions,
+                        obligations,
+                        ctx,
+                        depth + 1,
+                    )?;
                 }
             }
         }

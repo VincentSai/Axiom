@@ -1927,17 +1927,17 @@ fn test_v3_database_golden_fixture_migration_to_v4() {
 }
 
 #[test]
-fn test_verification_profile_v8_invalidates_v7_receipts() {
-    let v7_profile_str = "axiom-smt-v7-anf-hygienic-caller-requires-micros-abi";
-    let v7_profile_hash = axiom_db::compute_hash("vprof", &v7_profile_str);
-    let current_v8_profile = axiom_db::current_verification_profile_hash();
+fn test_verification_profile_v9_invalidates_v8_receipts() {
+    let v8_profile_str = "axiom-smt-v8-lexical-scoped-preconditions-wf-contracts";
+    let v8_profile_hash = axiom_db::compute_hash("vprof", &v8_profile_str);
+    let current_v9_profile = axiom_db::current_verification_profile_hash();
 
     assert_ne!(
-        v7_profile_hash, current_v8_profile,
-        "v7 profile hash must not match current v8 profile hash"
+        v8_profile_hash, current_v9_profile,
+        "v8 profile hash must not match current v9 profile hash"
     );
 
-    let rcpt_v7 = axiom_db::VerificationReceipt {
+    let rcpt_v8 = axiom_db::VerificationReceipt {
         candidate_hash: axiom_db::compute_hash("cand", &"test_cand"),
         proof_level: axiom_db::ProofLevel::Proved,
         solver: "Microsoft Z3 (SMT-LIB2)".into(),
@@ -1947,20 +1947,20 @@ fn test_verification_profile_v8_invalidates_v7_receipts() {
         ),
         obligations_checked: 5,
         proof_obligation_hash: axiom_db::compute_hash("obl", &"test_obl"),
-        verification_profile_hash: v7_profile_hash,
+        verification_profile_hash: v8_profile_hash,
         attested_commit_hash: None,
         verified_at: 1000,
     };
 
     assert!(
-        !rcpt_v7.is_currently_valid_proved(&current_v8_profile),
-        "v7 receipt must be rejected by is_currently_valid_proved under current v8 profile"
+        !rcpt_v8.is_currently_valid_proved(&current_v9_profile),
+        "v8 receipt must be rejected by is_currently_valid_proved under current v9 profile"
     );
 
-    let mut rcpt_v8 = rcpt_v7.clone();
-    rcpt_v8.verification_profile_hash = current_v8_profile.clone();
+    let mut rcpt_v9 = rcpt_v8.clone();
+    rcpt_v9.verification_profile_hash = current_v9_profile.clone();
     assert!(
-        rcpt_v8.is_currently_valid_proved(&current_v8_profile),
-        "v8 receipt with valid sha256 and version must be accepted under current v8 profile"
+        rcpt_v9.is_currently_valid_proved(&current_v9_profile),
+        "v9 receipt with valid sha256 and version must be accepted under current v9 profile"
     );
 }

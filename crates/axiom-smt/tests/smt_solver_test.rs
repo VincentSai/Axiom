@@ -1102,6 +1102,60 @@ fn test_smt_inlining_unused_param_preserves_safety_obligations_and_catches_div_z
 }
 
 #[test]
+fn test_smt_rejects_unsafe_operation_inside_reachable_callee_body() {
+    let module = axiom_parser::parse_module(
+        r#"
+        fn helper(x: Int) -> Int {
+            let unused = 1 / x;
+            0
+        }
+
+        fn wrapper() -> Int ensures { result == 0 } {
+            helper(0)
+        }
+
+        fn guarded_helper(x: Int) -> Int requires { x != 0 } {
+            let unused = 1 / x;
+            0
+        }
+
+        fn guarded_wrapper() -> Int ensures { result == 0 } {
+            guarded_helper(1)
+        }
+        "#,
+    )
+    .expect("module should parse");
+
+    if axiom_smt::find_z3_executable().is_some() {
+        let wrapper_fn = module
+            .functions
+            .iter()
+            .find(|function| function.name == "wrapper")
+            .expect("wrapper should exist");
+        let result = axiom_smt::verify_function_in_module(wrapper_fn, &module);
+
+        assert!(
+            matches!(result, SmtResult::CounterExample(_)),
+            "wrapper must be rejected because its reachable helper divides by zero, got: {:?}",
+            result
+        );
+
+        let guarded_wrapper_fn = module
+            .functions
+            .iter()
+            .find(|function| function.name == "guarded_wrapper")
+            .expect("guarded_wrapper should exist");
+        let guarded_result = axiom_smt::verify_function_in_module(guarded_wrapper_fn, &module);
+
+        assert!(
+            matches!(guarded_result, SmtResult::Proved { .. }),
+            "guarded_wrapper must be proved because its call establishes x != 0, got: {:?}",
+            guarded_result
+        );
+    }
+}
+
+#[test]
 fn test_smt_hygienic_renaming_avoids_user_identifiers_collision() {
     let module = axiom_parser::parse_module(
         r#"

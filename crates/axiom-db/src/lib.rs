@@ -223,9 +223,8 @@ impl fmt::Display for ProofLevel {
 /// typed IR environment, decimal scale guards, transitive float closures,
 /// ANF inlining safety bindings, hygienic renamer, callee preconditions obligation,
 /// lexical scoped call-site preconditions, specification well-formedness checks,
-/// cross-language micros ABI, and solver requirements.
-pub const CURRENT_VERIFICATION_PROFILE: &str =
-    "axiom-smt-v8-lexical-scoped-preconditions-wf-contracts";
+/// transitive callee body safety obligations, cross-language micros ABI, and solver requirements.
+pub const CURRENT_VERIFICATION_PROFILE: &str = "axiom-smt-v9-transitive-callee-safety";
 
 /// Current database schema version (Version 5 incorporates typed lexical IR & decimal scale guards).
 pub const CURRENT_SCHEMA_VERSION: u32 = 5;
